@@ -11,7 +11,12 @@ Saved/
 .vs/
 build.log
 
-# Downloaded Fab / Paragon content: large, and always re-downloadable from Fab.
-# Anything derived from it (retargeted meshes, materials) is kept.
+# Downloaded content: large and always re-obtainable, so it is fetched rather
+# than cloned. Anything derived from it -- retargeted meshes, materials, the
+# class-to-character mapping -- is kept, because that is the actual work.
+# Sparrow alone is 3 GB; the whole roster would make a repository nobody could
+# clone. Docs/CharacterPipeline.md says where each piece comes from.
+Content/Paragon*/
+Content/Characters/Mannequins/
 Content/Characters/Paragon/
 !Content/Characters/Paragon/.gitkeep

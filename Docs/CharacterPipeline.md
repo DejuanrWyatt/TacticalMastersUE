@@ -39,9 +39,15 @@ needs its own animations, so exceptions should be rare and deliberate.
         Classes/         the 81 class files (already here)
         CharacterMap/    which class wears which body and which materials
 
-Paragon content stays exactly as downloaded in `Paragon/`. Nothing is edited in
-place, so a hero can be re-downloaded without losing work; everything derived
-lives in `Retargeted/`.
+Paragon content stays exactly where Fab puts it, at `Content/ParagonX/`, and is
+not edited in place — so a hero can be re-downloaded without losing work, and
+everything derived from it lives in `Retargeted/`.
+
+None of the downloaded content is committed. Sparrow alone is 3 GB and the
+whole roster would make a repository nobody could clone, so the repository holds
+the work and the instructions for fetching the rest. The canonical skeleton
+comes from any Unreal 5 template project (`Content/Characters/Mannequins`); it
+is not part of the engine itself.
 
 ## 39 heroes, 87 classes
 
@@ -56,8 +62,12 @@ upgraded later without touching the rules.
 ## Bringing in a Paragon hero
 
 1. In the editor, **Fab** → filter **Price: Free** → search Paragon. Each hero is
-   its own listing. **Add to Project**, choosing this project.
-2. It lands under `Content/ParagonX/`. Move it to `Content/Characters/Paragon/`.
+   its own listing. **Add to Project**, and make sure the project it offers is
+   this one — Fab remembers the last project you used, which is easy to miss.
+2. It lands under `Content/ParagonX/`. **Leave it there.** An Unreal asset refers
+   to the others by path, so moving a hero in Explorer breaks every reference
+   inside it. If you want it somewhere tidier, move it *inside the editor*,
+   which rewrites the references and leaves redirectors behind.
 3. Make an **IK Rig** for the hero's skeleton and one for the canonical skeleton
    if it does not exist yet.
 4. Make an **IK Retargeter** from the hero to the canonical skeleton, and export
