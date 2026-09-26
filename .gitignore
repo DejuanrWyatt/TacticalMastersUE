@@ -10,3 +10,8 @@ Saved/
 *.opendb
 .vs/
 build.log
+
+# Downloaded Fab / Paragon content: large, and always re-downloadable from Fab.
+# Anything derived from it (retargeted meshes, materials) is kept.
+Content/Characters/Paragon/
+!Content/Characters/Paragon/.gitkeep
