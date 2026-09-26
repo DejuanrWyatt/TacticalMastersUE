@@ -1,0 +1,23 @@
+{
+	"FileVersion": 3,
+	"EngineAssociation": "5.8",
+	"Category": "",
+	"Description": "Tactical Masters, ported from the Godot version.",
+	"Modules": [
+		{
+			"Name": "TMSim",
+			"Type": "Runtime",
+			"LoadingPhase": "PreDefault"
+		},
+		{
+			"Name": "TacticalMasters",
+			"Type": "Runtime",
+			"LoadingPhase": "Default",
+			"AdditionalDependencies": [ "Engine" ]
+		}
+	],
+	"Plugins": [
+		{ "Name": "RemoteControl", "Enabled": true },
+		{ "Name": "PythonScriptPlugin", "Enabled": true }
+	]
+}

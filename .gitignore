@@ -1,0 +1,12 @@
+# Unreal build output and caches - none of this belongs in the repository.
+Binaries/
+Build/
+DerivedDataCache/
+Intermediate/
+Saved/
+*.sln
+*.suo
+*.VC.db
+*.opendb
+.vs/
+build.log
