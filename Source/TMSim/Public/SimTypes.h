@@ -1,0 +1,115 @@
+// The vocabulary the battle rules are written in: stats, statuses, and the
+// handful of numbers that set the pace of a fight.
+//
+// Plain C++ on purpose. The rules must run headless so a battle can be replayed
+// and checked against the Godot version tick for tick, and nothing here should
+// need the editor to be open.
+
+#pragma once
+
+#include <cstdint>
+#include <string>
+
+namespace TMSim
+{
+	// ---------------------------------------------------------------- stats
+
+	enum class EStat : uint8_t
+	{
+		Hp, AttDef, MagDef, AEva, MEva, Crit, Speed, Move, Patience, Sight, Count
+	};
+
+	inline constexpr int StatCount = static_cast<int>(EStat::Count);
+
+	/** The name a class file uses for a stat, for reading data and for messages. */
+	const char* StatName(EStat Stat);
+
+	/** EStat::Count if the name belongs to no stat (a class file may carry its own). */
+	EStat StatFromName(const std::string& Name);
+
+	// ------------------------------------------------------------- statuses
+
+	/**
+	 * What a status does. A status is data: it names the flags it needs and the
+	 * rules read them, so adding one is a line in the table rather than a new
+	 * branch in the middle of a fight.
+	 *
+	 * Ported from Jobs.STATUSES in the Godot version, which stays the source of
+	 * truth until the rules live here. Only the parts the clock needs are acted
+	 * on so far -- TgFactor and bNoOrders -- but the whole table is here so the
+	 * two versions can be compared without translating as you read.
+	 */
+	struct FStatusDef
+	{
+		const char* Id = "";
+		const char* Name = "";
+		const char* Tag = "";
+
+		/** Health gained (positive) or lost (negative) each turn, as a share of max HP. */
+		float PerTurn = 0.0f;
+		/** Multiplies how fast the Turn Gauge fills. Slow halves it. */
+		float TgFactor = 1.0f;
+		/** Multiplies how far the unit walks. */
+		float MoveFactor = 1.0f;
+		/** Multiplies AttDef and MagDef. Shred cuts them, Freeze multiplies them. */
+		float DefenseFactor = 1.0f;
+		/** Added to the chance the unit's own attacks are evaded. */
+		int MissPercent = 0;
+
+		bool bHarmful = false;      /** Immunity clears these and turns them away. */
+		bool bNoOrders = false;     /** Takes the unit's turn away entirely. */
+		bool bNoMove = false;
+		bool bNoAbilities = false;
+		bool bInterrupt = false;    /** Takes the turn a unit is caught in. */
+		bool bAbsorbs = false;      /** Soaks damage before HP. */
+		bool bTaunt = false;
+		bool bOneAction = false;    /** May walk or act, not both. */
+		bool bExtraTurn = false;    /** Comes straight back round. */
+		bool bFly = false;
+		bool bImmune = false;
+		bool bInvulnerable = false;
+		bool bCleanse = false;
+		bool bWakesOnDamage = false;
+		bool bDoom = false;         /** Falls when the count runs out. */
+	};
+
+	/** Every status, in the order the Godot table lists them. */
+	const FStatusDef* AllStatuses(int& OutCount);
+
+	/** Null if no status has that id. */
+	const FStatusDef* FindStatus(const std::string& StatusId);
+
+	// ----------------------------------------------------------------- time
+
+	namespace Pace
+	{
+		/** The simulation steps this many times a second. */
+		inline constexpr int TicksPerSecond = 10;
+		/** A full Turn Gauge. Fine-grained so half speed stays whole for any Speed. */
+		inline constexpr int TgMax = 4000;
+		/** Gauge gained per tick per point of Speed. */
+		inline constexpr int TgPerSpeed = 2;
+		/** Head start at the beginning of a battle, per point of Speed. */
+		inline constexpr int StartTgPerSpeed = 320;
+		/** Gauge kept after a turn that only moved or only acted, and neither. */
+		inline constexpr int TgKeepOne = 800;
+		inline constexpr int TgKeepNone = 1600;
+	}
+
+	/**
+	 * The rule numbers a battle is played with. Defaults match GameState.TUNING;
+	 * a battle carries its own copy so a match or a replay can be played with
+	 * the numbers it was recorded under.
+	 */
+	struct FTuning
+	{
+		float SpeedMultiplier = 1.0f;
+		float ClockBase = 8.0f;
+		float PatienceMultiplier = 2.0f;
+		/** Percent faster the gauge fills for a unit that held its ability back. */
+		float HustleBonus = 25.0f;
+	};
+
+	/** Godot's roundi(): halves go away from zero, which is what the rules assume. */
+	int RoundToInt(double Value);
+}

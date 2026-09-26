@@ -1,0 +1,38 @@
+@echo off
+REM Builds and runs the plain-C++ tests for the battle rules. No Unreal, no
+REM editor: the sim is deliberately engine-free so it can be checked in seconds.
+REM
+REM Both tests measure the port against the Godot game rather than against
+REM themselves. The battle is a deterministic simulation -- an online match
+REM steps the same rules on both machines and compares checksums, and a replay
+REM re-runs a recorded fight -- so "close enough" is not a thing it can be.
+setlocal
+call "E:\VS2022\VC\Auxiliary\Build\vcvars64.bat" >nul 2>&1
+REM vcvars leaves a non-zero errorlevel over a harmless vswhere warning, so ask
+REM whether the compiler is actually on the path rather than trusting that.
+where cl >nul 2>&1
+if errorlevel 1 (echo Could not find the MSVC compiler. Is Visual Studio installed? & exit /b 1)
+
+set HERE=%~dp0
+set PUB=%HERE%..\Source\TMSim\Public
+set PRIV=%HERE%..\Source\TMSim\Private
+set OUT=%TEMP%\tmsim_tests
+if not exist "%OUT%" mkdir "%OUT%"
+if not exist "%OUT%\obj" mkdir "%OUT%\obj"
+set FAILED=0
+
+echo === the dice ===
+cl /nologo /EHsc /std:c++17 /W4 /D_CRT_SECURE_NO_WARNINGS /I"%PUB%" "%HERE%SimRandomTest.cpp" /Fo:"%OUT%\obj\\" /Fe:"%OUT%\SimRandomTest.exe" >nul
+if errorlevel 1 (echo BUILD FAILED & exit /b 1)
+"%OUT%\SimRandomTest.exe" || set FAILED=1
+
+echo.
+echo === the clock ===
+cl /nologo /EHsc /std:c++17 /W4 /D_CRT_SECURE_NO_WARNINGS /I"%PUB%" "%HERE%SimTickTest.cpp" "%PRIV%\SimTypes.cpp" "%PRIV%\SimUnit.cpp" "%PRIV%\SimBattle.cpp" /Fo:"%OUT%\obj\\" /Fe:"%OUT%\SimTickTest.exe" >nul
+if errorlevel 1 (echo BUILD FAILED & exit /b 1)
+"%OUT%\SimTickTest.exe" "%HERE%GodotTickTrace.txt" || set FAILED=1
+
+echo.
+if "%FAILED%"=="1" (echo SOME TESTS FAILED & exit /b 1)
+echo ALL TESTS PASSED
+exit /b 0
