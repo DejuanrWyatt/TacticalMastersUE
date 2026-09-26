@@ -28,9 +28,15 @@ if errorlevel 1 (echo BUILD FAILED & exit /b 1)
 
 echo.
 echo === the clock ===
-cl /nologo /EHsc /std:c++17 /W4 /D_CRT_SECURE_NO_WARNINGS /I"%PUB%" "%HERE%SimTickTest.cpp" "%PRIV%\SimTypes.cpp" "%PRIV%\SimUnit.cpp" "%PRIV%\SimBattle.cpp" /Fo:"%OUT%\obj\\" /Fe:"%OUT%\SimTickTest.exe" >nul
+cl /nologo /EHsc /std:c++17 /W4 /D_CRT_SECURE_NO_WARNINGS /I"%PUB%" "%HERE%SimTickTest.cpp" "%PRIV%\SimTypes.cpp" "%PRIV%\SimUnit.cpp" "%PRIV%\SimAbility.cpp" "%PRIV%\SimBattle.cpp" /Fo:"%OUT%\obj\\" /Fe:"%OUT%\SimTickTest.exe" >nul
 if errorlevel 1 (echo BUILD FAILED & exit /b 1)
 "%OUT%\SimTickTest.exe" "%HERE%GodotTickTrace.txt" || set FAILED=1
+
+echo.
+echo === what an ability does ===
+cl /nologo /EHsc /std:c++17 /W4 /D_CRT_SECURE_NO_WARNINGS /I"%PUB%" "%HERE%SimCalcTest.cpp" "%PRIV%\SimTypes.cpp" "%PRIV%\SimUnit.cpp" "%PRIV%\SimAbility.cpp" "%PRIV%\SimBattle.cpp" /Fo:"%OUT%\obj\\" /Fe:"%OUT%\SimCalcTest.exe" >nul
+if errorlevel 1 (echo BUILD FAILED & exit /b 1)
+"%OUT%\SimCalcTest.exe" "%HERE%GodotCalcTable.txt" || set FAILED=1
 
 echo.
 if "%FAILED%"=="1" (echo SOME TESTS FAILED & exit /b 1)

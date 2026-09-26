@@ -50,6 +50,14 @@ namespace TMSim
 		/** The class's own numbers. Shared by every unit of that class. */
 		const FJobStats* Stats = nullptr;
 
+		/** Where it stands, in meters. Always a navigation node centre. */
+		FVec2 Pos;
+		/**
+		 * The way it faces: where it last walked or aimed. Hits from the side or
+		 * from behind land harder, so this is part of the rules, not decoration.
+		 */
+		FVec2 Facing = FVec2(0.0f, 1.0f);
+
 		int Hp = 0;
 		/** Ready to act once this reaches Pace::TgMax. */
 		int Tg = 0;
@@ -90,6 +98,9 @@ namespace TMSim
 
 		/** How fast the gauge fills compared with normal: Slow halves it. */
 		float TgFactor() const;
+
+		/** Added to the chance this unit's own attacks are evaded (Blind). */
+		int MissChance() const;
 
 		/** The status taking this unit's orders away, or "" if it can act. */
 		std::string NoOrdersStatus() const;

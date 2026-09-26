@@ -84,10 +84,10 @@ namespace
 			if (Line.rfind("TRACE", 0) == 0) { Section = ESection::Trace; continue; }
 			if (Line.rfind("TUNING", 0) == 0)
 			{
-				Out.Tuning.ClockBase = static_cast<float>(DoubleOf(Line, "clock_base", 8.0));
-				Out.Tuning.PatienceMultiplier = static_cast<float>(DoubleOf(Line, "patience_multiplier", 2.0));
-				Out.Tuning.SpeedMultiplier = static_cast<float>(DoubleOf(Line, "speed_multiplier", 1.0));
-				Out.Tuning.HustleBonus = static_cast<float>(DoubleOf(Line, "hustle_bonus", 25.0));
+				Out.Tuning.ClockBase = DoubleOf(Line, "clock_base", 8.0);
+				Out.Tuning.PatienceMultiplier = DoubleOf(Line, "patience_multiplier", 2.0);
+				Out.Tuning.SpeedMultiplier = DoubleOf(Line, "speed_multiplier", 1.0);
+				Out.Tuning.HustleBonus = DoubleOf(Line, "hustle_bonus", 25.0);
 				continue;
 			}
 

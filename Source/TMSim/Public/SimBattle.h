@@ -12,6 +12,7 @@
 
 #pragma once
 
+#include "SimAbility.h"
 #include "SimRandom.h"
 #include "SimTypes.h"
 #include "SimUnit.h"
@@ -48,11 +49,31 @@ namespace TMSim
 		/** The same, after Slow and after a held-back turn. */
 		int TgGain(const FUnit& Unit) const;
 		/** Faster until its next turn, for a unit that kept its ability back. */
-		float HustleFactor(const FUnit& Unit) const;
+		double HustleFactor(const FUnit& Unit) const;
 		/** Ticks a READY unit has to act in, from its Patience. */
 		int ClockTicks(const FUnit& Unit) const;
 		/** Ticks until this unit's turn comes (0 if it is ready now). */
 		int TicksToReady(const FUnit& Unit) const;
+
+		// --------------------------------------------------------- what it does
+
+		/**
+		 * What an ability does to one target: damage, healing, or the health a
+		 * revive brings it back with. The ground levels come in rather than being
+		 * looked up, because the map is not ported yet -- and because it keeps
+		 * this answerable without one.
+		 */
+		int CalcAmount(const FUnit& User, const FAbility& Ability, FVec2 From,
+			const FUnit& Target, FVec2 TargetPos, int FromLevel, int TargetLevel) const;
+
+		/** Hits from the side and from behind land harder. */
+		double FlankBonus(const FUnit& Target, FVec2 TargetPos, FVec2 From) const;
+
+		/** Chance in % the target gets out of the way. Friendly abilities never are. */
+		int EvadeChance(const FUnit& Target, const FAbility& Ability, const FUnit* Attacker) const;
+
+		/** Chance in % that this unit's abilities land a critical hit. */
+		int CritChance(const FUnit& User) const;
 
 		// ------------------------------------------------------------ state
 

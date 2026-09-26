@@ -32,9 +32,9 @@ namespace TMSim
 		return std::max(1, RoundToInt(Unit.Stat(EStat::Speed) * Pace::TgPerSpeed * Tuning.SpeedMultiplier));
 	}
 
-	float FBattle::HustleFactor(const FUnit& Unit) const
+	double FBattle::HustleFactor(const FUnit& Unit) const
 	{
-		return Unit.IsHustling() ? 1.0f + Tuning.HustleBonus * 0.01f : 1.0f;
+		return Unit.IsHustling() ? 1.0 + Tuning.HustleBonus * 0.01 : 1.0;
 	}
 
 	int FBattle::TgGain(const FUnit& Unit) const
@@ -144,6 +144,85 @@ namespace TMSim
 		{
 			Tick(Report);
 		}
+	}
+
+	double FBattle::FlankBonus(const FUnit& Target, FVec2 TargetPos, FVec2 From) const
+	{
+		const FVec2 ToAttacker = From - TargetPos;
+		if (ToAttacker.Length() < 0.01f)
+		{
+			return 1.0;
+		}
+		// Which way the target is looking, against where the blow comes from.
+		const float Facing = Target.Facing.Dot(ToAttacker.Normalized());
+		if (Facing < -0.5f)
+		{
+			return Tuning.BackBonus;
+		}
+		if (Facing < 0.5f)
+		{
+			return Tuning.SideBonus;
+		}
+		return 1.0;
+	}
+
+	int FBattle::CalcAmount(const FUnit& User, const FAbility& Ability, FVec2 From,
+		const FUnit& Target, FVec2 TargetPos, int FromLevel, int TargetLevel) const
+	{
+		(void)User;  // nothing of the user's is added: the ability is the whole of it
+
+		// What an ability does is its own power, and nothing else.
+		const double Power = Ability.Power;
+
+		switch (Ability.Effect)
+		{
+		case EEffect::Damage:
+		{
+			const int Defence = Target.Stat(Ability.Scale == EScale::Att ? EStat::AttDef : EStat::MagDef);
+
+			int Levels = FromLevel - TargetLevel;
+			Levels = std::max(-Combat::MaxHeightLevels, std::min(Combat::MaxHeightLevels, Levels));
+			const double Height = 1.0 + Tuning.HeightBonus * Levels;
+			const double Flank = FlankBonus(Target, TargetPos, From);
+
+			const int Raw = RoundToInt(Power * Combat::DamageScale * Height * Flank);
+			return std::max(Combat::MinimumDamage, RoundToInt((Raw - Defence) * Tuning.DamageMultiplier));
+		}
+		case EEffect::Heal:
+		{
+			const int Full = RoundToInt(Power * Combat::HealScale * Tuning.HealMultiplier);
+			// Never more than it is short of: overhealing is not a thing here.
+			const int Missing = Target.MaxHp() - Target.Hp;
+			return std::min(Full, Missing);
+		}
+		case EEffect::Revive:
+			// A revive's power is the share of max HP it comes back with.
+			return std::max(1, RoundToInt(Target.MaxHp() * Power));
+
+		case EEffect::Support:
+		default:
+			return 0;
+		}
+	}
+
+	int FBattle::EvadeChance(const FUnit& Target, const FAbility& Ability, const FUnit* Attacker) const
+	{
+		// Only something harmful can be got out of the way of.
+		if (Ability.Effect != EEffect::Damage)
+		{
+			return 0;
+		}
+		const int Base = Target.Stat(Ability.Scale == EScale::Att ? EStat::AEva : EStat::MEva);
+		// A blinded attacker is that much easier to step around.
+		const int Blind = Attacker ? Attacker->MissChance() : 0;
+		const int Chance = RoundToInt(Base * Tuning.EvadeMultiplier) + Blind;
+		return std::max(0, std::min(95, Chance));
+	}
+
+	int FBattle::CritChance(const FUnit& User) const
+	{
+		const int Chance = RoundToInt(User.Stat(EStat::Crit) * Tuning.CritChanceMultiplier);
+		return std::max(0, std::min(100, Chance));
 	}
 
 	void FBattle::BecomeReady(FUnit& Unit, FTickReport& Report)

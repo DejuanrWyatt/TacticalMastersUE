@@ -5,6 +5,17 @@
 
 namespace TMSim
 {
+	float FVec2::Length() const
+	{
+		return std::sqrt(X * X + Y * Y);
+	}
+
+	FVec2 FVec2::Normalized() const
+	{
+		const float Len = Length();
+		return Len > 0.0f ? FVec2(X / Len, Y / Len) : FVec2();
+	}
+
 	static const char* const GStatNames[StatCount] =
 	{
 		"hp", "attdef", "magdef", "aeva", "meva", "crit", "speed", "move", "patience", "sight"

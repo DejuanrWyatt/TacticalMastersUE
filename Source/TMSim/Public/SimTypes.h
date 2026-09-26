@@ -12,6 +12,28 @@
 
 namespace TMSim
 {
+	// --------------------------------------------------------------- vectors
+
+	/**
+	 * A spot on the ground, in meters. Single precision on purpose: Godot's
+	 * Vector2 is float, and the flank test turns on the sign of a dot product,
+	 * so widening it here could take a different branch from the original.
+	 */
+	struct FVec2
+	{
+		float X = 0.0f;
+		float Y = 0.0f;
+
+		FVec2() = default;
+		FVec2(float InX, float InY) : X(InX), Y(InY) {}
+
+		FVec2 operator-(const FVec2& Other) const { return FVec2(X - Other.X, Y - Other.Y); }
+		float Length() const;
+		FVec2 Normalized() const;
+		float Dot(const FVec2& Other) const { return X * Other.X + Y * Other.Y; }
+		float DistanceTo(const FVec2& Other) const { return (*this - Other).Length(); }
+	};
+
 	// ---------------------------------------------------------------- stats
 
 	enum class EStat : uint8_t
@@ -101,14 +123,37 @@ namespace TMSim
 	 * a battle carries its own copy so a match or a replay can be played with
 	 * the numbers it was recorded under.
 	 */
-	struct FTuning
+	struct FTuning  // doubles: GDScript has no 32-bit float
 	{
-		float SpeedMultiplier = 1.0f;
-		float ClockBase = 8.0f;
-		float PatienceMultiplier = 2.0f;
+		double SpeedMultiplier = 1.0;
+		double ClockBase = 8.0;
+		double PatienceMultiplier = 2.0;
 		/** Percent faster the gauge fills for a unit that held its ability back. */
-		float HustleBonus = 25.0f;
+		double HustleBonus = 25.0;
+
+		/** What every hit is multiplied by once defence has been taken off. */
+		double DamageMultiplier = 0.5;
+		double HealMultiplier = 1.0;
+		/** Damage added per height level above the target, taken off below. */
+		double HeightBonus = 0.1;
+		double SideBonus = 1.1;
+		double BackBonus = 1.25;
+		/** What a critical hit multiplies damage by. */
+		double CritMultiplier = 1.5;
+		double EvadeMultiplier = 1.0;
+		double CritChanceMultiplier = 1.0;
 	};
+
+	namespace Combat
+	{
+		/** An ability's power is the damage; this is the scale it is read at. */
+		inline constexpr double DamageScale = 1.0;
+		inline constexpr double HealScale = 1.5;
+		/** Height counts for at most this many levels either way. */
+		inline constexpr int MaxHeightLevels = 3;
+		/** However good the defence, a hit still lands for this much. */
+		inline constexpr int MinimumDamage = 1;
+	}
 
 	/** Godot's roundi(): halves go away from zero, which is what the rules assume. */
 	int RoundToInt(double Value);

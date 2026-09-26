@@ -47,6 +47,19 @@ namespace TMSim
 		return StatusProduct(&FStatusDef::TgFactor);
 	}
 
+	int FUnit::MissChance() const
+	{
+		int Total = 0;
+		for (const FStatus& Status : Statuses)
+		{
+			if (const FStatusDef* Def = FindStatus(Status.Id))
+			{
+				Total += Def->MissPercent;
+			}
+		}
+		return Total;
+	}
+
 	std::string FUnit::NoOrdersStatus() const
 	{
 		for (const FStatus& Status : Statuses)
