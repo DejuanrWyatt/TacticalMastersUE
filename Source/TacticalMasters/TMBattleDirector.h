@@ -321,11 +321,17 @@ private:
 	};
 	FAim Aim();
 
-	/** The walkable spots, the path, the reach and the forecast, drawn on the board. */
-	void DrawPlayerAids();
+	/** Works out the way to the spot under the pointer, only when that spot changes. */
+	void UpdateHoverPath();
 
-	/** Whose turn it is, what the keys do, and what just happened, on screen. */
-	void DrawPlayerPanel(float DeltaSeconds);
+	/** A click that landed on the HUD rather than the board. */
+	void PressHudButton(const struct FTMHudButton& Button);
+
+	/** Puts the battle HUD up for this machine's player. */
+	void ShowHud();
+
+	/** The HUD reads the selection, the aim and the log straight from here. */
+	friend class ATMBattleHud;
 
 	/** Something the person should read: why an order was refused, mostly. */
 	void Tell(const FString& What);
@@ -403,6 +409,8 @@ private:
 	int32 OrdersGiven = 0;
 	/** Said once, so the result is not logged every frame after it is decided. */
 	bool bSaidWon = false;
+	/** Seconds since the battle was decided, for leaving an unattended run. */
+	float DecidedFor = 0.0f;
 	/** How many rising numbers have been put up, as evidence they are. */
 	int32 NumbersShown = 0;
 

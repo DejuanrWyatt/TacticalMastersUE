@@ -16,7 +16,7 @@
 #include "Misc/CommandLine.h"
 #include "Misc/Parse.h"
 #include "Components/InputComponent.h"
-#include "DrawDebugHelpers.h"
+#include "TMBattleHud.h"
 
 #include "SimAbility.h"
 
@@ -50,7 +50,18 @@ void ATMBattleDirector::BeginPlay()
 	// would sit out every turn and the battle would never be decided -- and a
 	// headless session that cannot end holds the DLL open. -tmwatch asks for the
 	// same with a window, to watch the computer play itself.
-	if (FApp::IsUnattended() || FParse::Param(FCommandLine::Get(), TEXT("tmwatch")))
+	//
+	// -tmplayblue keeps blue for a person even then. Nobody clicks, so blue's
+	// turns run out and red wins, and the run still ends -- which is how pictures
+	// of the player's HUD are taken without anyone at the machine.
+	const bool bKeepBlue = FParse::Param(FCommandLine::Get(), TEXT("tmplayblue"));
+	if (bKeepBlue)
+	{
+		bComputerPlaysTeam0 = false;
+		bComputerPlaysTeam1 = true;
+		SetUpPlayerInput();
+	}
+	else if (FApp::IsUnattended() || FParse::Param(FCommandLine::Get(), TEXT("tmwatch")))
 	{
 		bComputerPlaysTeam0 = true;
 		bComputerPlaysTeam1 = true;
@@ -60,6 +71,8 @@ void ATMBattleDirector::BeginPlay()
 	{
 		SetUpPlayerInput();
 	}
+	// Up even while watching: the turn order and the log are how a battle is read.
+	ShowHud();
 }
 
 void ATMBattleDirector::ClearBattle()
@@ -656,7 +669,9 @@ void ATMBattleDirector::MaybeCapture()
 	// command writes nothing in an unattended off-screen run, and says so nowhere.
 	const FString Where = FPaths::ProjectSavedDir()
 		/ TEXT("Match") / FString::Printf(TEXT("frame_%03d_%.0fs.png"), Captured, Now);
-	FScreenshotRequest::RequestScreenshot(Where, false, false);
+	// With the HUD in the picture: the turn order and the log are half of what a
+	// picture of a battle is for.
+	FScreenshotRequest::RequestScreenshot(Where, true, false);
 	UE_LOG(LogTemp, Log, TEXT("CAPTURE %d at %.1fs -> %s"), Captured, Now, *Where);
 }
 
@@ -990,9 +1005,9 @@ void ATMBattleDirector::Tick(float DeltaSeconds)
 	{
 		MaintainSelection();
 		PickUnderCursor();
-		DrawPlayerAids();
-		DrawPlayerPanel(DeltaSeconds);
+		UpdateHoverPath();
 	}
+	NoticeLeft -= DeltaSeconds;
 
 	// Paused, nothing moves: not the clock and not the computer. Nothing is
 	// submitted for it either -- a pause is time not passing, and time only
@@ -1033,7 +1048,22 @@ void ATMBattleDirector::Tick(float DeltaSeconds)
 				Battle.Winner, Battle.TickCount / float(TMSim::Pace::TicksPerSecond),
 				OrdersGiven, NumbersShown);
 			UE_LOG(LogTemp, Log, TEXT("%s"), *DescribeBattle());
-			if (FApp::IsUnattended())
+			DecidedFor = 0.0f;
+		}
+		if (FApp::IsUnattended())
+		{
+			// A moment on the result before leaving, so a run taking pictures
+			// gets one of the end of the battle -- it used to exit in the very
+			// frame the battle was decided, before anything showed the result.
+			const float Before = DecidedFor;
+			DecidedFor += DeltaSeconds;
+			if (CaptureEverySeconds > 0.0f && Before < 0.5f && DecidedFor >= 0.5f)
+			{
+				const FString Where = FPaths::ProjectSavedDir() / TEXT("Match") / TEXT("frame_end.png");
+				FScreenshotRequest::RequestScreenshot(Where, true, false);
+				UE_LOG(LogTemp, Log, TEXT("CAPTURE end -> %s"), *Where);
+			}
+			if (DecidedFor >= 1.5f)
 			{
 				FPlatformMisc::RequestExit(false);
 			}
@@ -1105,10 +1135,6 @@ namespace
 		}
 		return A->Id < B->Id;
 	}
-
-	const uint64 PanelKey = 0x544D0001;
-	const uint64 NoticeKey = 0x544D0002;
-	const uint64 LogKey = 0x544D0003;
 }
 
 void ATMBattleDirector::SetUpPlayerInput()
@@ -1581,7 +1607,21 @@ ATMBattleDirector::FAim ATMBattleDirector::Aim()
 
 void ATMBattleDirector::OnClick()
 {
-	// battle.gd:765-803, _on_click.
+	// battle.gd:765-803, _on_click. A click on the HUD is the HUD's, not the board's.
+	UWorld* World = GetWorld();
+	APlayerController* Player = World ? World->GetFirstPlayerController() : nullptr;
+	float MouseX = 0.0f;
+	float MouseY = 0.0f;
+	if (Player && Player->GetMousePosition(MouseX, MouseY))
+	{
+		FTMHudButton Button;
+		const ATMBattleHud* Hud = Cast<ATMBattleHud>(Player->GetHUD());
+		if (Hud && Hud->ButtonAt(FVector2D(MouseX, MouseY), Button))
+		{
+			PressHudButton(Button);
+			return;
+		}
+	}
 	PickUnderCursor();
 	if (!bHaveHover)
 	{
@@ -1639,237 +1679,80 @@ FVector ATMBattleDirector::BoardPoint(const TMSim::FVec2& Point, float Lift) con
 	return GetActorTransform().TransformPosition(WorldFromMetres(Point, Level) + FVector(0.0f, 0.0f, Lift));
 }
 
-void ATMBattleDirector::DrawPlayerAids()
+void ATMBattleDirector::UpdateHoverPath()
 {
-	// Drawn with the engine's debug lines: quick, and enough to play with. They
-	// are compiled out of a shipping build, so the proper board markings belong
-	// with the HUD slice (feat-hud-forecast) before anything ships.
-#if ENABLE_DRAW_DEBUG
-	UWorld* World = GetWorld();
+	// The HUD draws the way there; it is worked out here, and only when the spot
+	// under the pointer changes, because it is a search over the whole grid.
 	const TMSim::FUnit* Unit = SelectedUnit();
-	if (!World || !PlayerCanOrder(Unit))
+	if (!PlayerCanOrder(Unit) || AimMode != EAimMode::Move || !bHaveHover)
+	{
+		PathShown.clear();
+		PathNode = TMSim::FNode{ -9999, -9999 };
+		return;
+	}
+	const TMSim::FNode Node = TMSim::FMap::NodeOf(HoverPoint);
+	if (Node == PathNode)
 	{
 		return;
 	}
-	const FVector Flat(1.0f, 0.0f, 0.0f);
-	const FVector Across(0.0f, 1.0f, 0.0f);
-
-	// Whose orders these are.
-	DrawDebugCircle(World, BoardPoint(Unit->Pos, 6.0f), 0.45f * TileSize, 32, FColor(90, 220, 255),
-		false, -1.0f, 0, 3.0f, Flat, Across, false);
-
-	if (AimMode == EAimMode::Move)
+	PathNode = Node;
+	PathShown.clear();
+	const bool bReachable = std::any_of(Reachable.begin(), Reachable.end(),
+		[&Node](const std::pair<TMSim::FNode, double>& Entry) { return Entry.first == Node; });
+	if (bReachable)
 	{
-		// Every spot it can walk to, and the way to the one under the pointer.
-		const FColor Spot = bSprinting ? FColor(255, 170, 60) : FColor(80, 160, 255);
-		for (const std::pair<TMSim::FNode, double>& Entry : Reachable)
-		{
-			DrawDebugPoint(World, BoardPoint(TMSim::FMap::NodePos(Entry.first)), 7.0f, Spot, false, -1.0f, 0);
-		}
-		if (bHaveHover)
-		{
-			const TMSim::FNode Node = TMSim::FMap::NodeOf(HoverPoint);
-			if (Node != PathNode)
-			{
-				PathNode = Node;
-				PathShown.clear();
-				const bool bReachable = std::any_of(Reachable.begin(), Reachable.end(),
-					[&Node](const std::pair<TMSim::FNode, double>& Entry) { return Entry.first == Node; });
-				if (bReachable)
-				{
-					PathShown = Battle.PathTo(*Unit, Node, bSprinting);
-				}
-			}
-			for (size_t i = 1; i < PathShown.size(); ++i)
-			{
-				DrawDebugLine(World, BoardPoint(PathShown[i - 1], 10.0f), BoardPoint(PathShown[i], 10.0f),
-					FColor(255, 230, 90), false, -1.0f, 0, 4.0f);
-			}
-		}
+		PathShown = Battle.PathTo(*Unit, Node, bSprinting);
 	}
-	else if (AimMode == EAimMode::Ability)
-	{
-		const TMSim::FAbility* Ability = TMSim::JobAbility(Unit->Job, AimSlot);
-		if (!Ability)
-		{
-			return;
-		}
-		// How far it reaches, and the ring it cannot be used inside.
-		const FColor Reach(200, 200, 215);
-		if (Ability->MaxRange > 0.0f)
-		{
-			DrawDebugCircle(World, BoardPoint(Unit->Pos, 8.0f), Ability->MaxRange * TileSize, 72, Reach,
-				false, -1.0f, 0, 2.0f, Flat, Across, false);
-		}
-		if (Ability->MinRange > 0.0f)
-		{
-			DrawDebugCircle(World, BoardPoint(Unit->Pos, 8.0f), Ability->MinRange * TileSize, 48, FColor(150, 90, 90),
-				false, -1.0f, 0, 2.0f, Flat, Across, false);
-		}
-
-		const FAim Where = Aim();
-		if (!Where.bHave)
-		{
-			return;
-		}
-		const float Radius = FMath::Max(Ability->Aoe, TMSim::Ground::HitRadius) * TileSize;
-		DrawDebugCircle(World, BoardPoint(Where.Point, 12.0f), Radius, 48,
-			Where.bOk ? FColor(110, 255, 140) : FColor(255, 90, 80), false, -1.0f, 0, 3.0f, Flat, Across, false);
-		if (!Where.bOk)
-		{
-			return;
-		}
-
-		// The forecast: who it would reach and what it would do to each, from the
-		// same Preview the rules resolve with. The miss chance is the rules' too.
-		// It does not say who a cast will have reached by the time it lands.
-		const std::vector<TMSim::FHit> Hits = Battle.Preview(*Unit, AimSlot, Unit->Pos, Where.Point);
-		for (const TMSim::FHit& Hit : Hits)
-		{
-			const TMSim::FUnit* Target = FindIn(Battle, Hit.UnitId);
-			if (!Target)
-			{
-				continue;
-			}
-			FString Text;
-			FColor Tint = FColor::White;
-			switch (Ability->Effect)
-			{
-			case TMSim::EEffect::Damage:
-			{
-				Text = FString::Printf(TEXT("-%d"), Hit.Amount);
-				const int32 Miss = Battle.EvadeChance(*Target, *Ability, Unit);
-				if (Miss > 0)
-				{
-					Text += FString::Printf(TEXT("  %d%% miss"), Miss);
-				}
-				Tint = FColor(255, 120, 95);
-				break;
-			}
-			case TMSim::EEffect::Heal:
-				Text = FString::Printf(TEXT("+%d"), Hit.Amount);
-				Tint = FColor(120, 255, 135);
-				break;
-			case TMSim::EEffect::Revive:
-				Text = FString::Printf(TEXT("up with %d"), Hit.Amount);
-				Tint = FColor(255, 242, 153);
-				break;
-			default:
-				Text = Ability->HasStatus() ? FString(UTF8_TO_TCHAR(Ability->StatusId.c_str())) : FString(TEXT("affected"));
-				Tint = FColor(224, 153, 255);
-				break;
-			}
-			DrawDebugString(World, BoardPoint(Target->Pos, 225.0f), Text, nullptr, Tint, -1.0f, true, 1.3f);
-		}
-	}
-#endif
 }
 
-void ATMBattleDirector::DrawPlayerPanel(float DeltaSeconds)
+void ATMBattleDirector::ShowHud()
 {
-	// A plain text panel until the HUD slice gives this a proper screen. It uses
-	// the engine's on-screen messages, which a shipping build leaves out.
-	if (!GEngine)
+	UWorld* World = GetWorld();
+	if (APlayerController* Player = World ? World->GetFirstPlayerController() : nullptr)
 	{
-		return;
+		// Put up from here rather than by a game mode, so the level needs no
+		// game mode asset made in the editor for it.
+		Player->ClientSetHUD(ATMBattleHud::StaticClass());
 	}
-	const float Tps = static_cast<float>(TMSim::Pace::TicksPerSecond);
-	FString Panel;
+}
 
-	if (Battle.Winner != -1)
+void ATMBattleDirector::PressHudButton(const FTMHudButton& Button)
+{
+	// The HUD's buttons do what their keys do (hud.gd's action bar calls the same
+	// functions the key bindings do).
+	const TMSim::FUnit* Unit = SelectedUnit();
+	switch (Button.Action)
 	{
-		if (Battle.Winner == TMSim::FBattle::Draw)
+	case ETMHudAction::Move:
+		OnKey(EKeys::SpaceBar);
+		break;
+	case ETMHudAction::Sprint:
+		OnKey(EKeys::LeftShift);
+		break;
+	case ETMHudAction::Ability:
+		SelectAbility(Button.Value);
+		break;
+	case ETMHudAction::EndTurn:
+		if (PlayerCanOrder(Unit))
 		{
-			Panel = TEXT("Nobody is left standing.");
+			OrderSelected(TMSim::FOrder::MakeEndTurn(Unit->Id, Unit->Serial));
 		}
-		else
+		break;
+	case ETMHudAction::PickUnit:
+	{
+		// A chip on the turn order: take that unit up if it can be ordered
+		// (battle.gd:902-910, _on_chip_pressed).
+		const TMSim::FUnit* Picked = FindIn(Battle, Button.Value);
+		if (Picked && PlayerCanOrder(Picked) && Picked->Id != SelectedId)
 		{
-			Panel = ComputerPlays(Battle.Winner) ? TEXT("The computer wins.") : TEXT("You win!");
+			SelectUnit(Picked->Id);
 		}
-		Panel += TEXT("\nR: another battle");
+		break;
 	}
-	else if (const TMSim::FUnit* Unit = SelectedUnit())
-	{
-		Panel = FString::Printf(TEXT("%hs %d   hp %d/%d   %.1fs to act%s%s"),
-			Unit->Job.c_str(), Unit->Id, Unit->Hp, Unit->MaxHp(), Unit->Clock / Tps,
-			Unit->bMoved ? TEXT("   walked") : TEXT(""),
-			Unit->bActed ? TEXT("   acted") : TEXT(""));
-		for (int32 Slot = 0; Slot < 4; ++Slot)
-		{
-			const TMSim::FAbility* Ability = TMSim::JobAbility(Unit->Job, Slot);
-			if (!Ability)
-			{
-				continue;
-			}
-			const std::string Blocked = Battle.AbilityBlockedReason(*Unit, Slot);
-			Panel += FString::Printf(TEXT("\n  %d  %hs%s%hs%s"), Slot + 1, Ability->Name.c_str(),
-				Blocked.empty() ? TEXT("") : TEXT("   -- "), Blocked.c_str(),
-				AimMode == EAimMode::Ability && AimSlot == Slot ? TEXT("   <") : TEXT(""));
-		}
-		switch (AimMode)
-		{
-		case EAimMode::Move:
-			Panel += bSprinting
-				? TEXT("\nSprinting: click an orange dot. No ability after.")
-				: TEXT("\nClick a blue dot to walk there.");
-			break;
-		case EAimMode::Ability:
-			Panel += TEXT("\nClick a target. Green ring: it can be used there.");
-			break;
-		default:
-			Panel += Unit->bMoved ? TEXT("\n1-4 to use an ability, or Enter to end the turn.")
-				: TEXT("\nSpace to walk, 1-4 for an ability, Enter to end the turn.");
-			break;
-		}
-		if (bPaused)
-		{
-			Panel += TEXT("\nPAUSED -- P to carry on");
-		}
-	}
-	else
-	{
-		// Nobody of ours is ready: say who is next and when.
-		const TMSim::FUnit* Next = nullptr;
-		int32 Soonest = 0;
-		for (const TMSim::FUnit& Candidate : Battle.Units)
-		{
-			if (!Candidate.IsAlive() || ComputerPlays(Candidate.Team))
-			{
-				continue;
-			}
-			const int32 Ticks = Battle.TicksToReady(Candidate);
-			if (!Next || Ticks < Soonest)
-			{
-				Next = &Candidate;
-				Soonest = Ticks;
-			}
-		}
-		Panel = Next
-			? FString::Printf(TEXT("Waiting: %hs %d is up in %.1fs"), Next->Job.c_str(), Next->Id, Soonest / Tps)
-			: FString(TEXT("Watching."));
-		if (bPaused)
-		{
-			Panel += TEXT("\nPAUSED -- P to carry on");
-		}
-	}
-	Panel += TEXT("\n\nSpace walk   Shift sprint   1-4 ability   Enter end turn   Tab next   Esc cancel   P pause");
-	GEngine->AddOnScreenDebugMessage(PanelKey, 0.0f, FColor(235, 235, 245), Panel, false, FVector2D(1.2f, 1.2f));
-
-	NoticeLeft -= DeltaSeconds;
-	if (NoticeLeft > 0.0f && !Notice.IsEmpty())
-	{
-		GEngine->AddOnScreenDebugMessage(NoticeKey, 0.0f, FColor(255, 215, 90), Notice, false, FVector2D(1.2f, 1.2f));
-	}
-
-	// The last few lines of the fight, so it can be followed without the log file.
-	const int32 Shown = 8;
-	TArray<FString> Recent;
-	for (int32 i = FMath::Max(0, Log.Num() - Shown); i < Log.Num(); ++i)
-	{
-		Recent.Add(Log[i]);
-	}
-	if (Recent.Num() > 0)
-	{
-		GEngine->AddOnScreenDebugMessage(LogKey, 0.0f, FColor(170, 175, 190), FString::Join(Recent, TEXT("\n")));
+	case ETMHudAction::NewBattle:
+		OnKey(EKeys::R);
+		break;
+	default:
+		break;
 	}
 }

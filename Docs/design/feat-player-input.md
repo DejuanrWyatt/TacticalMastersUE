@@ -32,6 +32,5 @@ started a cast) has its turn ended for it. A turn that runs out while the person
 ## Not done yet (named where the gap is)
 - Walk-into-range-then-fire (`_walk_into_range`, :840). Out of range just says so.
 - Fog of war in the view: hidden enemies are still drawn.
-- Board markings use debug drawing and the panel uses on-screen debug messages. Both are absent from a
-  Shipping build. The HUD slice (`feat-hud-forecast`) replaces them.
+- Board markings and the panel are now the HUD (`feat-hud-forecast`), which is in a Shipping build.
 - Camera movement (WASD/QE in Godot) and centring on a unit.
