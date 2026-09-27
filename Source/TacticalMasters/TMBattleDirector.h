@@ -267,6 +267,52 @@ private:
 	/** Takes a picture every so often, when asked to. */
 	void MaybeCapture();
 
+	// ------------------------------------------------------------ match flow
+	//
+	// The title screen, the battle setup and the menu inside a battle, after the
+	// Godot game's main_menu.gd and battle_setup.gd. Like everything else in the
+	// view, none of it is rules state: what it produces is a roster for each side,
+	// who plays each side, and a seed, and those are what BuildBattle starts from.
+
+	enum class EScreen : uint8 { Title, Setup, Battle };
+
+	/** What the next battle will be (game_config.gd: mode, rosters, ai_team, difficulties). */
+	struct FMatchSetup
+	{
+		/** "ai" (a person against the computer), "hotseat" (two people) or "cpu" (watch). */
+		FString Mode = TEXT("ai");
+		/** In "ai", the side the person plays. */
+		int32 PlayerTeam = 0;
+		/** Each side's four classes, by id. */
+		std::string Rosters[2][4] = {
+			{ "knight", "archer", "black_mage", "white_mage" },
+			{ "knight", "archer", "black_mage", "white_mage" } };
+		FString Difficulty[2] = { TEXT("hard"), TEXT("hard") };
+		/** A fresh seed every battle, or the same one every time. */
+		bool bRandomSeed = true;
+		uint64 FixedSeed = 12345;
+	};
+
+	FMatchSetup Setup;
+	/** Whether a person chose the setup. If not, ComputerSkill sets both difficulties, as it always has. */
+	bool bSetupChosen = false;
+	EScreen Screen = EScreen::Battle;
+	/** The menu opened inside a battle. It pauses a local game. */
+	bool bMenuOpen = false;
+	/** The seed the battle on the board was started from, to say and to replay. */
+	uint64 BattleSeed = 12345;
+	/** Seconds into -tmmenushots, or -1 when not taking menu pictures. */
+	float MenuShotsAt = -1.0f;
+
+	/** Starts a battle from Setup and hands the sides to whoever plays them. */
+	void StartMatch(bool bNewSeed);
+	void OpenTitle();
+	void OpenSetup();
+	/** One of the buttons on the title, setup or in-battle menu. */
+	void PressMenuButton(const struct FTMHudButton& Button);
+	/** A tank, two damage dealers and someone to keep them standing (class_list.gd:62-77). */
+	void RandomTeam(int32 Team);
+
 	// ------------------------------------------------------ a person playing
 	//
 	// How a person gives orders, following the Godot game's battle.gd. None of
@@ -398,8 +444,12 @@ private:
 	/** The rules. Plain C++, and deliberately unaware of everything above. */
 	TMSim::FBattle Battle;
 
-	/** Not part of the rules, and holds nothing the rules need. */
-	TMSim::FAIPlayer Computer;
+	/**
+	 * One computer player per side, each with its own generator, so two computers
+	 * at different difficulties can play each other. Not part of the rules, and
+	 * holding nothing the rules need.
+	 */
+	TMSim::FAIPlayer Computers[2];
 
 	/** Seconds still to wait before the computer gives its next order. */
 	float ThinkRemainder = 0.0f;

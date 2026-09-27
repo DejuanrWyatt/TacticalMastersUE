@@ -17,6 +17,8 @@
 #include "Misc/Parse.h"
 #include "Components/InputComponent.h"
 #include "TMBattleHud.h"
+#include "Kismet/KismetSystemLibrary.h"
+#include "Misc/DateTime.h"
 
 #include "SimAbility.h"
 
@@ -66,10 +68,20 @@ void ATMBattleDirector::BeginPlay()
 		bComputerPlaysTeam0 = true;
 		bComputerPlaysTeam1 = true;
 		UE_LOG(LogTemp, Log, TEXT("the computer plays both sides"));
+		// -tmmenushots: pictures of the title and setup screens first, then the
+		// battle as any unattended run plays it.
+		if (FParse::Param(FCommandLine::Get(), TEXT("tmmenushots")))
+		{
+			Screen = EScreen::Title;
+			MenuShotsAt = 0.0f;
+		}
 	}
-	else if (!bComputerPlaysTeam0 || !bComputerPlaysTeam1)
+	else
 	{
+		// Somebody is at this machine: they start at the title screen, with the
+		// board built behind it and the clock stopped until a battle is started.
 		SetUpPlayerInput();
+		Screen = EScreen::Title;
 	}
 	// Up even while watching: the turn order and the log are how a battle is read.
 	ShowHud();
@@ -111,13 +123,14 @@ void ATMBattleDirector::BuildBattle()
 {
 	ClearBattle();
 
-	// Two sides of four, as the Godot game sets up. The classes are the
-	// built-in ones for now; the other 81 arrive with the class importer.
-	const char* Roster[8] =
+	// Two sides of four, as the Godot game sets up, with the classes the setup
+	// screen chose. They are the six built-in ones for now; the other 81 arrive
+	// with the class importer.
+	if (!bSetupChosen)
 	{
-		"knight", "archer", "black_mage", "white_mage",
-		"knight", "archer", "black_mage", "white_mage"
-	};
+		Setup.Difficulty[0] = ComputerSkill;
+		Setup.Difficulty[1] = ComputerSkill;
+	}
 
 	// The map first: units stand on it, and the pathfinder needs it before
 	// anything can be asked about where a unit could walk.
@@ -134,17 +147,18 @@ void ATMBattleDirector::BuildBattle()
 
 	for (int32 Index = 0; Index < 8; ++Index)
 	{
-		const TMSim::FJobDef* Job = TMSim::FindJob(Roster[Index]);
+		const std::string& JobId = Setup.Rosters[Index < 4 ? 0 : 1][Index % 4];
+		const TMSim::FJobDef* Job = TMSim::FindJob(JobId);
 		if (!Job)
 		{
-			UE_LOG(LogTemp, Warning, TEXT("No class registered called %hs"), Roster[Index]);
+			UE_LOG(LogTemp, Warning, TEXT("No class registered called %hs"), JobId.c_str());
 			continue;
 		}
 
 		TMSim::FUnit Unit;
 		Unit.Id = Index;
 		Unit.Team = Index < 4 ? 0 : 1;
-		Unit.Job = Roster[Index];
+		Unit.Job = JobId;
 		Unit.Stats = &Job->Stats;
 
 		const TMSim::FVec2 Spawn = BlueSpawns[Index % 4];
@@ -156,15 +170,21 @@ void ATMBattleDirector::BuildBattle()
 		Battle.Units.push_back(Unit);
 	}
 
-	// The same seed the clock was checked against, so what happens here is what
-	// the Godot game does.
-	Battle.Start(12345);
+	// The seed is part of the battle: the same seed and the same orders give the
+	// same battle. Left alone it is the one the clock was checked against, so a
+	// battle nobody set up is the one the Godot game plays.
+	Battle.Start(BattleSeed);
 
-	// The computer gets its own generator off the same seed, so a battle against
-	// it plays out the same way twice. Its own, and not the battle's, because a
-	// player thinking harder must not change what the dice do.
-	Computer.SetDifficulty(TCHAR_TO_UTF8(*ComputerSkill));
-	Computer.Rng.Seed(12345);
+	// Each computer gets its own generator, so a battle against it plays out the
+	// same way twice -- its own and not the battle's, because a player thinking
+	// harder must not change what the dice do. Godot leaves its computer's
+	// generator unseeded (battle.gd:199), which only matters for easy and medium;
+	// hard never draws from it.
+	for (int32 Team = 0; Team < 2; ++Team)
+	{
+		Computers[Team].SetDifficulty(TCHAR_TO_UTF8(*Setup.Difficulty[Team]));
+		Computers[Team].Rng.Seed(BattleSeed + Team);
+	}
 	ThinkingAbout = -1;
 	ThinkRemainder = 0.0f;
 
@@ -916,8 +936,7 @@ FString ATMBattleDirector::TakeComputerTurn(int32 UnitId)
 		return TEXT("It isn't its turn.");
 	}
 
-	Computer.SetDifficulty(TCHAR_TO_UTF8(*ComputerSkill));
-	const TMSim::FOrder Order = Computer.NextCommand(Battle, *Unit);
+	const TMSim::FOrder Order = Computers[Unit->Team].NextCommand(Battle, *Unit);
 	const FString Refused = Submit(Order);
 	if (!Refused.IsEmpty())
 	{
@@ -1001,19 +1020,59 @@ void ATMBattleDirector::Tick(float DeltaSeconds)
 		return;
 	}
 
+	NoticeLeft -= DeltaSeconds;
+
+	// On the title and setup screens the board stands behind the menu with its
+	// clock stopped; a battle begins only when one is started.
+	if (Screen != EScreen::Battle)
+	{
+		TickRemainder = 0.0f;
+		if (MenuShotsAt >= 0.0f)
+		{
+			// -tmmenushots: a picture of each screen, then on to the battle.
+			const float Before = MenuShotsAt;
+			MenuShotsAt += DeltaSeconds;
+			auto Shoot = [this](const TCHAR* Name)
+			{
+				const FString Where = FPaths::ProjectSavedDir() / TEXT("Match") / Name;
+				FScreenshotRequest::RequestScreenshot(Where, true, false);
+				UE_LOG(LogTemp, Log, TEXT("CAPTURE %s"), *Where);
+			};
+			if (Before < 1.0f && MenuShotsAt >= 1.0f)
+			{
+				Shoot(TEXT("menu_title.png"));
+			}
+			else if (Before < 1.5f && MenuShotsAt >= 1.5f)
+			{
+				Setup.Mode = TEXT("cpu");
+				OpenSetup();
+			}
+			else if (Before < 2.5f && MenuShotsAt >= 2.5f)
+			{
+				Shoot(TEXT("menu_setup.png"));
+			}
+			else if (MenuShotsAt >= 3.0f)
+			{
+				MenuShotsAt = -1.0f;
+				StartMatch(false);
+			}
+		}
+		return;
+	}
+
 	if (bPlayerInput)
 	{
 		MaintainSelection();
 		PickUnderCursor();
 		UpdateHoverPath();
 	}
-	NoticeLeft -= DeltaSeconds;
 
 	// Paused, nothing moves: not the clock and not the computer. Nothing is
 	// submitted for it either -- a pause is time not passing, and time only
 	// passes by an Advance order. Online, both machines would have to agree to
 	// one; there is no online play yet, so this is a local-only key for now.
-	if (bPaused)
+	// The in-battle menu pauses the same way.
+	if (bPaused || bMenuOpen)
 	{
 		TickRemainder = 0.0f;
 		return;
@@ -1084,7 +1143,7 @@ void ATMBattleDirector::Tick(float DeltaSeconds)
 	if (ThinkingAbout != Unit->Id)
 	{
 		ThinkingAbout = Unit->Id;
-		ThinkRemainder = static_cast<float>(Computer.Skill().Think);
+		ThinkRemainder = static_cast<float>(Computers[Unit->Team].Skill().Think);
 	}
 	ThinkRemainder -= DeltaSeconds;
 	if (ThinkRemainder <= 0.0f)
@@ -1095,7 +1154,7 @@ void ATMBattleDirector::Tick(float DeltaSeconds)
 			EndUnitTurn(UnitId);
 		}
 		++OrdersGiven;
-		ThinkRemainder = static_cast<float>(Computer.Skill().Step);
+		ThinkRemainder = static_cast<float>(Computers[Unit->Team].Skill().Step);
 	}
 }
 
@@ -1184,8 +1243,41 @@ void ATMBattleDirector::OnKey(FKey Key)
 	if (Key == EKeys::LeftMouseButton)
 	{
 		OnClick();
+		return;
 	}
-	else if (Key == EKeys::RightMouseButton || Key == EKeys::Escape)
+	// Away from a battle only the mouse and Esc mean anything: Esc steps back
+	// from the setup to the title.
+	if (Screen != EScreen::Battle)
+	{
+		if (Key == EKeys::Escape && Screen == EScreen::Setup)
+		{
+			OpenTitle();
+		}
+		return;
+	}
+	if (Key == EKeys::Escape)
+	{
+		// Esc cancels an aim first; with nothing to cancel it opens the menu
+		// (battle.gd:1039-1051 pauses the game while a menu is open).
+		if (bMenuOpen)
+		{
+			bMenuOpen = false;
+		}
+		else if (AimMode != EAimMode::None)
+		{
+			CancelAim();
+		}
+		else if (Battle.Winner == -1)
+		{
+			bMenuOpen = true;
+		}
+		return;
+	}
+	if (bMenuOpen)
+	{
+		return;
+	}
+	if (Key == EKeys::RightMouseButton)
 	{
 		CancelAim();
 	}
@@ -1253,10 +1345,7 @@ void ATMBattleDirector::OnKey(FKey Key)
 		// Only once a battle is decided, so a stray key cannot throw one away.
 		if (Battle.Winner != -1)
 		{
-			BuildBattle();
-			Log.Reset();
-			OrdersGiven = 0;
-			Tell(TEXT("A new battle."));
+			StartMatch(true);
 		}
 	}
 }
@@ -1265,7 +1354,7 @@ bool ATMBattleDirector::PlayerCanOrder(const TMSim::FUnit* Unit) const
 {
 	// battle.gd:293-295, _commandable.
 	return Unit && Unit->IsAlive() && Unit->bReady && !ComputerPlays(Unit->Team)
-		&& Battle.Winner == -1 && !bPaused;
+		&& Battle.Winner == -1 && !bPaused && !bMenuOpen && Screen == EScreen::Battle;
 }
 
 const TMSim::FUnit* ATMBattleDirector::SelectedUnit() const
@@ -1622,6 +1711,11 @@ void ATMBattleDirector::OnClick()
 			return;
 		}
 	}
+	// Behind a menu, the board takes no clicks.
+	if (Screen != EScreen::Battle || bMenuOpen)
+	{
+		return;
+	}
 	PickUnderCursor();
 	if (!bHaveHover)
 	{
@@ -1751,6 +1845,228 @@ void ATMBattleDirector::PressHudButton(const FTMHudButton& Button)
 	}
 	case ETMHudAction::NewBattle:
 		OnKey(EKeys::R);
+		break;
+	default:
+		PressMenuButton(Button);
+		break;
+	}
+}
+// ================================================================ match flow
+
+void ATMBattleDirector::StartMatch(bool bNewSeed)
+{
+	// Who plays each side (game_config.gd:219-231, ai_teams).
+	if (Setup.Mode == TEXT("hotseat"))
+	{
+		bComputerPlaysTeam0 = false;
+		bComputerPlaysTeam1 = false;
+	}
+	else if (Setup.Mode == TEXT("cpu"))
+	{
+		bComputerPlaysTeam0 = true;
+		bComputerPlaysTeam1 = true;
+	}
+	else
+	{
+		bComputerPlaysTeam0 = Setup.PlayerTeam != 0;
+		bComputerPlaysTeam1 = Setup.PlayerTeam != 1;
+	}
+
+	// The seed is chosen here, by the view, and then handed to the rules like
+	// everything else about the battle: a replay needs only it and the orders.
+	// A fresh one is a small number so it can be read off the screen and typed
+	// back in to play the same battle again.
+	if (!Setup.bRandomSeed)
+	{
+		BattleSeed = Setup.FixedSeed;
+	}
+	else if (bNewSeed)
+	{
+		uint64 Mixed = static_cast<uint64>(FDateTime::UtcNow().GetTicks());
+		Mixed ^= Mixed >> 31;
+		Mixed *= 0x9E3779B97F4A7C15ull;
+		Mixed ^= Mixed >> 29;
+		BattleSeed = 1 + Mixed % 999999;
+	}
+
+	bSetupChosen = true;
+	Screen = EScreen::Battle;
+	bMenuOpen = false;
+	bPaused = false;
+	BuildBattle();
+	Log.Reset();
+	OrdersGiven = 0;
+	DecidedFor = 0.0f;
+
+	auto Who = [this](int32 Team)
+	{
+		return ComputerPlays(Team)
+			? FString::Printf(TEXT("the computer (%s)"), *Setup.Difficulty[Team])
+			: FString(TEXT("a person"));
+	};
+	const FString Opening = FString::Printf(TEXT("Seed %llu. Blue: %s. Red: %s."),
+		BattleSeed, *Who(0), *Who(1));
+	Log.Add(Opening);
+	UE_LOG(LogTemp, Log, TEXT("%s"), *Opening);
+}
+
+void ATMBattleDirector::OpenTitle()
+{
+	Screen = EScreen::Title;
+	bMenuOpen = false;
+	bPaused = false;
+	// A fresh board behind the menu rather than a battle frozen part-way.
+	BuildBattle();
+}
+
+void ATMBattleDirector::OpenSetup()
+{
+	Screen = EScreen::Setup;
+	bMenuOpen = false;
+	bPaused = false;
+	BuildBattle();
+}
+
+void ATMBattleDirector::RandomTeam(int32 Team)
+{
+	// class_list.gd:62-77, sensible_team: a class for each wanted role, preferring
+	// one not already picked so the team is not four of a kind. The dice here are
+	// the menu's own, nothing to do with a battle.
+	static FRandomStream Pick(static_cast<int32>(FDateTime::UtcNow().GetTicks() & 0x7FFFFFFF));
+	const char* Wanted[4] = { "tank", "damage", "damage", "support" };
+	std::vector<std::string> Chosen;
+	for (const char* WantedRole : Wanted)
+	{
+		std::vector<std::string> Fresh;
+		std::vector<std::string> Any;
+		for (const TMSim::FJobDef* Job : TMSim::AllJobs())
+		{
+			if (!TMSim::JobHasRole(Job->Id, WantedRole))
+			{
+				continue;
+			}
+			Any.push_back(Job->Id);
+			if (std::find(Chosen.begin(), Chosen.end(), Job->Id) == Chosen.end())
+			{
+				Fresh.push_back(Job->Id);
+			}
+		}
+		const std::vector<std::string>& From = !Fresh.empty() ? Fresh : Any;
+		if (From.empty())
+		{
+			Chosen.push_back(TMSim::AllJobs().front()->Id);
+			continue;
+		}
+		Chosen.push_back(From[Pick.RandRange(0, static_cast<int32>(From.size()) - 1)]);
+	}
+	for (int32 Slot = 0; Slot < 4; ++Slot)
+	{
+		Setup.Rosters[Team][Slot] = Chosen[Slot];
+	}
+	BuildBattle();
+}
+
+void ATMBattleDirector::PressMenuButton(const FTMHudButton& Button)
+{
+	static const TCHAR* Levels[3] = { TEXT("easy"), TEXT("medium"), TEXT("hard") };
+	switch (Button.Action)
+	{
+	// The title screen (main_menu.gd:67-69): every way to play goes through setup.
+	case ETMHudAction::TitleVsComputer:
+		Setup.Mode = TEXT("ai");
+		OpenSetup();
+		break;
+	case ETMHudAction::TitleTwoPlayers:
+		Setup.Mode = TEXT("hotseat");
+		OpenSetup();
+		break;
+	case ETMHudAction::TitleWatch:
+		Setup.Mode = TEXT("cpu");
+		OpenSetup();
+		break;
+	case ETMHudAction::Quit:
+		UKismetSystemLibrary::QuitGame(this, GetWorld() ? GetWorld()->GetFirstPlayerController() : nullptr,
+			EQuitPreference::Quit, false);
+		break;
+
+	// The setup screen (battle_setup.gd).
+	case ETMHudAction::SetupClass:
+	{
+		// Each click moves a slot on to the next class.
+		const int32 Team = Button.Value / 4;
+		const int32 Slot = Button.Value % 4;
+		const std::vector<const TMSim::FJobDef*>& Jobs = TMSim::AllJobs();
+		size_t Next = 0;
+		for (size_t i = 0; i < Jobs.size(); ++i)
+		{
+			if (Jobs[i]->Id == Setup.Rosters[Team][Slot])
+			{
+				Next = (i + 1) % Jobs.size();
+			}
+		}
+		Setup.Rosters[Team][Slot] = Jobs[Next]->Id;
+		BuildBattle();
+		break;
+	}
+	case ETMHudAction::SetupRandom:
+		RandomTeam(Button.Value);
+		break;
+	case ETMHudAction::SetupDefault:
+	{
+		const char* Default[4] = { "knight", "archer", "black_mage", "white_mage" };
+		for (int32 Slot = 0; Slot < 4; ++Slot)
+		{
+			Setup.Rosters[Button.Value][Slot] = Default[Slot];
+		}
+		BuildBattle();
+		break;
+	}
+	case ETMHudAction::SetupSide:
+		Setup.PlayerTeam = 1 - Setup.PlayerTeam;
+		break;
+	case ETMHudAction::SetupDifficulty:
+	{
+		FString& Current = Setup.Difficulty[Button.Value];
+		int32 At = 2;
+		for (int32 i = 0; i < 3; ++i)
+		{
+			if (Current == Levels[i])
+			{
+				At = i;
+			}
+		}
+		Current = Levels[(At + 1) % 3];
+		break;
+	}
+	case ETMHudAction::SetupSeed:
+		Setup.bRandomSeed = !Setup.bRandomSeed;
+		// Fixing the seed keeps the one just played, so a battle worth seeing again
+		// can be seen again.
+		if (!Setup.bRandomSeed)
+		{
+			Setup.FixedSeed = BattleSeed;
+		}
+		break;
+	case ETMHudAction::SetupStart:
+		StartMatch(true);
+		break;
+	case ETMHudAction::SetupBack:
+		OpenTitle();
+		break;
+
+	// The menu inside a battle, and the end of one.
+	case ETMHudAction::MenuResume:
+		bMenuOpen = false;
+		break;
+	case ETMHudAction::MenuRestart:
+		// The same battle again from the start: same classes, same seed.
+		StartMatch(false);
+		break;
+	case ETMHudAction::MenuSetup:
+		OpenSetup();
+		break;
+	case ETMHudAction::MenuTitle:
+		OpenTitle();
 		break;
 	default:
 		break;

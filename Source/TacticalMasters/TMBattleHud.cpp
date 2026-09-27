@@ -197,6 +197,18 @@ void ATMBattleHud::DrawHUD()
 	}
 	S = Canvas->ClipY / 1080.0f;
 
+	// Away from a battle, the menu is the whole screen, over the board.
+	if (Found->Screen == ATMBattleDirector::EScreen::Title)
+	{
+		DrawTitle(*Found);
+		return;
+	}
+	if (Found->Screen == ATMBattleDirector::EScreen::Setup)
+	{
+		DrawSetup(*Found);
+		return;
+	}
+
 	// Under everything else, since it is drawn onto the board.
 	DrawBoardAids(*Found);
 	DrawTurnOrder(*Found);
@@ -204,6 +216,12 @@ void ATMBattleHud::DrawHUD()
 	DrawUnitCard(*Found);
 	DrawActionBar(*Found);
 	DrawBanners(*Found);
+	if (Found->bMenuOpen)
+	{
+		// Only the menu's buttons answer while it is open.
+		Buttons.Reset();
+		DrawBattleMenu(*Found);
+	}
 }
 
 void ATMBattleHud::DrawBoardAids(ATMBattleDirector& From)
@@ -832,8 +850,9 @@ void ATMBattleHud::DrawBanners(ATMBattleDirector& From)
 			Line = TEXT("Nobody is left standing");
 			Colour = Dim;
 		}
-		else if (!From.bPlayerInput)
+		else if (From.ComputerPlays(0) == From.ComputerPlays(1))
 		{
+			// Two people, or two computers: nobody here is "you".
 			Line = From.Battle.Winner == 0 ? TEXT("Blue wins") : TEXT("Red wins");
 			Colour = TeamColour(From.Battle.Winner);
 		}
@@ -842,9 +861,9 @@ void ATMBattleHud::DrawBanners(ATMBattleDirector& From)
 			Line = From.ComputerPlays(From.Battle.Winner) ? TEXT("The computer wins") : TEXT("You win!");
 			Colour = From.ComputerPlays(From.Battle.Winner) ? Urgent : Gold;
 		}
-		const FString Time = FString::Printf(TEXT("after %.0f seconds"), From.Battle.TickCount / Tps);
+		const FString Time = FString::Printf(TEXT("after %.0f seconds   seed %llu"), From.Battle.TickCount / Tps, From.BattleSeed);
 		const FVector2D Size = TextSize(Line, Big, 1.0f * S);
-		const float PW = FMath::Max(Size.X + 80.0f * S, 420.0f * S);
+		const float PW = FMath::Max(Size.X + 80.0f * S, 560.0f * S);
 		const float PH = 190.0f * S;
 		const float PX = CentreX - PW * 0.5f;
 		const float PY = Canvas->ClipY * 0.32f;
@@ -854,16 +873,231 @@ void ATMBattleHud::DrawBanners(ATMBattleDirector& From)
 		Text(Time, CentreX - TimeSize.X * 0.5f, PY + 72.0f * S, Dim, Font, 0.65f * S);
 		if (From.bPlayerInput)
 		{
-			const float BW = 220.0f * S;
+			// Play again, change the teams, or go back to the title (hud.gd:911).
+			const float BW = 168.0f * S;
 			const float BH = 44.0f * S;
-			const float BX = CentreX - BW * 0.5f;
+			const float Gap = 10.0f * S;
 			const float BY = PY + PH - BH - 20.0f * S;
-			const bool bOver = FBox2D(FVector2D(BX, BY), FVector2D(BX + BW, BY + BH)).IsInside(Mouse);
-			Panel(BX, BY, BW, BH, bOver ? FLinearColor(0.2f, 0.25f, 0.36f, 0.95f) : FLinearColor(0.12f, 0.15f, 0.22f, 0.95f), Gold, 1.5f);
-			const FString Label = TEXT("Another battle  (R)");
-			const FVector2D LabelSize = TextSize(Label, Font, 0.7f * S);
-			Text(Label, CentreX - LabelSize.X * 0.5f, BY + (BH - LabelSize.Y) * 0.5f, TextColour, Font, 0.7f * S);
-			AddButton(BX, BY, BW, BH, ETMHudAction::NewBattle, -1);
+			float BX = CentreX - (3.0f * BW + 2.0f * Gap) * 0.5f;
+			MenuButton(BX, BY, BW, BH, TEXT("Rematch  (R)"), ETMHudAction::NewBattle, -1, true);
+			BX += BW + Gap;
+			MenuButton(BX, BY, BW, BH, TEXT("Change setup"), ETMHudAction::MenuSetup);
+			BX += BW + Gap;
+			MenuButton(BX, BY, BW, BH, TEXT("Main menu"), ETMHudAction::MenuTitle);
 		}
 	}
+}
+
+// ================================================================ menus
+
+FVector2D ATMBattleHud::MousePoint() const
+{
+	float MX = 0.0f;
+	float MY = 0.0f;
+	if (PlayerOwner && PlayerOwner->GetMousePosition(MX, MY))
+	{
+		return FVector2D(MX, MY);
+	}
+	return FVector2D(-1.0f, -1.0f);
+}
+
+void ATMBattleHud::MenuButton(float X, float Y, float W, float H, const FString& Label, ETMHudAction Action, int32 Value,
+	bool bPrimary, const FString& Detail)
+{
+	const bool bOver = FBox2D(FVector2D(X, Y), FVector2D(X + W, Y + H)).IsInside(MousePoint());
+	const FLinearColor Fill = bOver ? FLinearColor(0.2f, 0.25f, 0.36f, 0.96f) : FLinearColor(0.12f, 0.15f, 0.22f, 0.96f);
+	Panel(X, Y, W, H, Fill, bPrimary ? Gold : FLinearColor(0.4f, 0.45f, 0.55f, 0.8f), bPrimary ? 2.0f : 1.0f);
+	UFont* Font = GEngine->GetMediumFont();
+	const float Scale = 0.66f * S;
+	const FVector2D Size = TextSize(Label, Font, Scale);
+	if (Detail.IsEmpty())
+	{
+		Text(Label, X + (W - Size.X) * 0.5f, Y + (H - Size.Y) * 0.5f, bPrimary ? Gold : TextColour, Font, Scale);
+	}
+	else
+	{
+		// A name and, under it, what it is -- as the action bar's buttons are.
+		const FVector2D DetailSize = TextSize(Detail, Font, 0.48f * S);
+		const float Top = Y + (H - Size.Y - DetailSize.Y - 2.0f * S) * 0.5f;
+		Text(Label, X + (W - Size.X) * 0.5f, Top, bPrimary ? Gold : TextColour, Font, Scale);
+		Text(Detail, X + (W - DetailSize.X) * 0.5f, Top + Size.Y + 2.0f * S, Dim, Font, 0.48f * S);
+	}
+	AddButton(X, Y, W, H, Action, Value);
+}
+
+void ATMBattleHud::DrawTitle(ATMBattleDirector& From)
+{
+	// main_menu.gd:38-116. The board stands behind it, dimmed.
+	DrawRect(FLinearColor(0.02f, 0.03f, 0.06f, 0.55f), 0.0f, 0.0f, Canvas->ClipX, Canvas->ClipY);
+	UFont* Font = GEngine->GetMediumFont();
+	UFont* Big = GEngine->GetLargeFont();
+	const float CentreX = Canvas->ClipX * 0.5f;
+	float Y = Canvas->ClipY * 0.2f;
+
+	const FString Title = TEXT("TACTICAL MASTERS");
+	const FVector2D TitleSize = TextSize(Title, Big, 1.6f * S);
+	Text(Title, CentreX - TitleSize.X * 0.5f, Y, Gold, Big, 1.6f * S);
+	Y += TitleSize.Y + 6.0f * S;
+	const FString Subtitle = TEXT("Real-time tactics on a 3D battlefield");
+	const FVector2D SubSize = TextSize(Subtitle, Font, 0.75f * S);
+	Text(Subtitle, CentreX - SubSize.X * 0.5f, Y, Dim, Font, 0.75f * S);
+	Y += SubSize.Y + 40.0f * S;
+
+	const float W = 400.0f * S;
+	const float H = 56.0f * S;
+	const float Gap = 12.0f * S;
+	const float X = CentreX - W * 0.5f;
+	MenuButton(X, Y, W, H, TEXT("Play vs Computer"), ETMHudAction::TitleVsComputer, -1, true);
+	Y += H + Gap;
+	MenuButton(X, Y, W, H, TEXT("Two Players (Same Device)"), ETMHudAction::TitleTwoPlayers);
+	Y += H + Gap;
+	MenuButton(X, Y, W, H, TEXT("Computer vs Computer"), ETMHudAction::TitleWatch);
+	Y += H + Gap * 3.0f;
+	MenuButton(X, Y, W, 44.0f * S, TEXT("Quit"), ETMHudAction::Quit);
+	Y += 44.0f * S + 30.0f * S;
+
+	// Said rather than left out quietly: what the Godot title has that this one does not yet.
+	const FString Missing = TEXT("Online play, How to Play, the Unit Guide and Options are not ported yet.");
+	const FVector2D MissingSize = TextSize(Missing, Font, 0.5f * S);
+	Text(Missing, CentreX - MissingSize.X * 0.5f, Y, Dim, Font, 0.5f * S);
+}
+
+void ATMBattleHud::DrawSetup(ATMBattleDirector& From)
+{
+	// battle_setup.gd: both teams, who plays them, and how the battle is seeded.
+	// The board behind shows the teams as they are chosen.
+	DrawRect(FLinearColor(0.02f, 0.03f, 0.06f, 0.35f), 0.0f, 0.0f, Canvas->ClipX, Canvas->ClipY);
+	UFont* Font = GEngine->GetMediumFont();
+	UFont* Big = GEngine->GetLargeFont();
+	const ATMBattleDirector::FMatchSetup& Setup = From.Setup;
+	const bool bVsComputer = Setup.Mode == TEXT("ai");
+	const bool bWatch = Setup.Mode == TEXT("cpu");
+
+	const float PW = 1180.0f * S;
+	const float PH = 720.0f * S;
+	const float PX = (Canvas->ClipX - PW) * 0.5f;
+	const float PY = (Canvas->ClipY - PH) * 0.5f;
+	Panel(PX, PY, PW, PH, FLinearColor(0.05f, 0.06f, 0.1f, 0.94f), FLinearColor(0.4f, 0.45f, 0.55f, 0.8f), 1.5f);
+
+	const FString Heading = bVsComputer ? TEXT("Battle Setup: Play vs Computer")
+		: bWatch ? TEXT("Battle Setup: Computer vs Computer") : TEXT("Battle Setup: Two Players");
+	Text(Heading, PX + 30.0f * S, PY + 20.0f * S, TextColour, Big, 0.9f * S);
+
+	// The two teams, side by side.
+	const float ColumnW = 520.0f * S;
+	const float ColumnTop = PY + 80.0f * S;
+	for (int32 Team = 0; Team < 2; ++Team)
+	{
+		const float CX = PX + 30.0f * S + Team * (ColumnW + 80.0f * S);
+		const bool bComputer = bWatch || (bVsComputer && Setup.PlayerTeam != Team);
+		const FString Who = bComputer
+			? FString::Printf(TEXT("Computer (%s)"), *Setup.Difficulty[Team])
+			: bVsComputer ? FString(TEXT("You")) : FString::Printf(TEXT("Player %d"), Team + 1);
+		Text(FString::Printf(TEXT("%s   %s"), Team == 0 ? TEXT("Blue") : TEXT("Red"), *Who),
+			CX, ColumnTop, TeamColour(Team), Font, 0.8f * S);
+
+		float Y = ColumnTop + 36.0f * S;
+		for (int32 Slot = 0; Slot < 4; ++Slot)
+		{
+			const TMSim::FJobDef* Job = TMSim::FindJob(Setup.Rosters[Team][Slot]);
+			FString Name = Job ? FString(UTF8_TO_TCHAR(Job->Name.c_str())) : FString(UTF8_TO_TCHAR(Setup.Rosters[Team][Slot].c_str()));
+			FString Roles;
+			if (Job)
+			{
+				for (const std::string& JobRole : Job->Roles)
+				{
+					Roles += (Roles.IsEmpty() ? TEXT("") : TEXT(", ")) + FString(UTF8_TO_TCHAR(JobRole.c_str()));
+				}
+			}
+			MenuButton(CX, Y, ColumnW, 56.0f * S, Name, ETMHudAction::SetupClass, Team * 4 + Slot, false,
+				Roles.IsEmpty() ? FString(TEXT("click to change")) : Roles + TEXT("   (click to change)"));
+			Y += 64.0f * S;
+		}
+		const float Half = (ColumnW - 10.0f * S) * 0.5f;
+		MenuButton(CX, Y, Half, 40.0f * S, TEXT("Random team"), ETMHudAction::SetupRandom, Team);
+		MenuButton(CX + Half + 10.0f * S, Y, Half, 40.0f * S, TEXT("Default"), ETMHudAction::SetupDefault, Team);
+	}
+
+	// Who plays, how hard, and the seed.
+	float Y = ColumnTop + 36.0f * S + 4.0f * 64.0f * S + 60.0f * S;
+	const float RowX = PX + 30.0f * S;
+	const float LabelW = 230.0f * S;
+	const float ValueW = 300.0f * S;
+	auto Row = [&](const FString& Label, const FString& Value, ETMHudAction Action, int32 ActionValue)
+	{
+		Text(Label, RowX, Y + 8.0f * S, Dim, Font, 0.62f * S);
+		MenuButton(RowX + LabelW, Y, ValueW, 38.0f * S, Value, Action, ActionValue);
+		Y += 46.0f * S;
+	};
+	if (bVsComputer)
+	{
+		Row(TEXT("You play"), Setup.PlayerTeam == 0 ? TEXT("Blue (click to switch)") : TEXT("Red (click to switch)"),
+			ETMHudAction::SetupSide, -1);
+	}
+	for (int32 Team = 0; Team < 2; ++Team)
+	{
+		if (bWatch || (bVsComputer && Setup.PlayerTeam != Team))
+		{
+			Row(FString::Printf(TEXT("%s computer"), Team == 0 ? TEXT("Blue") : TEXT("Red")),
+				Setup.Difficulty[Team], ETMHudAction::SetupDifficulty, Team);
+		}
+	}
+	Row(TEXT("Seed"), Setup.bRandomSeed ? FString(TEXT("New each battle"))
+		: FString::Printf(TEXT("Fixed: %llu"), Setup.FixedSeed), ETMHudAction::SetupSeed, -1);
+	Text(TEXT("Map"), RowX, Y + 2.0f * S, Dim, Font, 0.62f * S);
+	Text(TEXT("Highlands"), RowX + LabelW, Y + 2.0f * S, TextColour, Font, 0.62f * S);
+
+	// What the Godot setup offers that is not here yet, said where it would be.
+	const float NoteX = PX + PW * 0.5f + 40.0f * S;
+	float NoteY = ColumnTop + 36.0f * S + 4.0f * 64.0f * S + 64.0f * S;
+	const TCHAR* Notes[] =
+	{
+		TEXT("Not ported yet:"),
+		TEXT("  other maps, and saved teams"),
+		TEXT("  hold-the-middle, time limits, planning time"),
+		TEXT("  the other 81 classes (they wait on the importer)"),
+		TEXT("Easy and medium think more simply than hard, but"),
+		TEXT("  do not yet make Godot's random mistakes."),
+	};
+	for (const TCHAR* Note : Notes)
+	{
+		Text(Note, NoteX, NoteY, Dim, Font, 0.5f * S);
+		NoteY += 20.0f * S;
+	}
+
+	// Back, and start.
+	const float BW = 220.0f * S;
+	const float BH = 52.0f * S;
+	const float BY = PY + PH - BH - 24.0f * S;
+	MenuButton(PX + 30.0f * S, BY, 160.0f * S, BH, TEXT("Back  (Esc)"), ETMHudAction::SetupBack);
+	MenuButton(PX + PW - BW - 30.0f * S, BY, BW, BH, TEXT("Start Battle"), ETMHudAction::SetupStart, -1, true);
+}
+
+void ATMBattleHud::DrawBattleMenu(ATMBattleDirector& From)
+{
+	// The in-game menu (hud.gd:996-1026), which pauses a local game while open.
+	DrawRect(FLinearColor(0.02f, 0.03f, 0.06f, 0.45f), 0.0f, 0.0f, Canvas->ClipX, Canvas->ClipY);
+	UFont* Big = GEngine->GetLargeFont();
+	const float W = 380.0f * S;
+	const float H = 52.0f * S;
+	const float Gap = 10.0f * S;
+	const float PW = W + 60.0f * S;
+	const float PH = 4.0f * (H + Gap) + 100.0f * S;
+	const float PX = (Canvas->ClipX - PW) * 0.5f;
+	const float PY = (Canvas->ClipY - PH) * 0.5f;
+	Panel(PX, PY, PW, PH, FLinearColor(0.05f, 0.06f, 0.1f, 0.95f), Gold, 1.5f);
+	const FString Title = TEXT("Paused");
+	const FVector2D Size = TextSize(Title, Big, 0.9f * S);
+	Text(Title, PX + (PW - Size.X) * 0.5f, PY + 18.0f * S, Gold, Big, 0.9f * S);
+
+	float Y = PY + 80.0f * S;
+	const float X = PX + 30.0f * S;
+	MenuButton(X, Y, W, H, TEXT("Resume  (Esc)"), ETMHudAction::MenuResume, -1, true);
+	Y += H + Gap;
+	MenuButton(X, Y, W, H, TEXT("Restart battle"), ETMHudAction::MenuRestart, -1, false,
+		FString::Printf(TEXT("same teams, same seed (%llu)"), From.BattleSeed));
+	Y += H + Gap;
+	MenuButton(X, Y, W, H, TEXT("Change setup"), ETMHudAction::MenuSetup);
+	Y += H + Gap;
+	MenuButton(X, Y, W, H, TEXT("Main menu"), ETMHudAction::MenuTitle);
 }

@@ -46,7 +46,7 @@ Not yet broken down; run `/plan-milestone` to split it into slices.
 |----|------|-----------|-------|--------|
 | feat-player-input | In Play, the human picks a ready unit's move and ability with the mouse; every choice goes through `Submit()` with the unit's real `Serial` | – | unreal-engineer | Built, untested by hand. See `Docs/design/feat-player-input.md`. Tests, build, wiring and battle tests pass |
 | feat-hud-forecast | A HUD: turn gauges and whose turn it is, ability slots with cooldowns, and a forecast from `Preview` before committing | feat-player-input | unreal-engineer | Built; seen in screenshots except aiming. See `Docs/design/feat-hud-forecast.md` |
-| feat-match-flow | Start a match, see who won, play again | feat-player-input | unreal-engineer | Todo |
+| feat-match-flow | Start a match, see who won, play again | feat-player-input | unreal-engineer | Built: title, setup, in-battle menu, rematch. See `Docs/design/feat-match-flow.md` |
 
 ## Milestone 3: The whole roster
 | id | goal | depends on | owner | status |

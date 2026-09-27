@@ -36,6 +36,28 @@ enum class ETMHudAction : uint8
 	EndTurn,
 	PickUnit,
 	NewBattle,
+
+	// The title screen.
+	TitleVsComputer,
+	TitleTwoPlayers,
+	TitleWatch,
+	Quit,
+
+	// The setup screen. SetupClass's value is team * 4 + slot; the others' is the team.
+	SetupClass,
+	SetupRandom,
+	SetupDefault,
+	SetupSide,
+	SetupDifficulty,
+	SetupSeed,
+	SetupStart,
+	SetupBack,
+
+	// The menu inside a battle, and the end of one.
+	MenuResume,
+	MenuRestart,
+	MenuSetup,
+	MenuTitle,
 };
 
 struct FTMHudButton
@@ -67,6 +89,15 @@ private:
 	void DrawUnitCard(ATMBattleDirector& Director);
 	void DrawActionBar(ATMBattleDirector& Director);
 	void DrawBanners(ATMBattleDirector& Director);
+	void DrawTitle(ATMBattleDirector& Director);
+	void DrawSetup(ATMBattleDirector& Director);
+	void DrawBattleMenu(ATMBattleDirector& Director);
+
+	/** A button on a menu: a label, an optional second line, and a highlight under the pointer. */
+	void MenuButton(float X, float Y, float W, float H, const FString& Label, ETMHudAction Action, int32 Value = -1,
+		bool bPrimary = false, const FString& Detail = FString());
+	/** Where the pointer is, or off the screen. */
+	FVector2D MousePoint() const;
 
 	// Drawing helpers, in pixels already scaled.
 	void Panel(float X, float Y, float W, float H, const FLinearColor& Fill, const FLinearColor& Edge = FLinearColor::Transparent, float Thickness = 1.0f);
