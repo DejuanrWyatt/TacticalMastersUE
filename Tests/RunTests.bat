@@ -51,6 +51,12 @@ if errorlevel 1 (echo BUILD FAILED & exit /b 1)
 "%OUT%\SimAITest.exe" "%HERE%GodotAITable.txt" || set FAILED=1
 
 echo.
+echo === a battle played and replayed ===
+cl /nologo /EHsc /std:c++17 /W4 /D_CRT_SECURE_NO_WARNINGS /I"%PUB%" "%HERE%SimPlayTest.cpp" "%PRIV%\SimTypes.cpp" "%PRIV%\SimUnit.cpp" "%PRIV%\SimAbility.cpp" "%PRIV%\SimMap.cpp" "%PRIV%\SimMovement.cpp" "%PRIV%\SimWorld.cpp" "%PRIV%\SimAI.cpp" "%PRIV%\SimBattle.cpp" /Fo:"%OUT%\obj\\" /Fe:"%OUT%\SimPlayTest.exe" >nul
+if errorlevel 1 (echo BUILD FAILED & exit /b 1)
+"%OUT%\SimPlayTest.exe" || set FAILED=1
+
+echo.
 if "%FAILED%"=="1" (echo SOME TESTS FAILED & exit /b 1)
 echo ALL TESTS PASSED
 exit /b 0

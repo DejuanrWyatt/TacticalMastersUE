@@ -112,7 +112,7 @@ void ATMBattleDirector::BuildBattle()
 	for (size_t i = 0; i < Battle.Units.size(); ++i)
 	{
 		const FName Name = *FString::Printf(TEXT("Unit_%d"), Battle.Units[i].Id);
-		USkeletalMeshComponent* Visual = NewObject<USkeletalMeshComponent>(this, Name);
+		USkeletalMeshComponent* Visual = NewObject<USkeletalMeshComponent>(this, Name, RF_Transient);
 		Visual->SetupAttachment(RootComponent);
 		Visual->RegisterComponent();
 		if (Mesh)
@@ -126,7 +126,7 @@ void ATMBattleDirector::BuildBattle()
 		// Whose turn it is is said with light at their feet rather than by
 		// lifting them off the ground, which only ever looked like a bug.
 		UPointLightComponent* Light = NewObject<UPointLightComponent>(
-			this, *FString::Printf(TEXT("Ready_%d"), Battle.Units[i].Id));
+			this, *FString::Printf(TEXT("Ready_%d"), Battle.Units[i].Id), RF_Transient);
 		Light->SetupAttachment(RootComponent);
 		Light->RegisterComponent();
 		Light->SetLightColor(ReadyColour);
@@ -184,11 +184,22 @@ void ATMBattleDirector::BuildBoard()
 			}
 
 			UStaticMeshComponent* Tile = NewObject<UStaticMeshComponent>(
-				this, *FString::Printf(TEXT("Tile_%d_%d"), X, Y));
+				this, *FString::Printf(TEXT("Tile_%d_%d"), X, Y),
+				RF_Transient);
+			// Movable, and set before attaching. A static component refuses to
+			// attach to a movable parent outright -- it does not warn and carry
+			// on, it aborts the attach -- so a static tile built here ends up
+			// unparented, and the board comes apart when the director moves.
+			//
+			// Transient too, along with the units and their lights. All of it is
+			// built from the simulation whenever a battle starts, so saving it
+			// into the level only leaves a stale copy to be loaded and thrown
+			// away next time -- which is exactly what the flood of attach
+			// warnings on load turned out to be.
+			Tile->SetMobility(EComponentMobility::Movable);
 			Tile->SetupAttachment(RootComponent);
 			Tile->RegisterComponent();
 			Tile->SetStaticMesh(Mesh);
-			Tile->SetMobility(EComponentMobility::Static);
 
 			// A column from the ground up to this tile's height, so there is no
 			// daylight under the edge of a raised one.
@@ -259,8 +270,9 @@ FString ATMBattleDirector::DescribeBattle() const
 	FString Text = FString::Printf(TEXT("tick %d\n"), Battle.TickCount);
 	for (const TMSim::FUnit& Unit : Battle.Units)
 	{
-		Text += FString::Printf(TEXT("  %d %-11hs team %d  tg %4d/%d%s%s\n"),
-			Unit.Id, Unit.Job.c_str(), Unit.Team, Unit.Tg, TMSim::Pace::TgMax,
+		Text += FString::Printf(TEXT("  %d %-11hs team %d  at %6.2f,%6.2f  hp %3d  tg %4d/%d%s%s\n"),
+			Unit.Id, Unit.Job.c_str(), Unit.Team, Unit.Pos.X, Unit.Pos.Y, Unit.Hp,
+			Unit.Tg, TMSim::Pace::TgMax,
 			Unit.bReady ? TEXT("  READY") : TEXT(""),
 			Unit.bReady ? *FString::Printf(TEXT(" clock %d"), Unit.Clock) : TEXT(""));
 	}

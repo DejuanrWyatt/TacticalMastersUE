@@ -164,6 +164,21 @@ namespace TMSim
 
 		TMSIM_API FUnit* FindUnit(int Id);
 
+		/**
+		 * A number standing for everything about this battle that the rules
+		 * decide. Two machines stepping the same orders from the same seed must
+		 * agree on it after every step; the moment they do not, the match has
+		 * come apart and carrying on would only make it worse.
+		 *
+		 * Deliberately not the same number the Godot game produces. Godot's is
+		 * the hash of a printed string, so matching it would tie this to how
+		 * Godot chooses to format a vector and to order a dictionary -- a very
+		 * long way from anything about the rules. What has to agree here is two
+		 * copies of this build, and Godot remains the reference for the rules
+		 * themselves, which is what the other tests measure.
+		 */
+		TMSIM_API uint64_t Checksum() const;
+
 	private:
 		/** Its turn has come: the gauge is full and the countdown starts. */
 		void BecomeReady(FUnit& Unit, FTickReport& Report);

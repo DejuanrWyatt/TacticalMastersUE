@@ -7,6 +7,7 @@
 #include "SimBattle.h"
 
 #include <cmath>
+#include <cstring>
 #include <limits>
 
 namespace TMSim
@@ -162,6 +163,74 @@ namespace TMSim
 			}
 		}
 		return Best;
+	}
+
+	uint64_t FBattle::Checksum() const
+	{
+		// FNV-1a, written out rather than pulled in, because the exact arithmetic
+		// is part of what the two machines are agreeing on.
+		uint64_t Hash = 14695981039346656037ull;
+		auto Mix = [&Hash](uint64_t Value)
+		{
+			for (int Byte = 0; Byte < 8; ++Byte)
+			{
+				Hash ^= (Value >> (Byte * 8)) & 0xff;
+				Hash *= 1099511628211ull;
+			}
+		};
+		// A position is hashed by its bits, not rounded first: two machines that
+		// disagree in the last bit of a coordinate have already gone wrong, and
+		// the point of this is to say so at once rather than in ten seconds.
+		auto MixFloat = [&Mix](float Value)
+		{
+			uint32_t Bits = 0;
+			std::memcpy(&Bits, &Value, sizeof(Bits));
+			Mix(Bits);
+		};
+
+		Mix(static_cast<uint64_t>(TickCount));
+		Mix(static_cast<uint64_t>(Winner + 1));
+		Mix(static_cast<uint64_t>(PlanningTicks));
+
+		for (const FUnit& Unit : Units)
+		{
+			Mix(static_cast<uint64_t>(Unit.Id));
+			MixFloat(Unit.Pos.X);
+			MixFloat(Unit.Pos.Y);
+			MixFloat(Unit.Facing.X);
+			MixFloat(Unit.Facing.Y);
+			Mix(static_cast<uint64_t>(Unit.Hp));
+			Mix(static_cast<uint64_t>(Unit.Tg));
+			Mix(static_cast<uint64_t>(Unit.Serial));
+			Mix(static_cast<uint64_t>(Unit.Ult));
+			// What it did with the turn, which decides when its next one comes.
+			Mix(static_cast<uint64_t>(Unit.bReady ? 1 : 0));
+			Mix(static_cast<uint64_t>(Unit.bMoved ? 2 : 0));
+			Mix(static_cast<uint64_t>(Unit.bActed ? 4 : 0));
+			Mix(static_cast<uint64_t>(Unit.Clock));
+
+			for (const FStatus& Status : Unit.Statuses)
+			{
+				for (const char Letter : Status.Id)
+				{
+					Mix(static_cast<uint64_t>(static_cast<unsigned char>(Letter)));
+				}
+				Mix(static_cast<uint64_t>(Status.Turns));
+				Mix(static_cast<uint64_t>(Status.Amount));
+				Mix(static_cast<uint64_t>(Status.By + 1));
+			}
+			for (const FBuff& Buff : Unit.Buffs)
+			{
+				Mix(static_cast<uint64_t>(Buff.Stat));
+				Mix(static_cast<uint64_t>(Buff.Amount));
+				Mix(static_cast<uint64_t>(Buff.Turns));
+			}
+			for (int Slot = 0; Slot < 4; ++Slot)
+			{
+				Mix(static_cast<uint64_t>(Unit.Cooldowns[Slot]));
+			}
+		}
+		return Hash;
 	}
 
 	std::string FBattle::AbilityBlockedReason(const FUnit& Unit, int Slot) const
