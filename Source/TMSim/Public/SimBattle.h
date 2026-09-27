@@ -13,10 +13,13 @@
 #pragma once
 
 #include "SimAbility.h"
+#include "SimMap.h"
 #include "SimRandom.h"
 #include "SimTypes.h"
 #include "SimUnit.h"
 
+#include <string>
+#include <utility>
 #include <vector>
 
 namespace TMSim
@@ -28,6 +31,7 @@ namespace TMSim
 		std::vector<int> TurnEnded;
 		std::vector<int> TimedOut;
 		std::vector<int> Gone;
+		std::vector<int> Moved;
 	};
 
 	class FBattle
@@ -75,6 +79,36 @@ namespace TMSim
 		/** Chance in % that this unit's abilities land a critical hit. */
 		TMSIM_API int CritChance(const FUnit& User) const;
 
+		// --------------------------------------------------------- walking
+
+		/** Metres this unit walks in a turn. */
+		TMSIM_API double MoveOf(const FUnit& Unit, bool bSprint = false) const;
+
+		/**
+		 * Every node the unit could stand on this turn, and the metres walked to
+		 * reach each. Allies can be walked through but not stood on; enemies
+		 * block, and stepping out of an enemy's reach costs extra.
+		 */
+		TMSIM_API std::vector<std::pair<FNode, double>> ReachableNodes(const FUnit& Unit, bool bSprint = false);
+
+		/** The way there, both ends included, or empty if there is no way. */
+		TMSIM_API std::vector<FVec2> PathTo(const FUnit& Unit, const FNode& To, bool bSprint = false);
+
+		/** "" if the unit may walk there now, otherwise why not. */
+		TMSIM_API std::string ValidateMove(int UnitId, const FVec2& To, bool bSprint = false);
+
+		/** Walks the unit there. It faces the way it last stepped. */
+		TMSIM_API bool ApplyMove(int UnitId, const FVec2& To, bool bSprint, FTickReport& Report);
+
+		/**
+		 * Ends a unit's turn the way giving no further orders would. What it
+		 * keeps of its gauge depends on what it did with the turn, so this is
+		 * the rules' business rather than the caller's.
+		 */
+		TMSIM_API void EndTurnFor(FUnit& Unit, bool bTimedOut, FTickReport& Report);
+
+		FMap Map;
+
 		// ------------------------------------------------------------ state
 
 		std::vector<FUnit> Units;
@@ -92,5 +126,27 @@ namespace TMSim
 		void BecomeReady(FUnit& Unit, FTickReport& Report);
 		/** Its turn is over, by choice or because the countdown ran out. */
 		void EndTurn(FUnit& Unit, bool bTimedOut, FTickReport& Report);
+
+		/** Height levels this unit may cross in one step. */
+		int JumpOf(const FUnit& Unit) const;
+
+		/**
+		 * Dijkstra over the navigation grid. Costs land in Cost and the way back
+		 * in Parent, both indexed by node. Kept as one flat pass over arrays
+		 * because the computer player asks for this constantly.
+		 */
+		void RunDijkstra(const std::vector<FNode>& Starts, double MaxCost, int Team, int Jump);
+
+		/** Marks every node within a radius of a point. */
+		void MarkBlocked(const FVec2& Point, double Radius, std::vector<uint8_t>& Flags) const;
+
+		void HeapPush(double Cost, int Node);
+		void HeapPop();
+		void HeapSwap(int A, int B);
+
+		std::vector<double> Cost;
+		std::vector<int> Parent;
+		std::vector<double> HeapCost;
+		std::vector<int> HeapNode;
 	};
 }

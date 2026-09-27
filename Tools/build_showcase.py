@@ -75,7 +75,7 @@ def build_lighting():
         # Actors do not all expose their component as a named property, so ask
         # for it by class -- that works the same way for every one of them.
         light = sun.get_component_by_class(unreal.DirectionalLightComponent)
-        light.set_intensity(5.0)
+        light.set_intensity(8.0)
         light.set_light_color(unreal.LinearColor(1.0, 0.96, 0.88, 1.0))
         # Long shadows across the board read the height differences that the
         # rules already care about.
@@ -87,7 +87,7 @@ def build_lighting():
     if sky_light:
         component = sky_light.get_component_by_class(unreal.SkyLightComponent)
         component.set_editor_property("real_time_capture", True)
-        component.set_intensity(3.0)
+        component.set_intensity(4.0)
 
     fog = spawn(unreal.ExponentialHeightFog, unreal.Vector(0, 0, 0), None, "Fog")
     if fog:
@@ -186,7 +186,7 @@ def place_camera():
     The angle the game is played from: high enough to read the board, low
     enough that the character is a character rather than a token.
     """
-    distance = BOARD * TILE * 1.15
+    distance = 2400.0  # the board is 24 m across
     camera = spawn(unreal.CameraActor,
                    unreal.Vector(-distance * 0.7, -distance * 0.7, distance * 0.75),
                    unreal.Rotator(0.0, -32.0, 45.0), "TacticalCamera")
@@ -209,8 +209,9 @@ def run():
 
     clear_generated()
     build_lighting()
-    build_board()
     place_camera()
+    # No board here either: the battle director builds it out of the map the
+    # rules are actually pathfinding over, so what you see is what they use.
     # No lone hero any more: the battle director puts a unit on the board for
     # each unit in the simulation, which is the thing worth looking at.
 

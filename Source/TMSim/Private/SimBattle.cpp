@@ -7,6 +7,11 @@ namespace TMSim
 {
 	void FBattle::Start(uint64_t InSeed)
 	{
+		// Somewhere to stand, if nobody has said where yet.
+		if (Map.TilesX == 0)
+		{
+			Map.BuildMirrored(HighlandsRows());
+		}
 		Rng.Seed(InSeed);
 		TickCount = 0;
 		Winner = -1;
@@ -260,6 +265,11 @@ namespace TMSim
 		Unit.Buffs.swap(Kept);
 
 		Report.BecameReady.push_back(Unit.Id);
+	}
+
+	void FBattle::EndTurnFor(FUnit& Unit, bool bTimedOut, FTickReport& Report)
+	{
+		EndTurn(Unit, bTimedOut, Report);
 	}
 
 	void FBattle::EndTurn(FUnit& Unit, bool bTimedOut, FTickReport& Report)

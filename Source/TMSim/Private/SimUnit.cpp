@@ -47,6 +47,50 @@ namespace TMSim
 		return StatusProduct(&FStatusDef::TgFactor);
 	}
 
+	float FUnit::MoveFactor() const
+	{
+		return StatusProduct(&FStatusDef::MoveFactor);
+	}
+
+	bool FUnit::ActsOnce() const
+	{
+		for (const FStatus& Status : Statuses)
+		{
+			const FStatusDef* Def = FindStatus(Status.Id);
+			if (Def && Def->bOneAction)
+			{
+				return true;
+			}
+		}
+		return false;
+	}
+
+	bool FUnit::Flies() const
+	{
+		for (const FStatus& Status : Statuses)
+		{
+			const FStatusDef* Def = FindStatus(Status.Id);
+			if (Def && Def->bFly)
+			{
+				return true;
+			}
+		}
+		return false;
+	}
+
+	bool FUnit::IsRooted() const
+	{
+		for (const FStatus& Status : Statuses)
+		{
+			const FStatusDef* Def = FindStatus(Status.Id);
+			if (Def && Def->bNoMove)
+			{
+				return true;
+			}
+		}
+		return false;
+	}
+
 	int FUnit::MissChance() const
 	{
 		int Total = 0;

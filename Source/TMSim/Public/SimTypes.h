@@ -150,6 +150,15 @@ namespace TMSim
 		double CritMultiplier = 1.5;
 		double EvadeMultiplier = 1.0;
 		double CritChanceMultiplier = 1.0;
+
+		/** Multiplier on how far every unit walks. */
+		double MoveMultiplier = 1.0;
+		/** How far a sprint goes, as a multiple of Move. A sprint costs the action. */
+		double SprintMultiplier = 1.25;
+		/** How close an enemy has to be to engage a unit. */
+		double EngageRadius = 1.8;
+		/** Movement spent stepping out of an enemy's reach. Walking in is free. */
+		double EngageCost = 1.0;
 	};
 
 	namespace Combat

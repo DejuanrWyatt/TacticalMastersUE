@@ -102,6 +102,18 @@ namespace TMSim
 		/** Added to the chance this unit's own attacks are evaded (Blind). */
 		TMSIM_API int MissChance() const;
 
+		/** How far it walks compared with its Move stat (Crippled, Stride). */
+		TMSIM_API float MoveFactor() const;
+
+		/** May walk or act on its turn, but not both (Knockdown). */
+		TMSIM_API bool ActsOnce() const;
+
+		/** Crosses any height, and melee cannot reach it (Fly). */
+		TMSIM_API bool Flies() const;
+
+		/** Cannot walk at all (Root, Freeze). */
+		TMSIM_API bool IsRooted() const;
+
 		/** The status taking this unit's orders away, or "" if it can act. */
 		TMSIM_API std::string NoOrdersStatus() const;
 		bool IsStunned() const { return !NoOrdersStatus().empty(); }

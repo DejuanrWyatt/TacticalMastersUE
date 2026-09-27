@@ -1,6 +1,9 @@
 #include "TMBattleDirector.h"
 
+#include "Components/PointLightComponent.h"
 #include "Components/SkeletalMeshComponent.h"
+#include "Components/StaticMeshComponent.h"
+#include "Engine/StaticMesh.h"
 #include "Engine/SkeletalMesh.h"
 
 #include "SimAbility.h"
@@ -30,6 +33,16 @@ void ATMBattleDirector::ClearBattle()
 		}
 	}
 	UnitVisuals.Reset();
+	for (TObjectPtr<UStaticMeshComponent>& Tile : TileVisuals)
+	{
+		if (Tile) { Tile->DestroyComponent(); }
+	}
+	TileVisuals.Reset();
+	for (TObjectPtr<UPointLightComponent>& Light : ReadyLights)
+	{
+		if (Light) { Light->DestroyComponent(); }
+	}
+	ReadyLights.Reset();
 	Battle.Units.clear();
 	bBuilt = false;
 }
@@ -46,6 +59,19 @@ void ATMBattleDirector::BuildBattle()
 		"knight", "archer", "black_mage", "white_mage"
 	};
 
+	// The map first: units stand on it, and the pathfinder needs it before
+	// anything can be asked about where a unit could walk.
+	Battle.Map.BuildMirrored(TMSim::HighlandsRows());
+
+	// Where the maps put the two sides, in metres. Blue as written, red at the
+	// mirrored spots, which is how a symmetric map is laid out.
+	const TMSim::FVec2 BlueSpawns[4] =
+	{
+		TMSim::FVec2(2.75f, 4.75f), TMSim::FVec2(0.75f, 8.75f),
+		TMSim::FVec2(4.75f, 6.75f), TMSim::FVec2(2.75f, 10.75f)
+	};
+	const TMSim::FVec2 Size = Battle.Map.SizeMeters();
+
 	for (int32 Index = 0; Index < 8; ++Index)
 	{
 		const TMSim::FJobDef* Job = TMSim::FindJob(Roster[Index]);
@@ -61,11 +87,11 @@ void ATMBattleDirector::BuildBattle()
 		Unit.Job = Roster[Index];
 		Unit.Stats = &Job->Stats;
 
-		// Facing each other across the board, a side to each end.
-		const float Row = Unit.Team == 0 ? -2.5f : 2.5f;
-		const float Column = static_cast<float>(Index % 4) - 1.5f;
-		Unit.Pos = TMSim::FVec2(Row, Column);
-		Unit.Facing = TMSim::FVec2(Unit.Team == 0 ? 1.0f : -1.0f, 0.0f);
+		const TMSim::FVec2 Spawn = BlueSpawns[Index % 4];
+		Unit.Pos = Unit.Team == 0 ? Spawn : TMSim::FVec2(Size.X - Spawn.X, Size.Y - Spawn.Y);
+		// Facing the middle, as a unit does when a battle opens.
+		const TMSim::FVec2 Middle(Size.X * 0.5f, Size.Y * 0.5f);
+		Unit.Facing = (Middle - Unit.Pos).Normalized();
 
 		Battle.Units.push_back(Unit);
 	}
@@ -88,7 +114,22 @@ void ATMBattleDirector::BuildBattle()
 		// The two sides tinted apart, until classes bring their own materials.
 		Visual->SetCustomPrimitiveDataFloat(0, Battle.Units[i].Team == 0 ? 0.0f : 1.0f);
 		UnitVisuals.Add(Visual);
+
+		// Whose turn it is is said with light at their feet rather than by
+		// lifting them off the ground, which only ever looked like a bug.
+		UPointLightComponent* Light = NewObject<UPointLightComponent>(
+			this, *FString::Printf(TEXT("Ready_%d"), Battle.Units[i].Id));
+		Light->SetupAttachment(RootComponent);
+		Light->RegisterComponent();
+		Light->SetLightColor(ReadyColour);
+		Light->SetIntensity(ReadyLightBrightness);
+		Light->SetAttenuationRadius(220.0f);
+		Light->SetCastShadows(false);
+		Light->SetVisibility(false);
+		ReadyLights.Add(Light);
 	}
+
+	BuildBoard();
 
 	bBuilt = true;
 	RefreshVisuals();
@@ -96,12 +137,67 @@ void ATMBattleDirector::BuildBattle()
 	UE_LOG(LogTemp, Log, TEXT("Battle built with %d units"), static_cast<int32>(Battle.Units.size()));
 }
 
+FVector ATMBattleDirector::WorldFromMetres(const TMSim::FVec2& Point, int Level) const
+{
+	// The rules think in metres and Unreal in centimetres, and a height level is
+	// a fixed number of metres, so the board's shape comes out of the map rather
+	// than being decided here.
+	return FVector(Point.X * TileSize, Point.Y * TileSize, Level * TMSim::Ground::LevelHeight * TileSize);
+}
+
 FVector ATMBattleDirector::WorldFor(const TMSim::FUnit& Unit) const
 {
-	// A unit that is READY stands a little proud of the board, so whose turn it
-	// is can be seen without reading anything.
-	const float Lift = Unit.bReady ? ReadyLift : 0.0f;
-	return FVector(Unit.Pos.X * TileSize, Unit.Pos.Y * TileSize, BoardHeight + Lift);
+	const int Level = Battle.Map.NodeLevel(TMSim::FMap::NodeOf(Unit.Pos));
+	return WorldFromMetres(Unit.Pos, Level);
+}
+
+void ATMBattleDirector::BuildBoard()
+{
+	UStaticMesh* Mesh = TileMesh.LoadSynchronous();
+	if (!Mesh)
+	{
+		Mesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cube"));
+	}
+	if (!Mesh)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("No tile mesh; the board will not be built"));
+		return;
+	}
+
+	const float TileMetres = TMSim::Ground::TileSize;
+	for (int32 Y = 0; Y < Battle.Map.TilesY; ++Y)
+	{
+		for (int32 X = 0; X < Battle.Map.TilesX; ++X)
+		{
+			const int Level = Battle.Map.TileLevel(X, Y);
+			if (Level <= 0)
+			{
+				continue;  // water and rock: nothing to stand on
+			}
+
+			UStaticMeshComponent* Tile = NewObject<UStaticMeshComponent>(
+				this, *FString::Printf(TEXT("Tile_%d_%d"), X, Y));
+			Tile->SetupAttachment(RootComponent);
+			Tile->RegisterComponent();
+			Tile->SetStaticMesh(Mesh);
+			Tile->SetMobility(EComponentMobility::Static);
+
+			// A column from the ground up to this tile's height, so there is no
+			// daylight under the edge of a raised one.
+			const float TopMetres = Level * TMSim::Ground::LevelHeight;
+			const FVector Centre(
+				(X + 0.5f) * TileMetres * TileSize,
+				(Y + 0.5f) * TileMetres * TileSize,
+				TopMetres * TileSize * 0.5f);
+			Tile->SetRelativeLocation(Centre);
+			// The engine cube is 100 units across; a hair under a tile leaves a
+			// seam, so the grid reads without anything drawn on it.
+			const float Across = TileMetres * TileSize / 100.0f;
+			Tile->SetRelativeScale3D(FVector(Across * 0.98f, Across * 0.98f, TopMetres * TileSize / 100.0f));
+			TileVisuals.Add(Tile);
+		}
+	}
+	UE_LOG(LogTemp, Log, TEXT("Board built: %d tiles"), TileVisuals.Num());
 }
 
 void ATMBattleDirector::RefreshVisuals()
@@ -113,11 +209,18 @@ void ATMBattleDirector::RefreshVisuals()
 			continue;
 		}
 		const TMSim::FUnit& Unit = Battle.Units[i];
-		UnitVisuals[i]->SetRelativeLocation(WorldFor(Unit));
+		const FVector Where = WorldFor(Unit);
+		UnitVisuals[i]->SetRelativeLocation(Where);
 		// A Paragon mesh does not face along its actor's +X, hence the offset.
 		const float Yaw = FMath::RadiansToDegrees(FMath::Atan2(Unit.Facing.Y, Unit.Facing.X)) + 180.0f;
 		UnitVisuals[i]->SetRelativeRotation(FRotator(0.0f, Yaw, 0.0f));
 		UnitVisuals[i]->SetVisibility(Unit.IsAlive());
+
+		if (ReadyLights.IsValidIndex(i) && ReadyLights[i])
+		{
+			ReadyLights[i]->SetRelativeLocation(Where + FVector(0.0f, 0.0f, 55.0f));
+			ReadyLights[i]->SetVisibility(Unit.bReady && Unit.IsAlive());
+		}
 	}
 }
 
@@ -154,6 +257,52 @@ FString ATMBattleDirector::DescribeBattle() const
 			Unit.bReady ? *FString::Printf(TEXT(" clock %d"), Unit.Clock) : TEXT(""));
 	}
 	return Text;
+}
+
+FString ATMBattleDirector::MoveUnitTo(int32 UnitId, float MetresX, float MetresY, bool bSprint)
+{
+	if (!bBuilt)
+	{
+		BuildBattle();
+	}
+	// Snapped first: a unit stands on a navigation node, not wherever a click
+	// happened to land.
+	const TMSim::FVec2 To = TMSim::FMap::Snap(TMSim::FVec2(MetresX, MetresY));
+
+	const std::string Refused = Battle.ValidateMove(UnitId, To, bSprint);
+	if (!Refused.empty())
+	{
+		const FString Why = UTF8_TO_TCHAR(Refused.c_str());
+		UE_LOG(LogTemp, Log, TEXT("unit %d cannot walk there: %s"), UnitId, *Why);
+		return Why;
+	}
+
+	TMSim::FTickReport Report;
+	Battle.ApplyMove(UnitId, To, bSprint, Report);
+	RefreshVisuals();
+	UE_LOG(LogTemp, Log, TEXT("unit %d walked to %.2f, %.2f"), UnitId, To.X, To.Y);
+	return FString();
+}
+
+void ATMBattleDirector::EndUnitTurn(int32 UnitId)
+{
+	if (TMSim::FUnit* Unit = Battle.FindUnit(UnitId))
+	{
+		TMSim::FTickReport Report;
+		Battle.EndTurnFor(*Unit, false, Report);
+		RefreshVisuals();
+	}
+}
+
+int32 ATMBattleDirector::ReachableCount(int32 UnitId) const
+{
+	// Const in spirit: the pathfinder scribbles on its own scratch arrays.
+	ATMBattleDirector* Self = const_cast<ATMBattleDirector*>(this);
+	if (const TMSim::FUnit* Unit = Self->Battle.FindUnit(UnitId))
+	{
+		return static_cast<int32>(Self->Battle.ReachableNodes(*Unit).size());
+	}
+	return 0;
 }
 
 void ATMBattleDirector::Tick(float DeltaSeconds)
