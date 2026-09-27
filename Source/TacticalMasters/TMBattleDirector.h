@@ -13,6 +13,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
+#include "InputCoreTypes.h"
 
 #include "SimAI.h"
 #include "SimBattle.h"
@@ -193,11 +194,12 @@ public:
 	// to the computer to watch a battle play itself, or neither for two people.
 
 	/**
-	 * Both sides by default, because there is no way to take orders from a person
-	 * yet. Turn a side off as soon as somebody can play it.
+	 * Blue is the person at this machine by default, and red the computer. A run
+	 * with nobody watching (-unattended), or one started with -tmwatch, hands both
+	 * sides to the computer so a battle can still play itself to the end.
 	 */
 	UPROPERTY(EditAnywhere, Category = "Tactical Masters|Computer")
-	bool bComputerPlaysTeam0 = true;
+	bool bComputerPlaysTeam0 = false;
 
 	UPROPERTY(EditAnywhere, Category = "Tactical Masters|Computer")
 	bool bComputerPlaysTeam1 = true;
@@ -264,6 +266,99 @@ private:
 
 	/** Takes a picture every so often, when asked to. */
 	void MaybeCapture();
+
+	// ------------------------------------------------------ a person playing
+	//
+	// How a person gives orders, following the Godot game's battle.gd. None of
+	// this is state: which unit is selected, what the mouse is over and what is
+	// drawn on the board are the view's business. Every order still goes through
+	// Submit, with the unit's real Serial, exactly as the computer's do.
+
+	enum class EAimMode : uint8 { None, Move, Ability };
+
+	/** Hooks up the keys and the mouse, and shows the pointer. */
+	void SetUpPlayerInput();
+
+	/** One handler for every key, so the bindings read as one table. */
+	void OnKey(FKey Key);
+
+	/** A left click on the board: walk, aim, or pick a unit. */
+	void OnClick();
+
+	/** Whether this machine may give this unit an order right now. */
+	bool PlayerCanOrder(const TMSim::FUnit* Unit) const;
+
+	/** The unit the person is ordering, or null. */
+	const TMSim::FUnit* SelectedUnit() const;
+
+	void SelectUnit(int32 UnitId);
+	void Deselect();
+	/** Picks this machine's ready unit with the least time left, if any. */
+	void AutoSelect();
+	/** The next of this machine's ready units, round and round. */
+	void CycleReady();
+	void EnterMoveMode(bool bSprint);
+	void SelectAbility(int32 Slot);
+	void CancelAim();
+
+	/** Sends an order for the selected unit and takes the next step after it. */
+	void OrderSelected(const TMSim::FOrder& Order);
+
+	/** Keeps the selection honest as time runs: turns end, units fall. */
+	void MaintainSelection();
+
+	/** Works out what is under the mouse: a spot on the board, and a unit. */
+	void PickUnderCursor();
+
+	/** Where the chosen ability would land for where the mouse is, and whether it may. */
+	struct FAim
+	{
+		bool bHave = false;
+		TMSim::FVec2 Point;
+		int32 Follow = -1;
+		bool bOk = false;
+		FString Why;
+	};
+	FAim Aim();
+
+	/** The walkable spots, the path, the reach and the forecast, drawn on the board. */
+	void DrawPlayerAids();
+
+	/** Whose turn it is, what the keys do, and what just happened, on screen. */
+	void DrawPlayerPanel(float DeltaSeconds);
+
+	/** Something the person should read: why an order was refused, mostly. */
+	void Tell(const FString& What);
+
+	/** Metres on the board to a spot in the world, a little above the ground. */
+	FVector BoardPoint(const TMSim::FVec2& Point, float Lift = 4.0f) const;
+
+	/** Whether a person is at this machine giving orders at all. */
+	bool bPlayerInput = false;
+	bool bPaused = false;
+
+	int32 SelectedId = -1;
+	/** The turn the selection was made on, so a fresh turn starts afresh. */
+	int32 SelectedSerial = -1;
+	EAimMode AimMode = EAimMode::None;
+	int32 AimSlot = -1;
+	bool bSprinting = false;
+	std::vector<std::pair<TMSim::FNode, double>> Reachable;
+
+	bool bHaveHover = false;
+	TMSim::FVec2 HoverPoint;
+	int32 HoverUnitId = -1;
+
+	/** The path last drawn, kept so the pathfinder is not asked every frame. */
+	TMSim::FNode PathNode{ -9999, -9999 };
+	std::vector<TMSim::FVec2> PathShown;
+
+	/** Orders other than time applied so far, to notice when the board has changed. */
+	int32 OrdersApplied = 0;
+	int32 OrdersSeen = 0;
+
+	FString Notice;
+	float NoticeLeft = 0.0f;
 
 	UPROPERTY()
 	TObjectPtr<ACameraActor> Watcher = nullptr;

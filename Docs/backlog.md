@@ -21,7 +21,7 @@ reorder it yourself.
 | feat-time-as-orders | Director steps time via `Submit(MakeAdvance)` so a battle is fully recordable (F8) | – | unreal-engineer | Done |
 | port-turn-start | Start-of-turn effects: statuses tick/expire, hazards, regen, auras, channel continuation | port-cast-and-orders | sim-engineer | Done except auras — no built-in ability is one, so there is nothing to refresh yet; the gap is named in `BecomeReady` |
 | port-ai-abilities | AI chooses and aims abilities (plus the `Randf` tie-break, verified bit-exact) | port-cast-and-orders | sim-engineer | Done for hard, parity-tested (`SimAIActionTest`). `Randf` is still unported, so easy and medium cannot be replayed bit-for-bit; and Godot settles a tie with an unstable sort, so tied options may differ — the test proves they are ties |
-| feat-class-creator | A creator that makes a class from the ground up: stats, four abilities, role, look, lore. Research and ideas: https://claude.ai/code/artifact/7a75f6fe-cd93-4771-bd60-2e0c8260342a | port-astra-importer | game-designer | Researched, not specified. The honest shape is generate-simulate-report: `tests/balance.gd` already scores a candidate class against a fixed team, so the creator can measure rather than reason |
+| feat-class-creator | A creator that makes a class from the ground up: stats, four abilities, role, look, lore. Research and ideas: https://claude.ai/code/artifact/7a75f6fe-cd93-4771-bd60-2e0c8260342a | port-astra-importer | game-designer | Built as its own tool, `E:\TacticsClassCreator` (separate git repo, Node, runs against the Godot game): reads/writes class files, lints for fields the importer would silently drop, reads back through `tests/check_class.gd`, measures with `balance.gd`. 16 archetypes: 10 ship; 6 wait on engine mechanics (Cast Catch, Held Aim, Gauge Field, Finisher, Gauge Theft, Lone Fight). Unreal only receives its output in `Content/Data/Classes`, so it still needs the importer port here |
 | feat-event-playback | Director plays back `FTickReport` events: movement, casts, hits, misses, KOs | port-cast-and-orders | unreal-engineer | Done — `Narrate` builds the log, `ShowEvents` puts up rising numbers and flashes a struck unit (game world only); a cast bar is text in `DescribeBattle`. Projectiles and animations belong with the character pipeline |
 
 ### port-resolve-parity
@@ -40,7 +40,15 @@ Acceptance criteria:
 - `SimPlayTest` gains a wrong-seed probe that fails, which proves abilities consume dice.
 - Casting state is in the checksum, and the replay test still passes with abilities in play.
 
-## Milestone 2: The whole roster
+## Milestone 2: Playable (chosen 2026-09-27: playable before the roster)
+Not yet broken down; run `/plan-milestone` to split it into slices.
+| id | goal | depends on | owner | status |
+|----|------|-----------|-------|--------|
+| feat-player-input | In Play, the human picks a ready unit's move and ability with the mouse; every choice goes through `Submit()` with the unit's real `Serial` | – | unreal-engineer | Built, untested by hand. See `Docs/design/feat-player-input.md`. Tests, build, wiring and battle tests pass |
+| feat-hud-forecast | A HUD: turn gauges and whose turn it is, ability slots with cooldowns, and a forecast from `Preview` before committing | feat-player-input | unreal-engineer | Todo |
+| feat-match-flow | Start a match, see who won, play again | feat-player-input | unreal-engineer | Todo |
+
+## Milestone 3: The whole roster
 | id | goal | depends on | owner | status |
 |----|------|-----------|-------|--------|
 | port-passives-auras | Passive/aura stat contributions in `FUnit::Stat`, auras applied | port-turn-start | sim-engineer | Todo |
@@ -49,5 +57,4 @@ Acceptance criteria:
 | chore-packaging-classes | Add `Data/Classes` to non-asset directories to package (F5) | port-astra-import | human | Todo |
 
 ## Later (not yet broken down)
-Ultimates · player input and order submission in Play · camera · HUD with forecasts from `Preview` ·
-animation from events on the canonical skeleton · CharacterMap data · networking over `Submit` + checksums.
+Ultimates · animation from events on the canonical skeleton · CharacterMap data · networking over `Submit` + checksums.

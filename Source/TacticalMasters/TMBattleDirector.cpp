@@ -15,8 +15,12 @@
 #include "Misc/App.h"
 #include "Misc/CommandLine.h"
 #include "Misc/Parse.h"
+#include "Components/InputComponent.h"
+#include "DrawDebugHelpers.h"
 
 #include "SimAbility.h"
+
+#include <algorithm>
 
 ATMBattleDirector::ATMBattleDirector()
 {
@@ -40,6 +44,21 @@ void ATMBattleDirector::BeginPlay()
 	{
 		CaptureEverySeconds = Every;
 		UE_LOG(LogTemp, Log, TEXT("taking a picture every %.1fs of battle"), Every);
+	}
+
+	// Nobody is there to click in an unattended run, so a side left to a person
+	// would sit out every turn and the battle would never be decided -- and a
+	// headless session that cannot end holds the DLL open. -tmwatch asks for the
+	// same with a window, to watch the computer play itself.
+	if (FApp::IsUnattended() || FParse::Param(FCommandLine::Get(), TEXT("tmwatch")))
+	{
+		bComputerPlaysTeam0 = true;
+		bComputerPlaysTeam1 = true;
+		UE_LOG(LogTemp, Log, TEXT("the computer plays both sides"));
+	}
+	else if (!bComputerPlaysTeam0 || !bComputerPlaysTeam1)
+	{
+		SetUpPlayerInput();
 	}
 }
 
@@ -70,6 +89,9 @@ void ATMBattleDirector::ClearBattle()
 	Plates.Reset();
 	Battle.Units.clear();
 	bBuilt = false;
+	// A selection means nothing once the battle it was in is gone.
+	Deselect();
+	bSaidWon = false;
 }
 
 void ATMBattleDirector::BuildBattle()
@@ -146,6 +168,10 @@ void ATMBattleDirector::BuildBattle()
 		}
 		// The two sides tinted apart, until classes bring their own materials.
 		Visual->SetCustomPrimitiveDataFloat(0, Battle.Units[i].Team == 0 ? 0.0f : 1.0f);
+		// Clicks pass through bodies to the board. Units are picked by where they
+		// appear on screen instead (PickUnderCursor), which does not depend on the
+		// mesh having a physics asset.
+		Visual->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 		UnitVisuals.Add(Visual);
 
 		// Whose turn it is is said with light at their feet rather than by
@@ -446,6 +472,10 @@ FString ATMBattleDirector::Submit(const TMSim::FOrder& Order)
 		UE_LOG(LogTemp, Error,
 			TEXT("an order for unit %d passed the rules and then did nothing"), Order.UnitId);
 		return TEXT("The order could not be carried out.");
+	}
+	if (Order.Type != TMSim::EOrderType::Advance)
+	{
+		++OrdersApplied;
 	}
 	Narrate(Report);
 	ShowEvents(Report);
@@ -956,6 +986,24 @@ void ATMBattleDirector::Tick(float DeltaSeconds)
 		return;
 	}
 
+	if (bPlayerInput)
+	{
+		MaintainSelection();
+		PickUnderCursor();
+		DrawPlayerAids();
+		DrawPlayerPanel(DeltaSeconds);
+	}
+
+	// Paused, nothing moves: not the clock and not the computer. Nothing is
+	// submitted for it either -- a pause is time not passing, and time only
+	// passes by an Advance order. Online, both machines would have to agree to
+	// one; there is no online play yet, so this is a local-only key for now.
+	if (bPaused)
+	{
+		TickRemainder = 0.0f;
+		return;
+	}
+
 	// The rules run at a fixed rate whatever the frame rate is doing. That is
 	// not a detail: the same battle has to play out the same way on both
 	// machines in an online match, and on a replay.
@@ -1018,5 +1066,810 @@ void ATMBattleDirector::Tick(float DeltaSeconds)
 		}
 		++OrdersGiven;
 		ThinkRemainder = static_cast<float>(Computer.Skill().Step);
+	}
+}
+
+// ============================================================ a person playing
+//
+// Follows the Godot game's battle.gd: select a ready unit, walk it, aim one of
+// its four abilities, end its turn. Everything below only chooses which order
+// to send; the rules decide whether it is allowed, and say why not.
+
+namespace
+{
+	const TMSim::FUnit* FindIn(const TMSim::FBattle& Battle, int32 UnitId)
+	{
+		return UnitId >= 0 ? const_cast<TMSim::FBattle&>(Battle).FindUnit(UnitId) : nullptr;
+	}
+
+	/** Whether a unit is the kind of target this ability takes (battle.gd:894-897). */
+	bool FitsTarget(const TMSim::FUnit& User, const TMSim::FAbility& Ability, const TMSim::FUnit& Target)
+	{
+		if (Ability.Target == TMSim::ETargetSide::KoAlly)
+		{
+			return Target.IsKo() && Target.Team == User.Team;
+		}
+		return Target.IsAlive() && ((Target.Team != User.Team) == (Ability.Target == TMSim::ETargetSide::Enemy));
+	}
+
+	/**
+	 * Ready units first, then the least time left, then id (game_state.gd:768-775,
+	 * _schedule_before). Every unit this is asked about is ready, and a ready
+	 * unit's time left is its countdown.
+	 */
+	bool ActsSooner(const TMSim::FUnit* A, const TMSim::FUnit* B)
+	{
+		if (A->Clock != B->Clock)
+		{
+			return A->Clock < B->Clock;
+		}
+		return A->Id < B->Id;
+	}
+
+	const uint64 PanelKey = 0x544D0001;
+	const uint64 NoticeKey = 0x544D0002;
+	const uint64 LogKey = 0x544D0003;
+}
+
+void ATMBattleDirector::SetUpPlayerInput()
+{
+	UWorld* World = GetWorld();
+	APlayerController* Player = World ? World->GetFirstPlayerController() : nullptr;
+	if (!Player)
+	{
+		return;
+	}
+	EnableInput(Player);
+	if (!InputComponent)
+	{
+		return;
+	}
+
+	// The pointer stays on screen and free to leave the window: this is a game
+	// played by clicking on the board, not by steering a camera.
+	Player->bShowMouseCursor = true;
+	FInputModeGameAndUI Mode;
+	Mode.SetHideCursorDuringCapture(false);
+	Mode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+	Player->SetInputMode(Mode);
+
+	// The Godot game's default keys (keybinds.gd:17-30), less the camera and the
+	// windows this port does not have yet. Bound to keys directly rather than
+	// through input assets, which would be editor work.
+	const FKey Keys[] =
+	{
+		EKeys::LeftMouseButton, EKeys::RightMouseButton,
+		EKeys::One, EKeys::Two, EKeys::Three, EKeys::Four,
+		EKeys::SpaceBar, EKeys::LeftShift, EKeys::Enter, EKeys::Tab, EKeys::Escape,
+		EKeys::P, EKeys::R
+	};
+	for (const FKey& Key : Keys)
+	{
+		InputComponent->BindKey(Key, IE_Pressed, this, &ATMBattleDirector::OnKey);
+	}
+	bPlayerInput = true;
+	UE_LOG(LogTemp, Log, TEXT("taking orders from the mouse and keyboard"));
+}
+
+void ATMBattleDirector::OnKey(FKey Key)
+{
+	// battle.gd:699-739, _unhandled_input.
+	const TMSim::FUnit* Sel = SelectedUnit();
+	if (Key == EKeys::LeftMouseButton)
+	{
+		OnClick();
+	}
+	else if (Key == EKeys::RightMouseButton || Key == EKeys::Escape)
+	{
+		CancelAim();
+	}
+	else if (Key == EKeys::One) { SelectAbility(0); }
+	else if (Key == EKeys::Two) { SelectAbility(1); }
+	else if (Key == EKeys::Three) { SelectAbility(2); }
+	else if (Key == EKeys::Four) { SelectAbility(3); }
+	else if (Key == EKeys::SpaceBar)
+	{
+		// battle.gd:966-972, _toggle_move.
+		if (!PlayerCanOrder(Sel))
+		{
+			return;
+		}
+		if (AimMode == EAimMode::Move && !bSprinting)
+		{
+			CancelAim();
+		}
+		else
+		{
+			EnterMoveMode(false);
+		}
+	}
+	else if (Key == EKeys::LeftShift)
+	{
+		// battle.gd:977-987, _toggle_sprint: further than a walk, but it is the
+		// unit's action for the turn.
+		if (!PlayerCanOrder(Sel))
+		{
+			return;
+		}
+		if (AimMode == EAimMode::Move && bSprinting)
+		{
+			CancelAim();
+			return;
+		}
+		if (Sel->bActed)
+		{
+			Tell(TEXT("Already used an ability this turn: no sprinting."));
+			return;
+		}
+		EnterMoveMode(true);
+	}
+	else if (Key == EKeys::Enter)
+	{
+		if (PlayerCanOrder(Sel))
+		{
+			OrderSelected(TMSim::FOrder::MakeEndTurn(Sel->Id, Sel->Serial));
+		}
+	}
+	else if (Key == EKeys::Tab)
+	{
+		CycleReady();
+	}
+	else if (Key == EKeys::P)
+	{
+		if (Battle.Winner == -1)
+		{
+			bPaused = !bPaused;
+			Tell(bPaused ? TEXT("Paused.") : TEXT("Resumed."));
+		}
+	}
+	else if (Key == EKeys::R)
+	{
+		// Only once a battle is decided, so a stray key cannot throw one away.
+		if (Battle.Winner != -1)
+		{
+			BuildBattle();
+			Log.Reset();
+			OrdersGiven = 0;
+			Tell(TEXT("A new battle."));
+		}
+	}
+}
+
+bool ATMBattleDirector::PlayerCanOrder(const TMSim::FUnit* Unit) const
+{
+	// battle.gd:293-295, _commandable.
+	return Unit && Unit->IsAlive() && Unit->bReady && !ComputerPlays(Unit->Team)
+		&& Battle.Winner == -1 && !bPaused;
+}
+
+const TMSim::FUnit* ATMBattleDirector::SelectedUnit() const
+{
+	return FindIn(Battle, SelectedId);
+}
+
+void ATMBattleDirector::SelectUnit(int32 UnitId)
+{
+	// battle.gd:912-923. Walking is offered straight away, since it is what a
+	// turn usually starts with.
+	const TMSim::FUnit* Unit = FindIn(Battle, UnitId);
+	if (!Unit)
+	{
+		return;
+	}
+	SelectedId = UnitId;
+	SelectedSerial = Unit->Serial;
+	AimMode = EAimMode::None;
+	AimSlot = -1;
+	bSprinting = false;
+	PathNode = TMSim::FNode{ -9999, -9999 };
+	if (!Unit->bMoved)
+	{
+		EnterMoveMode(false);
+	}
+}
+
+void ATMBattleDirector::Deselect()
+{
+	SelectedId = -1;
+	SelectedSerial = -1;
+	AimMode = EAimMode::None;
+	AimSlot = -1;
+	bSprinting = false;
+	Reachable.clear();
+	PathShown.clear();
+}
+
+void ATMBattleDirector::AutoSelect()
+{
+	// battle.gd:933-937: this machine's ready unit with the least time left.
+	const TMSim::FUnit* Best = nullptr;
+	for (const TMSim::FUnit& Unit : Battle.Units)
+	{
+		if (PlayerCanOrder(&Unit) && (!Best || ActsSooner(&Unit, Best)))
+		{
+			Best = &Unit;
+		}
+	}
+	if (Best)
+	{
+		SelectUnit(Best->Id);
+	}
+}
+
+void ATMBattleDirector::CycleReady()
+{
+	// battle.gd:940-951.
+	std::vector<const TMSim::FUnit*> Ready;
+	for (const TMSim::FUnit& Unit : Battle.Units)
+	{
+		if (PlayerCanOrder(&Unit))
+		{
+			Ready.push_back(&Unit);
+		}
+	}
+	if (Ready.empty())
+	{
+		return;
+	}
+	std::sort(Ready.begin(), Ready.end(), ActsSooner);
+	size_t Next = 0;
+	for (size_t i = 0; i < Ready.size(); ++i)
+	{
+		if (Ready[i]->Id == SelectedId)
+		{
+			Next = (i + 1) % Ready.size();
+		}
+	}
+	SelectUnit(Ready[Next]->Id);
+}
+
+void ATMBattleDirector::EnterMoveMode(bool bSprint)
+{
+	// battle.gd:954-963.
+	const TMSim::FUnit* Unit = SelectedUnit();
+	if (!Unit || Unit->bMoved || (bSprint && Unit->bActed))
+	{
+		return;
+	}
+	AimMode = EAimMode::Move;
+	bSprinting = bSprint;
+	AimSlot = -1;
+	Reachable = Battle.ReachableNodes(*Unit, bSprint);
+	PathNode = TMSim::FNode{ -9999, -9999 };
+	PathShown.clear();
+}
+
+void ATMBattleDirector::SelectAbility(int32 Slot)
+{
+	// battle.gd:990-1006. The reason an ability cannot be used is the rules'
+	// (AbilityBlockedReason), so the words are the same ones a refused order gets.
+	const TMSim::FUnit* Unit = SelectedUnit();
+	if (!PlayerCanOrder(Unit))
+	{
+		return;
+	}
+	if (AimMode == EAimMode::Ability && AimSlot == Slot)
+	{
+		CancelAim();
+		return;
+	}
+	if (Unit->bActed)
+	{
+		Tell(TEXT("Already used an ability this turn."));
+		return;
+	}
+	const std::string Blocked = Battle.AbilityBlockedReason(*Unit, Slot);
+	if (!Blocked.empty())
+	{
+		Tell(UTF8_TO_TCHAR(Blocked.c_str()));
+		return;
+	}
+	AimMode = EAimMode::Ability;
+	AimSlot = Slot;
+	bSprinting = false;
+}
+
+void ATMBattleDirector::CancelAim()
+{
+	// battle.gd:1009-1014.
+	AimMode = EAimMode::None;
+	AimSlot = -1;
+	bSprinting = false;
+}
+
+void ATMBattleDirector::OrderSelected(const TMSim::FOrder& Order)
+{
+	// battle.gd:389-395, then what it does after the order lands (:468-485).
+	const FString Refused = Submit(Order);
+	if (!Refused.IsEmpty())
+	{
+		Tell(Refused);
+		return;
+	}
+	const TMSim::FUnit* Unit = SelectedUnit();
+	if (!Unit || Order.UnitId != Unit->Id)
+	{
+		return;
+	}
+	if (!Unit->IsAlive() || !Unit->bReady || Battle.Winner != -1)
+	{
+		Deselect();
+		AutoSelect();
+		return;
+	}
+	// Acted, and walked or started a cast: nothing is left to do with the turn,
+	// so it is ended rather than left to run out.
+	if (Unit->bActed && (Unit->bMoved || Unit->IsCasting()))
+	{
+		OrderSelected(TMSim::FOrder::MakeEndTurn(Unit->Id, Unit->Serial));
+		return;
+	}
+	AimMode = EAimMode::None;
+	AimSlot = -1;
+	bSprinting = false;
+	if (!Unit->bMoved)
+	{
+		EnterMoveMode(false);
+	}
+}
+
+void ATMBattleDirector::MaintainSelection()
+{
+	// Time runs while a person thinks, so the unit they were ordering can time
+	// out, be knocked down or be stunned under them (battle.gd:468-471, 484-485).
+	const TMSim::FUnit* Unit = SelectedUnit();
+	if (Unit && (!Unit->IsAlive() || !Unit->bReady || ComputerPlays(Unit->Team) || Battle.Winner != -1))
+	{
+		Deselect();
+		Unit = nullptr;
+	}
+	else if (Unit && Unit->Serial != SelectedSerial)
+	{
+		// Its turn ended and a new one began (Relentless): start that one afresh.
+		SelectUnit(Unit->Id);
+		Unit = SelectedUnit();
+	}
+	if (SelectedId == -1 && !bPaused)
+	{
+		AutoSelect();
+		Unit = SelectedUnit();
+	}
+	// Somebody else moved or fell, so the ground this unit can reach has changed
+	// (battle.gd:482-483).
+	if (OrdersSeen != OrdersApplied)
+	{
+		OrdersSeen = OrdersApplied;
+		if (Unit && AimMode == EAimMode::Move)
+		{
+			Reachable = Battle.ReachableNodes(*Unit, bSprinting);
+			PathNode = TMSim::FNode{ -9999, -9999 };
+		}
+	}
+}
+
+void ATMBattleDirector::PickUnderCursor()
+{
+	// battle.gd:743-762, _pick.
+	bHaveHover = false;
+	HoverUnitId = -1;
+	UWorld* World = GetWorld();
+	APlayerController* Player = World ? World->GetFirstPlayerController() : nullptr;
+	float MouseX = 0.0f;
+	float MouseY = 0.0f;
+	if (!Player || !Player->GetMousePosition(MouseX, MouseY))
+	{
+		return;
+	}
+	const FVector2D Mouse(MouseX, MouseY);
+
+	// Units by where they appear on screen. The camera looks down at an angle, so
+	// a ray through a unit's chest meets the board well behind its feet; asking
+	// the screen is what makes clicking a unit land on that unit.
+	int32 Best = -1;
+	double BestPixels = 36.0;
+	for (const TMSim::FUnit& Unit : Battle.Units)
+	{
+		if (!Unit.IsAlive() && !Unit.IsKo())
+		{
+			continue;
+		}
+		// A fallen unit is lying down, and only its plate is shown.
+		const float Up = Unit.IsAlive() ? 90.0f : 20.0f;
+		FVector2D OnScreen;
+		if (Player->ProjectWorldLocationToScreen(
+			GetActorTransform().TransformPosition(WorldFor(Unit) + FVector(0.0f, 0.0f, Up)), OnScreen))
+		{
+			const double Pixels = FVector2D::Distance(OnScreen, Mouse);
+			if (Pixels < BestPixels)
+			{
+				BestPixels = Pixels;
+				Best = Unit.Id;
+			}
+		}
+	}
+
+	// The board under the pointer, in the rules' metres.
+	bool bGround = false;
+	TMSim::FVec2 Ground;
+	FHitResult Hit;
+	if (Player->GetHitResultAtScreenPosition(Mouse, ECC_Visibility, false, Hit))
+	{
+		const FVector Local = GetActorTransform().InverseTransformPosition(Hit.ImpactPoint);
+		const TMSim::FVec2 Point(static_cast<float>(Local.X / TileSize), static_cast<float>(Local.Y / TileSize));
+		if (Battle.InBounds(Point))
+		{
+			bGround = true;
+			Ground = Point;
+		}
+	}
+
+	// Walking wants the ground under the pointer; aiming and picking want the unit.
+	if (Best >= 0 && !(AimMode == EAimMode::Move && bGround))
+	{
+		bHaveHover = true;
+		HoverUnitId = Best;
+		HoverPoint = FindIn(Battle, Best)->Pos;
+		return;
+	}
+	if (bGround)
+	{
+		bHaveHover = true;
+		HoverPoint = Ground;
+		if (Best >= 0)
+		{
+			HoverUnitId = Best;
+		}
+		else if (const TMSim::FUnit* Near = Battle.UnitNear(Ground, 0.5f))
+		{
+			HoverUnitId = Near->Id;
+		}
+	}
+}
+
+ATMBattleDirector::FAim ATMBattleDirector::Aim()
+{
+	// battle.gd:810-833, _aim. Pointing at a unit aims at that unit, and a cast
+	// follows it; pointing at the ground aims at that spot.
+	FAim Out;
+	const TMSim::FUnit* Unit = SelectedUnit();
+	const TMSim::FAbility* Ability = Unit ? TMSim::JobAbility(Unit->Job, AimSlot) : nullptr;
+	if (!Ability)
+	{
+		return Out;
+	}
+	if (Ability->MaxRange == 0.0f)
+	{
+		// Centred on the user: click the user, or anywhere in the area.
+		Out.bHave = true;
+		Out.Point = Unit->Pos;
+		Out.Follow = Unit->Id;
+		const float Near = FMath::Max(Ability->Aoe, 1.0f) + 0.5f;
+		if (!bHaveHover || HoverPoint.DistanceTo(Unit->Pos) > Near)
+		{
+			Out.Why = FString::Printf(TEXT("Click on %hs to use %hs."), Unit->Job.c_str(), Ability->Name.c_str());
+			return Out;
+		}
+	}
+	else
+	{
+		if (!bHaveHover)
+		{
+			return Out;
+		}
+		Out.bHave = true;
+		Out.Point = TMSim::FMap::Snap(HoverPoint);
+		const TMSim::FUnit* Target = FindIn(Battle, HoverUnitId);
+		if (Target && FitsTarget(*Unit, *Ability, *Target))
+		{
+			Out.Point = Target->Pos;
+			Out.Follow = Target->Id;
+		}
+		else if (Ability->Target == TMSim::ETargetSide::KoAlly)
+		{
+			Out.Why = TEXT("Pick a knocked-out ally.");
+			return Out;
+		}
+	}
+	// Range, sight and line of sight are the rules' to judge, and Godot's own
+	// checks here (:827-832) are the same ones ValidateAbility makes. Asking the
+	// rules means the reason shown is exactly the reason an order would get.
+	const std::string Refused = Battle.ValidateAbility(Unit->Id, AimSlot, Out.Point, Out.Follow);
+	Out.bOk = Refused.empty();
+	Out.Why = UTF8_TO_TCHAR(Refused.c_str());
+	return Out;
+}
+
+void ATMBattleDirector::OnClick()
+{
+	// battle.gd:765-803, _on_click.
+	PickUnderCursor();
+	if (!bHaveHover)
+	{
+		return;
+	}
+	const TMSim::FUnit* Unit = SelectedUnit();
+	if (PlayerCanOrder(Unit))
+	{
+		if (AimMode == EAimMode::Move)
+		{
+			const TMSim::FNode Node = TMSim::FMap::NodeOf(HoverPoint);
+			const bool bReachable = std::any_of(Reachable.begin(), Reachable.end(),
+				[&Node](const std::pair<TMSim::FNode, double>& Entry) { return Entry.first == Node; });
+			if (bReachable && Node != TMSim::FMap::NodeOf(Unit->Pos))
+			{
+				OrderSelected(TMSim::FOrder::MakeMove(Unit->Id, Unit->Serial, TMSim::FMap::NodePos(Node), bSprinting));
+				return;
+			}
+		}
+		else if (AimMode == EAimMode::Ability)
+		{
+			const FAim Where = Aim();
+			if (Where.bOk)
+			{
+				OrderSelected(TMSim::FOrder::MakeUseAbility(Unit->Id, Unit->Serial, AimSlot, Where.Point, Where.Follow));
+			}
+			else if (!Where.Why.IsEmpty())
+			{
+				// Godot walks into range and fires on arrival when the target is
+				// merely too far (battle.gd:791, _walk_into_range). Not ported yet:
+				// here the person walks there first and aims again.
+				Tell(Where.Why);
+			}
+			return;
+		}
+	}
+	// Anyone else of this machine's who is ready: take them up instead.
+	const TMSim::FUnit* Clicked = FindIn(Battle, HoverUnitId);
+	if (Clicked && Clicked != Unit && PlayerCanOrder(Clicked))
+	{
+		SelectUnit(Clicked->Id);
+	}
+}
+
+void ATMBattleDirector::Tell(const FString& What)
+{
+	Notice = What;
+	NoticeLeft = 3.0f;
+	UE_LOG(LogTemp, Log, TEXT("player: %s"), *What);
+}
+
+FVector ATMBattleDirector::BoardPoint(const TMSim::FVec2& Point, float Lift) const
+{
+	const int Level = Battle.Map.NodeLevel(TMSim::FMap::NodeOf(Point));
+	return GetActorTransform().TransformPosition(WorldFromMetres(Point, Level) + FVector(0.0f, 0.0f, Lift));
+}
+
+void ATMBattleDirector::DrawPlayerAids()
+{
+	// Drawn with the engine's debug lines: quick, and enough to play with. They
+	// are compiled out of a shipping build, so the proper board markings belong
+	// with the HUD slice (feat-hud-forecast) before anything ships.
+#if ENABLE_DRAW_DEBUG
+	UWorld* World = GetWorld();
+	const TMSim::FUnit* Unit = SelectedUnit();
+	if (!World || !PlayerCanOrder(Unit))
+	{
+		return;
+	}
+	const FVector Flat(1.0f, 0.0f, 0.0f);
+	const FVector Across(0.0f, 1.0f, 0.0f);
+
+	// Whose orders these are.
+	DrawDebugCircle(World, BoardPoint(Unit->Pos, 6.0f), 0.45f * TileSize, 32, FColor(90, 220, 255),
+		false, -1.0f, 0, 3.0f, Flat, Across, false);
+
+	if (AimMode == EAimMode::Move)
+	{
+		// Every spot it can walk to, and the way to the one under the pointer.
+		const FColor Spot = bSprinting ? FColor(255, 170, 60) : FColor(80, 160, 255);
+		for (const std::pair<TMSim::FNode, double>& Entry : Reachable)
+		{
+			DrawDebugPoint(World, BoardPoint(TMSim::FMap::NodePos(Entry.first)), 7.0f, Spot, false, -1.0f, 0);
+		}
+		if (bHaveHover)
+		{
+			const TMSim::FNode Node = TMSim::FMap::NodeOf(HoverPoint);
+			if (Node != PathNode)
+			{
+				PathNode = Node;
+				PathShown.clear();
+				const bool bReachable = std::any_of(Reachable.begin(), Reachable.end(),
+					[&Node](const std::pair<TMSim::FNode, double>& Entry) { return Entry.first == Node; });
+				if (bReachable)
+				{
+					PathShown = Battle.PathTo(*Unit, Node, bSprinting);
+				}
+			}
+			for (size_t i = 1; i < PathShown.size(); ++i)
+			{
+				DrawDebugLine(World, BoardPoint(PathShown[i - 1], 10.0f), BoardPoint(PathShown[i], 10.0f),
+					FColor(255, 230, 90), false, -1.0f, 0, 4.0f);
+			}
+		}
+	}
+	else if (AimMode == EAimMode::Ability)
+	{
+		const TMSim::FAbility* Ability = TMSim::JobAbility(Unit->Job, AimSlot);
+		if (!Ability)
+		{
+			return;
+		}
+		// How far it reaches, and the ring it cannot be used inside.
+		const FColor Reach(200, 200, 215);
+		if (Ability->MaxRange > 0.0f)
+		{
+			DrawDebugCircle(World, BoardPoint(Unit->Pos, 8.0f), Ability->MaxRange * TileSize, 72, Reach,
+				false, -1.0f, 0, 2.0f, Flat, Across, false);
+		}
+		if (Ability->MinRange > 0.0f)
+		{
+			DrawDebugCircle(World, BoardPoint(Unit->Pos, 8.0f), Ability->MinRange * TileSize, 48, FColor(150, 90, 90),
+				false, -1.0f, 0, 2.0f, Flat, Across, false);
+		}
+
+		const FAim Where = Aim();
+		if (!Where.bHave)
+		{
+			return;
+		}
+		const float Radius = FMath::Max(Ability->Aoe, TMSim::Ground::HitRadius) * TileSize;
+		DrawDebugCircle(World, BoardPoint(Where.Point, 12.0f), Radius, 48,
+			Where.bOk ? FColor(110, 255, 140) : FColor(255, 90, 80), false, -1.0f, 0, 3.0f, Flat, Across, false);
+		if (!Where.bOk)
+		{
+			return;
+		}
+
+		// The forecast: who it would reach and what it would do to each, from the
+		// same Preview the rules resolve with. The miss chance is the rules' too.
+		// It does not say who a cast will have reached by the time it lands.
+		const std::vector<TMSim::FHit> Hits = Battle.Preview(*Unit, AimSlot, Unit->Pos, Where.Point);
+		for (const TMSim::FHit& Hit : Hits)
+		{
+			const TMSim::FUnit* Target = FindIn(Battle, Hit.UnitId);
+			if (!Target)
+			{
+				continue;
+			}
+			FString Text;
+			FColor Tint = FColor::White;
+			switch (Ability->Effect)
+			{
+			case TMSim::EEffect::Damage:
+			{
+				Text = FString::Printf(TEXT("-%d"), Hit.Amount);
+				const int32 Miss = Battle.EvadeChance(*Target, *Ability, Unit);
+				if (Miss > 0)
+				{
+					Text += FString::Printf(TEXT("  %d%% miss"), Miss);
+				}
+				Tint = FColor(255, 120, 95);
+				break;
+			}
+			case TMSim::EEffect::Heal:
+				Text = FString::Printf(TEXT("+%d"), Hit.Amount);
+				Tint = FColor(120, 255, 135);
+				break;
+			case TMSim::EEffect::Revive:
+				Text = FString::Printf(TEXT("up with %d"), Hit.Amount);
+				Tint = FColor(255, 242, 153);
+				break;
+			default:
+				Text = Ability->HasStatus() ? FString(UTF8_TO_TCHAR(Ability->StatusId.c_str())) : FString(TEXT("affected"));
+				Tint = FColor(224, 153, 255);
+				break;
+			}
+			DrawDebugString(World, BoardPoint(Target->Pos, 225.0f), Text, nullptr, Tint, -1.0f, true, 1.3f);
+		}
+	}
+#endif
+}
+
+void ATMBattleDirector::DrawPlayerPanel(float DeltaSeconds)
+{
+	// A plain text panel until the HUD slice gives this a proper screen. It uses
+	// the engine's on-screen messages, which a shipping build leaves out.
+	if (!GEngine)
+	{
+		return;
+	}
+	const float Tps = static_cast<float>(TMSim::Pace::TicksPerSecond);
+	FString Panel;
+
+	if (Battle.Winner != -1)
+	{
+		if (Battle.Winner == TMSim::FBattle::Draw)
+		{
+			Panel = TEXT("Nobody is left standing.");
+		}
+		else
+		{
+			Panel = ComputerPlays(Battle.Winner) ? TEXT("The computer wins.") : TEXT("You win!");
+		}
+		Panel += TEXT("\nR: another battle");
+	}
+	else if (const TMSim::FUnit* Unit = SelectedUnit())
+	{
+		Panel = FString::Printf(TEXT("%hs %d   hp %d/%d   %.1fs to act%s%s"),
+			Unit->Job.c_str(), Unit->Id, Unit->Hp, Unit->MaxHp(), Unit->Clock / Tps,
+			Unit->bMoved ? TEXT("   walked") : TEXT(""),
+			Unit->bActed ? TEXT("   acted") : TEXT(""));
+		for (int32 Slot = 0; Slot < 4; ++Slot)
+		{
+			const TMSim::FAbility* Ability = TMSim::JobAbility(Unit->Job, Slot);
+			if (!Ability)
+			{
+				continue;
+			}
+			const std::string Blocked = Battle.AbilityBlockedReason(*Unit, Slot);
+			Panel += FString::Printf(TEXT("\n  %d  %hs%s%hs%s"), Slot + 1, Ability->Name.c_str(),
+				Blocked.empty() ? TEXT("") : TEXT("   -- "), Blocked.c_str(),
+				AimMode == EAimMode::Ability && AimSlot == Slot ? TEXT("   <") : TEXT(""));
+		}
+		switch (AimMode)
+		{
+		case EAimMode::Move:
+			Panel += bSprinting
+				? TEXT("\nSprinting: click an orange dot. No ability after.")
+				: TEXT("\nClick a blue dot to walk there.");
+			break;
+		case EAimMode::Ability:
+			Panel += TEXT("\nClick a target. Green ring: it can be used there.");
+			break;
+		default:
+			Panel += Unit->bMoved ? TEXT("\n1-4 to use an ability, or Enter to end the turn.")
+				: TEXT("\nSpace to walk, 1-4 for an ability, Enter to end the turn.");
+			break;
+		}
+		if (bPaused)
+		{
+			Panel += TEXT("\nPAUSED -- P to carry on");
+		}
+	}
+	else
+	{
+		// Nobody of ours is ready: say who is next and when.
+		const TMSim::FUnit* Next = nullptr;
+		int32 Soonest = 0;
+		for (const TMSim::FUnit& Candidate : Battle.Units)
+		{
+			if (!Candidate.IsAlive() || ComputerPlays(Candidate.Team))
+			{
+				continue;
+			}
+			const int32 Ticks = Battle.TicksToReady(Candidate);
+			if (!Next || Ticks < Soonest)
+			{
+				Next = &Candidate;
+				Soonest = Ticks;
+			}
+		}
+		Panel = Next
+			? FString::Printf(TEXT("Waiting: %hs %d is up in %.1fs"), Next->Job.c_str(), Next->Id, Soonest / Tps)
+			: FString(TEXT("Watching."));
+		if (bPaused)
+		{
+			Panel += TEXT("\nPAUSED -- P to carry on");
+		}
+	}
+	Panel += TEXT("\n\nSpace walk   Shift sprint   1-4 ability   Enter end turn   Tab next   Esc cancel   P pause");
+	GEngine->AddOnScreenDebugMessage(PanelKey, 0.0f, FColor(235, 235, 245), Panel, false, FVector2D(1.2f, 1.2f));
+
+	NoticeLeft -= DeltaSeconds;
+	if (NoticeLeft > 0.0f && !Notice.IsEmpty())
+	{
+		GEngine->AddOnScreenDebugMessage(NoticeKey, 0.0f, FColor(255, 215, 90), Notice, false, FVector2D(1.2f, 1.2f));
+	}
+
+	// The last few lines of the fight, so it can be followed without the log file.
+	const int32 Shown = 8;
+	TArray<FString> Recent;
+	for (int32 i = FMath::Max(0, Log.Num() - Shown); i < Log.Num(); ++i)
+	{
+		Recent.Add(Log[i]);
+	}
+	if (Recent.Num() > 0)
+	{
+		GEngine->AddOnScreenDebugMessage(LogKey, 0.0f, FColor(170, 175, 190), FString::Join(Recent, TEXT("\n")));
 	}
 }
