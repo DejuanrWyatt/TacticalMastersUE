@@ -301,6 +301,10 @@ private:
 	bool bMenuOpen = false;
 	/** The seed the battle on the board was started from, to say and to replay. */
 	uint64 BattleSeed = 12345;
+	/** Seconds into -tmhudshots, or -1 when not taking pictures of the panels. */
+	float HudShotsAt = -1.0f;
+	/** A picture of the screen, HUD and all, under Saved/Match. */
+	void CaptureNamed(const TCHAR* Name);
 	/** Seconds into -tmmenushots, or -1 when not taking menu pictures. */
 	float MenuShotsAt = -1.0f;
 
@@ -411,6 +415,52 @@ private:
 
 	FString Notice;
 	float NoticeLeft = 0.0f;
+
+	// ------------------------------------------------ what a person can look at
+	//
+	// The rest of the Godot HUD: a card for a clicked unit and the threat it
+	// poses, the list of every unit, the log window, the Unit Guide, and fog of
+	// war. All of it is looking, not playing: nothing here reaches the rules
+	// except through questions that change nothing.
+
+	/** A unit clicked on that is not taking orders, shown on its own card, or -1 (battle.gd:799-803). */
+	int32 InspectedId = -1;
+
+	/**
+	 * Where an inspected enemy could walk this turn and how far its longest attack
+	 * reaches from where it stands (battle.gd:512-527). Worked out again only when
+	 * that unit moves or takes a turn.
+	 */
+	std::vector<TMSim::FNode> ThreatNodes;
+	float ThreatReach = 0.0f;
+	FString ThreatSignature;
+	void UpdateThreat();
+
+	/**
+	 * The side this screen is played from, whose sight decides what is shown, or
+	 * -1 to show everything (two people at one screen, or watching the computer).
+	 */
+	int32 ViewerTeam() const;
+	/** Whether this screen may show that unit (battle.gd:302-303, _is_seen). */
+	bool IsSeen(const TMSim::FUnit& Unit) const;
+	/** Whether this screen may show what happens at a spot (battle.gd:306-307). */
+	bool IsPointSeen(const TMSim::FVec2& Point) const;
+
+	/** The log: shown or not, how many lines, and how far scrolled back. */
+	bool bShowLog = true;
+	bool bLogLarge = false;
+	int32 LogScroll = 0;
+
+	/** The list of every unit on the field (hud.gd:515-606). */
+	bool bShowField = false;
+
+	/** The Unit Guide: open, which class it shows, and which class the numbers are worked out against. */
+	bool bGuideOpen = false;
+	int32 GuideJob = 0;
+	int32 GuideAgainst = 0;
+	/** Opening the guide in a local battle pauses it, and closing it resumes (battle.gd:1039-1051). */
+	bool bPausedByGuide = false;
+	void ToggleGuide();
 
 	UPROPERTY()
 	TObjectPtr<ACameraActor> Watcher = nullptr;

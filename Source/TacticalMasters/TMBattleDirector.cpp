@@ -62,6 +62,10 @@ void ATMBattleDirector::BeginPlay()
 		bComputerPlaysTeam0 = false;
 		bComputerPlaysTeam1 = true;
 		SetUpPlayerInput();
+		if (FParse::Param(FCommandLine::Get(), TEXT("tmhudshots")))
+		{
+			HudShotsAt = 0.0f;
+		}
 	}
 	else if (FApp::IsUnattended() || FParse::Param(FCommandLine::Get(), TEXT("tmwatch")))
 	{
@@ -116,6 +120,10 @@ void ATMBattleDirector::ClearBattle()
 	bBuilt = false;
 	// A selection means nothing once the battle it was in is gone.
 	Deselect();
+	InspectedId = -1;
+	ThreatSignature.Reset();
+	ThreatNodes.clear();
+	LogScroll = 0;
 	bSaidWon = false;
 }
 
@@ -328,7 +336,7 @@ void ATMBattleDirector::RefreshPlates()
 		if (!Unit.IsAlive())
 		{
 			// A fallen unit still says so while it can be raised, then goes quiet.
-			Plate->SetVisibility(Unit.IsKo());
+			Plate->SetVisibility(Unit.IsKo() && IsSeen(Unit));
 			if (Unit.IsKo())
 			{
 				Plate->SetText(FText::FromString(FString::Printf(TEXT("%hs  down %.0fs"),
@@ -359,7 +367,8 @@ void ATMBattleDirector::RefreshPlates()
 		// Blue and red, which is the only thing telling the sides apart until the
 		// classes have their own materials.
 		Plate->SetTextRenderColor(Unit.Team == 0 ? FColor(120, 180, 255) : FColor(255, 130, 120));
-		Plate->SetVisibility(true);
+		// Fog of war: what this side cannot see, this screen does not show.
+		Plate->SetVisibility(IsSeen(Unit));
 		Plate->SetRelativeLocation(WorldFor(Unit) + FVector(0.0f, 0.0f, 150.0f));
 	}
 }
@@ -379,12 +388,12 @@ void ATMBattleDirector::RefreshVisuals()
 		// A Paragon mesh does not face along its actor's +X, hence the offset.
 		const float Yaw = FMath::RadiansToDegrees(FMath::Atan2(Unit.Facing.Y, Unit.Facing.X)) + 180.0f;
 		UnitVisuals[i]->SetRelativeRotation(FRotator(0.0f, Yaw, 0.0f));
-		UnitVisuals[i]->SetVisibility(Unit.IsAlive());
+		UnitVisuals[i]->SetVisibility(Unit.IsAlive() && IsSeen(Unit));
 
 		if (ReadyLights.IsValidIndex(i) && ReadyLights[i])
 		{
 			ReadyLights[i]->SetRelativeLocation(Where + FVector(0.0f, 0.0f, 55.0f));
-			ReadyLights[i]->SetVisibility(Unit.bReady && Unit.IsAlive());
+			ReadyLights[i]->SetVisibility(Unit.bReady && Unit.IsAlive() && IsSeen(Unit));
 		}
 	}
 }
@@ -588,7 +597,8 @@ void ATMBattleDirector::ShowEvents(const TMSim::FTickReport& Report)
 		}
 
 		const TMSim::FUnit* Unit = Battle.FindUnit(Event.Unit);
-		if (!Unit)
+		// Nothing rises off a unit this side cannot see (battle.gd:450-452).
+		if (!Unit || !IsSeen(*Unit))
 		{
 			continue;
 		}
@@ -758,7 +768,7 @@ void ATMBattleDirector::AdvanceFloaters(float DeltaSeconds)
 			const TMSim::FUnit* Unit = Battle.FindUnit(Index);
 			Light->SetLightColor(ReadyColour);
 			Light->SetIntensity(ReadyLightBrightness);
-			Light->SetVisibility(Unit && Unit->bReady && Unit->IsAlive());
+			Light->SetVisibility(Unit && Unit->bReady && Unit->IsAlive() && IsSeen(*Unit));
 			Flashes.RemoveAt(i);
 			continue;
 		}
@@ -1066,6 +1076,65 @@ void ATMBattleDirector::Tick(float DeltaSeconds)
 		PickUnderCursor();
 		UpdateHoverPath();
 	}
+	UpdateThreat();
+
+	if (HudShotsAt >= 0.0f)
+	{
+		// -tmhudshots: the panels a person opens by clicking, opened here on a
+		// timer so a run nobody is at can take pictures of them. Real seconds,
+		// not battle time, because the guide pauses the battle.
+		// It waits for an enemy to come into sight, since a card is only shown
+		// for a unit this side can see, and then holds the clock still (from
+		// 14 s on) while the pictures are taken.
+		if (HudShotsAt < 14.0f)
+		{
+			HudShotsAt += DeltaSeconds;
+			if (HudShotsAt >= 14.0f)
+			{
+				for (const TMSim::FUnit& Unit : Battle.Units)
+				{
+					if (Unit.Team == 1 && Unit.IsAlive() && IsSeen(Unit) && InspectedId < 0)
+					{
+						InspectedId = Unit.Id;
+					}
+				}
+				if (InspectedId < 0)
+				{
+					HudShotsAt = 13.0f;  // nobody in sight yet: look again in a second
+				}
+				else
+				{
+					bShowField = true;
+					bLogLarge = true;
+					bPaused = true;
+				}
+			}
+		}
+		const float Before = HudShotsAt;
+		if (Before >= 14.0f)
+		{
+			HudShotsAt += DeltaSeconds;
+		}
+		auto Passed = [Before, this](float At) { return Before < At && HudShotsAt >= At; };
+		if (Passed(15.5f))
+		{
+			CaptureNamed(TEXT("hud_panels.png"));
+		}
+		if (Passed(16.0f))
+		{
+			ToggleGuide();
+		}
+		if (Passed(17.5f))
+		{
+			CaptureNamed(TEXT("hud_guide.png"));
+		}
+		if (Passed(18.0f))
+		{
+			ToggleGuide();
+			bPaused = false;
+			HudShotsAt = -1.0f;
+		}
+	}
 
 	// Paused, nothing moves: not the clock and not the computer. Nothing is
 	// submitted for it either -- a pause is time not passing, and time only
@@ -1226,7 +1295,7 @@ void ATMBattleDirector::SetUpPlayerInput()
 		EKeys::LeftMouseButton, EKeys::RightMouseButton,
 		EKeys::One, EKeys::Two, EKeys::Three, EKeys::Four,
 		EKeys::SpaceBar, EKeys::LeftShift, EKeys::Enter, EKeys::Tab, EKeys::Escape,
-		EKeys::P, EKeys::R
+		EKeys::P, EKeys::R, EKeys::L, EKeys::U, EKeys::MouseScrollUp, EKeys::MouseScrollDown
 	};
 	for (const FKey& Key : Keys)
 	{
@@ -1245,6 +1314,15 @@ void ATMBattleDirector::OnKey(FKey Key)
 		OnClick();
 		return;
 	}
+	// The Unit Guide covers the screen: only U or Esc closes it.
+	if (bGuideOpen)
+	{
+		if (Key == EKeys::U || Key == EKeys::Escape)
+		{
+			ToggleGuide();
+		}
+		return;
+	}
 	// Away from a battle only the mouse and Esc mean anything: Esc steps back
 	// from the setup to the title.
 	if (Screen != EScreen::Battle)
@@ -1252,6 +1330,10 @@ void ATMBattleDirector::OnKey(FKey Key)
 		if (Key == EKeys::Escape && Screen == EScreen::Setup)
 		{
 			OpenTitle();
+		}
+		else if (Key == EKeys::U)
+		{
+			ToggleGuide();
 		}
 		return;
 	}
@@ -1327,6 +1409,34 @@ void ATMBattleDirector::OnKey(FKey Key)
 		{
 			OrderSelected(TMSim::FOrder::MakeEndTurn(Sel->Id, Sel->Serial));
 		}
+	}
+	else if (Key == EKeys::L)
+	{
+		// Shown, shown large, hidden.
+		if (!bShowLog)
+		{
+			bShowLog = true;
+			bLogLarge = false;
+		}
+		else if (!bLogLarge)
+		{
+			bLogLarge = true;
+		}
+		else
+		{
+			bShowLog = false;
+		}
+		LogScroll = 0;
+	}
+	else if (Key == EKeys::U)
+	{
+		ToggleGuide();
+	}
+	else if (Key == EKeys::MouseScrollUp || Key == EKeys::MouseScrollDown)
+	{
+		// The wheel scrolls the log back through the fight; the newest line is
+		// never more than a few turns of the wheel away.
+		LogScroll = FMath::Clamp(LogScroll + (Key == EKeys::MouseScrollUp ? 1 : -1), 0, FMath::Max(0, Log.Num() - 1));
 	}
 	else if (Key == EKeys::Tab)
 	{
@@ -1584,7 +1694,7 @@ void ATMBattleDirector::PickUnderCursor()
 	double BestPixels = 36.0;
 	for (const TMSim::FUnit& Unit : Battle.Units)
 	{
-		if (!Unit.IsAlive() && !Unit.IsKo())
+		if ((!Unit.IsAlive() && !Unit.IsKo()) || !IsSeen(Unit))
 		{
 			continue;
 		}
@@ -1636,7 +1746,10 @@ void ATMBattleDirector::PickUnderCursor()
 		}
 		else if (const TMSim::FUnit* Near = Battle.UnitNear(Ground, 0.5f))
 		{
-			HoverUnitId = Near->Id;
+			if (IsSeen(*Near))
+			{
+				HoverUnitId = Near->Id;
+			}
 		}
 	}
 }
@@ -1711,8 +1824,8 @@ void ATMBattleDirector::OnClick()
 			return;
 		}
 	}
-	// Behind a menu, the board takes no clicks.
-	if (Screen != EScreen::Battle || bMenuOpen)
+	// Behind a menu or the guide, the board takes no clicks.
+	if (Screen != EScreen::Battle || bMenuOpen || bGuideOpen)
 	{
 		return;
 	}
@@ -1752,11 +1865,20 @@ void ATMBattleDirector::OnClick()
 			return;
 		}
 	}
-	// Anyone else of this machine's who is ready: take them up instead.
+	// Anyone else of this machine's who is ready: take them up instead. Anyone
+	// else at all: open or close its card. Nobody: close it (battle.gd:796-803).
 	const TMSim::FUnit* Clicked = FindIn(Battle, HoverUnitId);
 	if (Clicked && Clicked != Unit && PlayerCanOrder(Clicked))
 	{
 		SelectUnit(Clicked->Id);
+	}
+	else if (Clicked && Clicked != Unit && IsSeen(*Clicked))
+	{
+		InspectedId = InspectedId == Clicked->Id ? -1 : Clicked->Id;
+	}
+	else if (!Clicked)
+	{
+		InspectedId = -1;
 	}
 }
 
@@ -1841,10 +1963,47 @@ void ATMBattleDirector::PressHudButton(const FTMHudButton& Button)
 		{
 			SelectUnit(Picked->Id);
 		}
+		else if (Picked && Picked->Id != SelectedId && IsSeen(*Picked))
+		{
+			// Anyone else: its card, as a click on it on the board would give.
+			InspectedId = InspectedId == Picked->Id ? -1 : Picked->Id;
+		}
 		break;
 	}
 	case ETMHudAction::NewBattle:
 		OnKey(EKeys::R);
+		break;
+	// The corner buttons (hud.gd:608-623) and the cards.
+	case ETMHudAction::ToggleLog:
+		bShowLog = !bShowLog;
+		LogScroll = 0;
+		break;
+	case ETMHudAction::GrowLog:
+		bLogLarge = !bLogLarge;
+		break;
+	case ETMHudAction::ToggleField:
+		bShowField = !bShowField;
+		break;
+	case ETMHudAction::ToggleGuide:
+		ToggleGuide();
+		break;
+	case ETMHudAction::Pause:
+		OnKey(EKeys::P);
+		break;
+	case ETMHudAction::OpenMenu:
+		if (Battle.Winner == -1)
+		{
+			bMenuOpen = true;
+		}
+		break;
+	case ETMHudAction::CloseCard:
+		InspectedId = -1;
+		break;
+	case ETMHudAction::GuideJob:
+		GuideJob = Button.Value;
+		break;
+	case ETMHudAction::GuideAgainst:
+		GuideAgainst = (GuideAgainst + 1) % FMath::Max(1, static_cast<int32>(TMSim::AllJobs().size()));
 		break;
 	default:
 		PressMenuButton(Button);
@@ -2071,4 +2230,118 @@ void ATMBattleDirector::PressMenuButton(const FTMHudButton& Button)
 	default:
 		break;
 	}
+}
+// ============================================================ what can be seen
+
+int32 ATMBattleDirector::ViewerTeam() const
+{
+	// One person against the computer sees what their side sees. Two people at
+	// one screen, or nobody playing at all, see everything (battle.gd viewer_team).
+	if (Screen != EScreen::Battle || ComputerPlays(0) == ComputerPlays(1))
+	{
+		return -1;
+	}
+	return ComputerPlays(0) ? 1 : 0;
+}
+
+bool ATMBattleDirector::IsSeen(const TMSim::FUnit& Unit) const
+{
+	const int32 Viewer = ViewerTeam();
+	return Viewer < 0 || Battle.Winner != -1 || Unit.Team == Viewer || Battle.CanSee(Viewer, Unit.Pos);
+}
+
+bool ATMBattleDirector::IsPointSeen(const TMSim::FVec2& Point) const
+{
+	const int32 Viewer = ViewerTeam();
+	return Viewer < 0 || Battle.Winner != -1 || Battle.CanSee(Viewer, Point);
+}
+
+void ATMBattleDirector::UpdateThreat()
+{
+	// A card stays open only for a unit that is still there to be looked at, and
+	// is not the one being ordered (hud.gd _update_inspect, battle.gd:494-497).
+	const TMSim::FUnit* Unit = FindIn(Battle, InspectedId);
+	if (Unit && (((!Unit->IsAlive()) && !Unit->IsKo()) || !IsSeen(*Unit) || Unit->Id == SelectedId))
+	{
+		InspectedId = -1;
+		Unit = nullptr;
+	}
+
+	// The threat is drawn only for an enemy of whoever is looking.
+	const TMSim::FUnit* Selected = SelectedUnit();
+	const int32 AllyTeam = Selected ? Selected->Team : (ViewerTeam() >= 0 ? ViewerTeam() : 0);
+	if (!Unit || !Unit->IsAlive() || Unit->Team == AllyTeam)
+	{
+		ThreatSignature.Reset();
+		ThreatNodes.clear();
+		ThreatReach = 0.0f;
+		return;
+	}
+	const FString Signature = FString::Printf(TEXT("%d:%.2f,%.2f:%d:%d"),
+		Unit->Id, Unit->Pos.X, Unit->Pos.Y, Unit->Serial, Unit->bMoved ? 1 : 0);
+	if (Signature == ThreatSignature)
+	{
+		return;
+	}
+	ThreatSignature = Signature;
+	ThreatNodes.clear();
+	for (const std::pair<TMSim::FNode, double>& Entry : Battle.ReachableNodes(*Unit))
+	{
+		ThreatNodes.push_back(Entry.first);
+	}
+	ThreatReach = 0.0f;
+	for (int32 Slot = 0; Slot < 4; ++Slot)
+	{
+		const TMSim::FAbility* Ability = TMSim::JobAbility(Unit->Job, Slot);
+		if (Ability && Ability->Effect == TMSim::EEffect::Damage)
+		{
+			ThreatReach = FMath::Max(ThreatReach, Ability->MaxRange);
+		}
+	}
+}
+
+void ATMBattleDirector::ToggleGuide()
+{
+	bGuideOpen = !bGuideOpen;
+	// A local battle stops while the guide is read, and starts again when it is
+	// closed -- unless it was already paused, which stays as it was.
+	if (Screen == EScreen::Battle && Battle.Winner == -1)
+	{
+		if (bGuideOpen && !bPaused)
+		{
+			bPaused = true;
+			bPausedByGuide = true;
+		}
+		else if (!bGuideOpen && bPausedByGuide)
+		{
+			bPaused = false;
+			bPausedByGuide = false;
+		}
+	}
+	// Open on the class being looked at, if there is one.
+	if (bGuideOpen)
+	{
+		const TMSim::FUnit* Looking = SelectedUnit();
+		if (!Looking)
+		{
+			Looking = FindIn(Battle, InspectedId);
+		}
+		if (Looking)
+		{
+			const std::vector<const TMSim::FJobDef*>& Jobs = TMSim::AllJobs();
+			for (size_t i = 0; i < Jobs.size(); ++i)
+			{
+				if (Jobs[i]->Id == Looking->Job)
+				{
+					GuideJob = static_cast<int32>(i);
+				}
+			}
+		}
+	}
+}
+void ATMBattleDirector::CaptureNamed(const TCHAR* Name)
+{
+	const FString Where = FPaths::ProjectSavedDir() / TEXT("Match") / Name;
+	FScreenshotRequest::RequestScreenshot(Where, true, false);
+	UE_LOG(LogTemp, Log, TEXT("CAPTURE %s"), *Where);
 }

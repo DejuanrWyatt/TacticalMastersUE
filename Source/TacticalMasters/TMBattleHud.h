@@ -58,6 +58,24 @@ enum class ETMHudAction : uint8
 	MenuRestart,
 	MenuSetup,
 	MenuTitle,
+
+	// The corner buttons, the log, the cards and the Unit Guide. GuideJob's value is the class's index.
+	ToggleLog,
+	GrowLog,
+	ToggleField,
+	ToggleGuide,
+	Pause,
+	OpenMenu,
+	CloseCard,
+	GuideJob,
+	GuideAgainst,
+};
+
+/** Words shown when the pointer rests on part of the HUD: how a number is worked out. */
+struct FTMHudTip
+{
+	FBox2D Area;
+	FString Text;
 };
 
 struct FTMHudButton
@@ -92,6 +110,26 @@ private:
 	void DrawTitle(ATMBattleDirector& Director);
 	void DrawSetup(ATMBattleDirector& Director);
 	void DrawBattleMenu(ATMBattleDirector& Director);
+	void DrawCornerButtons(ATMBattleDirector& Director);
+	void DrawField(ATMBattleDirector& Director);
+	void DrawInspectCard(ATMBattleDirector& Director);
+	void DrawGuide(ATMBattleDirector& Director);
+	void DrawTooltip();
+
+	/** Who is casting what at this unit, as a line per caster (hud.gd:1123-1150). Returns the height used. */
+	float DrawIncoming(ATMBattleDirector& Director, const TMSim::FUnit& Unit, float X, float Y, float W);
+	/** A unit's gauges and numbers, as the selected-unit card and the inspect card both show them. Returns the height used. */
+	float DrawUnitBody(ATMBattleDirector& Director, const TMSim::FUnit& Unit, float X, float Y, float W);
+
+	// How numbers are worked out, in words (game_state.gd:952-1016).
+	FString ExplainTurn(ATMBattleDirector& Director, const TMSim::FUnit& Unit) const;
+	FString ExplainCountdown(ATMBattleDirector& Director, const TMSim::FUnit& Unit) const;
+	FString ExplainMove(ATMBattleDirector& Director, const TMSim::FUnit& Unit) const;
+	FString ExplainSight(ATMBattleDirector& Director, const TMSim::FUnit& Unit) const;
+	FString ExplainAbility(ATMBattleDirector& Director, const TMSim::FUnit& Unit, int32 Slot) const;
+	static FString BuffText(const TMSim::FUnit& Unit);
+
+	void AddTip(float X, float Y, float W, float H, const FString& Tip);
 
 	/** A button on a menu: a label, an optional second line, and a highlight under the pointer. */
 	void MenuButton(float X, float Y, float W, float H, const FString& Label, ETMHudAction Action, int32 Value = -1,
@@ -120,6 +158,14 @@ private:
 	float S = 1.0f;
 
 	TArray<FTMHudButton> Buttons;
+	TArray<FTMHudTip> Tips;
+
+	/** Where each turn chip is drawn, so it glides rather than jumps (hud.gd:1297-1311). */
+	TMap<int32, FVector2D> ChipPlace;
+	TMap<int32, float> ChipScale;
+
+	/** The bottom of the log window, so the field list can sit under it. */
+	float LogBottom = 0.0f;
 
 	/** The top of the action bar, so the preview and notices can sit on it. */
 	float ActionBarTop = 0.0f;

@@ -21,15 +21,32 @@ nothing. A click on one of its buttons goes back to the director, which turns it
 The forecast numbers are `FBattle::Preview` and `FBattle::EvadeChance`, the numbers the dice are rolled
 against. The blocked reasons are `AbilityBlockedReason` and `ValidateAbility`.
 
+## Added in the second pass (2026-09-27)
+| What | Godot |
+|---|---|
+| Turn chips that would touch merge into a framed group, centred on their average time. Far-off chips are smaller. Chips glide instead of jumping. A time shows only when ready, casting, within 3 s, or under the pointer. | hud.gd:1226-1387 |
+| Corner buttons: Log, Field, Units (the guide), Pause, Menu | hud.gd:608-623 |
+| Log window: L or the button shows it, + makes it taller, the wheel scrolls back | log window |
+| Field list: every unit with name, HP bar and state. Click a row to pick or inspect that unit. | hud.gd:515-606 |
+| Inspect card: click a unit that isn't taking orders. It shows its gauges, stats and four abilities coloured by what they are for, with a legend. For an enemy, its reachable ground and longest attack range are drawn on the board. | hud.gd:708-863, battle.gd:509-527 |
+| Incoming: on both cards, who is casting what at that unit and how long is left | hud.gd:1112-1165 |
+| Tooltips that explain the numbers: turn gauge, countdown, move, sight, HP, ultimate, each ability, and buffs | game_state.gd:952-1016 |
+| Unit Guide (U, or the Units button; also on the title screen): every class's stats; one class's abilities worked out against a chosen target by the rules' own `CalcAmount` and `EvadeChance`. It pauses a local battle while open. | unit_guide.gd |
+| Fog of war: against the computer, units your side can't see are hidden on the board, "?" on the turn order and in the field list, and give no damage numbers | battle.gd:302-307 |
+
 ## Test switches
 - `-tmplayblue`: blue stays with a person even in an unattended run. Nobody clicks, so red wins and the run
   ends. Used with `-tmcapture=N` to take pictures of the player's HUD.
 - An unattended run now waits 1.5 s after the battle is decided before exiting. It takes `frame_end.png`
   when capturing.
+- `-tmhudshots` (with `-tmplayblue`): once an enemy is in sight, pauses and opens the field list, that
+  enemy's card and the Unit Guide, taking `hud_panels.png` and `hud_guide.png`.
 
 ## Not done yet
-- Godot merges turn chips that overlap into a framed group. Here they overlap.
-- Class icons: chips show two letters of the class name.
-- The movable/resizable log window, the Units list, the stats card of a clicked enemy, "incoming" casts on a
-  card, tooltips that explain each calculation, and the menu, Options and Unit Guide overlays.
-- The board markings are drawn over the scene, so they are not hidden behind raised tiles.
+- **Class and ability icons.** Godot's are SVG files, which Unreal can't load at runtime, and turning them
+  into texture assets is editor work. Chips and rows show two letters instead.
+- **Options** (key rebinding, turn-order style, team colours) and **Developer Tools** (tuning numbers live).
+- Dragging and resizing the log window. It can be shown, made taller and scrolled.
+- Fog shading on the ground itself. Hidden units are hidden, but unseen tiles aren't darkened.
+- Editing class stats from the Unit Guide. Godot allows this from the main menu.
+- The board markings are drawn over the scene, so they aren't hidden behind raised tiles.

@@ -7,71 +7,13 @@
 #include "GameFramework/PlayerController.h"
 
 #include "TMBattleDirector.h"
+#include "TMBattleHudStyle.h"
 #include "SimAbility.h"
 
 #include <algorithm>
 #include <cmath>
 
-namespace
-{
-	// The Godot HUD's colours (hud.gd:51, 75-79).
-	const FLinearColor TextColour(0.92f, 0.94f, 1.0f);
-	const FLinearColor Dim(0.92f, 0.94f, 1.0f, 0.55f);
-	const FLinearColor Gold(1.0f, 0.82f, 0.35f);
-	const FLinearColor Urgent(1.0f, 0.38f, 0.32f);
-	const FLinearColor CastColour(0.75f, 0.45f, 1.0f);
-	const FLinearColor PanelFill(0.06f, 0.08f, 0.12f, 0.78f);
-	const FLinearColor Shadow(0.0f, 0.0f, 0.0f, 0.8f);
-
-	FLinearColor TeamColour(int32 Team)
-	{
-		return Team == 0 ? FLinearColor(0.47f, 0.7f, 1.0f) : FLinearColor(1.0f, 0.51f, 0.47f);
-	}
-
-	FLinearColor TeamFill(int32 Team)
-	{
-		return Team == 0 ? FLinearColor(0.1f, 0.2f, 0.42f, 0.95f) : FLinearColor(0.42f, 0.12f, 0.1f, 0.95f);
-	}
-
-	// The turn order timeline (hud.gd:56-74).
-	const float TimelineSeconds = 30.0f;
-	const float RowHeight = 42.0f;
-	const float ChipSize = 36.0f;
-	const float ChipGap = 3.0f;
-	const int32 ReadySlots = 4;
-	const float TrackStart = ReadySlots * (ChipSize + ChipGap) + 10.0f;
-	const float TickSeconds[] = { 0.0f, 1.0f, 3.0f, 5.0f, 10.0f, 20.0f, 30.0f };
-
-	const float Tps = static_cast<float>(TMSim::Pace::TicksPerSecond);
-
-	/**
-	 * The engine's fonts are drawn for a small screen. Every text scale below is
-	 * written as a share of a readable size and multiplied up here, once.
-	 */
-	const float FontBoost = 2.2f;
-
-	/** Ready first, least time left, then id -- the same order the director selects in. */
-	bool SoonerReady(const TMSim::FUnit* A, const TMSim::FUnit* B)
-	{
-		if (A->Clock != B->Clock)
-		{
-			return A->Clock < B->Clock;
-		}
-		return A->Id < B->Id;
-	}
-
-	/** Two letters for a chip, from the class name: "Black Mage" is BM, "Knight" Kn. */
-	FString Initials(const FString& Name)
-	{
-		TArray<FString> Words;
-		Name.ParseIntoArray(Words, TEXT(" "));
-		if (Words.Num() >= 2)
-		{
-			return Words[0].Left(1) + Words[1].Left(1);
-		}
-		return Name.Left(2);
-	}
-}
+using namespace TMHudStyle;
 
 ATMBattleDirector* ATMBattleHud::FindDirector()
 {
@@ -190,6 +132,7 @@ void ATMBattleHud::DrawHUD()
 {
 	Super::DrawHUD();
 	Buttons.Reset();
+	Tips.Reset();
 	ATMBattleDirector* Found = FindDirector();
 	if (!Canvas || !Found || !Found->bBuilt || !GEngine)
 	{
@@ -198,14 +141,24 @@ void ATMBattleHud::DrawHUD()
 	S = Canvas->ClipY / 1080.0f;
 
 	// Away from a battle, the menu is the whole screen, over the board.
-	if (Found->Screen == ATMBattleDirector::EScreen::Title)
+	if (Found->Screen != ATMBattleDirector::EScreen::Battle)
 	{
-		DrawTitle(*Found);
-		return;
-	}
-	if (Found->Screen == ATMBattleDirector::EScreen::Setup)
-	{
-		DrawSetup(*Found);
+		if (Found->Screen == ATMBattleDirector::EScreen::Title)
+		{
+			DrawTitle(*Found);
+		}
+		else
+		{
+			DrawSetup(*Found);
+		}
+		// The Unit Guide can be opened from the title too, over everything.
+		if (Found->bGuideOpen)
+		{
+			Buttons.Reset();
+			Tips.Reset();
+			DrawGuide(*Found);
+		}
+		DrawTooltip();
 		return;
 	}
 
@@ -215,17 +168,50 @@ void ATMBattleHud::DrawHUD()
 	DrawLog(*Found);
 	DrawUnitCard(*Found);
 	DrawActionBar(*Found);
+	DrawField(*Found);
+	DrawInspectCard(*Found);
+	DrawCornerButtons(*Found);
 	DrawBanners(*Found);
-	if (Found->bMenuOpen)
+	// Over everything else, only the open overlay's buttons answer.
+	if (Found->bGuideOpen)
 	{
-		// Only the menu's buttons answer while it is open.
 		Buttons.Reset();
+		Tips.Reset();
+		DrawGuide(*Found);
+	}
+	else if (Found->bMenuOpen)
+	{
+		Buttons.Reset();
+		Tips.Reset();
 		DrawBattleMenu(*Found);
 	}
+	DrawTooltip();
 }
 
 void ATMBattleHud::DrawBoardAids(ATMBattleDirector& From)
 {
+	// What an inspected enemy could do next: the ground it can walk to, and the
+	// reach of its longest attack from where it stands (battle.gd:512-527).
+	if (!From.ThreatNodes.empty())
+	{
+		const float Dot = FMath::Max(3.0f, 4.0f * S);
+		for (const TMSim::FNode& Node : From.ThreatNodes)
+		{
+			FVector2D At;
+			if (ToScreen(From, TMSim::FMap::NodePos(Node), 4.0f, At))
+			{
+				DrawRect(FLinearColor(1.0f, 0.35f, 0.3f, 0.65f), At.X - Dot * 0.5f, At.Y - Dot * 0.5f, Dot, Dot);
+			}
+		}
+		if (const TMSim::FUnit* Enemy = From.Battle.FindUnit(From.InspectedId))
+		{
+			if (From.ThreatReach > 0.0f)
+			{
+				BoardRing(From, Enemy->Pos, From.ThreatReach, FLinearColor(1.0f, 0.4f, 0.35f, 0.85f), 2.0f);
+			}
+		}
+	}
+
 	const TMSim::FUnit* Unit = From.SelectedUnit();
 	if (!From.PlayerCanOrder(Unit))
 	{
@@ -348,272 +334,7 @@ void ATMBattleHud::DrawBoardAids(ATMBattleDirector& From)
 	}
 }
 
-void ATMBattleHud::DrawTurnOrder(ATMBattleDirector& From)
-{
-	// Two bars, one per team. A chip slides along its team's bar toward the READY
-	// zone at the left, placed by seconds until ready on a square-root scale so
-	// the last seconds get the most room (hud.gd:52-74, 307-311). Godot merges
-	// chips that land on one another into a framed group; not done here yet, so
-	// two units due at the same moment overlap.
-	const float X0 = 16.0f * S;
-	const float Y0 = 12.0f * S;
-	const float Width = Canvas->ClipX - 32.0f * S;
-	const float Track = TrackStart * S;
-	const float Chip = ChipSize * S;
-	auto BarX = [&](float Seconds)
-	{
-		const float Frac = FMath::Sqrt(FMath::Clamp(Seconds / TimelineSeconds, 0.0f, 1.0f));
-		return X0 + Track + Frac * (Width - Track - Chip * 0.5f);
-	};
-
-	UFont* Font = GEngine->GetMediumFont();
-	FVector2D Mouse(-1.0f, -1.0f);
-	if (PlayerOwner)
-	{
-		float MX = 0.0f;
-		float MY = 0.0f;
-		if (PlayerOwner->GetMousePosition(MX, MY))
-		{
-			Mouse = FVector2D(MX, MY);
-		}
-	}
-
-	for (int32 Team = 0; Team < 2; ++Team)
-	{
-		const float RowY = Y0 + Team * RowHeight * S;
-		const float LineY = RowY + Chip * 0.5f + 2.0f * S;
-		Panel(X0 - 6.0f * S, RowY - 3.0f * S, Width + 12.0f * S, (RowHeight - 2.0f) * S, PanelFill);
-		// The ready zone, and the bar with its marks.
-		DrawRect(FLinearColor(Gold.R, Gold.G, Gold.B, 0.12f), X0, RowY, Track - 6.0f * S, Chip);
-		DrawRect(TeamColour(Team) * FLinearColor(1, 1, 1, 0.5f), X0 + Track, LineY - 1.5f * S, Width - Track, 3.0f * S);
-		for (float Seconds : TickSeconds)
-		{
-			const float X = BarX(Seconds);
-			const float Tall = (Seconds == 0.0f ? 10.0f : 6.0f) * S;
-			DrawRect(Dim, X - 1.0f, LineY - Tall * 0.5f, 2.0f, Tall);
-			if (Team == 1)
-			{
-				Text(FString::Printf(TEXT("%.0fs"), Seconds), X - 6.0f * S, RowY + Chip + 1.0f * S, Dim, Font, 0.4f * S, false);
-			}
-		}
-
-		std::vector<const TMSim::FUnit*> Ready;
-		std::vector<const TMSim::FUnit*> Waiting;
-		for (const TMSim::FUnit& Unit : From.Battle.Units)
-		{
-			if (Unit.Team != Team || !Unit.IsAlive())
-			{
-				continue;
-			}
-			(Unit.bReady ? Ready : Waiting).push_back(&Unit);
-		}
-		std::sort(Ready.begin(), Ready.end(), SoonerReady);
-
-		auto DrawChip = [&](const TMSim::FUnit& Unit, float X, const FString& Badge)
-		{
-			// Gold, red or purple outline when ready, urgent or casting; white when
-			// selected (hud.gd:1088-1107).
-			FLinearColor Edge = TeamColour(Team) * FLinearColor(1, 1, 1, 0.6f);
-			float Thick = 1.5f;
-			if (Unit.IsCasting())
-			{
-				Edge = CastColour;
-				Thick = 2.5f;
-			}
-			else if (Unit.bReady)
-			{
-				Edge = Unit.Clock <= 5 * TMSim::Pace::TicksPerSecond ? Urgent : Gold;
-				Thick = 2.5f;
-			}
-			if (Unit.Id == From.SelectedId)
-			{
-				Edge = FLinearColor::White;
-				Thick = 3.5f;
-			}
-			Panel(X, RowY, Chip, Chip, TeamFill(Team), Edge, Thick);
-			const FString Letters = Initials(JobName(Unit));
-			const FVector2D Size = TextSize(Letters, Font, 0.58f * S);
-			Text(Letters, X + (Chip - Size.X) * 0.5f, RowY + 1.0f * S, TextColour, Font, 0.58f * S);
-			const FVector2D BadgeSize = TextSize(Badge, Font, 0.42f * S);
-			Text(Badge, X + (Chip - BadgeSize.X) * 0.5f, RowY + Chip - BadgeSize.Y - 1.0f * S,
-				Unit.bReady ? Gold : Dim, Font, 0.42f * S);
-			AddButton(X, RowY, Chip, Chip, ETMHudAction::PickUnit, Unit.Id);
-		};
-
-		for (size_t i = 0; i < Ready.size(); ++i)
-		{
-			const TMSim::FUnit& Unit = *Ready[i];
-			const float X = X0 + static_cast<float>(i) * (ChipSize + ChipGap) * S;
-			// A ready unit's badge is its countdown, or the cast it is holding.
-			const FString Badge = Unit.IsCasting()
-				? FString::Printf(TEXT("c%.0f"), FMath::CeilToFloat(Unit.Casting.Ticks / Tps))
-				: FString::Printf(TEXT("%.0f"), FMath::CeilToFloat(Unit.Clock / Tps));
-			DrawChip(Unit, X, Badge);
-		}
-		for (const TMSim::FUnit* Unit : Waiting)
-		{
-			// A cast in flight is shown by when it lands, since that is when
-			// anything happens; otherwise by when the unit is next ready.
-			const float Seconds = Unit->IsCasting()
-				? Unit->Casting.Ticks / Tps
-				: From.Battle.TicksToReady(*Unit) / Tps;
-			const FString Badge = Unit->IsCasting()
-				? FString::Printf(TEXT("c%.0f"), FMath::CeilToFloat(Seconds))
-				: FString::Printf(TEXT("%.0f"), FMath::CeilToFloat(Seconds));
-			DrawChip(*Unit, BarX(Seconds) - Chip * 0.5f, Badge);
-		}
-
-		// Whoever the pointer is over, named, since two letters are not a name.
-		for (const TMSim::FUnit& Unit : From.Battle.Units)
-		{
-			if (Unit.Team != Team)
-			{
-				continue;
-			}
-			FTMHudButton Over;
-			if (ButtonAt(Mouse, Over) && Over.Action == ETMHudAction::PickUnit && Over.Value == Unit.Id)
-			{
-				const FString Name = FString::Printf(TEXT("%s %d  hp %d/%d"), *JobName(Unit), Unit.Id, Unit.Hp, Unit.MaxHp());
-				const FVector2D Size = TextSize(Name, Font, 0.62f * S);
-				Panel(Mouse.X + 12.0f * S, Mouse.Y + 12.0f * S, Size.X + 12.0f * S, Size.Y + 6.0f * S, PanelFill);
-				Text(Name, Mouse.X + 18.0f * S, Mouse.Y + 15.0f * S, TeamColour(Team), Font, 0.62f * S);
-			}
-		}
-	}
-}
-
-void ATMBattleHud::DrawLog(ATMBattleDirector& From)
-{
-	// The last few lines of the fight, under the turn order on the left.
-	const int32 Shown = 10;
-	if (From.Log.Num() == 0)
-	{
-		return;
-	}
-	UFont* Font = GEngine->GetMediumFont();
-	const float Scale = 0.5f * S;
-	const float LineH = TextSize(TEXT("Ag"), Font, Scale).Y;
-	const int32 First = FMath::Max(0, From.Log.Num() - Shown);
-	const int32 Count = From.Log.Num() - First;
-	const float X = 16.0f * S;
-	const float Y = 12.0f * S + 2.0f * RowHeight * S + 18.0f * S;
-	const float W = 520.0f * S;
-	Panel(X - 6.0f * S, Y - 4.0f * S, W, Count * LineH + 8.0f * S, FLinearColor(0.06f, 0.08f, 0.12f, 0.55f));
-	for (int32 i = 0; i < Count; ++i)
-	{
-		// Older lines fade, so the eye goes to what just happened.
-		const float Age = static_cast<float>(Count - 1 - i) / FMath::Max(1, Count - 1);
-		const FLinearColor Colour(0.8f, 0.83f, 0.9f, 1.0f - 0.5f * Age);
-		Text(From.Log[First + i], X, Y + i * LineH, Colour, Font, Scale);
-	}
-}
-
-void ATMBattleHud::DrawUnitCard(ATMBattleDirector& From)
-{
-	// The selected unit; while watching, the unit whose turn it is; otherwise the
-	// one under the pointer (hud.gd:1390-1427).
-	const TMSim::FUnit* Unit = From.SelectedUnit();
-	if (!Unit && !From.bPlayerInput)
-	{
-		Unit = From.WaitingOn();
-	}
-	if (!Unit)
-	{
-		Unit = From.Battle.FindUnit(From.HoverUnitId);
-	}
-	if (!Unit || (!Unit->IsAlive() && !Unit->IsKo()))
-	{
-		return;
-	}
-
-	UFont* Font = GEngine->GetMediumFont();
-	UFont* Big = GEngine->GetLargeFont();
-	const float W = 440.0f * S;
-	const float H = 238.0f * S;
-	const float X = 16.0f * S;
-	const float Y = Canvas->ClipY - H - 16.0f * S;
-	Panel(X, Y, W, H, PanelFill, TeamColour(Unit->Team) * FLinearColor(1, 1, 1, 0.5f), 1.5f);
-
-	const float Pad = 10.0f * S;
-	float Row = Y + Pad;
-	Text(FString::Printf(TEXT("%s %d"), *JobName(*Unit), Unit->Id), X + Pad, Row, TeamColour(Unit->Team), Big, 0.85f * S);
-	Row += 38.0f * S;
-
-	// When it acts next, and what is on it.
-	FString Sub;
-	FLinearColor SubColour = Dim;
-	if (!Unit->IsAlive())
-	{
-		Sub = FString::Printf(TEXT("DOWN  %.0fs to raise"), Unit->KoTicks / Tps);
-		SubColour = Urgent;
-	}
-	else if (Unit->bReady)
-	{
-		const float Left = Unit->Clock / Tps;
-		Sub = FString::Printf(TEXT("READY  %.0fs left"), FMath::CeilToFloat(Left));
-		SubColour = Left <= 5.0f ? Urgent : Gold;
-	}
-	else
-	{
-		Sub = FString::Printf(TEXT("Ready in %.1fs"), From.Battle.TicksToReady(*Unit) / Tps);
-	}
-	for (const TMSim::FStatus& Status : Unit->Statuses)
-	{
-		Sub += FString::Printf(TEXT("  %hs"), Status.Id.c_str());
-	}
-	if (Unit->bMoved)
-	{
-		Sub += TEXT("  walked");
-	}
-	if (Unit->bActed)
-	{
-		Sub += TEXT("  acted");
-	}
-	Text(Sub, X + Pad, Row, SubColour, Font, 0.6f * S);
-	Row += 26.0f * S;
-
-	const float GaugeW = W - 2.0f * Pad;
-	const float GaugeH = 22.0f * S;
-	const int32 MaxHp = FMath::Max(1, Unit->MaxHp());
-	const float HpPart = static_cast<float>(Unit->Hp) / MaxHp;
-	Gauge(X + Pad, Row, GaugeW, GaugeH, HpPart,
-		HpPart > 0.5f ? FLinearColor(0.25f, 0.7f, 0.35f) : HpPart > 0.25f ? FLinearColor(0.8f, 0.65f, 0.2f) : FLinearColor(0.8f, 0.25f, 0.2f),
-		FString::Printf(TEXT("HP  %d / %d"), Unit->Hp, Unit->MaxHp()));
-	Row += GaugeH + 4.0f * S;
-
-	if (Unit->IsCasting())
-	{
-		const TMSim::FAbility* Ability = TMSim::JobAbility(Unit->Job, Unit->Casting.Slot);
-		const float Done = 1.0f - static_cast<float>(Unit->Casting.Ticks) / FMath::Max(1, Unit->Casting.Total);
-		Gauge(X + Pad, Row, GaugeW, GaugeH, Done, CastColour * FLinearColor(1, 1, 1, 0.8f),
-			FString::Printf(TEXT("Casting %hs  %.1fs"), Ability ? Ability->Name.c_str() : "", Unit->Casting.Ticks / Tps));
-	}
-	else if (Unit->bReady)
-	{
-		Gauge(X + Pad, Row, GaugeW, GaugeH, 1.0f, Gold * FLinearColor(1, 1, 1, 0.7f), TEXT("TG  READY"));
-	}
-	else
-	{
-		Gauge(X + Pad, Row, GaugeW, GaugeH, static_cast<float>(Unit->Tg) / TMSim::Pace::TgMax, FLinearColor(0.3f, 0.45f, 0.8f),
-			FString::Printf(TEXT("TG  %d%%"), Unit->Tg * 100 / TMSim::Pace::TgMax));
-	}
-	Row += GaugeH + 4.0f * S;
-
-	Gauge(X + Pad, Row, GaugeW, GaugeH, static_cast<float>(Unit->Ult) / TMSim::Pace::UltMax,
-		Unit->Ult >= TMSim::Pace::UltMax ? FLinearColor(1.0f, 0.95f, 0.6f, 0.85f) : FLinearColor(0.55f, 0.5f, 0.3f),
-		FString::Printf(TEXT("ULT  %d%%"), Unit->Ult));
-	Row += GaugeH + 8.0f * S;
-
-	// The numbers, as hud.gd:1416 prints them.
-	Text(FString::Printf(TEXT("DEF %d  MDF %d  CRIT %d%%"),
-		Unit->Stat(TMSim::EStat::AttDef), Unit->Stat(TMSim::EStat::MagDef), Unit->Stat(TMSim::EStat::Crit)),
-		X + Pad, Row, Dim, Font, 0.52f * S);
-	Row += 20.0f * S;
-	Text(FString::Printf(TEXT("AEV %d%%  MEV %d%%  SPD %d  MOV %.1fm  PAT %d  SGT %.1fm"),
-		Unit->Stat(TMSim::EStat::AEva), Unit->Stat(TMSim::EStat::MEva), Unit->Stat(TMSim::EStat::Speed),
-		From.Battle.MoveOf(*Unit), Unit->Stat(TMSim::EStat::Patience), From.Battle.SightOf(*Unit)),
-		X + Pad, Row, Dim, Font, 0.52f * S);
-}
+// DrawTurnOrder, DrawLog and DrawUnitCard live in TMBattleHudPanels.cpp with the other panels.
 
 void ATMBattleHud::DrawActionBar(ATMBattleDirector& From)
 {
@@ -953,11 +674,13 @@ void ATMBattleHud::DrawTitle(ATMBattleDirector& From)
 	Y += H + Gap;
 	MenuButton(X, Y, W, H, TEXT("Computer vs Computer"), ETMHudAction::TitleWatch);
 	Y += H + Gap * 3.0f;
+	MenuButton(X, Y, W, 44.0f * S, TEXT("Unit Guide  (U)"), ETMHudAction::ToggleGuide);
+	Y += 44.0f * S + Gap;
 	MenuButton(X, Y, W, 44.0f * S, TEXT("Quit"), ETMHudAction::Quit);
 	Y += 44.0f * S + 30.0f * S;
 
 	// Said rather than left out quietly: what the Godot title has that this one does not yet.
-	const FString Missing = TEXT("Online play, How to Play, the Unit Guide and Options are not ported yet.");
+	const FString Missing = TEXT("Online play, How to Play and Options are not ported yet.");
 	const FVector2D MissingSize = TextSize(Missing, Font, 0.5f * S);
 	Text(Missing, CentreX - MissingSize.X * 0.5f, Y, Dim, Font, 0.5f * S);
 }
