@@ -2,7 +2,7 @@
 REM Builds and runs the plain-C++ tests for the battle rules. No Unreal, no
 REM editor: the sim is deliberately engine-free so it can be checked in seconds.
 REM
-REM Both tests measure the port against the Godot game rather than against
+REM The tests measure the port against the Godot game rather than against
 REM themselves. The battle is a deterministic simulation -- an online match
 REM steps the same rules on both machines and compares checksums, and a replay
 REM re-runs a recorded fight -- so "close enough" is not a thing it can be.
@@ -28,21 +28,27 @@ if errorlevel 1 (echo BUILD FAILED & exit /b 1)
 
 echo.
 echo === the clock ===
-cl /nologo /EHsc /std:c++17 /W4 /D_CRT_SECURE_NO_WARNINGS /I"%PUB%" "%HERE%SimTickTest.cpp" "%PRIV%\SimTypes.cpp" "%PRIV%\SimUnit.cpp" "%PRIV%\SimAbility.cpp" "%PRIV%\SimMap.cpp" "%PRIV%\SimMovement.cpp" "%PRIV%\SimBattle.cpp" /Fo:"%OUT%\obj\\" /Fe:"%OUT%\SimTickTest.exe" >nul
+cl /nologo /EHsc /std:c++17 /W4 /D_CRT_SECURE_NO_WARNINGS /I"%PUB%" "%HERE%SimTickTest.cpp" "%PRIV%\SimTypes.cpp" "%PRIV%\SimUnit.cpp" "%PRIV%\SimAbility.cpp" "%PRIV%\SimMap.cpp" "%PRIV%\SimMovement.cpp" "%PRIV%\SimWorld.cpp" "%PRIV%\SimAI.cpp" "%PRIV%\SimBattle.cpp" /Fo:"%OUT%\obj\\" /Fe:"%OUT%\SimTickTest.exe" >nul
 if errorlevel 1 (echo BUILD FAILED & exit /b 1)
 "%OUT%\SimTickTest.exe" "%HERE%GodotTickTrace.txt" || set FAILED=1
 
 echo.
 echo === what an ability does ===
-cl /nologo /EHsc /std:c++17 /W4 /D_CRT_SECURE_NO_WARNINGS /I"%PUB%" "%HERE%SimCalcTest.cpp" "%PRIV%\SimTypes.cpp" "%PRIV%\SimUnit.cpp" "%PRIV%\SimAbility.cpp" "%PRIV%\SimMap.cpp" "%PRIV%\SimMovement.cpp" "%PRIV%\SimBattle.cpp" /Fo:"%OUT%\obj\\" /Fe:"%OUT%\SimCalcTest.exe" >nul
+cl /nologo /EHsc /std:c++17 /W4 /D_CRT_SECURE_NO_WARNINGS /I"%PUB%" "%HERE%SimCalcTest.cpp" "%PRIV%\SimTypes.cpp" "%PRIV%\SimUnit.cpp" "%PRIV%\SimAbility.cpp" "%PRIV%\SimMap.cpp" "%PRIV%\SimMovement.cpp" "%PRIV%\SimWorld.cpp" "%PRIV%\SimAI.cpp" "%PRIV%\SimBattle.cpp" /Fo:"%OUT%\obj\\" /Fe:"%OUT%\SimCalcTest.exe" >nul
 if errorlevel 1 (echo BUILD FAILED & exit /b 1)
 "%OUT%\SimCalcTest.exe" "%HERE%GodotCalcTable.txt" || set FAILED=1
 
 echo.
 echo === walking ===
-cl /nologo /EHsc /std:c++17 /W4 /D_CRT_SECURE_NO_WARNINGS /I"%PUB%" "%HERE%SimMoveTest.cpp" "%PRIV%\SimTypes.cpp" "%PRIV%\SimUnit.cpp" "%PRIV%\SimAbility.cpp" "%PRIV%\SimMap.cpp" "%PRIV%\SimMovement.cpp" "%PRIV%\SimBattle.cpp" /Fo:"%OUT%\obj\\" /Fe:"%OUT%\SimMoveTest.exe" >nul
+cl /nologo /EHsc /std:c++17 /W4 /D_CRT_SECURE_NO_WARNINGS /I"%PUB%" "%HERE%SimMoveTest.cpp" "%PRIV%\SimTypes.cpp" "%PRIV%\SimUnit.cpp" "%PRIV%\SimAbility.cpp" "%PRIV%\SimMap.cpp" "%PRIV%\SimMovement.cpp" "%PRIV%\SimWorld.cpp" "%PRIV%\SimAI.cpp" "%PRIV%\SimBattle.cpp" /Fo:"%OUT%\obj\\" /Fe:"%OUT%\SimMoveTest.exe" >nul
 if errorlevel 1 (echo BUILD FAILED & exit /b 1)
 "%OUT%\SimMoveTest.exe" "%HERE%GodotMoveTable.txt" || set FAILED=1
+
+echo.
+echo === the computer player ===
+cl /nologo /EHsc /std:c++17 /W4 /D_CRT_SECURE_NO_WARNINGS /I"%PUB%" "%HERE%SimAITest.cpp" "%PRIV%\SimTypes.cpp" "%PRIV%\SimUnit.cpp" "%PRIV%\SimAbility.cpp" "%PRIV%\SimMap.cpp" "%PRIV%\SimMovement.cpp" "%PRIV%\SimWorld.cpp" "%PRIV%\SimAI.cpp" "%PRIV%\SimBattle.cpp" /Fo:"%OUT%\obj\\" /Fe:"%OUT%\SimAITest.exe" >nul
+if errorlevel 1 (echo BUILD FAILED & exit /b 1)
+"%OUT%\SimAITest.exe" "%HERE%GodotAITable.txt" || set FAILED=1
 
 echo.
 if "%FAILED%"=="1" (echo SOME TESTS FAILED & exit /b 1)

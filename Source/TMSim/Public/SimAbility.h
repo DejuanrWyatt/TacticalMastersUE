@@ -24,6 +24,11 @@ namespace TMSim
 	{
 		std::string Id;
 		std::string Name;
+		/**
+		 * "active", "passive", "aura" or "toggle". Only an active is something
+		 * a unit chooses to do on its turn; the rest are not orders at all.
+		 */
+		std::string Kind = "active";
 		EEffect Effect = EEffect::Damage;
 		EScale Scale = EScale::Att;
 		ETargetSide Target = ETargetSide::Enemy;

@@ -1,0 +1,148 @@
+TUNING sight_multiplier=1.0 hazard_percent=8.0
+SPAWNS 2.75,4.75 21.25,19.25
+SCENARIO opening
+UNITS
+  0 knight team=0 sight=8 maxhp=105 pos=2.75,4.75 hp=105
+  1 archer team=0 sight=13 maxhp=60 pos=0.75,8.75 hp=60
+  2 black_mage team=0 sight=10 maxhp=60 pos=4.75,6.75 hp=60
+  3 white_mage team=0 sight=10 maxhp=65 pos=2.75,10.75 hp=65
+  4 knight team=1 sight=8 maxhp=105 pos=21.25,19.25 hp=105
+  5 archer team=1 sight=13 maxhp=60 pos=23.25,15.25 hp=60
+  6 black_mage team=1 sight=10 maxhp=60 pos=19.25,17.25 hp=60
+  7 white_mage team=1 sight=10 maxhp=65 pos=21.25,13.25 hp=65
+SIGHT
+  0 -
+  1 -
+  2 -
+  3 -
+  4 -
+  5 -
+  6 -
+  7 -
+SPOTS
+  0 walk approach=7.25,8.25 retreat=2.75,4.75
+  0 sprint approach=8.75,8.25 retreat=2.75,4.75
+  1 walk approach=7.75,8.75 retreat=0.75,8.75
+  1 sprint approach=8.25,11.75 retreat=0.75,8.75
+  2 walk approach=9.25,10.25 retreat=4.75,6.75
+  2 sprint approach=10.75,10.25 retreat=4.75,6.75
+  3 walk approach=8.75,10.75 retreat=2.75,10.75
+  3 sprint approach=8.75,14.25 retreat=2.75,10.75
+  4 walk approach=16.75,15.75 retreat=21.25,19.25
+  4 sprint approach=15.25,15.75 retreat=21.25,19.25
+  5 walk approach=16.25,15.25 retreat=23.25,15.25
+  5 sprint approach=15.75,12.25 retreat=23.25,15.25
+  6 walk approach=14.75,13.75 retreat=19.25,17.25
+  6 sprint approach=13.25,13.75 retreat=19.25,17.25
+  7 walk approach=15.25,13.25 retreat=21.25,13.25
+  7 sprint approach=15.25,9.75 retreat=21.25,13.25
+SCENARIO contact
+UNITS
+  0 knight team=0 sight=8 maxhp=105 pos=9.00,9.00 hp=105
+  1 archer team=0 sight=13 maxhp=60 pos=11.00,9.00 hp=12
+  2 black_mage team=0 sight=10 maxhp=60 pos=13.00,9.00 hp=60
+  3 white_mage team=0 sight=10 maxhp=65 pos=15.00,9.00 hp=65
+  4 knight team=1 sight=8 maxhp=105 pos=9.00,11.00 hp=105
+  5 archer team=1 sight=13 maxhp=60 pos=11.00,11.00 hp=33
+  6 black_mage team=1 sight=10 maxhp=60 pos=13.00,11.00 hp=60
+  7 white_mage team=1 sight=10 maxhp=65 pos=15.00,11.00 hp=65
+SIGHT
+  0 4,5,6,7
+  1 4,5,6,7
+  2 4,5,6,7
+  3 4,5,6,7
+  4 0,1,2,3
+  5 0,1,2,3
+  6 0,1,2,3
+  7 0,1,2,3
+SPOTS
+  0 walk approach=9.25,12.25 retreat=9.25,4.25
+  0 sprint approach=9.25,12.25 retreat=9.25,2.75
+  1 walk approach=11.25,3.25 retreat=11.25,3.25
+  1 sprint approach=10.75,1.75 retreat=10.75,1.75
+  2 walk approach=13.25,4.25 retreat=13.25,4.25
+  2 sprint approach=11.25,4.25 retreat=13.25,2.75
+  3 walk approach=13.25,6.25 retreat=15.25,4.25
+  3 sprint approach=19.25,13.75 retreat=15.25,2.75
+  4 walk approach=9.25,10.25 retreat=9.25,17.25
+  4 sprint approach=9.25,10.25 retreat=9.25,18.75
+  5 walk approach=11.25,18.25 retreat=11.25,18.25
+  5 sprint approach=10.75,19.75 retreat=10.75,19.75
+  6 walk approach=11.25,16.25 retreat=13.25,17.25
+  6 sprint approach=18.75,14.75 retreat=13.25,18.75
+  7 walk approach=18.75,12.75 retreat=15.25,17.25
+  7 sprint approach=18.75,12.75 retreat=15.25,18.75
+HAZARDS 0,0=-1 1,0=1 2,0=-1 3,0=1 4,0=-1 5,0=1 6,0=-1 7,0=1 8,0=-1 9,0=1 10,0=-1 11,0=1 0,1=1 1,1=-1 2,1=1 3,1=-1 4,1=1 5,1=-1 6,1=1 7,1=-1 8,1=1 9,1=-1 10,1=1 11,1=-1 0,2=-1 1,2=1 2,2=-1 3,2=1 4,2=-1 5,2=1 6,2=-1 7,2=1 8,2=-1 9,2=1 10,2=-1 11,2=1 0,3=1 1,3=-1 2,3=1 3,3=-1 4,3=1 5,3=-1 6,3=1 7,3=-1 8,3=1 9,3=-1 10,3=1 11,3=-1 0,4=-1 1,4=1 2,4=-1 3,4=1 4,4=-1 5,4=1 6,4=-1 7,4=1 8,4=-1 9,4=1 10,4=-1 11,4=1 0,5=1 1,5=-1 2,5=1 3,5=-1 4,5=1 5,5=-1 6,5=1 7,5=-1 8,5=1 9,5=-1 10,5=1 11,5=-1 0,6=-1 1,6=1 2,6=-1 3,6=1 4,6=-1 5,6=1 6,6=-1 7,6=1 8,6=-1 9,6=1 10,6=-1 11,6=1 0,7=1 1,7=-1 2,7=1 3,7=-1 4,7=1 5,7=-1 6,7=1 7,7=-1 8,7=1 9,7=-1 10,7=1 11,7=-1 0,8=-1 1,8=1 2,8=-1 3,8=1 4,8=-1 5,8=1 6,8=-1 7,8=1 8,8=-1 9,8=1 10,8=-1 11,8=1 0,9=1 1,9=-1 2,9=1 3,9=-1 4,9=1 5,9=-1 6,9=1 7,9=-1 8,9=1 9,9=-1 10,9=1 11,9=-1 0,10=-1 1,10=1 2,10=-1 3,10=1 4,10=-1 5,10=1 6,10=-1 7,10=1 8,10=-1 9,10=1 10,10=-1 11,10=1 0,11=1 1,11=-1 2,11=1 3,11=-1 4,11=1 5,11=-1 6,11=1 7,11=-1 8,11=1 9,11=-1 10,11=1 11,11=-1
+SCENARIO hazards
+UNITS
+  0 knight team=0 sight=8 maxhp=105 pos=9.00,9.00 hp=105
+  1 archer team=0 sight=13 maxhp=60 pos=11.00,9.00 hp=12
+  2 black_mage team=0 sight=10 maxhp=60 pos=13.00,9.00 hp=60
+  3 white_mage team=0 sight=10 maxhp=65 pos=15.00,9.00 hp=65
+  4 knight team=1 sight=8 maxhp=105 pos=9.00,11.00 hp=105
+  5 archer team=1 sight=13 maxhp=60 pos=11.00,11.00 hp=33
+  6 black_mage team=1 sight=10 maxhp=60 pos=13.00,11.00 hp=60
+  7 white_mage team=1 sight=10 maxhp=65 pos=15.00,11.00 hp=65
+SIGHT
+  0 4,5,6,7
+  1 4,5,6,7
+  2 4,5,6,7
+  3 4,5,6,7
+  4 0,1,2,3
+  5 0,1,2,3
+  6 0,1,2,3
+  7 0,1,2,3
+SPOTS
+  0 walk approach=9.75,10.25 retreat=10.25,4.75
+  0 sprint approach=11.25,12.25 retreat=9.25,2.75
+  1 walk approach=12.25,3.75 retreat=12.25,3.75
+  1 sprint approach=10.75,1.75 retreat=10.75,1.75
+  2 walk approach=14.25,4.75 retreat=14.25,4.75
+  2 sprint approach=11.25,4.25 retreat=13.25,2.75
+  3 walk approach=13.25,6.25 retreat=15.25,4.25
+  3 sprint approach=19.25,13.75 retreat=18.75,4.25
+  4 walk approach=9.25,10.25 retreat=5.75,15.75
+  4 sprint approach=9.25,10.25 retreat=9.25,18.75
+  5 walk approach=10.25,17.75 retreat=10.25,17.75
+  5 sprint approach=12.25,19.25 retreat=12.25,19.25
+  6 walk approach=11.25,16.25 retreat=14.25,16.75
+  6 sprint approach=8.25,15.75 retreat=13.25,18.75
+  7 walk approach=18.75,12.75 retreat=15.25,17.25
+  7 sprint approach=18.75,12.75 retreat=18.75,17.25
+HAZARDS 0,0=1 1,0=0 2,0=1 3,0=0 4,0=1 5,0=0 6,0=1 7,0=0 8,0=1 9,0=0 10,0=1 11,0=0 0,1=0 1,1=1 2,1=0 3,1=1 4,1=0 5,1=1 6,1=0 7,1=1 8,1=0 9,1=1 10,1=0 11,1=1 0,2=1 1,2=0 2,2=1 3,2=0 4,2=1 5,2=0 6,2=1 7,2=0 8,2=1 9,2=0 10,2=1 11,2=0 0,3=0 1,3=1 2,3=0 3,3=1 4,3=0 5,3=1 6,3=0 7,3=1 8,3=0 9,3=1 10,3=0 11,3=1 0,4=1 1,4=0 2,4=1 3,4=0 4,4=1 5,4=0 6,4=1 7,4=0 8,4=1 9,4=0 10,4=1 11,4=0 0,5=0 1,5=1 2,5=0 3,5=1 4,5=0 5,5=1 6,5=0 7,5=1 8,5=0 9,5=1 10,5=0 11,5=1 0,6=1 1,6=0 2,6=1 3,6=0 4,6=1 5,6=0 6,6=1 7,6=0 8,6=1 9,6=0 10,6=1 11,6=0 0,7=0 1,7=1 2,7=0 3,7=1 4,7=0 5,7=1 6,7=0 7,7=1 8,7=0 9,7=1 10,7=0 11,7=1 0,8=1 1,8=0 2,8=1 3,8=0 4,8=1 5,8=0 6,8=1 7,8=0 8,8=1 9,8=0 10,8=1 11,8=0 0,9=0 1,9=1 2,9=0 3,9=1 4,9=0 5,9=1 6,9=0 7,9=1 8,9=0 9,9=1 10,9=0 11,9=1 0,10=1 1,10=0 2,10=1 3,10=0 4,10=1 5,10=0 6,10=1 7,10=0 8,10=1 9,10=0 10,10=1 11,10=0 0,11=0 1,11=1 2,11=0 3,11=1 4,11=0 5,11=1 6,11=0 7,11=1 8,11=0 9,11=1 10,11=0 11,11=1
+SCENARIO springs
+UNITS
+  0 knight team=0 sight=8 maxhp=105 pos=9.00,9.00 hp=105
+  1 archer team=0 sight=13 maxhp=60 pos=11.00,9.00 hp=12
+  2 black_mage team=0 sight=10 maxhp=60 pos=13.00,9.00 hp=60
+  3 white_mage team=0 sight=10 maxhp=65 pos=15.00,9.00 hp=65
+  4 knight team=1 sight=8 maxhp=105 pos=9.00,11.00 hp=105
+  5 archer team=1 sight=13 maxhp=60 pos=11.00,11.00 hp=33
+  6 black_mage team=1 sight=10 maxhp=60 pos=13.00,11.00 hp=60
+  7 white_mage team=1 sight=10 maxhp=65 pos=15.00,11.00 hp=65
+SIGHT
+  0 4,5,6,7
+  1 4,5,6,7
+  2 4,5,6,7
+  3 4,5,6,7
+  4 0,1,2,3
+  5 0,1,2,3
+  6 0,1,2,3
+  7 0,1,2,3
+SPOTS
+  0 walk approach=9.25,12.25 retreat=9.25,4.25
+  0 sprint approach=9.25,12.25 retreat=5.75,4.25
+  1 walk approach=11.25,3.25 retreat=11.25,3.25
+  1 sprint approach=10.25,2.25 retreat=10.25,2.25
+  2 walk approach=13.25,4.25 retreat=13.25,4.25
+  2 sprint approach=11.25,4.25 retreat=14.25,3.25
+  3 walk approach=15.25,6.25 retreat=16.25,4.75
+  3 sprint approach=19.25,13.75 retreat=15.25,2.75
+  4 walk approach=9.25,10.25 retreat=9.25,17.25
+  4 sprint approach=15.75,10.25 retreat=5.75,17.25
+  5 walk approach=11.25,18.25 retreat=11.25,18.25
+  5 sprint approach=10.75,19.75 retreat=10.75,19.75
+  6 walk approach=13.25,16.25 retreat=13.25,17.25
+  6 sprint approach=18.75,14.75 retreat=14.25,18.25
+  7 walk approach=18.75,12.75 retreat=18.75,15.75
+  7 sprint approach=18.75,12.75 retreat=15.25,18.75

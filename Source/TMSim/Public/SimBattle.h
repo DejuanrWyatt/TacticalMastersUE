@@ -14,10 +14,12 @@
 
 #include "SimAbility.h"
 #include "SimMap.h"
+#include "SimOrder.h"
 #include "SimRandom.h"
 #include "SimTypes.h"
 #include "SimUnit.h"
 
+#include <map>
 #include <string>
 #include <utility>
 #include <vector>
@@ -107,6 +109,47 @@ namespace TMSim
 		 */
 		TMSIM_API void EndTurnFor(FUnit& Unit, bool bTimedOut, FTickReport& Report);
 
+		// ------------------------------------------------- orders and sight
+
+		/** "" if the order may be applied now, otherwise why not. */
+		/**
+		 * Why this unit cannot use the ability in that slot right now, or empty
+		 * if it can. Part of the rules rather than of the computer player,
+		 * because a player clicking the button has to be told the same thing.
+		 */
+		TMSIM_API std::string AbilityBlockedReason(const FUnit& Unit, int Slot) const;
+
+		TMSIM_API std::string Validate(const FOrder& Order);
+
+		/**
+		 * Applies an order that has passed Validate. Everything that changes a
+		 * battle comes through here -- a player's order, the computer's, or a
+		 * replay's -- so a battle is exactly the orders applied to it.
+		 */
+		TMSIM_API bool Apply(const FOrder& Order, FTickReport& Report);
+
+		/** Whether this side can see that spot at all. */
+		TMSIM_API bool CanSee(int Team, const FVec2& Point, int ExcludeId = -1) const;
+		TMSIM_API double SightOf(const FUnit& Unit) const;
+		/** Whether the ground between two points is low enough to see over. */
+		TMSIM_API bool HasLineOfSight(const FVec2& A, const FVec2& B) const;
+
+		TMSIM_API int LevelAt(const FVec2& Point) const;
+		TMSIM_API double GroundHeight(const FVec2& Point) const;
+		TMSIM_API bool IsCover(const FVec2& Point) const;
+		/** -1 burns a unit that starts its turn here, +1 heals. */
+		TMSIM_API int HazardAt(const FVec2& Point) const;
+		TMSIM_API bool InBounds(const FVec2& Point) const;
+
+		/** Walking distance from a spot to every node, ignoring units. */
+		TMSIM_API const std::vector<double>& DistanceFrom(const FVec2& Goal);
+		TMSIM_API double DistanceToNearest(const std::vector<FVec2>& Goals, const FNode& Node);
+
+		TMSIM_API std::vector<const FUnit*> TeamUnits(int Team) const;
+
+		/** Where each side starts, used when it cannot see anybody to walk at. */
+		FVec2 SpawnPoints[2];
+
 		FMap Map;
 
 		// ------------------------------------------------------------ state
@@ -143,6 +186,9 @@ namespace TMSim
 		void HeapPush(double Cost, int Node);
 		void HeapPop();
 		void HeapSwap(int A, int B);
+
+		/** Terrain never changes, so a distance field is worth keeping. */
+		std::map<long long, std::vector<double>> DistanceCache;
 
 		std::vector<double> Cost;
 		std::vector<int> Parent;

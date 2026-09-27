@@ -1,5 +1,7 @@
 #include "SimBattle.h"
 
+#include "SimAbility.h"
+
 #include <algorithm>
 #include <cmath>
 
@@ -12,11 +14,29 @@ namespace TMSim
 		{
 			Map.BuildMirrored(HighlandsRows());
 		}
+		// Where each side started, for a unit that cannot see anybody to walk at.
+		if (SpawnPoints[0] == FVec2() && SpawnPoints[1] == FVec2())
+		{
+			const FVec2 Size = Map.SizeMeters();
+			SpawnPoints[0] = FVec2(2.75f, 4.75f);
+			SpawnPoints[1] = FVec2(Size.X - 2.75f, Size.Y - 4.75f);
+		}
 		Rng.Seed(InSeed);
 		TickCount = 0;
 		Winner = -1;
 		for (FUnit& Unit : Units)
 		{
+			// What its class is worth. Without this a unit has no stats at all,
+			// which means no health, so it would quietly start the battle dead.
+			// Binding it here means a roster is only ever "these ids, these
+			// classes, these spots" and cannot be half-built.
+			if (!Unit.Stats)
+			{
+				if (const FJobDef* Job = FindJob(Unit.Job))
+				{
+					Unit.Stats = &Job->Stats;
+				}
+			}
 			Unit.Hp = Unit.MaxHp();
 			// A faster unit starts nearer its first turn, so the opening order is
 			// the Speed order rather than a scramble. One short of full: becoming

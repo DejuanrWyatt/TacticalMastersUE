@@ -39,6 +39,8 @@ namespace TMSim
 		TMSIM_API float Length() const;
 		TMSIM_API FVec2 Normalized() const;
 		float Dot(const FVec2& Other) const { return X * Other.X + Y * Other.Y; }
+		bool operator==(const FVec2& Other) const { return X == Other.X && Y == Other.Y; }
+		bool operator!=(const FVec2& Other) const { return !(*this == Other); }
 		float DistanceTo(const FVec2& Other) const { return (*this - Other).Length(); }
 	};
 
@@ -124,6 +126,8 @@ namespace TMSim
 		/** Gauge kept after a turn that only moved or only acted, and neither. */
 		inline constexpr int TgKeepOne = 800;
 		inline constexpr int TgKeepNone = 1600;
+		/** A full ultimate meter. */
+		inline constexpr int UltMax = 100;
 	}
 
 	/**
@@ -159,6 +163,10 @@ namespace TMSim
 		double EngageRadius = 1.8;
 		/** Movement spent stepping out of an enemy's reach. Walking in is free. */
 		double EngageCost = 1.0;
+		/** Multiplier on how far every unit can see. */
+		double SightMultiplier = 1.0;
+		/** Health lost on burning ground, or gained on a spring, per turn. */
+		double HazardPercent = 8.0;
 	};
 
 	namespace Combat

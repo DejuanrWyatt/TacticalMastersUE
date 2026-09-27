@@ -118,6 +118,10 @@ namespace TMSim
 		TMSIM_API std::string NoOrdersStatus() const;
 		bool IsStunned() const { return !NoOrdersStatus().empty(); }
 
+		/** The status sealing its abilities, or empty. It can still walk. */
+		TMSIM_API std::string NoAbilitiesStatus() const;
+		bool IsSilenced() const { return !NoAbilitiesStatus().empty(); }
+
 	private:
 		/** Every status flag of this kind multiplied together. */
 		float StatusProduct(float FStatusDef::* Member) const;

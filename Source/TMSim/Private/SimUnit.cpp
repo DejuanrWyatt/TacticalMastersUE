@@ -104,6 +104,19 @@ namespace TMSim
 		return Total;
 	}
 
+	std::string FUnit::NoAbilitiesStatus() const
+	{
+		for (const FStatus& Status : Statuses)
+		{
+			const FStatusDef* Def = FindStatus(Status.Id);
+			if (Def && Def->bNoAbilities)
+			{
+				return Status.Id;
+			}
+		}
+		return std::string();
+	}
+
 	std::string FUnit::NoOrdersStatus() const
 	{
 		for (const FStatus& Status : Statuses)

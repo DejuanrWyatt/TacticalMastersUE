@@ -14,7 +14,9 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
 
+#include "SimAI.h"
 #include "SimBattle.h"
+#include "SimOrder.h"
 
 #include "TMBattleDirector.generated.h"
 
@@ -108,10 +110,58 @@ public:
 	UFUNCTION(BlueprintCallable, CallInEditor, Category = "Tactical Masters")
 	int32 ReachableCount(int32 UnitId) const;
 
+	// The computer player. It is for practising against and for testing with,
+	// and it plays by clicking: it hands over an order and the order is checked
+	// and applied exactly as one arriving from a person would be. Set both sides
+	// to the computer to watch a battle play itself, or neither for two people.
+
+	UPROPERTY(EditAnywhere, Category = "Tactical Masters|Computer")
+	bool bComputerPlaysTeam0 = false;
+
+	UPROPERTY(EditAnywhere, Category = "Tactical Masters|Computer")
+	bool bComputerPlaysTeam1 = true;
+
+	/** "easy", "medium" or "hard". Hard never settles for a worse option. */
+	UPROPERTY(EditAnywhere, Category = "Tactical Masters|Computer")
+	FString ComputerSkill = TEXT("hard");
+
+	/** One order from the computer for this unit. Empty if it was accepted. */
+	UFUNCTION(BlueprintCallable, CallInEditor, Category = "Tactical Masters")
+	FString TakeComputerTurn(int32 UnitId);
+
+	/**
+	 * Lets the computer play every side it is set to play until nobody is
+	 * waiting on it. Returns how many orders it gave. The cap is there so a
+	 * mistake cannot spin the editor.
+	 */
+	UFUNCTION(BlueprintCallable, CallInEditor, Category = "Tactical Masters")
+	int32 PlayComputerTurns(int32 MaxOrders = 64);
+
 private:
+
+	/**
+	 * The one door every order comes through, whoever gave it: a person at this
+	 * machine, the computer player, or -- when there is one -- a message off the
+	 * network. Refusing is the same refusal for all three, which is the point.
+	 */
+	FString Submit(const TMSim::FOrder& Order);
+
+	/** Whether the computer is the one playing this side. */
+	bool ComputerPlays(int32 Team) const;
+
+	/** The unit the battle is currently waiting on, or nullptr. */
+	const TMSim::FUnit* WaitingOn() const;
 
 	/** The rules. Plain C++, and deliberately unaware of everything above. */
 	TMSim::FBattle Battle;
+
+	/** Not part of the rules, and holds nothing the rules need. */
+	TMSim::FAIPlayer Computer;
+
+	/** Seconds still to wait before the computer gives its next order. */
+	float ThinkRemainder = 0.0f;
+	/** Who the last order was for, so a new turn gets the longer pause. */
+	int32 ThinkingAbout = -1;
 
 	UPROPERTY()
 	TArray<TObjectPtr<USkeletalMeshComponent>> UnitVisuals;

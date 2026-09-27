@@ -100,6 +100,14 @@ void ATMBattleDirector::BuildBattle()
 	// the Godot game does.
 	Battle.Start(12345);
 
+	// The computer gets its own generator off the same seed, so a battle against
+	// it plays out the same way twice. Its own, and not the battle's, because a
+	// player thinking harder must not change what the dice do.
+	Computer.SetDifficulty(TCHAR_TO_UTF8(*ComputerSkill));
+	Computer.Rng.Seed(12345);
+	ThinkingAbout = -1;
+	ThinkRemainder = 0.0f;
+
 	USkeletalMesh* Mesh = UnitMesh.LoadSynchronous();
 	for (size_t i = 0; i < Battle.Units.size(); ++i)
 	{
@@ -269,28 +277,139 @@ FString ATMBattleDirector::MoveUnitTo(int32 UnitId, float MetresX, float MetresY
 	// happened to land.
 	const TMSim::FVec2 To = TMSim::FMap::Snap(TMSim::FVec2(MetresX, MetresY));
 
-	const std::string Refused = Battle.ValidateMove(UnitId, To, bSprint);
+	const TMSim::FUnit* Unit = Battle.FindUnit(UnitId);
+	if (!Unit)
+	{
+		return TEXT("No such unit.");
+	}
+	const FString Refused = Submit(TMSim::FOrder::MakeMove(UnitId, Unit->Serial, To, bSprint));
+	if (Refused.IsEmpty())
+	{
+		UE_LOG(LogTemp, Log, TEXT("unit %d walked to %.2f, %.2f"), UnitId, To.X, To.Y);
+	}
+	else
+	{
+		UE_LOG(LogTemp, Log, TEXT("unit %d cannot walk there: %s"), UnitId, *Refused);
+	}
+	return Refused;
+}
+
+FString ATMBattleDirector::Submit(const TMSim::FOrder& Order)
+{
+	// Checked, then applied, and never the other way round. A person's order
+	// arrives from a click, the computer's out of TMSim, and one day a third
+	// will arrive from the network; all three are strangers here and all three
+	// are checked. It is also what makes a battle replayable: it is exactly the
+	// list of orders that got through this function.
+	const std::string Refused = Battle.Validate(Order);
 	if (!Refused.empty())
 	{
-		const FString Why = UTF8_TO_TCHAR(Refused.c_str());
-		UE_LOG(LogTemp, Log, TEXT("unit %d cannot walk there: %s"), UnitId, *Why);
-		return Why;
+		return UTF8_TO_TCHAR(Refused.c_str());
 	}
 
 	TMSim::FTickReport Report;
-	Battle.ApplyMove(UnitId, To, bSprint, Report);
+	if (!Battle.Apply(Order, Report))
+	{
+		// Accepted and then not applied would mean the two halves disagree,
+		// which is the one thing that must never pass quietly.
+		UE_LOG(LogTemp, Error,
+			TEXT("an order for unit %d passed the rules and then did nothing"), Order.UnitId);
+		return TEXT("The order could not be carried out.");
+	}
 	RefreshVisuals();
-	UE_LOG(LogTemp, Log, TEXT("unit %d walked to %.2f, %.2f"), UnitId, To.X, To.Y);
 	return FString();
+}
+
+bool ATMBattleDirector::ComputerPlays(int32 Team) const
+{
+	return Team == 0 ? bComputerPlaysTeam0 : bComputerPlaysTeam1;
+}
+
+const TMSim::FUnit* ATMBattleDirector::WaitingOn() const
+{
+	for (const TMSim::FUnit& Unit : Battle.Units)
+	{
+		if (Unit.IsAlive() && Unit.bReady)
+		{
+			return &Unit;
+		}
+	}
+	return nullptr;
+}
+
+FString ATMBattleDirector::TakeComputerTurn(int32 UnitId)
+{
+	if (!bBuilt)
+	{
+		BuildBattle();
+	}
+	const TMSim::FUnit* Unit = Battle.FindUnit(UnitId);
+	if (!Unit || !Unit->IsAlive())
+	{
+		return TEXT("No such unit.");
+	}
+	if (!Unit->bReady)
+	{
+		return TEXT("It isn't its turn.");
+	}
+
+	Computer.SetDifficulty(TCHAR_TO_UTF8(*ComputerSkill));
+	const TMSim::FOrder Order = Computer.NextCommand(Battle, *Unit);
+	const FString Refused = Submit(Order);
+	if (!Refused.IsEmpty())
+	{
+		// The computer asking for something the rules refuse is a fault in the
+		// computer, not in the player who happens to be watching.
+		UE_LOG(LogTemp, Warning, TEXT("the computer asked for something it cannot do: %s"), *Refused);
+	}
+	return Refused;
+}
+
+int32 ATMBattleDirector::PlayComputerTurns(int32 MaxOrders)
+{
+	if (!bBuilt)
+	{
+		BuildBattle();
+	}
+	int32 Given = 0;
+	while (Given < MaxOrders)
+	{
+		const TMSim::FUnit* Unit = WaitingOn();
+		if (!Unit || !ComputerPlays(Unit->Team))
+		{
+			break;
+		}
+		const int32 UnitId = Unit->Id;
+		if (!TakeComputerTurn(UnitId).IsEmpty())
+		{
+			// It cannot have this turn, so give the turn up rather than ask
+			// again and again for the same refusal.
+			Submit(TMSim::FOrder::MakeEndTurn(UnitId, Battle.FindUnit(UnitId)->Serial));
+		}
+		++Given;
+	}
+	return Given;
 }
 
 void ATMBattleDirector::EndUnitTurn(int32 UnitId)
 {
-	if (TMSim::FUnit* Unit = Battle.FindUnit(UnitId))
+	if (!bBuilt)
 	{
-		TMSim::FTickReport Report;
-		Battle.EndTurnFor(*Unit, false, Report);
-		RefreshVisuals();
+		BuildBattle();
+	}
+	const TMSim::FUnit* Unit = Battle.FindUnit(UnitId);
+	if (!Unit)
+	{
+		return;
+	}
+	const FString Refused = Submit(TMSim::FOrder::MakeEndTurn(UnitId, Unit->Serial));
+	if (Refused.IsEmpty())
+	{
+		UE_LOG(LogTemp, Log, TEXT("unit %d ended its turn"), UnitId);
+	}
+	else
+	{
+		UE_LOG(LogTemp, Log, TEXT("unit %d cannot end its turn: %s"), UnitId, *Refused);
 	}
 }
 
@@ -330,5 +449,31 @@ void ATMBattleDirector::Tick(float DeltaSeconds)
 	if (Steps > 0)
 	{
 		StepTicks(Steps);
+	}
+
+	// Whoever the battle is waiting on, if the computer is playing that side it
+	// takes a moment to think and then gives one order. The pause is what makes
+	// it readable: a side that emptied its whole turn into one frame would be
+	// impossible to learn anything from.
+	const TMSim::FUnit* Unit = WaitingOn();
+	if (!Unit || !ComputerPlays(Unit->Team))
+	{
+		ThinkingAbout = -1;
+		return;
+	}
+	if (ThinkingAbout != Unit->Id)
+	{
+		ThinkingAbout = Unit->Id;
+		ThinkRemainder = static_cast<float>(Computer.Skill().Think);
+	}
+	ThinkRemainder -= DeltaSeconds;
+	if (ThinkRemainder <= 0.0f)
+	{
+		const int32 UnitId = Unit->Id;
+		if (!TakeComputerTurn(UnitId).IsEmpty())
+		{
+			EndUnitTurn(UnitId);
+		}
+		ThinkRemainder = static_cast<float>(Computer.Skill().Step);
 	}
 }
