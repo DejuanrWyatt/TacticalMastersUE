@@ -10,6 +10,14 @@
 #include <cstdint>
 #include <string>
 
+// Unreal builds each module as its own library, so anything used from another
+// module has to be exported. UBT defines TMSIM_API when it compiles this; the
+// fallback is for the standalone tests, which build these files with nothing
+// but a compiler.
+#ifndef TMSIM_API
+#define TMSIM_API
+#endif
+
 namespace TMSim
 {
 	// --------------------------------------------------------------- vectors
@@ -28,8 +36,8 @@ namespace TMSim
 		FVec2(float InX, float InY) : X(InX), Y(InY) {}
 
 		FVec2 operator-(const FVec2& Other) const { return FVec2(X - Other.X, Y - Other.Y); }
-		float Length() const;
-		FVec2 Normalized() const;
+		TMSIM_API float Length() const;
+		TMSIM_API FVec2 Normalized() const;
 		float Dot(const FVec2& Other) const { return X * Other.X + Y * Other.Y; }
 		float DistanceTo(const FVec2& Other) const { return (*this - Other).Length(); }
 	};
@@ -44,10 +52,10 @@ namespace TMSim
 	inline constexpr int StatCount = static_cast<int>(EStat::Count);
 
 	/** The name a class file uses for a stat, for reading data and for messages. */
-	const char* StatName(EStat Stat);
+	TMSIM_API const char* StatName(EStat Stat);
 
 	/** EStat::Count if the name belongs to no stat (a class file may carry its own). */
-	EStat StatFromName(const std::string& Name);
+	TMSIM_API EStat StatFromName(const std::string& Name);
 
 	// ------------------------------------------------------------- statuses
 
@@ -96,10 +104,10 @@ namespace TMSim
 	};
 
 	/** Every status, in the order the Godot table lists them. */
-	const FStatusDef* AllStatuses(int& OutCount);
+	TMSIM_API const FStatusDef* AllStatuses(int& OutCount);
 
 	/** Null if no status has that id. */
-	const FStatusDef* FindStatus(const std::string& StatusId);
+	TMSIM_API const FStatusDef* FindStatus(const std::string& StatusId);
 
 	// ----------------------------------------------------------------- time
 
@@ -156,5 +164,5 @@ namespace TMSim
 	}
 
 	/** Godot's roundi(): halves go away from zero, which is what the rules assume. */
-	int RoundToInt(double Value);
+	TMSIM_API int RoundToInt(double Value);
 }

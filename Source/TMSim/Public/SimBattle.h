@@ -34,26 +34,26 @@ namespace TMSim
 	{
 	public:
 		/** Places units with the head start their Speed earns them. */
-		void Start(uint64_t InSeed);
+		TMSIM_API void Start(uint64_t InSeed);
 
 		/** One step of the clock, TicksPerSecond of these to the second. */
-		void Tick(FTickReport& Report);
+		TMSIM_API void Tick(FTickReport& Report);
 
 		/** Runs the clock on, for tests and for catching a replay up. */
-		void Advance(int Ticks, FTickReport& Report);
+		TMSIM_API void Advance(int Ticks, FTickReport& Report);
 
 		// ----------------------------------------------------------- timing
 
 		/** Gauge per tick before statuses: Speed x TgPerSpeed x the multiplier. */
-		int BaseTgGain(const FUnit& Unit) const;
+		TMSIM_API int BaseTgGain(const FUnit& Unit) const;
 		/** The same, after Slow and after a held-back turn. */
-		int TgGain(const FUnit& Unit) const;
+		TMSIM_API int TgGain(const FUnit& Unit) const;
 		/** Faster until its next turn, for a unit that kept its ability back. */
-		double HustleFactor(const FUnit& Unit) const;
+		TMSIM_API double HustleFactor(const FUnit& Unit) const;
 		/** Ticks a READY unit has to act in, from its Patience. */
-		int ClockTicks(const FUnit& Unit) const;
+		TMSIM_API int ClockTicks(const FUnit& Unit) const;
 		/** Ticks until this unit's turn comes (0 if it is ready now). */
-		int TicksToReady(const FUnit& Unit) const;
+		TMSIM_API int TicksToReady(const FUnit& Unit) const;
 
 		// --------------------------------------------------------- what it does
 
@@ -63,17 +63,17 @@ namespace TMSim
 		 * looked up, because the map is not ported yet -- and because it keeps
 		 * this answerable without one.
 		 */
-		int CalcAmount(const FUnit& User, const FAbility& Ability, FVec2 From,
+		TMSIM_API int CalcAmount(const FUnit& User, const FAbility& Ability, FVec2 From,
 			const FUnit& Target, FVec2 TargetPos, int FromLevel, int TargetLevel) const;
 
 		/** Hits from the side and from behind land harder. */
-		double FlankBonus(const FUnit& Target, FVec2 TargetPos, FVec2 From) const;
+		TMSIM_API double FlankBonus(const FUnit& Target, FVec2 TargetPos, FVec2 From) const;
 
 		/** Chance in % the target gets out of the way. Friendly abilities never are. */
-		int EvadeChance(const FUnit& Target, const FAbility& Ability, const FUnit* Attacker) const;
+		TMSIM_API int EvadeChance(const FUnit& Target, const FAbility& Ability, const FUnit* Attacker) const;
 
 		/** Chance in % that this unit's abilities land a critical hit. */
-		int CritChance(const FUnit& User) const;
+		TMSIM_API int CritChance(const FUnit& User) const;
 
 		// ------------------------------------------------------------ state
 
@@ -85,7 +85,7 @@ namespace TMSim
 		/** While the sides are still placing units, nothing else happens. */
 		int PlanningTicks = 0;
 
-		FUnit* FindUnit(int Id);
+		TMSIM_API FUnit* FindUnit(int Id);
 
 	private:
 		/** Its turn has come: the gauge is full and the countdown starts. */

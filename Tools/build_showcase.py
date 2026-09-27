@@ -210,8 +210,9 @@ def run():
     clear_generated()
     build_lighting()
     build_board()
-    place_hero()
     place_camera()
+    # No lone hero any more: the battle director puts a unit on the board for
+    # each unit in the simulation, which is the thing worth looking at.
 
     level_editor().save_current_level()
     log("saved. Open {} to look at it.".format(LEVEL_PATH))

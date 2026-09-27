@@ -92,18 +92,18 @@ namespace TMSim
 		int MaxHp() const { return Stats ? Stats->Get(EStat::Hp) : 0; }
 
 		/** A stat with its buffs, and the statuses that scale the defences. */
-		int Stat(EStat Which) const;
+		TMSIM_API int Stat(EStat Which) const;
 
-		bool HasStatus(const std::string& StatusId) const;
+		TMSIM_API bool HasStatus(const std::string& StatusId) const;
 
 		/** How fast the gauge fills compared with normal: Slow halves it. */
-		float TgFactor() const;
+		TMSIM_API float TgFactor() const;
 
 		/** Added to the chance this unit's own attacks are evaded (Blind). */
-		int MissChance() const;
+		TMSIM_API int MissChance() const;
 
 		/** The status taking this unit's orders away, or "" if it can act. */
-		std::string NoOrdersStatus() const;
+		TMSIM_API std::string NoOrdersStatus() const;
 		bool IsStunned() const { return !NoOrdersStatus().empty(); }
 
 	private:

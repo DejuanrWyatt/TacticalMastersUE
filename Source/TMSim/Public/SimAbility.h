@@ -61,12 +61,12 @@ namespace TMSim
 	};
 
 	/** Null if nothing is registered under that id. */
-	const FJobDef* FindJob(const std::string& JobId);
-	const FAbility* FindAbility(const std::string& AbilityId);
+	TMSIM_API const FJobDef* FindJob(const std::string& JobId);
+	TMSIM_API const FAbility* FindAbility(const std::string& AbilityId);
 
 	/** The ability in one of a class's four slots, or null. */
-	const FAbility* JobAbility(const std::string& JobId, int Slot);
+	TMSIM_API const FAbility* JobAbility(const std::string& JobId, int Slot);
 
 	/** Every class the game knows, for listings. */
-	const std::vector<const FJobDef*>& AllJobs();
+	TMSIM_API const std::vector<const FJobDef*>& AllJobs();
 }
