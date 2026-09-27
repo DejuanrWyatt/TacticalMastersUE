@@ -3,8 +3,11 @@
 #include "Components/PointLightComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Components/StaticMeshComponent.h"
+#include "Components/TextRenderComponent.h"
 #include "Engine/StaticMesh.h"
 #include "Engine/SkeletalMesh.h"
+#include "GameFramework/PlayerController.h"
+#include "Misc/App.h"
 
 #include "SimAbility.h"
 
@@ -361,6 +364,7 @@ FString ATMBattleDirector::Submit(const TMSim::FOrder& Order)
 		return TEXT("The order could not be carried out.");
 	}
 	Narrate(Report);
+	ShowEvents(Report);
 	RefreshVisuals();
 	return FString();
 }
@@ -372,6 +376,173 @@ FString ATMBattleDirector::NameOf(int32 UnitId) const
 		return FString::Printf(TEXT("%hs %d"), Unit->Job.c_str(), Unit->Id);
 	}
 	return FString::Printf(TEXT("unit %d"), UnitId);
+}
+
+void ATMBattleDirector::ShowEvents(const TMSim::FTickReport& Report)
+{
+	// Only while playing. In the editor the clock is stepped by hand and nothing
+	// advances these, so they would pile up in the level and never fade; the log
+	// is the readable layer there.
+	if (!GetWorld() || !GetWorld()->IsGameWorld())
+	{
+		return;
+	}
+
+	for (const TMSim::FEvent& Event : Report.Events)
+	{
+		FString What;
+		FColor Tint = FColor::White;
+		switch (Event.Kind)
+		{
+		case TMSim::EEventKind::Hit:
+			// Damage has somebody behind it; healing and the ground do not, which
+			// is the difference between a number going down and one going up.
+			if (Event.By >= 0)
+			{
+				What = FString::Printf(TEXT("-%d"), Event.Amount);
+				Tint = FColor(255, 115, 90);
+			}
+			else
+			{
+				What = FString::Printf(TEXT("+%d"), Event.Amount);
+				Tint = FColor(115, 255, 128);
+			}
+			break;
+		case TMSim::EEventKind::Evaded:
+			What = TEXT("miss");
+			Tint = FColor(215, 224, 255);
+			break;
+		case TMSim::EEventKind::Critical:
+			What = TEXT("critical!");
+			Tint = FColor(255, 217, 77);
+			break;
+		case TMSim::EEventKind::Absorbed:
+			What = FString::Printf(TEXT("soaked %d"), Event.Amount);
+			Tint = FColor(153, 217, 255);
+			break;
+		case TMSim::EEventKind::StatusApplied:
+			What = UTF8_TO_TCHAR(Event.Id.c_str());
+			Tint = FColor(224, 153, 255);
+			break;
+		case TMSim::EEventKind::Knocked:
+			What = TEXT("down");
+			Tint = FColor(255, 77, 77);
+			break;
+		case TMSim::EEventKind::Revived:
+			What = TEXT("up again");
+			Tint = FColor(255, 242, 153);
+			break;
+		default:
+			break;
+		}
+		if (What.IsEmpty())
+		{
+			continue;
+		}
+
+		const TMSim::FUnit* Unit = Battle.FindUnit(Event.Unit);
+		if (!Unit)
+		{
+			continue;
+		}
+		// Above the head, and nudged along by however many are already in flight
+		// for this unit, so two numbers in the same instant do not sit on top of
+		// one another.
+		int32 Stacked = 0;
+		for (const FTMFloater& Other : Floaters)
+		{
+			if (Other.UnitId == Event.Unit)
+			{
+				++Stacked;
+			}
+		}
+		const FVector Where = WorldFor(*Unit)
+			+ FVector(0.0f, 0.0f, 190.0f + Stacked * 26.0f);
+
+		UTextRenderComponent* Text = NewObject<UTextRenderComponent>(this, NAME_None, RF_Transient);
+		Text->SetMobility(EComponentMobility::Movable);
+		Text->SetupAttachment(RootComponent);
+		Text->RegisterComponent();
+		Text->SetText(FText::FromString(What));
+		Text->SetTextRenderColor(Tint);
+		Text->SetWorldSize(FloaterSize);
+		Text->SetHorizontalAlignment(EHTA_Center);
+		Text->SetRelativeLocation(Where);
+		// Facing the camera is a per-frame job; billboarded below in Tick.
+		Floaters.Add({ Text, Event.Unit, 0.0f });
+		++NumbersShown;
+
+		if (Event.Kind == TMSim::EEventKind::Hit && Event.By >= 0)
+		{
+			Flashes.Add({ Event.Unit, 0.0f });
+		}
+	}
+}
+
+void ATMBattleDirector::AdvanceFloaters(float DeltaSeconds)
+{
+	// The numbers rise, lean towards the camera so they can be read, and fade.
+	// None of this is state: the rules neither know nor care that it happens.
+	FRotator Towards = FRotator::ZeroRotator;
+	if (const APlayerController* Watcher = GetWorld() ? GetWorld()->GetFirstPlayerController() : nullptr)
+	{
+		FVector Eye;
+		FRotator Look;
+		Watcher->GetPlayerViewPoint(Eye, Look);
+		Towards = FRotator(0.0f, Look.Yaw + 180.0f, 0.0f);
+	}
+
+	for (int32 i = Floaters.Num() - 1; i >= 0; --i)
+	{
+		FTMFloater& Floater = Floaters[i];
+		Floater.Age += DeltaSeconds;
+		if (!Floater.Text || Floater.Age >= FloaterSeconds)
+		{
+			if (Floater.Text)
+			{
+				Floater.Text->DestroyComponent();
+			}
+			Floaters.RemoveAt(i);
+			continue;
+		}
+		const float Part = Floater.Age / FloaterSeconds;
+		Floater.Text->AddLocalOffset(FVector(0.0f, 0.0f, 42.0f * DeltaSeconds));
+		Floater.Text->SetWorldRotation(Towards);
+		// Held at full strength for the first half, then gone by the end.
+		const float Alpha = Part < 0.5f ? 1.0f : 1.0f - (Part - 0.5f) * 2.0f;
+		Floater.Text->SetTextRenderColor(FColor(
+			Floater.Text->TextRenderColor.R, Floater.Text->TextRenderColor.G,
+			Floater.Text->TextRenderColor.B, static_cast<uint8>(Alpha * 255.0f)));
+	}
+
+	// A struck unit's own light flares and settles, which is cheaper to read than
+	// a number and says where to look.
+	for (int32 i = Flashes.Num() - 1; i >= 0; --i)
+	{
+		FFlash& Flash = Flashes[i];
+		Flash.Age += DeltaSeconds;
+		const int32 Index = Flash.UnitId;
+		if (!ReadyLights.IsValidIndex(Index) || !ReadyLights[Index])
+		{
+			Flashes.RemoveAt(i);
+			continue;
+		}
+		UPointLightComponent* Light = ReadyLights[Index];
+		if (Flash.Age >= FlashSeconds)
+		{
+			// Back to whose turn it is, which is what the light is normally for.
+			const TMSim::FUnit* Unit = Battle.FindUnit(Index);
+			Light->SetLightColor(ReadyColour);
+			Light->SetIntensity(ReadyLightBrightness);
+			Light->SetVisibility(Unit && Unit->bReady && Unit->IsAlive());
+			Flashes.RemoveAt(i);
+			continue;
+		}
+		const float Left = 1.0f - Flash.Age / FlashSeconds;
+		Light->SetVisibility(true);
+		Light->SetLightColor(FLinearColor(1.0f, 0.25f, 0.2f));
+		Light->SetIntensity(ReadyLightBrightness * (1.0f + 2.5f * Left));
+	}
 }
 
 void ATMBattleDirector::Narrate(const TMSim::FTickReport& Report)
@@ -508,6 +679,23 @@ const TMSim::FUnit* ATMBattleDirector::WaitingOn() const
 	return nullptr;
 }
 
+const TMSim::FUnit* ATMBattleDirector::WaitingOnComputer() const
+{
+	// The first unit waiting on a side the computer plays -- not simply the first
+	// unit waiting. Several units are ready at once, and time runs for all of
+	// them, so a computer side that stood aside until every other side had
+	// finished would let its own turns run out. That is exactly what happened:
+	// eight units became ready and all eight timed out without acting.
+	for (const TMSim::FUnit& Unit : Battle.Units)
+	{
+		if (Unit.IsAlive() && Unit.bReady && ComputerPlays(Unit.Team))
+		{
+			return &Unit;
+		}
+	}
+	return nullptr;
+}
+
 FString ATMBattleDirector::TakeComputerTurn(int32 UnitId)
 {
 	if (!bBuilt)
@@ -545,8 +733,8 @@ int32 ATMBattleDirector::PlayComputerTurns(int32 MaxOrders)
 	int32 Given = 0;
 	while (Given < MaxOrders)
 	{
-		const TMSim::FUnit* Unit = WaitingOn();
-		if (!Unit || !ComputerPlays(Unit->Team))
+		const TMSim::FUnit* Unit = WaitingOnComputer();
+		if (!Unit)
 		{
 			break;
 		}
@@ -599,6 +787,8 @@ void ATMBattleDirector::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
 
+	AdvanceFloaters(DeltaSeconds);
+
 	// Only while playing: in the editor the clock is stepped by hand, so a
 	// battle sitting in a level does not quietly run on while it is being built.
 	if (!bBuilt || !GetWorld() || !GetWorld()->IsGameWorld())
@@ -622,12 +812,33 @@ void ATMBattleDirector::Tick(float DeltaSeconds)
 		StepTicks(Steps);
 	}
 
+	// A battle run with nobody watching has to be able to finish. Without this a
+	// headless run sits there for ever after the last unit falls, and the next
+	// build cannot replace a DLL the dead session is still holding open.
+	if (Battle.Winner != -1)
+	{
+		if (!bSaidWon)
+		{
+			bSaidWon = true;
+			UE_LOG(LogTemp, Log,
+				TEXT("BATTLE OVER: winner %d after %.1fs, %d orders, %d numbers shown"),
+				Battle.Winner, Battle.TickCount / float(TMSim::Pace::TicksPerSecond),
+				OrdersGiven, NumbersShown);
+			UE_LOG(LogTemp, Log, TEXT("%s"), *DescribeBattle());
+			if (FApp::IsUnattended())
+			{
+				FPlatformMisc::RequestExit(false);
+			}
+		}
+		return;
+	}
+
 	// Whoever the battle is waiting on, if the computer is playing that side it
 	// takes a moment to think and then gives one order. The pause is what makes
 	// it readable: a side that emptied its whole turn into one frame would be
 	// impossible to learn anything from.
-	const TMSim::FUnit* Unit = WaitingOn();
-	if (!Unit || !ComputerPlays(Unit->Team))
+	const TMSim::FUnit* Unit = WaitingOnComputer();
+	if (!Unit)
 	{
 		ThinkingAbout = -1;
 		return;
@@ -645,6 +856,7 @@ void ATMBattleDirector::Tick(float DeltaSeconds)
 		{
 			EndUnitTurn(UnitId);
 		}
+		++OrdersGiven;
 		ThinkRemainder = static_cast<float>(Computer.Skill().Step);
 	}
 }

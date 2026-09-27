@@ -25,6 +25,26 @@ class USkeletalMeshComponent;
 class UStaticMesh;
 class UStaticMeshComponent;
 class UPointLightComponent;
+class UTextRenderComponent;
+
+/**
+ * A number rising off a unit. It is a USTRUCT only so the component it holds is
+ * kept from the garbage collector; nothing about it is game state.
+ */
+USTRUCT()
+struct FTMFloater
+{
+	GENERATED_BODY()
+
+	UPROPERTY()
+	TObjectPtr<class UTextRenderComponent> Text = nullptr;
+
+	UPROPERTY()
+	int32 UnitId = -1;
+
+	UPROPERTY()
+	float Age = 0.0f;
+};
 
 UCLASS()
 class TACTICALMASTERS_API ATMBattleDirector : public AActor
@@ -130,13 +150,28 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Tactical Masters")
 	int32 LogLines = 40;
 
+	/** How long a damage number lingers, and how big it is drawn. */
+	UPROPERTY(EditAnywhere, Category = "Tactical Masters|Reading a fight")
+	float FloaterSeconds = 1.4f;
+
+	UPROPERTY(EditAnywhere, Category = "Tactical Masters|Reading a fight")
+	float FloaterSize = 26.0f;
+
+	/** How long a struck unit's light flares. */
+	UPROPERTY(EditAnywhere, Category = "Tactical Masters|Reading a fight")
+	float FlashSeconds = 0.25f;
+
 	// The computer player. It is for practising against and for testing with,
 	// and it plays by clicking: it hands over an order and the order is checked
 	// and applied exactly as one arriving from a person would be. Set both sides
 	// to the computer to watch a battle play itself, or neither for two people.
 
+	/**
+	 * Both sides by default, because there is no way to take orders from a person
+	 * yet. Turn a side off as soon as somebody can play it.
+	 */
 	UPROPERTY(EditAnywhere, Category = "Tactical Masters|Computer")
-	bool bComputerPlaysTeam0 = false;
+	bool bComputerPlaysTeam0 = true;
 
 	UPROPERTY(EditAnywhere, Category = "Tactical Masters|Computer")
 	bool bComputerPlaysTeam1 = true;
@@ -179,11 +214,38 @@ private:
 	/** How a unit is referred to in the log. */
 	FString NameOf(int32 UnitId) const;
 
+	/**
+	 * Numbers that rise off a unit and fade. Presentation and nothing else: they
+	 * are built from the events the rules report, the rules never read them back,
+	 * and losing one would not change a battle by a hair.
+	 */
+	void ShowEvents(const TMSim::FTickReport& Report);
+
+	/** Moves, billboards and fades them, and settles the flash on a struck unit. */
+	void AdvanceFloaters(float DeltaSeconds);
+
+	/** One unit's light flaring after it was struck. */
+	struct FFlash
+	{
+		int32 UnitId = -1;
+		float Age = 0.0f;
+	};
+
+	UPROPERTY()
+	TArray<FTMFloater> Floaters;
+
+	TArray<FFlash> Flashes;
+
+
+
 	UPROPERTY()
 	TArray<FString> Log;
 
 	/** The unit the battle is currently waiting on, or nullptr. */
 	const TMSim::FUnit* WaitingOn() const;
+
+	/** The first such unit on a side the computer plays, which is not the same. */
+	const TMSim::FUnit* WaitingOnComputer() const;
 
 	/** The rules. Plain C++, and deliberately unaware of everything above. */
 	TMSim::FBattle Battle;
@@ -195,6 +257,12 @@ private:
 	float ThinkRemainder = 0.0f;
 	/** Who the last order was for, so a new turn gets the longer pause. */
 	int32 ThinkingAbout = -1;
+	/** Orders the computer has given, for the line printed when a battle ends. */
+	int32 OrdersGiven = 0;
+	/** Said once, so the result is not logged every frame after it is decided. */
+	bool bSaidWon = false;
+	/** How many rising numbers have been put up, as evidence they are. */
+	int32 NumbersShown = 0;
 
 	UPROPERTY()
 	TArray<TObjectPtr<USkeletalMeshComponent>> UnitVisuals;

@@ -34,6 +34,11 @@ ultimates, sight/fog and an AI opponent that plays through the same order path a
 | `Tests/` | Standalone parity tests, built with MSVC directly, no engine. | See Testing. |
 | `Tools/` | Editor Python: `build_showcase.py` (builds the Showcase level) and `play_battle.py` (wiring test). | Run through `UnrealEditor-Cmd -run=pythonscript`. |
 
+**A headless game session must be able to end itself.** The director asks to exit once a battle is
+decided and `FApp::IsUnattended()`. Without that a run sits there for ever holding
+`UnrealEditor-TacticalMasters.dll` open, and the next build fails with `LNK1104` — and the session can
+be hard to kill (`Stop-Process` and `taskkill` may both refuse; WMI `Terminate` worked).
+
 ## Determinism rules (non-negotiable in TMSim)
 1. **The dice are rolled only in `SimResolve.cpp`**, via `FBattle::Rng` (`FSimRandom`, a bit-exact copy
    of Godot 4's PCG32). The roll order is part of the rules: targets in unit-id order (as `Preview` returns
@@ -47,7 +52,11 @@ ultimates, sight/fog and an AI opponent that plays through the same order path a
    iteration, no pointer-address ordering. Iterate units in `Units` order (id order).
 4. **Every state change goes through `FBattle::Validate` + `FBattle::Apply`** with an `FOrder`. The AI,
    the player and replays use the same door. The AI must never get a special case inside the rules.
-5. **`FEvent`/`FTickReport` are presentation only.** Nothing in the rules may read them back.
+5. **`FEvent`/`FTickReport` are presentation only.** Nothing in the rules may read them back. The
+   director reads them twice, for two separate things: `Narrate` builds the battle log, and `ShowEvents`
+   puts up the rising numbers and flashes a struck unit's light. Losing either would not change a
+   battle by a hair. The numbers exist only in a game world, because nothing advances them in the
+   editor and they would pile up in the level.
 6. **Any new state field must be mixed into `FBattle::Checksum()`** (`SimWorld.cpp`), or desyncs go undetected.
    The gaps F7 listed (RNG state, `KoTicks`, `bHustling`, `UnharmedTurns`) are closed, along with casting,
    channelling and toggles. `SimPlayTest` has a probe per field that changes it and insists the checksum
@@ -69,6 +78,7 @@ ultimates, sight/fog and an AI opponent that plays through the same order path a
 | Rules parity tests (seconds, no engine) | `scripts\test.bat` (wraps `Tests\RunTests.bat`) |
 | Build the editor target | `scripts\build.bat` (**close the editor first**, or Live Coding blocks the build) |
 | Wiring test: sim ↔ Unreal, in a real level | `scripts\wiring-test.bat` (runs `Tools/play_battle.py` headless) |
+| A whole battle in a real game world | `scriptsattle-test.bat` (no window, no rendering; ends itself) |
 
 Paths on this machine: engine `E:\UE_5.8`, Visual Studio `E:\VS2022`.
 

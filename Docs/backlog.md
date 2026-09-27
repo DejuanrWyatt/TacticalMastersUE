@@ -21,7 +21,7 @@ reorder it yourself.
 | feat-time-as-orders | Director steps time via `Submit(MakeAdvance)` so a battle is fully recordable (F8) | – | unreal-engineer | Done |
 | port-turn-start | Start-of-turn effects: statuses tick/expire, hazards, regen, auras, channel continuation | port-cast-and-orders | sim-engineer | Done except auras — no built-in ability is one, so there is nothing to refresh yet; the gap is named in `BecomeReady` |
 | port-ai-abilities | AI chooses and aims abilities (plus the `Randf` tie-break, verified bit-exact) | port-cast-and-orders | sim-engineer | Done for hard, parity-tested (`SimAIActionTest`). `Randf` is still unported, so easy and medium cannot be replayed bit-for-bit; and Godot settles a tie with an unstable sort, so tied options may differ — the test proves they are ties |
-| feat-event-playback | Director plays back `FTickReport` events: movement, casts, hits, misses, KOs | port-cast-and-orders | unreal-engineer | Part done — the log and a text cast bar read from the events (`Narrate`, `BattleLog`, `DescribeBattle`); floating numbers and a hit flash on screen are not done |
+| feat-event-playback | Director plays back `FTickReport` events: movement, casts, hits, misses, KOs | port-cast-and-orders | unreal-engineer | Done — `Narrate` builds the log, `ShowEvents` puts up rising numbers and flashes a struck unit (game world only); a cast bar is text in `DescribeBattle`. Projectiles and animations belong with the character pipeline |
 
 ### port-resolve-parity
 Godot source: game_state.gd `_resolve_ability` (:1730-1867), `_hurt` (:1339), `_take_from_shield` (:1354),
