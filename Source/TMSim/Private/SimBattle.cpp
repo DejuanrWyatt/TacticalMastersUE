@@ -130,7 +130,7 @@ namespace TMSim
 				--Unit.KoTicks;
 				if (Unit.KoTicks <= 0)
 				{
-					Report.Gone.push_back(Unit.Id);
+					Report.Say(EEventKind::Gone, Unit.Id);
 				}
 				continue;
 			}
@@ -139,10 +139,55 @@ namespace TMSim
 				continue;
 			}
 
-			// A unit part-way through casting does not fill its gauge; the spell
-			// going off is what its turn was spent on. Casting is not ported yet,
-			// so this is always false and the shape is kept for when it is.
-			const bool bWasCasting = false;
+			// A spell part-way out. Three things follow from doing this here, before
+			// the gauge and the countdown below, and from nothing else:
+			//
+			//  - the gauge does not fill while casting, and not even on the tick the
+			//    cast lands, because bWasCasting is still true for that one;
+			//  - the turn countdown keeps running, so a cast begun late can time its
+			//    own turn out -- and the spell still lands afterwards, off a gauge
+			//    that then starts from nothing;
+			//  - units are walked in id order, so a spell can strike down someone
+			//    later in the list before their own tick is reached.
+			const bool bWasCasting = Unit.IsCasting();
+			if (bWasCasting)
+			{
+				--Unit.Casting.Ticks;
+				if (Unit.Casting.Ticks <= 0)
+				{
+					const FCast Cast = Unit.Casting;
+					Unit.Casting = FCast();
+
+					// Where it lands is decided now, not when it was cast: aimed at
+					// someone it follows them wherever they went, aimed at the ground
+					// it stays put. A followed unit that has fallen stops being
+					// followed, and the spell lands where they were.
+					FVec2 Where = Cast.Target;
+					if (const FUnit* Followed = FindUnit(Cast.FollowId))
+					{
+						if (Followed->IsAlive())
+						{
+							Where = Followed->Pos;
+						}
+					}
+					FEvent Event;
+					Event.Kind = EEventKind::CastFinished;
+					Event.Unit = Unit.Id;
+					Event.Slot = Cast.Slot;
+					Event.Where = Where;
+					Report.Events.push_back(Event);
+
+					ResolveAbility(Unit, Cast.Slot, Where, Report);
+					if (Winner != -1)
+					{
+						return;
+					}
+					if (!Unit.IsAlive())
+					{
+						continue;
+					}
+				}
+			}
 
 			if (Unit.bReady)
 			{
@@ -250,13 +295,178 @@ namespace TMSim
 		return std::max(0, std::min(100, Chance));
 	}
 
+	void FBattle::TickStatuses(FUnit& Unit, FTickReport& Report)
+	{
+		// Statuses act on the unit's own turn and then count down, so "two turns"
+		// means its next two. Burn can knock it out before it ever gets to act.
+		if (Unit.Statuses.empty())
+		{
+			return;
+		}
+		std::vector<FStatus> Kept;
+		Kept.reserve(Unit.Statuses.size());
+		for (FStatus& Status : Unit.Statuses)
+		{
+			const FStatusDef* Def = FindStatus(Status.Id);
+			if (!Def)
+			{
+				continue;
+			}
+			if (Def->PerTurn != 0.0f && Unit.IsAlive())
+			{
+				const int Amount = std::max(1,
+					RoundToInt(Unit.MaxHp() * std::fabs(static_cast<double>(Def->PerTurn))));
+				if (Def->PerTurn < 0.0f)
+				{
+					const int Taken = Hurt(Unit, Amount);
+					if (Taken > 0)
+					{
+						FEvent Event;
+						Event.Kind = EEventKind::Hit;
+						Event.Unit = Unit.Id;
+						Event.Amount = Taken;
+						Event.Where = Unit.Pos;
+						Event.Id = Status.Id;
+						Report.Events.push_back(Event);
+						if (!Unit.IsAlive())
+						{
+							KnockOut(Unit, Report);
+							CheckWinner();
+							return;
+						}
+					}
+				}
+				else
+				{
+					const int Healed = std::min(Amount, Unit.MaxHp() - Unit.Hp);
+					if (Healed > 0)
+					{
+						Unit.Hp += Healed;
+						FEvent Event;
+						Event.Kind = EEventKind::Hit;
+						Event.Unit = Unit.Id;
+						Event.Amount = Healed;
+						Event.Where = Unit.Pos;
+						Event.Id = Status.Id;
+						Report.Events.push_back(Event);
+					}
+				}
+			}
+
+			--Status.Turns;
+			if (Status.Turns > 0)
+			{
+				Kept.push_back(Status);
+			}
+			else if (Def->bDoom && Unit.IsAlive())
+			{
+				// The count has run out, and that is that however much health is
+				// left. Whatever else was on it goes too.
+				Unit.Hp = 0;
+				Unit.UnharmedTurns = 0;
+				Unit.Statuses.swap(Kept);
+				KnockOut(Unit, Report);
+				CheckWinner();
+				return;
+			}
+		}
+		Unit.Statuses.swap(Kept);
+	}
+
+	void FBattle::GroundEffect(FUnit& Unit, FTickReport& Report)
+	{
+		// Burning ground hurts and a spring heals, and either happens when the
+		// unit's turn comes round rather than when it walks on.
+		const int Kind = HazardAt(Unit.Pos);
+		if (Kind == 0)
+		{
+			return;
+		}
+		const int Amount = std::max(1, RoundToInt(Unit.MaxHp() * Tuning.HazardPercent * 0.01));
+		if (Kind < 0)
+		{
+			const int Taken = Hurt(Unit, Amount);
+			if (Taken > 0)
+			{
+				FEvent Event;
+				Event.Kind = EEventKind::Hit;
+				Event.Unit = Unit.Id;
+				Event.Amount = Taken;
+				Event.Where = Unit.Pos;
+				Event.Id = "ground";
+				Report.Events.push_back(Event);
+				if (!Unit.IsAlive())
+				{
+					KnockOut(Unit, Report);
+					CheckWinner();
+				}
+			}
+			return;
+		}
+		const int Healed = std::min(Amount, Unit.MaxHp() - Unit.Hp);
+		if (Healed > 0)
+		{
+			Unit.Hp += Healed;
+			FEvent Event;
+			Event.Kind = EEventKind::Hit;
+			Event.Unit = Unit.Id;
+			Event.Amount = Healed;
+			Event.Where = Unit.Pos;
+			Event.Id = "ground";
+			Report.Events.push_back(Event);
+		}
+	}
+
+	void FBattle::UndamagedRegen(FUnit& Unit, FTickReport& Report)
+	{
+		// Left alone long enough, a unit mends at the start of each of its turns.
+		// Anything that hurt it since its last turn puts the count back to nothing,
+		// so the room has to be given rather than merely waited for.
+		++Unit.UnharmedTurns;
+		if (Tuning.RegenPercent <= 0.0
+			|| Unit.UnharmedTurns < std::max(1, RoundToInt(Tuning.RegenAfterTurns)))
+		{
+			return;
+		}
+		const int Amount = std::min(
+			std::max(1, RoundToInt(Unit.MaxHp() * Tuning.RegenPercent * 0.01)),
+			Unit.MaxHp() - Unit.Hp);
+		if (Amount <= 0)
+		{
+			return;
+		}
+		Unit.Hp += Amount;
+		FEvent Event;
+		Event.Kind = EEventKind::Hit;
+		Event.Unit = Unit.Id;
+		Event.Amount = Amount;
+		Event.Where = Unit.Pos;
+		Event.Id = "mend";
+		Report.Events.push_back(Event);
+	}
+
 	void FBattle::BecomeReady(FUnit& Unit, FTickReport& Report)
 	{
-		// Before the turn starts, the original lets this unit's statuses act and
-		// count down, burns or heals it on the ground it stands on, mends it if it
-		// has been left alone, refreshes auras, and carries on a channelled spell.
-		// A status that takes its orders away costs it the turn here. None of that
-		// is ported yet; what follows is the turn itself beginning.
+		// The order here is the original's and is load-bearing: a status can kill
+		// the unit before its turn begins, and so can the ground it is standing on,
+		// so each is followed by a check that there is still anybody to give a turn
+		// to. Auras are not ported -- no built-in ability is one.
+
+		// Read before the statuses count down, because the status taking its orders
+		// away costs it this turn and then wears off in the same breath.
+		const std::string BlockedBy = Unit.NoOrdersStatus();
+
+		TickStatuses(Unit, Report);
+		if (!Unit.IsAlive())
+		{
+			return;
+		}
+		GroundEffect(Unit, Report);
+		if (!Unit.IsAlive())
+		{
+			return;
+		}
+		UndamagedRegen(Unit, Report);
 
 		Unit.bReady = true;
 		Unit.Tg = Pace::TgMax;
@@ -265,12 +475,12 @@ namespace TMSim
 		Unit.bMoved = false;
 		Unit.bActed = false;
 		Unit.bHustling = false;
-		++Unit.UnharmedTurns;
-
 		for (int Slot = 0; Slot < 4; ++Slot)
 		{
+			Unit.ToggledTurn[Slot] = false;
 			Unit.Cooldowns[Slot] = std::max(0, Unit.Cooldowns[Slot] - 1);
 		}
+		Unit.Ult = std::min(Pace::UltMax, Unit.Ult + RoundToInt(Tuning.UltPerTurn));
 
 		// Buffs last a number of the unit's own turns.
 		std::vector<FBuff> Kept;
@@ -284,7 +494,36 @@ namespace TMSim
 		}
 		Unit.Buffs.swap(Kept);
 
-		Report.BecameReady.push_back(Unit.Id);
+		// Channelling: it goes off again, and that is what the turn was for.
+		if (Unit.IsChanneling())
+		{
+			--Unit.Channeling.Turns;
+			Report.Say(EEventKind::BecameReady, Unit.Id);
+			const int Slot = Unit.Channeling.Slot;
+			const FVec2 Where = Unit.Channeling.Target;
+			const bool bDone = Unit.Channeling.Turns <= 0;
+			ResolveAbility(Unit, Slot, Where, Report);
+			if (bDone)
+			{
+				Unit.Channeling = FChannel();
+			}
+			if (Unit.IsAlive())
+			{
+				EndTurnFor(Unit, false, Report);
+			}
+			return;
+		}
+
+		// A status that takes its orders away: the turn it just earned is lost, and
+		// the status has counted down for it. Stun is not one of these -- that
+		// interrupts the turn a unit is already in.
+		if (!BlockedBy.empty())
+		{
+			EndTurn(Unit, true, Report);
+			return;
+		}
+
+		Report.Say(EEventKind::BecameReady, Unit.Id);
 	}
 
 	void FBattle::EndTurnFor(FUnit& Unit, bool bTimedOut, FTickReport& Report)
@@ -294,13 +533,20 @@ namespace TMSim
 
 	void FBattle::EndTurn(FUnit& Unit, bool bTimedOut, FTickReport& Report)
 	{
+		// A turn lost to the countdown stops a channel; giving the turn up on
+		// purpose does not, because carrying on is the whole point of one.
+		if (bTimedOut && Unit.IsChanneling())
+		{
+			Unit.Channeling = FChannel();
+		}
+
 		// What it kept of its gauge says what it did with the turn. Doing nothing
 		// leaves it nearest its next one, which is what makes waiting a choice
 		// rather than a punishment.
 		if (bTimedOut)
 		{
 			Unit.Tg = 0;
-			Report.TimedOut.push_back(Unit.Id);
+			Report.Say(EEventKind::TimedOut, Unit.Id);
 		}
 		else if (Unit.bMoved && Unit.bActed)
 		{
@@ -321,7 +567,7 @@ namespace TMSim
 		Unit.Clock = 0;
 		Unit.bMoved = false;
 		Unit.bActed = false;
-		Report.TurnEnded.push_back(Unit.Id);
+		Report.Say(EEventKind::TurnEnded, Unit.Id);
 
 		// Relentless: straight back round again, and it is spent doing so. Ported
 		// with the rest of EndTurn for fidelity, but nothing exercises it until

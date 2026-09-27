@@ -116,6 +116,23 @@ namespace TMSim
 		return false;
 	}
 
+	const FUnit* FBattle::UnitNear(const FVec2& Point, float Radius) const
+	{
+		const FUnit* Best = nullptr;
+		for (const FUnit& Unit : Units)
+		{
+			if (!Unit.IsAlive() || Unit.Pos.DistanceTo(Point) > Radius)
+			{
+				continue;
+			}
+			if (Best == nullptr || Unit.Pos.DistanceTo(Point) < Best->Pos.DistanceTo(Point))
+			{
+				Best = &Unit;
+			}
+		}
+		return Best;
+	}
+
 	std::vector<const FUnit*> FBattle::TeamUnits(int Team) const
 	{
 		std::vector<const FUnit*> Out;
@@ -191,6 +208,11 @@ namespace TMSim
 		Mix(static_cast<uint64_t>(TickCount));
 		Mix(static_cast<uint64_t>(Winner + 1));
 		Mix(static_cast<uint64_t>(PlanningTicks));
+		// The dice themselves. Two machines that have drawn a different number of
+		// times still agree about the board for a while, and then disagree about
+		// the very next thing anyone rolls for -- so the generator's own position
+		// has to be part of what they compare, not merely its consequences.
+		Mix(Rng.GetState());
 
 		for (const FUnit& Unit : Units)
 		{
@@ -208,6 +230,12 @@ namespace TMSim
 			Mix(static_cast<uint64_t>(Unit.bMoved ? 2 : 0));
 			Mix(static_cast<uint64_t>(Unit.bActed ? 4 : 0));
 			Mix(static_cast<uint64_t>(Unit.Clock));
+			// How long a fallen unit can still be raised, whether it is owed a
+			// faster gauge for holding its action back, and how long it has gone
+			// unhurt. All three decide something later, so all three must agree.
+			Mix(static_cast<uint64_t>(Unit.KoTicks));
+			Mix(static_cast<uint64_t>(Unit.bHustling ? 1 : 0));
+			Mix(static_cast<uint64_t>(Unit.UnharmedTurns));
 
 			for (const FStatus& Status : Unit.Statuses)
 			{
@@ -228,7 +256,24 @@ namespace TMSim
 			for (int Slot = 0; Slot < 4; ++Slot)
 			{
 				Mix(static_cast<uint64_t>(Unit.Cooldowns[Slot]));
+				Mix(static_cast<uint64_t>(Unit.Toggled[Slot] ? 1 : 0));
+				Mix(static_cast<uint64_t>(Unit.ToggledTurn[Slot] ? 1 : 0));
 			}
+
+			// A spell part-way out. Two machines that disagree about what is in
+			// flight, or about how much longer it has, will agree about
+			// everything else right up until it lands.
+			Mix(static_cast<uint64_t>(Unit.Casting.Slot + 1));
+			MixFloat(Unit.Casting.Target.X);
+			MixFloat(Unit.Casting.Target.Y);
+			Mix(static_cast<uint64_t>(Unit.Casting.FollowId + 1));
+			Mix(static_cast<uint64_t>(Unit.Casting.Ticks));
+			Mix(static_cast<uint64_t>(Unit.Casting.Total));
+
+			Mix(static_cast<uint64_t>(Unit.Channeling.Slot + 1));
+			MixFloat(Unit.Channeling.Target.X);
+			MixFloat(Unit.Channeling.Target.Y);
+			Mix(static_cast<uint64_t>(Unit.Channeling.Turns));
 		}
 		return Hash;
 	}
@@ -273,6 +318,14 @@ namespace TMSim
 	{
 		if (Order.Type == EOrderType::Advance)
 		{
+			// Time is the one thing nobody orders, but it still arrives as one so
+			// that a replay is a single list. A step has to be a sensible size:
+			// an enormous one would run a whole battle inside one order and give
+			// the other machine nothing to compare against until it was over.
+			if (Order.Ticks < 1 || Order.Ticks > Pace::MaxAdvance)
+			{
+				return "Bad time step.";
+			}
 			return std::string();
 		}
 
@@ -303,12 +356,94 @@ namespace TMSim
 		case EOrderType::EndTurn:
 			return std::string();
 		case EOrderType::UseAbility:
-			// Abilities are not wired to orders yet: the damage they do is
-			// ported and tested, what is missing is casting and cooldowns.
-			return "Abilities cannot be ordered yet.";
+			return ValidateAbility(Order.UnitId, Order.Slot, Order.Target, Order.Follow);
 		default:
 			return "Unknown order.";
 		}
+	}
+
+	std::string FBattle::ValidateAbility(int UnitId, int Slot, const FVec2& Target, int Follow)
+	{
+		// Checked here in full rather than trusting whoever called, because this is
+		// an entry point in its own right: the director asks it before offering an
+		// ability, and Validate asks it about an order off the network.
+		FUnit* Unit = FindUnit(UnitId);
+		if (!Unit || !Unit->IsAlive())
+		{
+			return "No such unit.";
+		}
+		if (!Unit->bReady)
+		{
+			return "It isn't ready.";
+		}
+		if (Unit->IsStunned())
+		{
+			return "It can't act.";
+		}
+		if (Unit->bActed)
+		{
+			return "Already used an ability this turn.";
+		}
+		if (Unit->ActsOnce() && Unit->bMoved)
+		{
+			return Unit->Job + " is knocked down: it can walk or act this turn, not both.";
+		}
+		if (Slot < 0 || Slot > 3)
+		{
+			return "No such ability.";
+		}
+		const std::string Blocked = AbilityBlockedReason(*Unit, Slot);
+		if (!Blocked.empty())
+		{
+			return Blocked;
+		}
+		if (!InAbilityRange(*Unit, Slot, Unit->Pos, Target))
+		{
+			return "That target is out of range.";
+		}
+		// Fog: a side cannot aim at ground none of it can see.
+		if (!CanSee(Unit->Team, Target))
+		{
+			return "You can't see that spot.";
+		}
+		const FAbility* Ability = JobAbility(Unit->Job, Slot);
+		if (!Ability)
+		{
+			return "No such ability.";
+		}
+		if (NeedsLineOfSight(*Ability) && !HasLineOfSight(Unit->Pos, Target))
+		{
+			return "No line of sight.";
+		}
+
+		// Taunted: while whoever taunted it is within reach, an attack has to be
+		// aimed somewhere that catches them.
+		if (Ability->Effect == EEffect::Damage)
+		{
+			const FUnit* Taunter = FindUnit(Unit->TauntedBy());
+			if (Taunter && Taunter->IsAlive()
+				&& InAbilityRange(*Unit, Slot, Unit->Pos, Taunter->Pos)
+				&& !InShape(*Ability, Unit->Pos, Target, Taunter->Pos))
+			{
+				return Unit->Job + " is taunted: it must attack unit "
+					+ std::to_string(Taunter->Id) + ".";
+			}
+		}
+
+		// Following a unit: it has to be a unit, in the state this ability wants,
+		// and standing where the order says it is. Otherwise the two halves of the
+		// order disagree and the cast would land somewhere nobody asked for.
+		if (Follow != -1)
+		{
+			const FUnit* Followed = FindUnit(Follow);
+			const bool bRightState = Followed
+				&& (Ability->Target == ETargetSide::KoAlly ? Followed->IsKo() : Followed->IsAlive());
+			if (!bRightState || Followed->Pos.DistanceTo(Target) > Ground::HitRadius)
+			{
+				return "Bad target.";
+			}
+		}
+		return std::string();
 	}
 
 	bool FBattle::Apply(const FOrder& Order, FTickReport& Report)
@@ -321,6 +456,14 @@ namespace TMSim
 
 		case EOrderType::Move:
 			return ApplyMove(Order.UnitId, Order.To, Order.bSprint, Report);
+
+		case EOrderType::UseAbility:
+			if (FUnit* Unit = FindUnit(Order.UnitId))
+			{
+				UseAbility(*Unit, Order.Slot, Order.Target, Order.Follow, Report);
+				return true;
+			}
+			return false;
 
 		case EOrderType::EndTurn:
 			if (FUnit* Unit = FindUnit(Order.UnitId))

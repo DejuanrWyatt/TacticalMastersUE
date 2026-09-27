@@ -25,8 +25,16 @@ namespace TMSim
 		std::string Id;
 		std::string Name;
 		/**
-		 * "active", "passive", "aura" or "toggle". Only an active is something
-		 * a unit chooses to do on its turn; the rest are not orders at all.
+		 * One of "active", "passive", "toggle", "channeled", "active_passive"
+		 * or "aura". Only an active is something a unit chooses to do on its
+		 * turn and be done with; a passive or an aura is never an order at all,
+		 * a toggle is a free switch, and a channelled one repeats on each of
+		 * the caster's next turns while it can do nothing else.
+		 *
+		 * None of the six built-in classes is anything but active. The class
+		 * files waiting on the importer hold 81 passives, 18 auras, 10 toggles
+		 * and 6 channelled, so the words matter even though nothing says them
+		 * yet.
 		 */
 		std::string Kind = "active";
 		EEffect Effect = EEffect::Damage;
@@ -44,6 +52,16 @@ namespace TMSim
 		float MaxRange = 0.0f;
 		/** Radius hit around the target point; 0 is a single unit. */
 		float Aoe = 0.0f;
+		/**
+		 * One of "unit", "point", "circle", "self", "line", "cone", "global" or
+		 * "vector"; empty means work it out from the ranges. Aoe is the radius
+		 * of a circle, the half-width of a line, and unused by a cone.
+		 */
+		std::string Shape;
+		/** Cone spread in degrees. */
+		float Angle = 60.0f;
+		/** Turns a channelled ability lasts. */
+		int Channel = 2;
 		int Cooldown = 0;
 		/** Seconds of casting before it goes off. */
 		float Cast = 0.0f;

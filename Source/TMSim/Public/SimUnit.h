@@ -42,6 +42,33 @@ namespace TMSim
 		int By = -1;
 	};
 
+	/**
+	 * A spell part-way out. It is simulation state rather than an animation,
+	 * because everything about it is a rule: the gauge stops filling, the turn
+	 * countdown does not, and where it lands is decided when it lands.
+	 */
+	struct FCast
+	{
+		int Slot = -1;
+		/** Where it was aimed, used unless it is following someone. */
+		FVec2 Target;
+		/** The unit it follows, or -1 for a spot on the ground. */
+		int FollowId = -1;
+		int Ticks = 0;
+		int Total = 0;
+	};
+
+	/**
+	 * An ability that keeps working over the caster's next few turns, and takes
+	 * each of them to do it.
+	 */
+	struct FChannel
+	{
+		int Slot = -1;
+		FVec2 Target;
+		int Turns = 0;
+	};
+
 	struct FUnit
 	{
 		int Id = 0;
@@ -83,7 +110,18 @@ namespace TMSim
 		std::vector<FBuff> Buffs;
 		int Cooldowns[4] = { 0, 0, 0, 0 };
 
+		/** A spell part-way out, or Slot -1 for none. */
+		FCast Casting;
+		/** A channelled ability in progress, or Slot -1 for none. */
+		FChannel Channeling;
+		/** Which toggles are switched on, and which were flipped this turn. */
+		bool Toggled[4] = { false, false, false, false };
+		bool ToggledTurn[4] = { false, false, false, false };
+
 		// ------------------------------------------------------------ state
+
+		bool IsCasting() const { return Casting.Slot >= 0; }
+		bool IsChanneling() const { return Channeling.Slot >= 0; }
 
 		bool IsAlive() const { return Hp > 0; }
 		bool IsKo() const { return Hp <= 0 && KoTicks > 0; }
@@ -121,6 +159,18 @@ namespace TMSim
 		/** The status sealing its abilities, or empty. It can still walk. */
 		TMSIM_API std::string NoAbilitiesStatus() const;
 		bool IsSilenced() const { return !NoAbilitiesStatus().empty(); }
+
+		/** Takes no damage at all while it lasts (Invulnerable). */
+		TMSIM_API bool IsInvulnerable() const;
+
+		/** Turns away anything harmful coming its way (Immunity). */
+		TMSIM_API bool IsImmune() const;
+
+		/** Goes again the moment this turn ends, and is spent doing so (Relentless). */
+		TMSIM_API bool HasExtraTurn() const;
+
+		/** Who it must attack while they are in reach, or -1 (Taunt). */
+		TMSIM_API int TauntedBy() const;
 
 	private:
 		/** Every status flag of this kind multiplied together. */

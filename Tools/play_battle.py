@@ -20,7 +20,7 @@ import unreal
 
 LEVEL_PATH = "/Game/Maps/Showcase"
 # Ten ticks is a second of battle. Long enough that several units get a turn.
-SECONDS = 20
+SECONDS = 75
 TICKS_PER_SECOND = 10
 
 
@@ -62,6 +62,54 @@ def main():
     closing = director.describe_battle()
     print("--- after %d seconds and %d orders ---" % (SECONDS, orders))
     print(closing)
+
+    # The fight as a person would read it. This is the part that says whether
+    # abilities are wired through to Unreal at all: the log is built from the
+    # events the rules report, so a silent one means nothing went off.
+    print("--- the log ---")
+    print(director.battle_log())
+
+    # One ability by hand, through the same door the computer's orders go.
+    #
+    # What this proves is the wiring: that an order reaches the rules, is accepted,
+    # costs the caster its action and its meter, and comes back out as something
+    # readable. It does not prove a blow lands, and often none does -- the computer
+    # walks to the distance it likes to fight from but has no reason yet to press
+    # an attack, so the enemy is usually out of reach and the only legal target is
+    # a friend. An ability that reaches nobody is legal in the original too.
+    # Whether a blow lands correctly is SimAbilityTest's job, and it checks 336 of
+    # them against Godot. Choosing a target worth hitting arrives with the AI.
+    #
+    # The clock has to be run on until somebody is actually waiting to act.
+    cast = None
+    why = ""
+    for _ in range(40):
+        for unit in range(8):
+            for slot in range(4):
+                # The other side first, so what comes out is a blow landing
+                # rather than a spell aimed at a friend and reaching nobody.
+                enemies = [t for t in range(8) if (t < 4) != (unit < 4)]
+                friends = [t for t in range(8) if (t < 4) == (unit < 4) and t != unit]
+                for target in enemies + friends:
+                    refused = director.order_ability_at(unit, slot, target)
+                    if refused == "":
+                        cast = (unit, slot, target)
+                        break
+                    why = refused
+                if cast:
+                    break
+            if cast:
+                break
+        if cast:
+            break
+        director.step_ticks(TICKS_PER_SECOND)
+    print("--- an ability ordered by hand: %s ---"
+          % (str(cast) if cast else "none was legal (%s)" % why))
+    if cast is None:
+        raise RuntimeError("no ability could be used at all: " + why)
+    print(director.describe_battle())
+    print("--- the log after it ---")
+    print(director.battle_log())
 
     if orders <= 0:
         raise RuntimeError("the computer gave no orders at all")

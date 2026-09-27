@@ -250,31 +250,63 @@ void ATMBattleDirector::StepTicks(int32 Ticks)
 		BuildBattle();
 	}
 
-	TMSim::FTickReport Report;
-	Battle.Advance(FMath::Max(0, Ticks), Report);
-
-	for (int32 Id : Report.BecameReady)
+	// Time comes through the same door as everything else. It is the one order
+	// nobody issues, but a battle is exactly the list of orders applied to it, so
+	// if the clock went round some other way a recording of the orders would not
+	// be enough to play the battle back.
+	const int32 Most = TMSim::Pace::MaxAdvance;
+	int32 Left = FMath::Max(0, Ticks);
+	while (Left > 0)
 	{
-		UE_LOG(LogTemp, Log, TEXT("tick %d: unit %d is ready"), Battle.TickCount, Id);
+		const int32 Now = FMath::Min(Left, Most);
+		Submit(TMSim::FOrder::MakeAdvance(Now));
+		Left -= Now;
 	}
-	for (int32 Id : Report.TimedOut)
-	{
-		UE_LOG(LogTemp, Log, TEXT("tick %d: unit %d ran out of time"), Battle.TickCount, Id);
-	}
-
-	RefreshVisuals();
 }
 
 FString ATMBattleDirector::DescribeBattle() const
 {
-	FString Text = FString::Printf(TEXT("tick %d\n"), Battle.TickCount);
+	FString Text = FString::Printf(TEXT("tick %d, winner %d\n"), Battle.TickCount, Battle.Winner);
 	for (const TMSim::FUnit& Unit : Battle.Units)
 	{
-		Text += FString::Printf(TEXT("  %d %-11hs team %d  at %6.2f,%6.2f  hp %3d  tg %4d/%d%s%s\n"),
+		Text += FString::Printf(TEXT("  %d %-11hs team %d  at %6.2f,%6.2f  hp %3d  tg %4d/%d  ult %3d%s%s"),
 			Unit.Id, Unit.Job.c_str(), Unit.Team, Unit.Pos.X, Unit.Pos.Y, Unit.Hp,
-			Unit.Tg, TMSim::Pace::TgMax,
+			Unit.Tg, TMSim::Pace::TgMax, Unit.Ult,
 			Unit.bReady ? TEXT("  READY") : TEXT(""),
 			Unit.bReady ? *FString::Printf(TEXT(" clock %d"), Unit.Clock) : TEXT(""));
+
+		// A spell part-way out, drawn as it fills, because how long is left is the
+		// only thing anyone watching a cast wants to know.
+		if (Unit.IsCasting())
+		{
+			const int32 Total = FMath::Max(1, Unit.Casting.Total);
+			const int32 Done = FMath::Clamp(((Total - Unit.Casting.Ticks) * 6) / Total, 0, 6);
+			FString Bar;
+			for (int32 Step = 0; Step < 6; ++Step)
+			{
+				Bar += Step < Done ? TEXT("#") : TEXT("-");
+			}
+			const TMSim::FAbility* Ability = TMSim::JobAbility(Unit.Job, Unit.Casting.Slot);
+			Text += FString::Printf(TEXT("  casting %hs [%s] %.1fs"),
+				Ability ? Ability->Name.c_str() : "something", *Bar,
+				Unit.Casting.Ticks / float(TMSim::Pace::TicksPerSecond));
+		}
+		if (Unit.IsChanneling())
+		{
+			Text += FString::Printf(TEXT("  channelling (%d more)"), Unit.Channeling.Turns);
+		}
+		if (!Unit.IsAlive())
+		{
+			Text += Unit.IsKo()
+				? FString::Printf(TEXT("  DOWN (%.1fs to raise)"),
+					Unit.KoTicks / float(TMSim::Pace::TicksPerSecond))
+				: FString(TEXT("  GONE"));
+		}
+		for (const TMSim::FStatus& Status : Unit.Statuses)
+		{
+			Text += FString::Printf(TEXT("  [%hs %d]"), Status.Id.c_str(), Status.Turns);
+		}
+		Text += TEXT("\n");
 	}
 	return Text;
 }
@@ -328,8 +360,135 @@ FString ATMBattleDirector::Submit(const TMSim::FOrder& Order)
 			TEXT("an order for unit %d passed the rules and then did nothing"), Order.UnitId);
 		return TEXT("The order could not be carried out.");
 	}
+	Narrate(Report);
 	RefreshVisuals();
 	return FString();
+}
+
+FString ATMBattleDirector::NameOf(int32 UnitId) const
+{
+	if (const TMSim::FUnit* Unit = const_cast<TMSim::FBattle&>(Battle).FindUnit(UnitId))
+	{
+		return FString::Printf(TEXT("%hs %d"), Unit->Job.c_str(), Unit->Id);
+	}
+	return FString::Printf(TEXT("unit %d"), UnitId);
+}
+
+void ATMBattleDirector::Narrate(const TMSim::FTickReport& Report)
+{
+	for (const TMSim::FEvent& Event : Report.Events)
+	{
+		FString Line;
+		switch (Event.Kind)
+		{
+		case TMSim::EEventKind::BecameReady:
+			Line = FString::Printf(TEXT("%s is ready"), *NameOf(Event.Unit));
+			break;
+		case TMSim::EEventKind::TimedOut:
+			Line = FString::Printf(TEXT("%s ran out of time"), *NameOf(Event.Unit));
+			break;
+		case TMSim::EEventKind::CastStarted:
+			Line = FString::Printf(TEXT("%s begins casting %hs (%.1fs)"), *NameOf(Event.Unit),
+				Event.Id.c_str(), Event.Amount / float(TMSim::Pace::TicksPerSecond));
+			break;
+		case TMSim::EEventKind::CastFizzled:
+			Line = FString::Printf(TEXT("%s's spell fizzles"), *NameOf(Event.Unit));
+			break;
+		case TMSim::EEventKind::Resolved:
+			Line = FString::Printf(TEXT("%s uses %hs"), *NameOf(Event.Unit), Event.Id.c_str());
+			break;
+		case TMSim::EEventKind::Hit:
+			// A minus sign for damage and a plus for healing, which is the whole of
+			// what a person needs to read a fight going past.
+			Line = FString::Printf(TEXT("    %s %s%d"), *NameOf(Event.Unit),
+				Event.By >= 0 ? TEXT("-") : TEXT("+"), Event.Amount);
+			break;
+		case TMSim::EEventKind::Evaded:
+			Line = FString::Printf(TEXT("    %s evades"), *NameOf(Event.Unit));
+			break;
+		case TMSim::EEventKind::Critical:
+			Line = FString::Printf(TEXT("    critical on %s"), *NameOf(Event.Unit));
+			break;
+		case TMSim::EEventKind::Absorbed:
+			Line = FString::Printf(TEXT("    %s's %hs soaks %d"), *NameOf(Event.Unit),
+				Event.Id.c_str(), Event.Amount);
+			break;
+		case TMSim::EEventKind::StatusApplied:
+			Line = FString::Printf(TEXT("    %s takes %hs"), *NameOf(Event.Unit), Event.Id.c_str());
+			break;
+		case TMSim::EEventKind::GaugeChanged:
+			Line = FString::Printf(TEXT("    %s gauge %+d%%"), *NameOf(Event.Unit), Event.Amount);
+			break;
+		case TMSim::EEventKind::Knocked:
+			Line = FString::Printf(TEXT("    %s is knocked out!"), *NameOf(Event.Unit));
+			break;
+		case TMSim::EEventKind::Revived:
+			Line = FString::Printf(TEXT("    %s is back on its feet"), *NameOf(Event.Unit));
+			break;
+		case TMSim::EEventKind::Won:
+			Line = Event.Unit == TMSim::FBattle::Draw
+				? FString(TEXT("Nobody is left standing."))
+				: FString::Printf(TEXT("Team %d wins."), Event.Unit);
+			break;
+		default:
+			break;  // walking and turns ending are not worth a line of their own
+		}
+		if (Line.IsEmpty())
+		{
+			continue;
+		}
+		Log.Add(FString::Printf(TEXT("%6.1fs  %s"),
+			Battle.TickCount / float(TMSim::Pace::TicksPerSecond), *Line));
+		UE_LOG(LogTemp, Log, TEXT("%s"), *Line);
+	}
+	const int32 Spare = Log.Num() - FMath::Max(1, LogLines);
+	if (Spare > 0)
+	{
+		Log.RemoveAt(0, Spare, EAllowShrinking::No);
+	}
+}
+
+FString ATMBattleDirector::BattleLog() const
+{
+	return FString::Join(Log, TEXT("\n"));
+}
+
+FString ATMBattleDirector::OrderAbility(int32 UnitId, int32 Slot, float MetresX, float MetresY,
+	int32 FollowId)
+{
+	if (!bBuilt)
+	{
+		BuildBattle();
+	}
+	const TMSim::FUnit* Unit = Battle.FindUnit(UnitId);
+	if (!Unit)
+	{
+		return TEXT("No such unit.");
+	}
+	// Aimed at a unit, the spell follows it; aimed at the ground it stays put. The
+	// caller says which by passing an id or -1, exactly as a click would.
+	const TMSim::FVec2 At(MetresX, MetresY);
+	const FString Refused = Submit(
+		TMSim::FOrder::MakeUseAbility(UnitId, Unit->Serial, Slot, At, FollowId));
+	if (!Refused.IsEmpty())
+	{
+		UE_LOG(LogTemp, Log, TEXT("unit %d cannot use that: %s"), UnitId, *Refused);
+	}
+	return Refused;
+}
+
+FString ATMBattleDirector::OrderAbilityAt(int32 UnitId, int32 Slot, int32 TargetUnitId)
+{
+	if (!bBuilt)
+	{
+		BuildBattle();
+	}
+	const TMSim::FUnit* Target = Battle.FindUnit(TargetUnitId);
+	if (!Target)
+	{
+		return TEXT("No such target.");
+	}
+	return OrderAbility(UnitId, Slot, Target->Pos.X, Target->Pos.Y, TargetUnitId);
 }
 
 bool ATMBattleDirector::ComputerPlays(int32 Team) const

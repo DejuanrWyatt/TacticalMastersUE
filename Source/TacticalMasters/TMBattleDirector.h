@@ -110,6 +110,26 @@ public:
 	UFUNCTION(BlueprintCallable, CallInEditor, Category = "Tactical Masters")
 	int32 ReachableCount(int32 UnitId) const;
 
+	/** Sends one of a unit's four abilities at a spot, or says why it cannot. */
+	UFUNCTION(BlueprintCallable, CallInEditor, Category = "Tactical Masters")
+	FString OrderAbility(int32 UnitId, int32 Slot, float MetresX, float MetresY, int32 FollowId = -1);
+
+	/**
+	 * The same, aimed at a unit rather than at a map reference. This is what a
+	 * click on somebody amounts to: the spell is aimed at where they are standing
+	 * and follows them if it takes a while to arrive.
+	 */
+	UFUNCTION(BlueprintCallable, CallInEditor, Category = "Tactical Masters")
+	FString OrderAbilityAt(int32 UnitId, int32 Slot, int32 TargetUnitId);
+
+	/** What has happened lately, newest last: the fight as a person would read it. */
+	UFUNCTION(BlueprintCallable, CallInEditor, Category = "Tactical Masters")
+	FString BattleLog() const;
+
+	/** How many lines of it to keep. */
+	UPROPERTY(EditAnywhere, Category = "Tactical Masters")
+	int32 LogLines = 40;
+
 	// The computer player. It is for practising against and for testing with,
 	// and it plays by clicking: it hands over an order and the order is checked
 	// and applied exactly as one arriving from a person would be. Set both sides
@@ -148,6 +168,19 @@ private:
 
 	/** Whether the computer is the one playing this side. */
 	bool ComputerPlays(int32 Team) const;
+
+	/**
+	 * Turns what the rules just reported into something readable. The events are
+	 * presentation only -- nothing in the rules reads them back -- so this is free
+	 * to say it however it likes, and free to be wrong without breaking a battle.
+	 */
+	void Narrate(const TMSim::FTickReport& Report);
+
+	/** How a unit is referred to in the log. */
+	FString NameOf(int32 UnitId) const;
+
+	UPROPERTY()
+	TArray<FString> Log;
 
 	/** The unit the battle is currently waiting on, or nullptr. */
 	const TMSim::FUnit* WaitingOn() const;

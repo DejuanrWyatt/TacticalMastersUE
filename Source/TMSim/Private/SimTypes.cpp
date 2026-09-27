@@ -16,6 +16,13 @@ namespace TMSim
 		return Len > 0.0f ? FVec2(X / Len, Y / Len) : FVec2();
 	}
 
+	float FVec2::AngleTo(const FVec2& Other) const
+	{
+		// atan2 of the cross over the dot, which is how Godot measures it: signed,
+		// and correct all the way round rather than only within a right angle.
+		return std::atan2(Cross(Other), Dot(Other));
+	}
+
 	static const char* const GStatNames[StatCount] =
 	{
 		"hp", "attdef", "magdef", "aeva", "meva", "crit", "speed", "move", "patience", "sight"

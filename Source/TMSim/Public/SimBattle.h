@@ -26,15 +26,110 @@
 
 namespace TMSim
 {
-	/** What happened during a tick, for the presentation layer to play back. */
+	/** One thing that happened. The kind says which of the fields below mean anything. */
+	enum class EEventKind : uint8_t
+	{
+		BecameReady,
+		TurnEnded,
+		TimedOut,
+		Gone,
+		Moved,
+		/** A cast begun, finished, or lost with the caster. */
+		CastStarted,
+		CastFinished,
+		CastFizzled,
+		/** An ability going off: Unit is the caster, Slot and Target say what and where. */
+		Resolved,
+		/** One target of it. Amount is the damage or the healing. */
+		Hit,
+		Evaded,
+		Critical,
+		/** Soaked by a Shield or a Barrier, or turned away by Invulnerable. */
+		Absorbed,
+		StatusApplied,
+		GaugeChanged,
+		Knocked,
+		Revived,
+		Won,
+	};
+
+	/**
+	 * What happened during a tick or while an order was applied.
+	 *
+	 * Ids alone were enough while units only walked, but a fight has to be read:
+	 * what was cast, at whom, for how much, whether it was dodged. So this is a
+	 * list of events in the order they happened, which the view plays back and
+	 * the log prints.
+	 *
+	 * It is presentation, not state. Nothing in the rules reads it back, and two
+	 * machines in a match agree by comparing checksums rather than these -- which
+	 * is what lets a host send them on for the other side to watch without any
+	 * of it being authoritative.
+	 */
+	struct FEvent
+	{
+		EEventKind Kind = EEventKind::BecameReady;
+		/** Whoever it happened to, or the caster for a Resolved. */
+		int Unit = -1;
+		/** The other party: the caster of a Hit, or who applied a status. */
+		int By = -1;
+		int Slot = -1;
+		int Amount = 0;
+		FVec2 Where;
+		/** The ability or status it concerns. */
+		std::string Id;
+	};
+
 	struct FTickReport
 	{
-		std::vector<int> BecameReady;
-		std::vector<int> TurnEnded;
-		std::vector<int> TimedOut;
-		std::vector<int> Gone;
-		std::vector<int> Moved;
+		std::vector<FEvent> Events;
+
+		void Say(EEventKind Kind, int Unit)
+		{
+			FEvent Event;
+			Event.Kind = Kind;
+			Event.Unit = Unit;
+			Events.push_back(Event);
+		}
+
+		/** Every unit an event of this kind happened to, for the simple cases. */
+		std::vector<int> WhoWas(EEventKind Kind) const
+		{
+			std::vector<int> Out;
+			for (const FEvent& Event : Events)
+			{
+				if (Event.Kind == Kind)
+				{
+					Out.push_back(Event.Unit);
+				}
+			}
+			return Out;
+		}
 	};
+
+	struct FAbility;
+
+	/**
+	 * One unit an ability would reach, and what it would do to it. Worked out
+	 * without touching anything, so the same answer serves the forecast a player
+	 * reads, the hits that land, and the computer weighing its options.
+	 */
+	struct FHit
+	{
+		int UnitId = -1;
+		/** Where it was judged from, which for the caster is where it cast. */
+		FVec2 Where;
+		/** Damage, healing, or the health a revive brings it back with. */
+		int Amount = 0;
+		/** How far from the aim point, which decides who a single shot hits. */
+		float Distance = 0.0f;
+		double Flank = 1.0;
+	};
+
+	/** "unit", "point", "circle", "self", "line", "cone", "global" or "vector". */
+	TMSIM_API std::string ShapeOf(const FAbility& Ability);
+	/** Anything reaching past arm's length has to see where it is going. */
+	TMSIM_API bool NeedsLineOfSight(const FAbility& Ability);
 
 	class FBattle
 	{
@@ -119,6 +214,71 @@ namespace TMSim
 		 */
 		TMSIM_API std::string AbilityBlockedReason(const FUnit& Unit, int Slot) const;
 
+		/** Whether a unit at TargetPos is caught by this aim. */
+		TMSIM_API bool InShape(const FAbility& Ability, const FVec2& From, const FVec2& Target,
+			const FVec2& TargetPos) const;
+
+		/** Whether the aim point itself is somewhere this ability may be pointed. */
+		TMSIM_API bool InAbilityRange(const FUnit& Unit, int Slot, const FVec2& From,
+			const FVec2& Target) const;
+
+		/**
+		 * What this ability would do, used from From and aimed at Target, without
+		 * doing any of it. Resolution walks exactly this list, so the order is
+		 * part of the rules: it is unit id order, and that fixes the order the
+		 * dice are rolled in.
+		 */
+		TMSIM_API std::vector<FHit> Preview(const FUnit& Unit, int Slot, const FVec2& From,
+			const FVec2& Target) const;
+
+		/** The nearest living unit within this far of a spot, or null. */
+		TMSIM_API const FUnit* UnitNear(const FVec2& Point, float Radius) const;
+
+		// ------------------------------------------------- what an ability does
+
+		/**
+		 * Sends an ability off at a spot. This is the only place in the rules the
+		 * dice are thrown, so a match and a replay roll the same numbers in the
+		 * same order.
+		 */
+		/**
+		 * Commits to an ability: pays for it, then either sends it off now or
+		 * starts casting it. Assumes the order already passed Validate.
+		 */
+		TMSIM_API void UseAbility(FUnit& User, int Slot, const FVec2& Target, int Follow,
+			FTickReport& Report);
+
+		/** Ticks of casting an ability takes, after the setting is applied. */
+		TMSIM_API int CastTicks(const FAbility& Ability) const;
+
+		TMSIM_API void ResolveAbility(FUnit& User, int Slot, const FVec2& Target, FTickReport& Report);
+
+		/** Takes health off, and the only way health is ever lost. */
+		TMSIM_API int Hurt(FUnit& Target, int Amount);
+
+		/** Soaks what a Shield or Barrier can; returns what is left to hurt with. */
+		TMSIM_API int TakeFromShield(FUnit& Target, int Amount, FTickReport& Report);
+
+		/** Puts a status on a unit, with the rules about refreshing and immunity. */
+		TMSIM_API void AddStatus(FUnit& Target, const std::string& StatusId, int Turns,
+			int Amount = 0, int By = -1);
+
+		/** Down, and revivable for as long as the setting allows. */
+		TMSIM_API void KnockOut(FUnit& Target, FTickReport& Report);
+
+		/** A Stun taking the turn a unit is in the middle of. */
+		TMSIM_API void StunInterrupt(FUnit& Target, FTickReport& Report);
+
+		/** Sets Winner if one side has nobody left standing. */
+		TMSIM_API void CheckWinner();
+
+		/**
+		 * Why this unit cannot send that ability at that spot, or empty if it can.
+		 * An entry point in its own right, so it repeats the checks Validate makes
+		 * rather than assuming them.
+		 */
+		TMSIM_API std::string ValidateAbility(int UnitId, int Slot, const FVec2& Target, int Follow);
+
 		TMSIM_API std::string Validate(const FOrder& Order);
 
 		/**
@@ -158,7 +318,9 @@ namespace TMSim
 		FTuning Tuning;
 		FSimRandom Rng;
 		int TickCount = 0;
+		/** -1 while it is still being fought, 0 or 1 for a side, Draw for neither. */
 		int Winner = -1;
+		static constexpr int Draw = 2;
 		/** While the sides are still placing units, nothing else happens. */
 		int PlanningTicks = 0;
 
@@ -182,6 +344,12 @@ namespace TMSim
 	private:
 		/** Its turn has come: the gauge is full and the countdown starts. */
 		void BecomeReady(FUnit& Unit, FTickReport& Report);
+		/** Statuses act on the unit's own turn, then count down. */
+		void TickStatuses(FUnit& Unit, FTickReport& Report);
+		/** Burning ground hurts, a spring heals, when its turn comes round. */
+		void GroundEffect(FUnit& Unit, FTickReport& Report);
+		/** Mends a unit that has been left alone long enough. */
+		void UndamagedRegen(FUnit& Unit, FTickReport& Report);
 		/** Its turn is over, by choice or because the countdown ran out. */
 		void EndTurn(FUnit& Unit, bool bTimedOut, FTickReport& Report);
 

@@ -65,6 +65,19 @@ namespace TMSim
 			return Order;
 		}
 
+		static FOrder MakeUseAbility(int InUnitId, int InSerial, int InSlot,
+			const FVec2& InTarget, int InFollow = -1)
+		{
+			FOrder Order;
+			Order.Type = EOrderType::UseAbility;
+			Order.UnitId = InUnitId;
+			Order.Serial = InSerial;
+			Order.Slot = InSlot;
+			Order.Target = InTarget;
+			Order.Follow = InFollow;
+			return Order;
+		}
+
 		static FOrder MakeEndTurn(int InUnitId, int InSerial)
 		{
 			FOrder Order;

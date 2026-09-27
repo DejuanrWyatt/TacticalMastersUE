@@ -36,9 +36,16 @@ namespace TMSim
 		FVec2(float InX, float InY) : X(InX), Y(InY) {}
 
 		FVec2 operator-(const FVec2& Other) const { return FVec2(X - Other.X, Y - Other.Y); }
+		FVec2 operator+(const FVec2& Other) const { return FVec2(X + Other.X, Y + Other.Y); }
+		FVec2 operator*(float By) const { return FVec2(X * By, Y * By); }
+		FVec2 operator/(float By) const { return FVec2(X / By, Y / By); }
 		TMSIM_API float Length() const;
 		TMSIM_API FVec2 Normalized() const;
 		float Dot(const FVec2& Other) const { return X * Other.X + Y * Other.Y; }
+		/** The 2D cross product: how far off the line the other one lies. */
+		float Cross(const FVec2& Other) const { return X * Other.Y - Y * Other.X; }
+		/** Signed angle to the other one, in radians, as Godot measures it. */
+		TMSIM_API float AngleTo(const FVec2& Other) const;
 		bool operator==(const FVec2& Other) const { return X == Other.X && Y == Other.Y; }
 		bool operator!=(const FVec2& Other) const { return !(*this == Other); }
 		float DistanceTo(const FVec2& Other) const { return (*this - Other).Length(); }
@@ -128,6 +135,8 @@ namespace TMSim
 		inline constexpr int TgKeepNone = 1600;
 		/** A full ultimate meter. */
 		inline constexpr int UltMax = 100;
+		/** Most ticks one Advance order may ask for. */
+		inline constexpr int MaxAdvance = 50;
 	}
 
 	/**
@@ -167,6 +176,24 @@ namespace TMSim
 		double SightMultiplier = 1.0;
 		/** Health lost on burning ground, or gained on a spring, per turn. */
 		double HazardPercent = 8.0;
+
+		/** Multiplier on every ability's cast time. */
+		double CastTimeMultiplier = 1.0;
+		/** Seconds a knocked-out unit can still be revived. */
+		double KoSeconds = 12.0;
+		/** Ultimate meter gained per ability used, and per turn taken. */
+		double UltPerAction = 20.0;
+		double UltPerTurn = 5.0;
+		/**
+		 * Gauge a unit keeps after a Stun takes its turn. Higher is a weaker
+		 * Stun: it loses the turn but is left most of the way to the next one
+		 * rather than starting the fill again.
+		 */
+		double StunTgPercent = 75.0;
+		/** Health mended each turn once a unit has been left alone; 0 is off. */
+		double RegenPercent = 5.0;
+		/** Turns it must go unhurt before that starts. */
+		double RegenAfterTurns = 2.0;
 	};
 
 	namespace Combat
@@ -178,6 +205,11 @@ namespace TMSim
 		inline constexpr int MaxHeightLevels = 3;
 		/** However good the defence, a hit still lands for this much. */
 		inline constexpr int MinimumDamage = 1;
+		/**
+		 * Ultimate meter a unit gains for being hurt, per percent of its own max
+		 * health lost. Taking a beating earns a comeback.
+		 */
+		inline constexpr double UltFromDamage = 0.5;
 	}
 
 	/** Godot's roundi(): halves go away from zero, which is what the rules assume. */

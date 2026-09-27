@@ -78,6 +78,58 @@ namespace TMSim
 		return false;
 	}
 
+	bool FUnit::IsInvulnerable() const
+	{
+		for (const FStatus& Status : Statuses)
+		{
+			const FStatusDef* Def = FindStatus(Status.Id);
+			if (Def && Def->bInvulnerable)
+			{
+				return true;
+			}
+		}
+		return false;
+	}
+
+	bool FUnit::IsImmune() const
+	{
+		for (const FStatus& Status : Statuses)
+		{
+			const FStatusDef* Def = FindStatus(Status.Id);
+			if (Def && Def->bImmune)
+			{
+				return true;
+			}
+		}
+		return false;
+	}
+
+	bool FUnit::HasExtraTurn() const
+	{
+		for (const FStatus& Status : Statuses)
+		{
+			const FStatusDef* Def = FindStatus(Status.Id);
+			if (Def && Def->bExtraTurn)
+			{
+				return true;
+			}
+		}
+		return false;
+	}
+
+	int FUnit::TauntedBy() const
+	{
+		for (const FStatus& Status : Statuses)
+		{
+			const FStatusDef* Def = FindStatus(Status.Id);
+			if (Def && Def->bTaunt)
+			{
+				return Status.By;
+			}
+		}
+		return -1;
+	}
+
 	bool FUnit::IsRooted() const
 	{
 		for (const FStatus& Status : Statuses)

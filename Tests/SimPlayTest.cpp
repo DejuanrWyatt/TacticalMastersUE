@@ -18,14 +18,12 @@
 // half disagree. And a unit that is ready, is refused every order, and so stays
 // ready forever would hang a real match on the spot.
 //
-// No winner is possible yet: nothing can deal damage until abilities are wired
-// to orders, so the battle is units manoeuvring. That does not weaken what is
-// being checked here, which is the order path rather than the fighting -- but it
-// does mean one thing this cannot yet check. Seeding the replay differently on
-// purpose still passes, because nothing in a battle consumes the dice until
-// there are attacks to miss and crits to roll. Once abilities arrive, that probe
-// should start failing, and if it does not, something has stopped using the
-// seeded generator.
+// The units fight now, which is what makes the replay check mean anything:
+// seeding the replay differently on purpose fails, because rolling to evade and
+// to crit is the only thing in a battle that touches the dice. While nothing
+// could deal damage that probe passed, and the check could not tell a right seed
+// from a wrong one. If it ever starts passing again, something has stopped using
+// the seeded generator and the replay guarantee is hollow.
 
 #include "SimAI.h"
 #include "SimBattle.h"
@@ -96,6 +94,55 @@ namespace
 		int Tick = 0;
 		FOrder Order;
 	};
+
+	/**
+	 * The first ability this unit could legally use, or an EndTurn if there is
+	 * none. Deliberately simple and deliberately not the computer player: what is
+	 * being checked here is the order path and whether a battle replays, not
+	 * whether the choices were good ones. Choosing well arrives with the AI's own
+	 * ability scoring, and until then this is what makes a battle a fight rather
+	 * than eight units walking about -- which matters, because until something
+	 * rolls to hit, nothing in a battle touches the dice and the replay check
+	 * below cannot tell a right seed from a wrong one.
+	 */
+	FOrder PickAbility(FBattle& Battle, const FUnit& Unit)
+	{
+		std::vector<FVec2> Aims;
+		Aims.push_back(Unit.Pos);
+		for (const FUnit& Other : Battle.Units)
+		{
+			if (Other.Id != Unit.Id && (Other.IsAlive() || Other.IsKo()))
+			{
+				Aims.push_back(Other.Pos);
+			}
+		}
+		for (int Slot = 0; Slot < 4; ++Slot)
+		{
+			for (const FVec2& Aim : Aims)
+			{
+				const FUnit* At = Battle.UnitNear(Aim, Ground::HitRadius);
+				const int Follow = (At && At->Id != Unit.Id) ? At->Id : -1;
+				if (!Battle.ValidateAbility(Unit.Id, Slot, Aim, Follow).empty())
+				{
+					continue;
+				}
+				// Legal is not the same as worth doing. Swinging at the ground
+				// under its own feet passes every check in the rules and hits
+				// nobody, and a battle of that is not a fight -- which is exactly
+				// what this looked like before the forecast was consulted.
+				bool bWorthIt = false;
+				for (const FHit& Hit : Battle.Preview(Unit, Slot, Unit.Pos, Aim))
+				{
+					bWorthIt = bWorthIt || Hit.Amount > 0;
+				}
+				if (bWorthIt)
+				{
+					return FOrder::MakeUseAbility(Unit.Id, Unit.Serial, Slot, Aim, Follow);
+				}
+			}
+		}
+		return FOrder::MakeEndTurn(Unit.Id, Unit.Serial);
+	}
 }
 
 int main()
@@ -108,6 +155,9 @@ int main()
 	Computer.Rng.Seed(12345);
 
 	std::vector<FRecorded> Recorded;
+	/** The checksum after each tick, so a divergence is caught where it happens. */
+	struct FMark { int Tick; uint64_t Sum; };
+	std::vector<FMark> Marks;
 	int Refusals = 0;
 	int Stuck = 0;
 
@@ -118,12 +168,22 @@ int main()
 		{
 			FTickReport Report;
 			Battle.Advance(1, Report);
+			Marks.push_back({ Battle.TickCount, Battle.Checksum() });
 			continue;
 		}
 
 		const int UnitId = Unit->Id;
 		const int Serial = Unit->Serial;
-		FOrder Order = Computer.NextCommand(Battle, *Unit);
+		// The action first, as the original's computer player does. It has to be
+		// this way round: a sprint spends the action, and the computer sprints
+		// whenever it has one going spare, so asking it to move first means almost
+		// nothing ever gets used.
+		FOrder Order = Unit->bActed ? FOrder::MakeEndTurn(Unit->Id, Unit->Serial)
+			: PickAbility(Battle, *Unit);
+		if (Order.Type != EOrderType::UseAbility)
+		{
+			Order = Computer.NextCommand(Battle, *Unit);
+		}
 
 		// Checked, then applied, and never the other way round.
 		const std::string Refused = Battle.Validate(Order);
@@ -167,11 +227,27 @@ int main()
 	std::printf("%d orders over %d ticks\n", static_cast<int>(Recorded.size()), Battle.TickCount);
 	std::printf("%d refused, %d stuck\n", Refusals, Stuck);
 
+	// What the fight came to. Orders alone would not say whether any of them did
+	// anything: a battle where every blow missed would look identical from here.
+	int Standing[2] = { 0, 0 };
+	int HealthLost = 0;
+	for (const FUnit& Unit : Battle.Units)
+	{
+		if (Unit.IsAlive())
+		{
+			++Standing[Unit.Team];
+		}
+		HealthLost += Unit.MaxHp() - Unit.Hp;
+	}
+	std::printf("%d left standing to %d, %d health between them, winner %d\n",
+		Standing[0], Standing[1], HealthLost, Battle.Winner);
+
 	// Now the replay: the same seed, the same orders, nothing else. Nobody
 	// decides anything this time -- the list is read off and applied.
 	FBattle Replay;
 	Deal(Replay);
 	size_t Next = 0;
+	size_t Marked = 0;
 	int Mismatches = 0;
 	while (Replay.TickCount < Battle.TickCount)
 	{
@@ -194,6 +270,21 @@ int main()
 		}
 		FTickReport Report;
 		Replay.Advance(1, Report);
+
+		// Compared here rather than only at the end. Comparing once tells you the
+		// replay went wrong; comparing every tick tells you which tick, and that
+		// is the difference between a bug you can find and one you cannot. It is
+		// also what two machines in a match do, so this is the same check.
+		if (Marked < Marks.size() && Marks[Marked].Tick == Replay.TickCount)
+		{
+			if (Marks[Marked].Sum != Replay.Checksum() && Mismatches == 0)
+			{
+				Fail("the replay parts company with the battle at tick "
+					+ std::to_string(Replay.TickCount));
+				++Mismatches;
+			}
+			++Marked;
+		}
 	}
 	// Anything the first battle did on its very last tick.
 	while (Next < Recorded.size() && Recorded[Next].Tick == Replay.TickCount)
@@ -207,8 +298,18 @@ int main()
 		++Next;
 	}
 
-	std::printf("replayed %d of %d orders\n", static_cast<int>(Next), static_cast<int>(Recorded.size()));
+	std::printf("replayed %d of %d orders, checked at %d of %d ticks\n",
+		static_cast<int>(Next), static_cast<int>(Recorded.size()),
+		static_cast<int>(Marked), static_cast<int>(Marks.size()));
 
+	// Every tick has to have been compared. If the two ran out of step the marks
+	// stop lining up and the comparison quietly stops happening, which would leave
+	// the rest of the replay unchecked while still reporting success.
+	if (Marked != Marks.size())
+	{
+		Fail("the replay only stayed in step for " + std::to_string(Marked) + " of "
+			+ std::to_string(Marks.size()) + " ticks");
+	}
 	if (Battle.Checksum() != Replay.Checksum())
 	{
 		Fail("the replay ended in a different state from the battle it replayed");
@@ -263,6 +364,35 @@ int main()
 		Notices("whether a unit has acted", [](FBattle& B) { B.Units[6].bActed = !B.Units[6].bActed; });
 		Notices("a unit's turn countdown", [](FBattle& B) { B.Units[7].Clock += 1; });
 		Notices("a recharging ability", [](FBattle& B) { B.Units[2].Cooldowns[1] += 1; });
+		Notices("a switched-on toggle", [](FBattle& B) { B.Units[3].Toggled[2] = !B.Units[3].Toggled[2]; });
+		Notices("a toggle already flipped this turn", [](FBattle& B)
+			{ B.Units[3].ToggledTurn[2] = !B.Units[3].ToggledTurn[2]; });
+		Notices("a spell part-way out", [](FBattle& B) { B.Units[2].Casting.Slot = 1; });
+		Notices("how much longer a cast has", [](FBattle& B)
+			{
+				B.Units[2].Casting.Slot = 1;
+				B.Units[2].Casting.Ticks = 7;
+			});
+		Notices("where a cast is aimed", [](FBattle& B)
+			{
+				B.Units[2].Casting.Slot = 1;
+				B.Units[2].Casting.Target.X += 1.0f;
+			});
+		Notices("who a cast is following", [](FBattle& B)
+			{
+				B.Units[2].Casting.Slot = 1;
+				B.Units[2].Casting.FollowId = 5;
+			});
+		Notices("a channelled ability", [](FBattle& B) { B.Units[6].Channeling.Slot = 3; });
+		Notices("where the dice have got to", [](FBattle& B) { B.Rng.Randi(); });
+		Notices("how long a fallen unit can still be raised", [](FBattle& B) { B.Units[4].KoTicks += 1; });
+		Notices("a gauge owed for holding back", [](FBattle& B) { B.Units[1].bHustling = !B.Units[1].bHustling; });
+		Notices("how long a unit has gone unhurt", [](FBattle& B) { B.Units[3].UnharmedTurns += 1; });
+		Notices("how many turns a channel has left", [](FBattle& B)
+			{
+				B.Units[6].Channeling.Slot = 3;
+				B.Units[6].Channeling.Turns = 2;
+			});
 		Notices("a status on a unit", [](FBattle& B)
 			{
 				FStatus Status;
@@ -286,20 +416,31 @@ int main()
 				Buff.Turns = 2;
 				B.Units[1].Buffs.push_back(Buff);
 			});
-		std::printf("the checksum notices %d kinds of change\n", 18 - Blind);
+		std::printf("the checksum notices %d kinds of change\n", 31 - Blind);
 	}
 
-	// A battle where nothing ever happened would pass everything above.
-	if (Recorded.size() < 50 || Battle.TickCount < TickLimit / 2)
+	// A battle where nothing ever happened would pass everything above, and so
+	// would one where every blow missed. It has to have been a fight: somebody
+	// lost health, and it either reached a decision or ran the clock out trying.
+	if (Recorded.size() < 50)
 	{
-		std::printf("THE BATTLE BARELY HAPPENED -- %d orders, %d ticks\n",
-			static_cast<int>(Recorded.size()), Battle.TickCount);
+		std::printf("THE BATTLE BARELY HAPPENED -- only %d orders\n", static_cast<int>(Recorded.size()));
 		return 1;
 	}
-	// And so would one where every order was refused.
+	if (HealthLost < 100)
+	{
+		std::printf("NOBODY REALLY FOUGHT -- %d health lost between eight units\n", HealthLost);
+		return 1;
+	}
+	if (Battle.Winner < 0 && Battle.TickCount < TickLimit)
+	{
+		std::printf("THE BATTLE STOPPED EARLY WITH NOBODY WINNING -- %d ticks\n", Battle.TickCount);
+		return 1;
+	}
+	// And one where the rules refused most of what was asked for.
 	if (Refusals * 2 > static_cast<int>(Recorded.size()))
 	{
-		std::printf("THE RULES REFUSED MOST OF WHAT THE COMPUTER ASKED FOR (%d of %d)\n",
+		std::printf("THE RULES REFUSED MOST OF WHAT WAS ASKED FOR (%d of %d)\n",
 			Refusals, static_cast<int>(Recorded.size()));
 		return 1;
 	}

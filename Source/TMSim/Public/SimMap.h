@@ -34,6 +34,15 @@ namespace TMSim
 		inline constexpr int Jump = 2;
 		/** What a flier may cross instead: any of them. */
 		inline constexpr int FlyJump = 999;
+		/**
+		 * How near a spot a unit has to be to be caught by something aimed at
+		 * it. A single-target ability sweeps up everyone inside this and then
+		 * keeps only the closest, which is what lets a click land on a unit
+		 * without being exactly on its feet.
+		 */
+		inline constexpr float HitRadius = 0.6f;
+		/** Past this, an ability is not swinging at arm's length any more. */
+		inline constexpr float MeleeRange = 1.8f;
 	}
 
 	/** A spot on the navigation grid. */

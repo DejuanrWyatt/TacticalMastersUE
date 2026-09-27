@@ -277,6 +277,12 @@ namespace TMSim
 		{
 			return "It can't act.";
 		}
+		if (Unit->IsCasting())
+		{
+			// Committed. A cast is begun standing still and finished standing still,
+			// so the choice is walk-then-cast or cast and stay where you are.
+			return "Can't move while casting.";
+		}
 		if (Unit->IsRooted())
 		{
 			return "It can't walk.";
@@ -336,7 +342,7 @@ namespace TMSim
 		{
 			Unit->bActed = true;  // a sprint is the unit's action as well
 		}
-		Report.Moved.push_back(Unit->Id);
+		Report.Say(EEventKind::Moved, Unit->Id);
 		return true;
 	}
 }
