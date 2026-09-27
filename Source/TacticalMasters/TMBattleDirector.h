@@ -26,6 +26,7 @@ class UStaticMesh;
 class UStaticMeshComponent;
 class UPointLightComponent;
 class UTextRenderComponent;
+class ACameraActor;
 
 /**
  * A number rising off a unit. It is a USTRUCT only so the component it holds is
@@ -161,6 +162,31 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Tactical Masters|Reading a fight")
 	float FlashSeconds = 0.25f;
 
+	// The view. Back along the diagonal and up, as a share of the board's width,
+	// so the framing holds whatever size map is loaded.
+
+	UPROPERTY(EditAnywhere, Category = "Tactical Masters|Camera")
+	float CameraBack = 1.15f;
+
+	UPROPERTY(EditAnywhere, Category = "Tactical Masters|Camera")
+	float CameraHeight = 1.02f;
+
+	UPROPERTY(EditAnywhere, Category = "Tactical Masters|Camera")
+	float CameraPitch = -32.0f;
+
+	UPROPERTY(EditAnywhere, Category = "Tactical Masters|Camera")
+	float CameraFov = 40.0f;
+
+	/** Seconds of battle between pictures; 0 takes none. */
+	UPROPERTY(EditAnywhere, Category = "Tactical Masters|Camera")
+	float CaptureEverySeconds = 0.0f;
+
+	UPROPERTY(EditAnywhere, Category = "Tactical Masters|Camera")
+	int32 CaptureWidth = 1600;
+
+	UPROPERTY(EditAnywhere, Category = "Tactical Masters|Camera")
+	int32 CaptureHeight = 900;
+
 	// The computer player. It is for practising against and for testing with,
 	// and it plays by clicking: it hands over an order and the order is checked
 	// and applied exactly as one arriving from a person would be. Set both sides
@@ -223,6 +249,27 @@ private:
 
 	/** Moves, billboards and fades them, and settles the flash on a struck unit. */
 	void AdvanceFloaters(float DeltaSeconds);
+
+	/** Who each unit is and how it is doing, over its head. */
+	void RefreshPlates();
+
+	UPROPERTY()
+	TArray<TObjectPtr<class UTextRenderComponent>> Plates;
+
+	/** Something happened that a picture would show. */
+	bool bWorthSeeing = false;
+
+	/** Puts a camera on the board this director built and looks through it. */
+	void FrameTheBoard();
+
+	/** Takes a picture every so often, when asked to. */
+	void MaybeCapture();
+
+	UPROPERTY()
+	TObjectPtr<ACameraActor> Watcher = nullptr;
+
+	float NextCaptureAt = 0.0f;
+	int32 Captured = 0;
 
 	/** One unit's light flaring after it was struck. */
 	struct FFlash

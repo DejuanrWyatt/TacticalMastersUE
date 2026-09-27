@@ -6,8 +6,15 @@
 #include "Components/TextRenderComponent.h"
 #include "Engine/StaticMesh.h"
 #include "Engine/SkeletalMesh.h"
+#include "Camera/CameraActor.h"
+#include "Camera/CameraComponent.h"
+#include "Engine/Engine.h"
+#include "Misc/Paths.h"
+#include "UnrealClient.h"
 #include "GameFramework/PlayerController.h"
 #include "Misc/App.h"
+#include "Misc/CommandLine.h"
+#include "Misc/Parse.h"
 
 #include "SimAbility.h"
 
@@ -23,6 +30,16 @@ void ATMBattleDirector::BeginPlay()
 	if (!bBuilt)
 	{
 		BuildBattle();
+	}
+	FrameTheBoard();
+
+	// A headless run is a separate process, so the only way to ask it for pictures
+	// is the command line: -tmcapture=15 takes one every fifteen seconds of battle.
+	float Every = 0.0f;
+	if (FParse::Value(FCommandLine::Get(), TEXT("tmcapture="), Every))
+	{
+		CaptureEverySeconds = Every;
+		UE_LOG(LogTemp, Log, TEXT("taking a picture every %.1fs of battle"), Every);
 	}
 }
 
@@ -46,6 +63,11 @@ void ATMBattleDirector::ClearBattle()
 		if (Light) { Light->DestroyComponent(); }
 	}
 	ReadyLights.Reset();
+	for (TObjectPtr<UTextRenderComponent>& Plate : Plates)
+	{
+		if (Plate) { Plate->DestroyComponent(); }
+	}
+	Plates.Reset();
 	Battle.Units.clear();
 	bBuilt = false;
 }
@@ -128,6 +150,15 @@ void ATMBattleDirector::BuildBattle()
 
 		// Whose turn it is is said with light at their feet rather than by
 		// lifting them off the ground, which only ever looked like a bug.
+		UTextRenderComponent* Plate = NewObject<UTextRenderComponent>(
+			this, *FString::Printf(TEXT("Plate_%d"), Battle.Units[i].Id), RF_Transient);
+		Plate->SetMobility(EComponentMobility::Movable);
+		Plate->SetupAttachment(RootComponent);
+		Plate->RegisterComponent();
+		Plate->SetWorldSize(22.0f);
+		Plate->SetHorizontalAlignment(EHTA_Center);
+		Plates.Add(Plate);
+
 		UPointLightComponent* Light = NewObject<UPointLightComponent>(
 			this, *FString::Printf(TEXT("Ready_%d"), Battle.Units[i].Id), RF_Transient);
 		Light->SetupAttachment(RootComponent);
@@ -222,8 +253,61 @@ void ATMBattleDirector::BuildBoard()
 	UE_LOG(LogTemp, Log, TEXT("Board built: %d tiles"), TileVisuals.Num());
 }
 
+void ATMBattleDirector::RefreshPlates()
+{
+	// Who each one is and how it is doing, over its head. Every unit wears the
+	// same borrowed mesh, so without this the two sides are indistinguishable and
+	// a match is unreadable however good the lighting gets.
+	for (int32 i = 0; i < Plates.Num() && i < static_cast<int32>(Battle.Units.size()); ++i)
+	{
+		if (!Plates[i])
+		{
+			continue;
+		}
+		const TMSim::FUnit& Unit = Battle.Units[i];
+		UTextRenderComponent* Plate = Plates[i];
+		if (!Unit.IsAlive())
+		{
+			// A fallen unit still says so while it can be raised, then goes quiet.
+			Plate->SetVisibility(Unit.IsKo());
+			if (Unit.IsKo())
+			{
+				Plate->SetText(FText::FromString(FString::Printf(TEXT("%hs  down %.0fs"),
+					Unit.Job.c_str(), Unit.KoTicks / float(TMSim::Pace::TicksPerSecond))));
+				Plate->SetTextRenderColor(FColor(140, 140, 150));
+				Plate->SetRelativeLocation(WorldFor(Unit) + FVector(0.0f, 0.0f, 150.0f));
+			}
+			continue;
+		}
+
+		FString Line = FString::Printf(TEXT("%hs  %d"), Unit.Job.c_str(), Unit.Hp);
+		if (Unit.IsCasting())
+		{
+			// What it is in the middle of, which is the thing worth reading.
+			const TMSim::FAbility* Ability = TMSim::JobAbility(Unit.Job, Unit.Casting.Slot);
+			Line += FString::Printf(TEXT("  casting %hs"),
+				Ability ? Ability->Name.c_str() : "something");
+		}
+		else if (Unit.bReady)
+		{
+			Line += TEXT("  *");
+		}
+		for (const TMSim::FStatus& Status : Unit.Statuses)
+		{
+			Line += FString::Printf(TEXT(" [%hs]"), Status.Id.c_str());
+		}
+		Plate->SetText(FText::FromString(Line));
+		// Blue and red, which is the only thing telling the sides apart until the
+		// classes have their own materials.
+		Plate->SetTextRenderColor(Unit.Team == 0 ? FColor(120, 180, 255) : FColor(255, 130, 120));
+		Plate->SetVisibility(true);
+		Plate->SetRelativeLocation(WorldFor(Unit) + FVector(0.0f, 0.0f, 150.0f));
+	}
+}
+
 void ATMBattleDirector::RefreshVisuals()
 {
+	RefreshPlates();
 	for (int32 i = 0; i < UnitVisuals.Num() && i < static_cast<int32>(Battle.Units.size()); ++i)
 	{
 		if (!UnitVisuals[i])
@@ -475,8 +559,75 @@ void ATMBattleDirector::ShowEvents(const TMSim::FTickReport& Report)
 		if (Event.Kind == TMSim::EEventKind::Hit && Event.By >= 0)
 		{
 			Flashes.Add({ Event.Unit, 0.0f });
+			// Worth a picture: a timed capture almost never lands on the second
+			// and a half a number is up for, so the interesting frames were all
+			// of eight people standing about.
+			bWorthSeeing = true;
 		}
 	}
+}
+
+void ATMBattleDirector::FrameTheBoard()
+{
+	// A camera on the board the director actually built, rather than wherever the
+	// level happened to leave the view. High enough to read the whole board, low
+	// enough that a unit is a character rather than a token.
+	UWorld* World = GetWorld();
+	if (!World || !World->IsGameWorld() || Watcher)
+	{
+		return;
+	}
+
+	const TMSim::FVec2 Size = Battle.Map.SizeMeters();
+	const float Span = FMath::Max(Size.X, Size.Y) * TileSize;
+	const FVector Middle(Size.X * 0.5f * TileSize, Size.Y * 0.5f * TileSize, 0.0f);
+	// Back along the diagonal and up, which is the angle the game is played from.
+	const FVector Where = Middle
+		+ FVector(-Span * CameraBack, -Span * CameraBack, Span * CameraHeight);
+
+	FActorSpawnParameters How;
+	How.ObjectFlags |= RF_Transient;  // a view, not part of the level
+	Watcher = World->SpawnActor<ACameraActor>(Where, FRotator(CameraPitch, 45.0f, 0.0f), How);
+	if (!Watcher)
+	{
+		return;
+	}
+	if (UCameraComponent* Lens = Watcher->GetCameraComponent())
+	{
+		Lens->SetFieldOfView(CameraFov);
+	}
+	if (APlayerController* Player = World->GetFirstPlayerController())
+	{
+		// Cut rather than glide: there is nothing to glide from on the first frame.
+		Player->SetViewTarget(Watcher);
+	}
+	UE_LOG(LogTemp, Log, TEXT("camera framing a %.0f by %.0f m board"), Size.X, Size.Y);
+}
+
+void ATMBattleDirector::MaybeCapture()
+{
+	// Pictures of a battle nobody is sitting in front of. Off unless asked for,
+	// because it writes a file every few seconds.
+	if (CaptureEverySeconds <= 0.0f || !GetWorld() || !GetWorld()->IsGameWorld())
+	{
+		return;
+	}
+	const float Now = Battle.TickCount / static_cast<float>(TMSim::Pace::TicksPerSecond);
+	// Either something just happened, or enough time has passed that a picture of
+	// the board is worth having anyway.
+	if (!bWorthSeeing && Now < NextCaptureAt)
+	{
+		return;
+	}
+	bWorthSeeing = false;
+	NextCaptureAt = Now + CaptureEverySeconds;
+	++Captured;
+	// Asked for by name rather than through the HighResShot console command: that
+	// command writes nothing in an unattended off-screen run, and says so nowhere.
+	const FString Where = FPaths::ProjectSavedDir()
+		/ TEXT("Match") / FString::Printf(TEXT("frame_%03d_%.0fs.png"), Captured, Now);
+	FScreenshotRequest::RequestScreenshot(Where, false, false);
+	UE_LOG(LogTemp, Log, TEXT("CAPTURE %d at %.1fs -> %s"), Captured, Now, *Where);
 }
 
 void ATMBattleDirector::AdvanceFloaters(float DeltaSeconds)
@@ -484,12 +635,20 @@ void ATMBattleDirector::AdvanceFloaters(float DeltaSeconds)
 	// The numbers rise, lean towards the camera so they can be read, and fade.
 	// None of this is state: the rules neither know nor care that it happens.
 	FRotator Towards = FRotator::ZeroRotator;
-	if (const APlayerController* Watcher = GetWorld() ? GetWorld()->GetFirstPlayerController() : nullptr)
+	if (const APlayerController* Viewer = GetWorld() ? GetWorld()->GetFirstPlayerController() : nullptr)
 	{
 		FVector Eye;
 		FRotator Look;
-		Watcher->GetPlayerViewPoint(Eye, Look);
+		Viewer->GetPlayerViewPoint(Eye, Look);
 		Towards = FRotator(0.0f, Look.Yaw + 180.0f, 0.0f);
+	}
+
+	for (TObjectPtr<UTextRenderComponent>& Plate : Plates)
+	{
+		if (Plate)
+		{
+			Plate->SetWorldRotation(Towards);
+		}
 	}
 
 	for (int32 i = Floaters.Num() - 1; i >= 0; --i)
@@ -788,6 +947,7 @@ void ATMBattleDirector::Tick(float DeltaSeconds)
 	Super::Tick(DeltaSeconds);
 
 	AdvanceFloaters(DeltaSeconds);
+	MaybeCapture();
 
 	// Only while playing: in the editor the clock is stepped by hand, so a
 	// battle sitting in a level does not quietly run on while it is being built.
