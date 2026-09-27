@@ -20,7 +20,7 @@ reorder it yourself.
 | port-cast-and-orders | Cast countdown in `Tick`/`TicksToReady`, `UseAbility` through `Validate`/`Apply` (cooldown logic exists) | port-resolve-parity, chore-checksum-gaps | sim-engineer | Done |
 | feat-time-as-orders | Director steps time via `Submit(MakeAdvance)` so a battle is fully recordable (F8) | – | unreal-engineer | Done |
 | port-turn-start | Start-of-turn effects: statuses tick/expire, hazards, regen, auras, channel continuation | port-cast-and-orders | sim-engineer | Done except auras — no built-in ability is one, so there is nothing to refresh yet; the gap is named in `BecomeReady` |
-| port-ai-abilities | AI chooses and aims abilities (plus the `Randf` tie-break, verified bit-exact) | port-cast-and-orders | sim-engineer | Todo |
+| port-ai-abilities | AI chooses and aims abilities (plus the `Randf` tie-break, verified bit-exact) | port-cast-and-orders | sim-engineer | Done for hard, parity-tested (`SimAIActionTest`). `Randf` is still unported, so easy and medium cannot be replayed bit-for-bit; and Godot settles a tie with an unstable sort, so tied options may differ — the test proves they are ties |
 | feat-event-playback | Director plays back `FTickReport` events: movement, casts, hits, misses, KOs | port-cast-and-orders | unreal-engineer | Part done — the log and a text cast bar read from the events (`Narrate`, `BattleLog`, `DescribeBattle`); floating numbers and a hit flash on screen are not done |
 
 ### port-resolve-parity

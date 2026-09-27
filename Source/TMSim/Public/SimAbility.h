@@ -81,6 +81,16 @@ namespace TMSim
 		std::string Name;
 		FJobStats Stats;
 		std::string AbilityIds[4];
+		/**
+		 * What the class is for: "tank", "damage", "support" or "special", and a
+		 * class may be two things. The computer hits the other side's supports
+		 * and specials first, so this is part of how it chooses.
+		 *
+		 * Every built-in class says what it is. The original can also work a role
+		 * out from a class's numbers and abilities when none is written down,
+		 * which the imported classes will need; that arrives with the importer.
+		 */
+		std::vector<std::string> Roles;
 	};
 
 	/** Null if nothing is registered under that id. */
@@ -89,6 +99,9 @@ namespace TMSim
 
 	/** The ability in one of a class's four slots, or null. */
 	TMSIM_API const FAbility* JobAbility(const std::string& JobId, int Slot);
+
+	/** Whether this class counts as that role. */
+	TMSIM_API bool JobHasRole(const std::string& JobId, const std::string& Role);
 
 	/** Every class the game knows, for listings. */
 	TMSIM_API const std::vector<const FJobDef*>& AllJobs();

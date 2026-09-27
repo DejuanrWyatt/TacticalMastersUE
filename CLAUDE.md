@@ -90,7 +90,9 @@ Paths on this machine: engine `E:\UE_5.8`, Visual Studio `E:\VS2022`.
 ## Porting status (keep this section current)
 Ported and parity-tested against Godot: dice (`SimRandomTest`), the clock with no orders
 (`SimTickTest`), damage/heal/evade/crit numbers (`SimCalcTest`), ground + reachability + paths
-(`SimMoveTest`), AI positioning, including sight (`SimAITest`), and abilities end to end
+(`SimMoveTest`), AI positioning, including sight (`SimAITest`), what the AI does with a turn
+(`SimAIActionTest` — the scoring arithmetic and the search over spots and targets, hard only), and
+abilities end to end
 (`SimAbilityTest`) — targeting and all eight shapes, the forecast, resolution with the dice in
 Godot's order, shields, invulnerability, statuses, gauge changes, buffs, KO, and what an ability
 costs to use. The order path + replay + checksum is self-checked (`SimPlayTest`), which now plays a
@@ -102,6 +104,19 @@ says so where the gap is — no built-in ability is one), the Astra class import
 the director playing the `FTickReport` events back on screen.
 Kept bug-for-bug from Godot, with a comment at each: a toggle in slot 3 skips the ultimate-meter and
 cooldown gates (`AbilityBlockedReason`, unreachable while no built-in class has a toggle).
+
+**One deliberate divergence**, in the AI's choice of action. Godot sorts its scored options and takes
+the first, with `sort_custom`, which is *not* a stable sort — so when two options score identically it
+may take either, and no transcription can promise to match that. The port takes the first of equals in
+build order. `SimAIActionTest` does not paper over it: where the two disagree it prices Godot's own
+choice and requires it to be worth *exactly* what the port's best is worth, so a disagreement is proven
+to be a tie rather than a worse decision. It reports how many were settled that way. This costs
+nothing for multiplayer, where both machines run this build and agree with each other; it only means a
+Godot battle and an Unreal battle can diverge on an option they both consider equally good.
+
+Easy and medium cannot yet be replayed bit-for-bit: their "settle for a worse option" roll needs
+Godot's `randf`, which is not ported. `SimRandom.h` records what was measured about it. Hard makes no
+random draw at all, which is why the parity tests use it.
 
 ## Documents
 - `Docs/backlog.md`: port slices and features with status (producer).

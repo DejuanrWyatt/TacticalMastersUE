@@ -56,6 +56,11 @@ cl /nologo /EHsc /std:c++17 /W4 /D_CRT_SECURE_NO_WARNINGS /I"%PUB%" "%HERE%SimAb
 if errorlevel 1 (echo BUILD FAILED & exit /b 1)
 "%OUT%\SimAbilityTest.exe" "%HERE%GodotAbilityTable.txt" || set FAILED=1
 echo.
+echo === what the computer does with a turn ===
+cl /nologo /EHsc /std:c++17 /W4 /D_CRT_SECURE_NO_WARNINGS /I"%PUB%" "%HERE%SimAIActionTest.cpp" "%PRIV%\SimTypes.cpp" "%PRIV%\SimUnit.cpp" "%PRIV%\SimAbility.cpp" "%PRIV%\SimMap.cpp" "%PRIV%\SimMovement.cpp" "%PRIV%\SimWorld.cpp" "%PRIV%\SimTargeting.cpp" "%PRIV%\SimResolve.cpp" "%PRIV%\SimAI.cpp" "%PRIV%\SimBattle.cpp" /Fo:"%OUT%\obj\\" /Fe:"%OUT%\SimAIActionTest.exe" >nul
+if errorlevel 1 (echo BUILD FAILED & exit /b 1)
+"%OUT%\SimAIActionTest.exe" "%HERE%GodotAIActionTable.txt" || set FAILED=1
+echo.
 echo === a battle played and replayed ===
 cl /nologo /EHsc /std:c++17 /W4 /D_CRT_SECURE_NO_WARNINGS /I"%PUB%" "%HERE%SimPlayTest.cpp" "%PRIV%\SimTypes.cpp" "%PRIV%\SimUnit.cpp" "%PRIV%\SimAbility.cpp" "%PRIV%\SimMap.cpp" "%PRIV%\SimMovement.cpp" "%PRIV%\SimWorld.cpp" "%PRIV%\SimTargeting.cpp" "%PRIV%\SimResolve.cpp" "%PRIV%\SimAI.cpp" "%PRIV%\SimBattle.cpp" /Fo:"%OUT%\obj\\" /Fe:"%OUT%\SimPlayTest.exe" >nul
 if errorlevel 1 (echo BUILD FAILED & exit /b 1)

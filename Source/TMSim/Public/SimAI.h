@@ -16,6 +16,7 @@
 
 #pragma once
 
+#include "SimBattle.h"
 #include "SimOrder.h"
 #include "SimRandom.h"
 #include "SimTypes.h"
@@ -43,6 +44,28 @@ namespace TMSim
 		int Top = 1;
 	};
 
+	/**
+	 * What it has decided to do with a turn: which ability, from where, aimed at
+	 * what. Slot -1 means it found nothing worth doing.
+	 */
+	struct FChoice
+	{
+		double Score = 0.0;
+		int Slot = -1;
+		/** Where it would stand to do it, which may not be where it is. */
+		FVec2 Spot;
+		FVec2 Target;
+		/** The unit a cast would follow, or -1 for a spot on the ground. */
+		int Follow = -1;
+		/**
+		 * How many options shared the best score. The original settles a tie with
+		 * a sort that is not stable, so a tie could fall either way there and a
+		 * transcription cannot promise to match it. In practice there is never
+		 * one, and the parity test insists on that rather than assuming it.
+		 */
+		int Ties = 0;
+	};
+
 	class TMSIM_API FAIPlayer
 	{
 	public:
@@ -64,6 +87,30 @@ namespace TMSim
 		// which is worth more than hiding them: they ask questions about the
 		// battle and change nothing, so a player could ask them too.
 
+		/**
+		 * The best thing it could do with this turn, over every spot it could
+		 * stand on and everything it could aim at. Slot -1 if nothing is worth
+		 * doing, which is when it falls back to walking.
+		 */
+		FChoice BestAction(FBattle& Battle, const FUnit& Unit,
+			const std::vector<std::pair<FNode, double>>& Reach);
+
+		/**
+		 * What one whole option is worth: the ability's own score, then the cast
+		 * time, the high ground, the walk and the footing. Public so a test can
+		 * price the option the original chose and show a disagreement was a tie
+		 * rather than a mistake.
+		 */
+		double ValueOfOption(FBattle& Battle, const FUnit& Unit, int Slot, const FVec2& Spot,
+			const FVec2& Target) const;
+
+		/** What one ability, aimed one way, would be worth. */
+		double Score(FBattle& Battle, const FUnit& User, int Slot, const FAbility& Ability,
+			const std::vector<FHit>& Hits) const;
+
+		/** How much a target is worth hitting: the other side's healers first. */
+		double TargetWorth(const FUnit& User, const FUnit& Target, bool bSmart) const;
+
 		/** Where it would rather stand, given what it can see. */
 		FVec2 ApproachSpot(FBattle& Battle, const FUnit& Unit, bool bSprint);
 		/** The reachable spot furthest from the enemies it can see. */
@@ -75,6 +122,14 @@ namespace TMSim
 		FSimRandom Rng;
 
 	private:
+
+		/** Spots worth considering: where it is, plus a one-metre lattice of reach. */
+		std::vector<FVec2> Spots(const FUnit& Unit,
+			const std::vector<std::pair<FNode, double>>& Reach) const;
+
+		/** The unit standing exactly there, for a cast to follow, or -1. */
+		int UnitAt(FBattle& Battle, const FVec2& Target, const FUnit& User, const FVec2& Spot,
+			const FAbility& Ability) const;
 
 		FSkill Level;
 		/** Only the careful settings sprint or back off when badly hurt. */

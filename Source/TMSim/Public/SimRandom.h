@@ -21,10 +21,25 @@
 //   seed 42    randi_range(1,100) 18, 29, 21, 16, 33, 57, 99, 4
 //   seed 12345 randi_range(1,100) 57, 48, 42, 21, 7, 70, 42, 89
 //
-// Randf is deliberately absent: Godot builds a double from several draws with
-// an exponent trick, and the battle rules never ask for one. The only float
-// draw in the whole game is a tie-break inside the computer player. Add it only
-// when that is ported, and verify it the same way first.
+// Randf is deliberately absent, and the rules never ask for one. The only float
+// draw in the whole game is the tie-break by which an easy or medium computer
+// player settles for a worse option, and a hard one never reaches it: GDScript
+// short-circuits `mistakes > 0.0 and rng.randf() < mistakes`, so at hard the
+// generator is untouched and the choice is wholly deterministic.
+//
+// What is known about it, measured against 4.7.2 rather than guessed, so nobody
+// has to find it out twice:
+//   - one randf() costs exactly two randi() draws (the state afterwards is the
+//     state after two, and the next randi is the third of the plain sequence);
+//   - it returns a value exactly representable as a 32-bit float;
+//   - seed 1     -> 0.32955908775329590, 0.27659484744071960
+//     seed 42    -> 0.11837019026279449, 0.65903240442276001
+//     seed 12345 -> 0.25204190611839294, 0.66667300462722778
+//     against the plain draws seed 1 -> 1811587497, 683407368, 2033395789, ...
+// No simple combination of those two draws reproduces all six values, so the
+// exponent trick needs reading out of the engine source rather than inferring.
+// Until it is, easy and medium cannot be replayed bit-for-bit -- hard can, and
+// that is what the parity tests use.
 
 #pragma once
 

@@ -121,11 +121,17 @@ namespace TMSim
 
 		FJobDef MakeJob(const char* Id, const char* Name, int Hp, int AttDef, int MagDef,
 			int AEva, int MEva, int Crit, int Speed, int Move, int Patience, int Sight,
-			const char* A0, const char* A1, const char* A2, const char* A3)
+			const char* A0, const char* A1, const char* A2, const char* A3,
+			const char* Role0, const char* Role1 = nullptr)
 		{
 			FJobDef Job;
 			Job.Id = Id;
 			Job.Name = Name;
+			Job.Roles.push_back(Role0);
+			if (Role1)
+			{
+				Job.Roles.push_back(Role1);
+			}
 			Job.Stats.Set(EStat::Hp, Hp);
 			Job.Stats.Set(EStat::AttDef, AttDef);
 			Job.Stats.Set(EStat::MagDef, MagDef);
@@ -148,12 +154,12 @@ namespace TMSim
 			std::map<std::string, FJobDef> Out;
 			auto Add = [&Out](FJobDef Job) { Out[Job.Id] = Job; };
 			//                 id            name          hp  ad  md  ae  me  cr  sp  mv  pa  si
-			Add(MakeJob("squire",     "Squire",      75,  8,  6,  8,  5,  8, 10,  7,  6,  9, "attack", "throw_stone", "focus", "brave_slash"));
-			Add(MakeJob("knight",     "Knight",     105, 12,  6,  5,  5,  5,  6,  6,  7,  8, "attack", "shield_bash", "guard", "holy_blade"));
-			Add(MakeJob("archer",     "Archer",      60,  6,  7, 15,  8, 15, 12,  7,  6, 13, "bow_shot", "aimed_shot", "pin_shot", "arrow_rain"));
-			Add(MakeJob("monk",       "Monk",        80,  8,  5, 18,  8, 12, 12,  8,  5,  9, "punch", "wave_fist", "chakra", "earth_slash"));
-			Add(MakeJob("black_mage", "Black Mage",  60,  4, 12,  5, 12, 10,  8,  6,  8, 10, "staff", "fire", "blizzard", "meteor"));
-			Add(MakeJob("white_mage", "White Mage",  65,  5, 13,  5, 15,  5,  8,  6,  8, 10, "raise", "cure", "haste", "sanctuary"));
+			Add(MakeJob("squire",     "Squire",      75,  8,  6,  8,  5,  8, 10,  7,  6,  9, "attack", "throw_stone", "focus", "brave_slash", "damage"));
+			Add(MakeJob("knight",     "Knight",     105, 12,  6,  5,  5,  5,  6,  6,  7,  8, "attack", "shield_bash", "guard", "holy_blade", "tank", "damage"));
+			Add(MakeJob("archer",     "Archer",      60,  6,  7, 15,  8, 15, 12,  7,  6, 13, "bow_shot", "aimed_shot", "pin_shot", "arrow_rain", "damage"));
+			Add(MakeJob("monk",       "Monk",        80,  8,  5, 18,  8, 12, 12,  8,  5,  9, "punch", "wave_fist", "chakra", "earth_slash", "damage", "support"));
+			Add(MakeJob("black_mage", "Black Mage",  60,  4, 12,  5, 12, 10,  8,  6,  8, 10, "staff", "fire", "blizzard", "meteor", "damage"));
+			Add(MakeJob("white_mage", "White Mage",  65,  5, 13,  5, 15,  5,  8,  6,  8, 10, "raise", "cure", "haste", "sanctuary", "support"));
 			return Out;
 		}
 
@@ -180,6 +186,23 @@ namespace TMSim
 	{
 		const auto Found = Abilities().find(AbilityId);
 		return Found == Abilities().end() ? nullptr : &Found->second;
+	}
+
+	bool JobHasRole(const std::string& JobId, const std::string& Role)
+	{
+		const FJobDef* Job = FindJob(JobId);
+		if (!Job)
+		{
+			return false;
+		}
+		for (const std::string& Each : Job->Roles)
+		{
+			if (Each == Role)
+			{
+				return true;
+			}
+		}
+		return false;
 	}
 
 	const FAbility* JobAbility(const std::string& JobId, int Slot)

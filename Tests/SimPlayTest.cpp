@@ -18,6 +18,10 @@
 // half disagree. And a unit that is ready, is refused every order, and so stays
 // ready forever would hang a real match on the spot.
 //
+// The orders all come from the computer player, which chooses abilities as well
+// as where to stand, so this is the real thing playing itself rather than a
+// stand-in policy written for the test.
+//
 // The units fight now, which is what makes the replay check mean anything:
 // seeding the replay differently on purpose fails, because rolling to evade and
 // to crit is the only thing in a battle that touches the dice. While nothing
@@ -95,54 +99,6 @@ namespace
 		FOrder Order;
 	};
 
-	/**
-	 * The first ability this unit could legally use, or an EndTurn if there is
-	 * none. Deliberately simple and deliberately not the computer player: what is
-	 * being checked here is the order path and whether a battle replays, not
-	 * whether the choices were good ones. Choosing well arrives with the AI's own
-	 * ability scoring, and until then this is what makes a battle a fight rather
-	 * than eight units walking about -- which matters, because until something
-	 * rolls to hit, nothing in a battle touches the dice and the replay check
-	 * below cannot tell a right seed from a wrong one.
-	 */
-	FOrder PickAbility(FBattle& Battle, const FUnit& Unit)
-	{
-		std::vector<FVec2> Aims;
-		Aims.push_back(Unit.Pos);
-		for (const FUnit& Other : Battle.Units)
-		{
-			if (Other.Id != Unit.Id && (Other.IsAlive() || Other.IsKo()))
-			{
-				Aims.push_back(Other.Pos);
-			}
-		}
-		for (int Slot = 0; Slot < 4; ++Slot)
-		{
-			for (const FVec2& Aim : Aims)
-			{
-				const FUnit* At = Battle.UnitNear(Aim, Ground::HitRadius);
-				const int Follow = (At && At->Id != Unit.Id) ? At->Id : -1;
-				if (!Battle.ValidateAbility(Unit.Id, Slot, Aim, Follow).empty())
-				{
-					continue;
-				}
-				// Legal is not the same as worth doing. Swinging at the ground
-				// under its own feet passes every check in the rules and hits
-				// nobody, and a battle of that is not a fight -- which is exactly
-				// what this looked like before the forecast was consulted.
-				bool bWorthIt = false;
-				for (const FHit& Hit : Battle.Preview(Unit, Slot, Unit.Pos, Aim))
-				{
-					bWorthIt = bWorthIt || Hit.Amount > 0;
-				}
-				if (bWorthIt)
-				{
-					return FOrder::MakeUseAbility(Unit.Id, Unit.Serial, Slot, Aim, Follow);
-				}
-			}
-		}
-		return FOrder::MakeEndTurn(Unit.Id, Unit.Serial);
-	}
 }
 
 int main()
@@ -174,16 +130,7 @@ int main()
 
 		const int UnitId = Unit->Id;
 		const int Serial = Unit->Serial;
-		// The action first, as the original's computer player does. It has to be
-		// this way round: a sprint spends the action, and the computer sprints
-		// whenever it has one going spare, so asking it to move first means almost
-		// nothing ever gets used.
-		FOrder Order = Unit->bActed ? FOrder::MakeEndTurn(Unit->Id, Unit->Serial)
-			: PickAbility(Battle, *Unit);
-		if (Order.Type != EOrderType::UseAbility)
-		{
-			Order = Computer.NextCommand(Battle, *Unit);
-		}
+		FOrder Order = Computer.NextCommand(Battle, *Unit);
 
 		// Checked, then applied, and never the other way round.
 		const std::string Refused = Battle.Validate(Order);
