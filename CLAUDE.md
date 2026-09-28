@@ -81,6 +81,7 @@ be hard to kill (`Stop-Process` and `taskkill` may both refuse; WMI `Terminate` 
 | Rules parity tests (seconds, no engine) | `scripts\test.bat` (wraps `Tests\RunTests.bat`) |
 | Build the editor target | `scripts\build.bat` (**close the editor first**, or Live Coding blocks the build) |
 | Wiring test: sim ↔ Unreal, in a real level | `scripts\wiring-test.bat` (runs `Tools/play_battle.py` headless) |
+| The class lab (the rules alone, for the class creator: check + playtest a class file) | `Tools\ClassLab\Build.bat` → `Binaries\ClassLab\TMClassLab.exe` |
 | A whole battle in a real game world | `scriptsattle-test.bat` (no window, no rendering; ends itself) |
 
 Paths on this machine: engine `E:\UE_5.8`, Visual Studio `E:\VS2022`.

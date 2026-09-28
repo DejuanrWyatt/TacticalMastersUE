@@ -53,7 +53,7 @@ Not yet broken down; run `/plan-milestone` to split it into slices.
 |----|------|-----------|-------|--------|
 | port-passives-auras | Passive/aura stat contributions in `FUnit::Stat`, auras applied | port-turn-start | sim-engineer | Todo |
 | class-files | Tactical Masters' own class format, made by the class creator; the 81 Astra classes converted once; Unreal loads `*.tmclass.json` (no Astra) | – | sim-engineer | Done: all 81 match Godot field for field, load, refuse bad files, and play legally. Replaces port-astra-import |
-| creator-native | The class creator keeps and writes classes in the new format, and playtests with Unreal's rules (a headless class lab) instead of Godot | class-files | – | Todo |
+| creator-native | The class creator keeps and writes classes in the new format, and playtests with Unreal's rules (a headless class lab) instead of Godot | class-files | – | Done: creator v2 (Astra-style screen), `Tools/ClassLab`, 144 archetype×element proposals proven identical to the old route |
 | chore-class-sync-check | Replaced by SimClassTest's match against Godot's own reading (F4) | class-files | qa-engineer | Superseded |
 | chore-packaging-classes | Add `Data/Classes` to non-asset directories to package (F5) | port-astra-import | human | Todo |
 
