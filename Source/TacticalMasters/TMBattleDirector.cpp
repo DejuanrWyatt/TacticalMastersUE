@@ -268,9 +268,7 @@ void ATMBattleDirector::BuildBattle()
 
 		const TMSim::FVec2 Spawn = BlueSpawns[Index % 4];
 		Unit.Pos = Unit.Team == 0 ? Spawn : TMSim::FVec2(Size.X - Spawn.X, Size.Y - Spawn.Y);
-		// Facing the middle, as a unit does when a battle opens.
-		const TMSim::FVec2 Middle(Size.X * 0.5f, Size.Y * 0.5f);
-		Unit.Facing = (Middle - Unit.Pos).Normalized();
+		// Which way it faces is set by the rules when the battle starts.
 
 		Battle.Units.push_back(Unit);
 	}

@@ -286,6 +286,10 @@ int main(int ArgCount, char** Args)
 	{
 		if (!bFollowing || ExpectedState.empty())
 		{
+			// A battle already parted from Godot, or nothing read yet: whatever
+			// was read belongs to no comparison and must not reach the next one.
+			ExpectedState.clear();
+			Expected.clear();
 			return;
 		}
 		++Checked;

@@ -120,12 +120,12 @@ field for field (`GodotClassTable.txt`), and every one plays a battle with no re
 Particle effects are presentation only. An ability's `vfx` field names a Niagara or Cascade system under
 `/Game` (a Fab pack, say). The rules read it and ignore it, and the director plays it when the ability
 resolves. `ATMVfxStudio` films every effect for the class creator.
-Ported, with a Godot check waiting on its golden file: passive and toggle buffs in `FUnit::Stat`,
-auras refreshed at the start of a turn (20 of the 81 classes have one, 11 a toggle), a toggle switched
-once a turn, the battle time limit and holding the middle (setup screen: Victory, Time).
-`SimTraceTest` replays whole battles from Godot's own orders (`tests/dump_battle_trace.gd` →
-`Tests/GodotBattleTrace.txt`) and compares every unit after every step; until that file exists it says
-NOT CHECKED. The two victory rules also pass Godot's own smoke-test cases (in `SimPlayTest`).
+Whole battles (`SimTraceTest`): 8 battles replayed from Godot's own orders
+(`tests/dump_battle_trace.gd` → `Tests/GodotBattleTrace.txt`, Godot 4.7.2-stable ed1daf0bf), every unit
+compared after every step — 856 orders, 1125 states, all agree. They cover passive and toggle buffs,
+auras (20 of the 81 classes have one, 11 a toggle), burn, regen, stun, channelling, the battle time
+limit and holding the middle (setup screen: Victory, Time). Units face the middle when a battle starts,
+set by `FBattle::Start` as Godot's `setup` does.
 Not yet ported (see `Docs/backlog.md`): `Randf` (easy/medium mistakes), planning time.
 Kept bug-for-bug from Godot, with a comment at each: a toggle in slot 3 skips the ultimate-meter and
 cooldown gates (`AbilityBlockedReason`; reachable now that loaded classes have toggles).

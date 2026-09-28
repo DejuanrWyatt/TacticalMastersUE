@@ -24,8 +24,15 @@ namespace TMSim
 		Rng.Seed(InSeed);
 		TickCount = 0;
 		Winner = -1;
+		const FVec2 Size = Map.SizeMeters();
+		const FVec2 Middle(Size.X * 0.5f, Size.Y * 0.5f);
 		for (FUnit& Unit : Units)
 		{
+			// Everybody opens the battle facing the middle of the map. Which way a
+			// unit faces is a rule -- a hit from the side or behind does more -- so
+			// the rules set it rather than whoever deals the units
+			// (game_state.gd:289).
+			Unit.Facing = (Middle - Unit.Pos).Normalized();
 			// What its class is worth. Without this a unit has no stats at all,
 			// which means no health, so it would quietly start the battle dead.
 			// Binding it here means a roster is only ever "these ids, these
