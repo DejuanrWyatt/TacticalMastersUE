@@ -1,0 +1,134 @@
+{
+  "format": "tactical-masters-class",
+  "version": 1,
+  "id": "gale_minstrel",
+  "name": "Gale Minstrel",
+  "color": "#59cf94",
+  "look": "squire",
+  "roles": [
+    "support"
+  ],
+  "stats": {
+    "hp": 72,
+    "attdef": 6,
+    "magdef": 10,
+    "aeva": 10,
+    "meva": 12,
+    "crit": 8,
+    "speed": 11,
+    "move": 7,
+    "patience": 7,
+    "sight": 11
+  },
+  "abilities": [
+    {
+      "id": "gale_minstrel_chord",
+      "name": "Chord",
+      "desc": "A sharp chord at an enemy 1-7 m away",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "mag",
+      "target": "enemy",
+      "shape": "unit",
+      "power": 25,
+      "min_range": 1,
+      "max_range": 7,
+      "aoe": 0,
+      "cooldown": 0,
+      "cast": 0,
+      "fx": "pin_shot"
+    },
+    {
+      "id": "gale_minstrel_anthem",
+      "name": "Anthem",
+      "desc": "Every ally within 3 m of a point up to 6 m away gains 25% TG",
+      "kind": "active",
+      "effect": "support",
+      "scale": "mag",
+      "target": "ally",
+      "shape": "circle",
+      "power": 0,
+      "min_range": 0,
+      "max_range": 6,
+      "aoe": 3,
+      "cooldown": 3,
+      "cast": 1.5,
+      "tg": 25,
+      "fx": "haste"
+    },
+    {
+      "id": "gale_minstrel_ballad",
+      "name": "Ballad",
+      "desc": "Every ally within 4 m is inspired",
+      "kind": "aura",
+      "effect": "support",
+      "scale": "mag",
+      "target": "ally",
+      "shape": "circle",
+      "power": 0,
+      "min_range": 0,
+      "max_range": 1.8,
+      "aoe": 4,
+      "cooldown": 0,
+      "cast": 0,
+      "tg": 20,
+      "buffs": [
+        {
+          "stat": "speed",
+          "amount": 2,
+          "turns": 2
+        }
+      ],
+      "fx": "haste"
+    },
+    {
+      "id": "gale_minstrel_finale",
+      "name": "Finale",
+      "desc": "ULTIMATE: Heal every ally within 4 m of you",
+      "kind": "active",
+      "effect": "heal",
+      "scale": "mag",
+      "target": "ally",
+      "shape": "circle",
+      "power": 18,
+      "min_range": 0,
+      "max_range": 1.8,
+      "aoe": 4,
+      "cooldown": 0,
+      "cast": 2,
+      "fx": "sanctuary"
+    }
+  ],
+  "creator": {
+    "archetypes": [
+      "minstrel"
+    ],
+    "damageTypes": [
+      "wind"
+    ],
+    "plan": [
+      {
+        "archetype": "minstrel",
+        "index": 0,
+        "damageType": "wind"
+      },
+      {
+        "archetype": "minstrel",
+        "index": 1,
+        "damageType": "wind"
+      },
+      {
+        "archetype": "minstrel",
+        "index": 2,
+        "damageType": "wind"
+      },
+      {
+        "archetype": "minstrel",
+        "index": 3,
+        "damageType": "wind"
+      }
+    ],
+    "description": "Speeds up and buffs allies",
+    "measured": -43
+  }
+}

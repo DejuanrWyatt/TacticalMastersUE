@@ -1,0 +1,153 @@
+{
+  "format": "tactical-masters-class",
+  "version": 1,
+  "id": "shadow_assassin",
+  "name": "Shadow Assassin",
+  "color": "#8346b9",
+  "look": "squire",
+  "roles": [
+    "damage"
+  ],
+  "stats": {
+    "hp": 84,
+    "attdef": 7,
+    "magdef": 7,
+    "aeva": 24,
+    "meva": 13,
+    "crit": 22,
+    "speed": 11,
+    "move": 8,
+    "patience": 5,
+    "sight": 10
+  },
+  "abilities": [
+    {
+      "id": "shadow_assassin_dagger",
+      "name": "Dagger",
+      "desc": "Stab an adjacent enemy",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "att",
+      "target": "enemy",
+      "shape": "unit",
+      "power": 37,
+      "min_range": 0,
+      "max_range": 1.8,
+      "aoe": 0,
+      "cooldown": 0,
+      "cast": 0,
+      "fx": "attack"
+    },
+    {
+      "id": "shadow_assassin_kunai",
+      "name": "Kunai",
+      "desc": "Throw a blade at an enemy 2-8 m away",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "att",
+      "target": "enemy",
+      "shape": "unit",
+      "power": 29,
+      "min_range": 2,
+      "max_range": 8,
+      "aoe": 0,
+      "cooldown": 1,
+      "cast": 0,
+      "buffs": [
+        {
+          "stat": "magdef",
+          "amount": -6,
+          "turns": 2
+        },
+        {
+          "stat": "attdef",
+          "amount": -3,
+          "turns": 2
+        }
+      ],
+      "fx": "throw_stone"
+    },
+    {
+      "id": "shadow_assassin_veil",
+      "name": "Veil",
+      "desc": "Slow every enemy within 2 m of a point 1-5 m away",
+      "kind": "active",
+      "effect": "support",
+      "scale": "mag",
+      "target": "enemy",
+      "shape": "circle",
+      "power": 0,
+      "min_range": 1,
+      "max_range": 5,
+      "aoe": 2,
+      "cooldown": 3,
+      "cast": 0,
+      "status": {
+        "id": "slow",
+        "turns": 2
+      },
+      "fx": "haste"
+    },
+    {
+      "id": "shadow_assassin_execution",
+      "name": "Execution",
+      "desc": "ULTIMATE: A killing blow on an adjacent enemy",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "att",
+      "target": "enemy",
+      "shape": "unit",
+      "power": 70,
+      "min_range": 0,
+      "max_range": 1.8,
+      "aoe": 0,
+      "cooldown": 0,
+      "cast": 0,
+      "buffs": [
+        {
+          "stat": "magdef",
+          "amount": -6,
+          "turns": 2
+        },
+        {
+          "stat": "attdef",
+          "amount": -3,
+          "turns": 2
+        }
+      ],
+      "fx": "brave_slash"
+    }
+  ],
+  "creator": {
+    "archetypes": [
+      "assassin"
+    ],
+    "damageTypes": [
+      "shadow"
+    ],
+    "plan": [
+      {
+        "archetype": "assassin",
+        "index": 0,
+        "damageType": "shadow"
+      },
+      {
+        "archetype": "assassin",
+        "index": 1,
+        "damageType": "shadow"
+      },
+      {
+        "archetype": "assassin",
+        "index": 2,
+        "damageType": "shadow"
+      },
+      {
+        "archetype": "assassin",
+        "index": 3,
+        "damageType": "shadow"
+      }
+    ],
+    "description": "Quick melee killer",
+    "measured": 34
+  }
+}

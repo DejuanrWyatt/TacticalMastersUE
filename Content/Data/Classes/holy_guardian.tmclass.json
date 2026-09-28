@@ -1,0 +1,138 @@
+{
+  "format": "tactical-masters-class",
+  "version": 1,
+  "id": "holy_guardian",
+  "name": "Holy Guardian",
+  "color": "#f4d87b",
+  "look": "knight",
+  "roles": [
+    "tank",
+    "support"
+  ],
+  "stats": {
+    "hp": 110,
+    "attdef": 13,
+    "magdef": 11,
+    "aeva": 6,
+    "meva": 8,
+    "crit": 5,
+    "speed": 7,
+    "move": 6,
+    "patience": 8,
+    "sight": 8
+  },
+  "abilities": [
+    {
+      "id": "holy_guardian_mace",
+      "name": "Mace",
+      "desc": "Strike an adjacent enemy",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "att",
+      "target": "enemy",
+      "shape": "unit",
+      "power": 31,
+      "min_range": 0,
+      "max_range": 1.8,
+      "aoe": 0,
+      "cooldown": 0,
+      "cast": 0,
+      "fx": "attack"
+    },
+    {
+      "id": "holy_guardian_bash",
+      "name": "Bash",
+      "desc": "Shield-bash an adjacent enemy",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "att",
+      "target": "enemy",
+      "shape": "unit",
+      "power": 31,
+      "min_range": 0,
+      "max_range": 1.8,
+      "aoe": 0,
+      "cooldown": 2,
+      "cast": 0,
+      "fx": "shield_bash"
+    },
+    {
+      "id": "holy_guardian_ward",
+      "name": "Ward",
+      "desc": "Every ally within 4 m is shielded",
+      "kind": "aura",
+      "effect": "support",
+      "scale": "mag",
+      "target": "ally",
+      "shape": "circle",
+      "power": 0,
+      "min_range": 0,
+      "max_range": 1.8,
+      "aoe": 4,
+      "cooldown": 0,
+      "cast": 0,
+      "buffs": [
+        {
+          "stat": "attdef",
+          "amount": 4,
+          "turns": 2
+        },
+        {
+          "stat": "magdef",
+          "amount": 4,
+          "turns": 2
+        }
+      ],
+      "fx": "guard"
+    },
+    {
+      "id": "holy_guardian_bastion",
+      "name": "Bastion",
+      "desc": "ULTIMATE: Slam the ground, hitting every enemy within 3 m of you",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "att",
+      "target": "enemy",
+      "shape": "circle",
+      "power": 40,
+      "min_range": 0,
+      "max_range": 1.8,
+      "aoe": 3,
+      "cooldown": 0,
+      "cast": 1,
+      "fx": "holy_blade"
+    }
+  ],
+  "creator": {
+    "archetypes": [
+      "guardian"
+    ],
+    "damageTypes": [
+      "holy"
+    ],
+    "plan": [
+      {
+        "archetype": "guardian",
+        "index": 0,
+        "damageType": "holy"
+      },
+      {
+        "archetype": "guardian",
+        "index": 1,
+        "damageType": "holy"
+      },
+      {
+        "archetype": "guardian",
+        "index": 2,
+        "damageType": "holy"
+      },
+      {
+        "archetype": "guardian",
+        "index": 3,
+        "damageType": "holy"
+      }
+    ],
+    "description": "Tank who shields allies",
+    "measured": -48
+  }
+}

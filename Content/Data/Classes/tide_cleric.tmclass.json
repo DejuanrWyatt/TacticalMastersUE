@@ -1,0 +1,125 @@
+{
+  "format": "tactical-masters-class",
+  "version": 1,
+  "id": "tide_cleric",
+  "name": "Tide Cleric",
+  "color": "#3687e2",
+  "look": "white_mage",
+  "roles": [
+    "support"
+  ],
+  "stats": {
+    "hp": 76,
+    "attdef": 5,
+    "magdef": 14,
+    "aeva": 5,
+    "meva": 16,
+    "crit": 5,
+    "speed": 8,
+    "move": 6,
+    "patience": 8,
+    "sight": 10
+  },
+  "abilities": [
+    {
+      "id": "tide_cleric_rod",
+      "name": "Rod",
+      "desc": "Strike an adjacent enemy",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "att",
+      "target": "enemy",
+      "shape": "unit",
+      "power": 24,
+      "min_range": 0,
+      "max_range": 1.8,
+      "aoe": 0,
+      "cooldown": 0,
+      "cast": 0,
+      "fx": "attack"
+    },
+    {
+      "id": "tide_cleric_mend",
+      "name": "Mend",
+      "desc": "Heal an ally up to 6 m away",
+      "kind": "active",
+      "effect": "heal",
+      "scale": "mag",
+      "target": "ally",
+      "shape": "unit",
+      "power": 22,
+      "min_range": 0,
+      "max_range": 6,
+      "aoe": 0,
+      "cooldown": 0,
+      "cast": 1,
+      "fx": "cure"
+    },
+    {
+      "id": "tide_cleric_rebirth",
+      "name": "Rebirth",
+      "desc": "Revive a knocked-out ally up to 5 m away with 30% HP",
+      "kind": "active",
+      "effect": "revive",
+      "scale": "mag",
+      "target": "ko_ally",
+      "shape": "unit",
+      "power": 0.3,
+      "min_range": 0,
+      "max_range": 5,
+      "aoe": 0,
+      "cooldown": 4,
+      "cast": 2,
+      "fx": "raise"
+    },
+    {
+      "id": "tide_cleric_sanctuary",
+      "name": "Sanctuary",
+      "desc": "ULTIMATE: Heal every ally within 3.5 m of a point up to 8 m away",
+      "kind": "active",
+      "effect": "heal",
+      "scale": "mag",
+      "target": "ally",
+      "shape": "circle",
+      "power": 27,
+      "min_range": 0,
+      "max_range": 8,
+      "aoe": 3.5,
+      "cooldown": 0,
+      "cast": 3,
+      "fx": "sanctuary"
+    }
+  ],
+  "creator": {
+    "archetypes": [
+      "cleric"
+    ],
+    "damageTypes": [
+      "water"
+    ],
+    "plan": [
+      {
+        "archetype": "cleric",
+        "index": 0,
+        "damageType": "water"
+      },
+      {
+        "archetype": "cleric",
+        "index": 1,
+        "damageType": "water"
+      },
+      {
+        "archetype": "cleric",
+        "index": 2,
+        "damageType": "water"
+      },
+      {
+        "archetype": "cleric",
+        "index": 3,
+        "damageType": "water"
+      }
+    ],
+    "description": "Healer who revives",
+    "measured": -40
+  }
+}

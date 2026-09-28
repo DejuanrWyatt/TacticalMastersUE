@@ -1,0 +1,140 @@
+{
+  "format": "tactical-masters-class",
+  "version": 1,
+  "id": "stone_brawler",
+  "name": "Stone Brawler",
+  "color": "#ab7a49",
+  "look": "monk",
+  "roles": [
+    "damage"
+  ],
+  "stats": {
+    "hp": 100,
+    "attdef": 10,
+    "magdef": 6,
+    "aeva": 18,
+    "meva": 8,
+    "crit": 12,
+    "speed": 10,
+    "move": 7,
+    "patience": 5,
+    "sight": 9
+  },
+  "abilities": [
+    {
+      "id": "stone_brawler_jab",
+      "name": "Jab",
+      "desc": "Punch an adjacent enemy",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "att",
+      "target": "enemy",
+      "shape": "unit",
+      "power": 32,
+      "min_range": 0,
+      "max_range": 1.8,
+      "aoe": 0,
+      "cooldown": 0,
+      "cast": 0,
+      "fx": "punch"
+    },
+    {
+      "id": "stone_brawler_uppercut",
+      "name": "Uppercut",
+      "desc": "A rising blow on an adjacent enemy",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "att",
+      "target": "enemy",
+      "shape": "unit",
+      "power": 44,
+      "min_range": 0,
+      "max_range": 1.8,
+      "aoe": 0,
+      "cooldown": 2,
+      "cast": 0,
+      "status": {
+        "id": "stun",
+        "turns": 1
+      },
+      "fx": "wave_fist"
+    },
+    {
+      "id": "stone_brawler_stance",
+      "name": "Stance",
+      "desc": "Take a fighting stance",
+      "kind": "toggle",
+      "effect": "support",
+      "scale": "mag",
+      "target": "ally",
+      "shape": "self",
+      "power": 0,
+      "min_range": 0,
+      "max_range": 0,
+      "aoe": 0,
+      "cooldown": 0,
+      "cast": 0,
+      "buffs": [
+        {
+          "stat": "attdef",
+          "amount": 4,
+          "turns": 2
+        }
+      ],
+      "fx": "focus"
+    },
+    {
+      "id": "stone_brawler_fury",
+      "name": "Fury",
+      "desc": "ULTIMATE: A flurry hitting every enemy within 2.5 m of you",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "att",
+      "target": "enemy",
+      "shape": "circle",
+      "power": 49,
+      "min_range": 0,
+      "max_range": 1.8,
+      "aoe": 2.5,
+      "cooldown": 0,
+      "cast": 0,
+      "status": {
+        "id": "stun",
+        "turns": 1
+      },
+      "fx": "earth_slash"
+    }
+  ],
+  "creator": {
+    "archetypes": [
+      "brawler"
+    ],
+    "damageTypes": [
+      "earth"
+    ],
+    "plan": [
+      {
+        "archetype": "brawler",
+        "index": 0,
+        "damageType": "earth"
+      },
+      {
+        "archetype": "brawler",
+        "index": 1,
+        "damageType": "earth"
+      },
+      {
+        "archetype": "brawler",
+        "index": 2,
+        "damageType": "earth"
+      },
+      {
+        "archetype": "brawler",
+        "index": 3,
+        "damageType": "earth"
+      }
+    ],
+    "description": "Fast melee fighter",
+    "measured": -26
+  }
+}

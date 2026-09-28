@@ -427,12 +427,17 @@ int main(int ArgCount, char** Args)
 			CompareWithGodot(Godot);
 			++Matched;
 		}
-		if (Matched != static_cast<int>(Loaded.size()))
+		// Every class Godot has must be here and agree. A class with no Godot line
+		// was made in the class creator, after the conversion, and has nothing in
+		// Godot to agree with; it is still read, refused if broken, and played.
+		if (Matched > static_cast<int>(Loaded.size()))
 		{
-			Fail("the Godot table has " + std::to_string(Matched) + " classes, the files " + std::to_string(Loaded.size()));
+			Fail("the Godot table has " + std::to_string(Matched) + " classes, more than the files' " + std::to_string(Loaded.size()));
 		}
 		std::printf("compared %d classes with what Godot made of them: %s\n", Matched,
 			Failures == Before ? "every field agrees" : "they differ");
+		std::printf("%d more made in the class creator, with no Godot counterpart\n",
+			static_cast<int>(Loaded.size()) - Matched);
 	}
 	else
 	{
@@ -466,7 +471,7 @@ int main(int ArgCount, char** Args)
 		std::printf("CLASS FILES FAILED (%d problems)\n", Failures);
 		return 1;
 	}
-	std::printf(bHaveTable ? "THE CLASS FILES ARE THE CLASSES GODOT PLAYS\n"
+	std::printf(bHaveTable ? "THE CLASS FILES ARE THE CLASSES GODOT PLAYS, AND THE NEW ONES READ AND PLAY\n"
 		: "THE CLASS FILES READ AND PLAY (not yet compared with Godot)\n");
 	return 0;
 }

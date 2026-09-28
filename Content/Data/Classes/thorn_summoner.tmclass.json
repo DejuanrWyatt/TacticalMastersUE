@@ -1,0 +1,146 @@
+{
+  "format": "tactical-masters-class",
+  "version": 1,
+  "id": "thorn_summoner",
+  "name": "Thorn Summoner",
+  "color": "#5cc639",
+  "look": "black_mage",
+  "roles": [
+    "damage",
+    "support"
+  ],
+  "stats": {
+    "hp": 68,
+    "attdef": 4,
+    "magdef": 12,
+    "aeva": 5,
+    "meva": 14,
+    "crit": 10,
+    "speed": 7,
+    "move": 6,
+    "patience": 10,
+    "sight": 10
+  },
+  "abilities": [
+    {
+      "id": "thorn_summoner_rod",
+      "name": "Rod",
+      "desc": "Strike an adjacent enemy",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "att",
+      "target": "enemy",
+      "shape": "unit",
+      "power": 34,
+      "min_range": 0,
+      "max_range": 1.8,
+      "aoe": 0,
+      "cooldown": 0,
+      "cast": 0,
+      "fx": "attack"
+    },
+    {
+      "id": "thorn_summoner_summon",
+      "name": "Summon",
+      "desc": "The beast strikes every enemy within 2 m of a point 3-9 m away",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "mag",
+      "target": "enemy",
+      "shape": "circle",
+      "power": 46,
+      "min_range": 3,
+      "max_range": 9,
+      "aoe": 2,
+      "cooldown": 2,
+      "cast": 2,
+      "status": {
+        "id": "burn",
+        "turns": 2
+      },
+      "fx": "fire"
+    },
+    {
+      "id": "thorn_summoner_pact",
+      "name": "Pact",
+      "desc": "Bless every ally within 3 m of a point up to 6 m away",
+      "kind": "active",
+      "effect": "support",
+      "scale": "mag",
+      "target": "ally",
+      "shape": "circle",
+      "power": 0,
+      "min_range": 0,
+      "max_range": 6,
+      "aoe": 3,
+      "cooldown": 3,
+      "cast": 1,
+      "buffs": [
+        {
+          "stat": "magdef",
+          "amount": 3,
+          "turns": 2
+        },
+        {
+          "stat": "attdef",
+          "amount": 3,
+          "turns": 2
+        }
+      ],
+      "fx": "haste"
+    },
+    {
+      "id": "thorn_summoner_ascendant",
+      "name": "Ascendant",
+      "desc": "ULTIMATE: Every enemy within 4 m of a point 4-11 m away",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "mag",
+      "target": "enemy",
+      "shape": "circle",
+      "power": 61,
+      "min_range": 4,
+      "max_range": 11,
+      "aoe": 4,
+      "cooldown": 0,
+      "cast": 4,
+      "status": {
+        "id": "burn",
+        "turns": 2
+      },
+      "fx": "meteor"
+    }
+  ],
+  "creator": {
+    "archetypes": [
+      "summoner"
+    ],
+    "damageTypes": [
+      "nature"
+    ],
+    "plan": [
+      {
+        "archetype": "summoner",
+        "index": 0,
+        "damageType": "nature"
+      },
+      {
+        "archetype": "summoner",
+        "index": 1,
+        "damageType": "nature"
+      },
+      {
+        "archetype": "summoner",
+        "index": 2,
+        "damageType": "nature"
+      },
+      {
+        "archetype": "summoner",
+        "index": 3,
+        "damageType": "nature"
+      }
+    ],
+    "description": "Slow caster of huge blows",
+    "measured": -43
+  }
+}

@@ -1,0 +1,134 @@
+{
+  "format": "tactical-masters-class",
+  "version": 1,
+  "id": "flame_sorcerer",
+  "name": "Flame Sorcerer",
+  "color": "#e86130",
+  "look": "black_mage",
+  "roles": [
+    "damage"
+  ],
+  "stats": {
+    "hp": 64,
+    "attdef": 4,
+    "magdef": 11,
+    "aeva": 5,
+    "meva": 14,
+    "crit": 12,
+    "speed": 8,
+    "move": 6,
+    "patience": 8,
+    "sight": 10
+  },
+  "abilities": [
+    {
+      "id": "flame_sorcerer_bolt",
+      "name": "Bolt",
+      "desc": "A bolt at an enemy 2-8 m away",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "mag",
+      "target": "enemy",
+      "shape": "unit",
+      "power": 47,
+      "min_range": 2,
+      "max_range": 8,
+      "aoe": 0,
+      "cooldown": 0,
+      "cast": 1,
+      "fx": "fire"
+    },
+    {
+      "id": "flame_sorcerer_burst",
+      "name": "Burst",
+      "desc": "Every enemy within 2 m of a point 2-8 m away",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "mag",
+      "target": "enemy",
+      "shape": "circle",
+      "power": 36,
+      "min_range": 2,
+      "max_range": 8,
+      "aoe": 2,
+      "cooldown": 2,
+      "cast": 2,
+      "status": {
+        "id": "burn",
+        "turns": 2
+      },
+      "fx": "fire"
+    },
+    {
+      "id": "flame_sorcerer_staff",
+      "name": "Staff",
+      "desc": "Strike an adjacent enemy",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "att",
+      "target": "enemy",
+      "shape": "unit",
+      "power": 29,
+      "min_range": 0,
+      "max_range": 1.8,
+      "aoe": 0,
+      "cooldown": 0,
+      "cast": 0,
+      "fx": "attack"
+    },
+    {
+      "id": "flame_sorcerer_cataclysm",
+      "name": "Cataclysm",
+      "desc": "ULTIMATE: Every enemy within 3.5 m of a point 4-11 m away",
+      "kind": "channeled",
+      "effect": "damage",
+      "scale": "mag",
+      "target": "enemy",
+      "shape": "circle",
+      "power": 40,
+      "min_range": 4,
+      "max_range": 11,
+      "aoe": 3.5,
+      "channel": 2,
+      "cooldown": 0,
+      "cast": 1,
+      "status": {
+        "id": "burn",
+        "turns": 2
+      },
+      "fx": "meteor"
+    }
+  ],
+  "creator": {
+    "archetypes": [
+      "sorcerer"
+    ],
+    "damageTypes": [
+      "fire"
+    ],
+    "plan": [
+      {
+        "archetype": "sorcerer",
+        "index": 0,
+        "damageType": "fire"
+      },
+      {
+        "archetype": "sorcerer",
+        "index": 1,
+        "damageType": "fire"
+      },
+      {
+        "archetype": "sorcerer",
+        "index": 2,
+        "damageType": "fire"
+      },
+      {
+        "archetype": "sorcerer",
+        "index": 3,
+        "damageType": "fire"
+      }
+    ],
+    "description": "Area magic damage",
+    "measured": -66
+  }
+}

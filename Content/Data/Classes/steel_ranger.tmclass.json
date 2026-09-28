@@ -1,0 +1,133 @@
+{
+  "format": "tactical-masters-class",
+  "version": 1,
+  "id": "steel_ranger",
+  "name": "Steel Ranger",
+  "color": "#929caa",
+  "look": "archer",
+  "roles": [
+    "damage"
+  ],
+  "stats": {
+    "hp": 72,
+    "attdef": 7,
+    "magdef": 7,
+    "aeva": 15,
+    "meva": 8,
+    "crit": 18,
+    "speed": 10,
+    "move": 7,
+    "patience": 6,
+    "sight": 13
+  },
+  "abilities": [
+    {
+      "id": "steel_ranger_arrow",
+      "name": "Arrow",
+      "desc": "Shoot an enemy 2-10 m away",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "att",
+      "target": "enemy",
+      "shape": "unit",
+      "power": 26,
+      "min_range": 2,
+      "max_range": 10,
+      "aoe": 0,
+      "cooldown": 0,
+      "cast": 0,
+      "fx": "bow_shot"
+    },
+    {
+      "id": "steel_ranger_snipe",
+      "name": "Snipe",
+      "desc": "A shot that pierces everyone in a line up to 13 m",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "att",
+      "target": "enemy",
+      "shape": "line",
+      "power": 38,
+      "min_range": 3,
+      "max_range": 13,
+      "aoe": 0.7,
+      "cooldown": 1,
+      "cast": 1,
+      "fx": "aimed_shot"
+    },
+    {
+      "id": "steel_ranger_barb",
+      "name": "Barb",
+      "desc": "A barbed arrow at an enemy 2-10 m away",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "att",
+      "target": "enemy",
+      "shape": "unit",
+      "power": 24,
+      "min_range": 2,
+      "max_range": 10,
+      "aoe": 0,
+      "cooldown": 2,
+      "cast": 0,
+      "status": {
+        "id": "bleed",
+        "turns": 2
+      },
+      "fx": "pin_shot"
+    },
+    {
+      "id": "steel_ranger_volley",
+      "name": "Volley",
+      "desc": "ULTIMATE: Arrows fall on every enemy within 2.5 m of a point 4-13 m away",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "att",
+      "target": "enemy",
+      "shape": "circle",
+      "power": 36,
+      "min_range": 4,
+      "max_range": 13,
+      "aoe": 2.5,
+      "cooldown": 0,
+      "cast": 2,
+      "status": {
+        "id": "bleed",
+        "turns": 2
+      },
+      "fx": "arrow_rain"
+    }
+  ],
+  "creator": {
+    "archetypes": [
+      "ranger"
+    ],
+    "damageTypes": [
+      "physical"
+    ],
+    "plan": [
+      {
+        "archetype": "ranger",
+        "index": 0,
+        "damageType": "physical"
+      },
+      {
+        "archetype": "ranger",
+        "index": 1,
+        "damageType": "physical"
+      },
+      {
+        "archetype": "ranger",
+        "index": 2,
+        "damageType": "physical"
+      },
+      {
+        "archetype": "ranger",
+        "index": 3,
+        "damageType": "physical"
+      }
+    ],
+    "description": "Long-range physical damage",
+    "measured": 47
+  }
+}
