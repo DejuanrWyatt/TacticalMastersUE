@@ -1,0 +1,173 @@
+{
+  "format": "tactical-masters-class",
+  "version": 1,
+  "id": "bastion",
+  "name": "Bastion",
+  "color": "#8a95a8",
+  "look": "knight",
+  "roles": [
+    "tank"
+  ],
+  "stats": {
+    "hp": 150,
+    "attdef": 19,
+    "magdef": 13,
+    "aeva": 4,
+    "meva": 5,
+    "crit": 4,
+    "speed": 8,
+    "move": 5,
+    "patience": 8,
+    "sight": 8
+  },
+  "abilities": [
+    {
+      "id": "bastion_shield_strike",
+      "name": "Shield Strike",
+      "desc": "A blow with the shield's rim, at arm's length.",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "att",
+      "target": "enemy",
+      "shape": "unit",
+      "power": 54,
+      "min_range": 0,
+      "max_range": 1.8,
+      "aoe": 0,
+      "cooldown": 0,
+      "cast": 0,
+      "fx": "shield_bash"
+    },
+    {
+      "id": "bastion_challenge",
+      "name": "Challenge",
+      "desc": "Strikes every enemy in a 90-degree cone 4 m ahead and taunts them for 2 turns: while the Bastion is in reach, it is the one they must attack.",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "att",
+      "target": "enemy",
+      "shape": "cone",
+      "power": 26,
+      "min_range": 0,
+      "max_range": 4,
+      "aoe": 0,
+      "angle": 90,
+      "cooldown": 3,
+      "cast": 0,
+      "status": {
+        "id": "taunt",
+        "turns": 2
+      },
+      "fx": "guard"
+    },
+    {
+      "id": "bastion_bulwark",
+      "name": "Bulwark",
+      "desc": "A barrier on an ally up to 5 m away that soaks 30 damage, for 3 turns.",
+      "kind": "active",
+      "effect": "support",
+      "scale": "mag",
+      "target": "ally",
+      "shape": "unit",
+      "power": 40,
+      "min_range": 0,
+      "max_range": 5,
+      "aoe": 0,
+      "cooldown": 3,
+      "cast": 0,
+      "status": {
+        "id": "barrier",
+        "turns": 3
+      },
+      "fx": "guard"
+    },
+    {
+      "id": "bastion_rallying_wall",
+      "name": "Rallying Wall",
+      "desc": "ULTIMATE: A barrier on every ally within 3.5 m that soaks 40 damage, for 3 turns.",
+      "kind": "active",
+      "effect": "support",
+      "scale": "mag",
+      "target": "ally",
+      "shape": "circle",
+      "power": 50,
+      "min_range": 0,
+      "max_range": 0,
+      "aoe": 3.5,
+      "cooldown": 0,
+      "cast": 0,
+      "status": {
+        "id": "barrier",
+        "turns": 3
+      },
+      "fx": "sanctuary"
+    }
+  ],
+  "creator": {
+    "description": "A wall with a voice. It dares the enemy to come at it -- taunted foes in reach must strike the Bastion -- and throws barriers over whoever it cannot stand in front of.",
+    "damageTypes": [
+      "physical"
+    ],
+    "icons": {
+      "class": {
+        "backing": "shield",
+        "glyph": "shield",
+        "colour": "#aab6c8",
+        "style": "light",
+        "mark": "none",
+        "scale": 1,
+        "rotate": 0
+      },
+      "abilities": [
+        {
+          "backing": "circle",
+          "glyph": "shield",
+          "colour": "#c9ced9",
+          "style": "light",
+          "mark": "none",
+          "scale": 1,
+          "rotate": 0
+        },
+        {
+          "backing": "circle",
+          "glyph": "crown",
+          "colour": "#e0625a",
+          "style": "light",
+          "mark": "none",
+          "scale": 1,
+          "rotate": 0
+        },
+        {
+          "backing": "circle",
+          "glyph": "shield",
+          "colour": "#7fb2e8",
+          "style": "light",
+          "mark": "none",
+          "scale": 1,
+          "rotate": 0
+        },
+        {
+          "backing": "hex",
+          "glyph": "shield",
+          "colour": "#f4e2a0",
+          "style": "light",
+          "mark": "none",
+          "scale": 1,
+          "rotate": 0
+        }
+      ]
+    },
+    "measured": {
+      "margin": -47.2,
+      "win": 20,
+      "games": 64,
+      "uses": [
+        252,
+        118,
+        136,
+        55
+      ],
+      "against": "reference team, medium"
+    }
+  }
+}

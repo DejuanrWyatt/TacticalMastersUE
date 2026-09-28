@@ -1,0 +1,173 @@
+{
+  "format": "tactical-masters-class",
+  "version": 1,
+  "id": "rime_warden",
+  "name": "Rime Warden",
+  "color": "#8fd3e8",
+  "look": "black_mage",
+  "roles": [
+    "special",
+    "damage"
+  ],
+  "stats": {
+    "hp": 88,
+    "attdef": 6,
+    "magdef": 13,
+    "aeva": 6,
+    "meva": 12,
+    "crit": 8,
+    "speed": 10,
+    "move": 5,
+    "patience": 8,
+    "sight": 10
+  },
+  "abilities": [
+    {
+      "id": "rime_warden_frost_shard",
+      "name": "Frost Shard",
+      "desc": "A shard of ice at an enemy 1-7 m away.",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "mag",
+      "target": "enemy",
+      "shape": "unit",
+      "power": 44,
+      "min_range": 1,
+      "max_range": 7,
+      "aoe": 0,
+      "cooldown": 0,
+      "cast": 0,
+      "fx": "blizzard"
+    },
+    {
+      "id": "rime_warden_rime_snare",
+      "name": "Rime Snare",
+      "desc": "Frost races along a line 7 m long: everyone within 1 m of it is struck and rooted for 2 turns (cannot walk, can still act).",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "mag",
+      "target": "enemy",
+      "shape": "line",
+      "power": 22,
+      "min_range": 0,
+      "max_range": 7,
+      "aoe": 1,
+      "cooldown": 3,
+      "cast": 0,
+      "status": {
+        "id": "root",
+        "turns": 2
+      },
+      "fx": "blizzard"
+    },
+    {
+      "id": "rime_warden_glacial_prison",
+      "name": "Glacial Prison",
+      "desc": "Seals an enemy 2-6 m away in ice for 1 turn: it can neither move nor act, but its AttDef and MagDef triple while it lasts. (1.5 s)",
+      "kind": "active",
+      "effect": "support",
+      "scale": "mag",
+      "target": "enemy",
+      "shape": "unit",
+      "power": 0,
+      "min_range": 2,
+      "max_range": 6,
+      "aoe": 0,
+      "cooldown": 3,
+      "cast": 1,
+      "status": {
+        "id": "freeze",
+        "turns": 1
+      },
+      "fx": "blizzard"
+    },
+    {
+      "id": "rime_warden_absolute_zero",
+      "name": "Absolute Zero",
+      "desc": "ULTIMATE: Everyone within 3 m of a point 3-9 m away is struck and frozen for 1 turn. (2 s)",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "mag",
+      "target": "enemy",
+      "shape": "circle",
+      "power": 56,
+      "min_range": 3,
+      "max_range": 9,
+      "aoe": 3,
+      "cooldown": 0,
+      "cast": 2,
+      "status": {
+        "id": "freeze",
+        "turns": 1
+      },
+      "fx": "blizzard"
+    }
+  ],
+  "creator": {
+    "description": "Ice that holds rather than harms. It roots a line of foes in place and seals the most dangerous in ice -- out of the fight for a turn, but harder to kill while it lasts.",
+    "damageTypes": [
+      "ice"
+    ],
+    "icons": {
+      "class": {
+        "backing": "hex",
+        "glyph": "snowflake",
+        "colour": "#7fd4ef",
+        "style": "light",
+        "mark": "none",
+        "scale": 1,
+        "rotate": 0
+      },
+      "abilities": [
+        {
+          "backing": "circle",
+          "glyph": "snowflake",
+          "colour": "#7fd4ef",
+          "style": "light",
+          "mark": "none",
+          "scale": 1,
+          "rotate": 0
+        },
+        {
+          "backing": "circle",
+          "glyph": "snowflake",
+          "colour": "#7fd4ef",
+          "style": "light",
+          "mark": "line",
+          "scale": 1,
+          "rotate": 0
+        },
+        {
+          "backing": "square",
+          "glyph": "snowflake",
+          "colour": "#bfeaf7",
+          "style": "light",
+          "mark": "none",
+          "scale": 1,
+          "rotate": 0
+        },
+        {
+          "backing": "hex",
+          "glyph": "snowflake",
+          "colour": "#dff5fc",
+          "style": "light",
+          "mark": "none",
+          "scale": 1,
+          "rotate": 0
+        }
+      ]
+    },
+    "measured": {
+      "margin": -26.1,
+      "win": 34,
+      "games": 64,
+      "uses": [
+        188,
+        106,
+        8,
+        56
+      ],
+      "against": "reference team, medium"
+    }
+  }
+}

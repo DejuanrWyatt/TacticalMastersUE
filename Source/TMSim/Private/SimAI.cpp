@@ -391,6 +391,11 @@ namespace TMSim
 		std::vector<FChoice> Options;
 		const std::vector<FVec2> Stands = Spots(Unit, Reach);
 		const double Sight = Battle.SightOf(Unit);
+		const FUnit* Taunter = Battle.FindUnit(Unit.TauntedBy());
+		if (Taunter && !Taunter->IsAlive())
+		{
+			Taunter = nullptr;
+		}
 
 		for (int Slot = 0; Slot < 4; ++Slot)
 		{
@@ -499,6 +504,15 @@ namespace TMSim
 
 				for (const FVec2& Target : Aims)
 				{
+					// Taunted (also a divergence from Godot, as NextCommand says): an
+					// attack that could reach the taunter has to catch it, as
+					// FBattle::Validate insists, so no other aim is considered.
+					if (Taunter && Ability->Effect == EEffect::Damage
+						&& Battle.InAbilityRange(Unit, Slot, Spot, Taunter->Pos)
+						&& !Battle.InShape(*Ability, Spot, Target, Taunter->Pos))
+					{
+						continue;
+					}
 					const double Value = ValueOfOption(Battle, Unit, Slot, Spot, Target);
 					if (Value <= 0.0)
 					{
@@ -560,16 +574,30 @@ namespace TMSim
 		// sprint spends the action, and it would sprint whenever it had one going
 		// spare, so deciding to move first would throw the turn away.
 
+		// DIVERGES FROM GODOT, by the human's decision (2026-09-28). Godot's
+		// computer player (ai_player.gd:43-50) takes no notice of Root, Freeze or
+		// Knockdown: it plans a walk the rules then refuse, drops the refused
+		// order, thinks again, and stalls until its turn runs out. This one plans
+		// only what those statuses allow: no walk while rooted or frozen, and a
+		// knocked-down unit walks or acts, never both. With none of them on the
+		// unit every choice below is Godot's, which is why the recorded battles
+		// (SimTraceTest, SimAIActionTest) still match decision for decision.
+		const bool bCanWalk = !Unit.bMoved && !Unit.IsCasting() && !Unit.IsRooted()
+			&& !(Unit.ActsOnce() && Unit.bActed);
+		const bool bCanAct = !Unit.bActed && !(Unit.ActsOnce() && Unit.bMoved);
+
 		// One search of the ground per decision, shared by everything below.
 		std::vector<std::pair<FNode, double>> Reach;
-		if (!Unit.bMoved && !Unit.IsCasting())
+		if (bCanWalk)
 		{
 			Reach = Battle.ReachableNodes(Unit);
 		}
 
-		if (!Unit.bActed)
+		if (bCanAct)
 		{
-			const FChoice Best = BestAction(Battle, Unit, Reach);
+			// Knocked down, an action cannot follow a walk: it acts from here.
+			static const std::vector<std::pair<FNode, double>> Here;
+			const FChoice Best = BestAction(Battle, Unit, Unit.ActsOnce() ? Here : Reach);
 			if (Best.Slot >= 0)
 			{
 				if (Best.Spot != Unit.Pos)
@@ -581,7 +609,7 @@ namespace TMSim
 			}
 		}
 
-		if (!Unit.bMoved && !Unit.IsCasting())
+		if (bCanWalk)
 		{
 			// Nothing worth doing with the action, so the walk may as well be a
 			// sprint: it goes further and only costs the action already spare.

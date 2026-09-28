@@ -153,6 +153,10 @@ Maps are files now (`Content/Data/Maps`, read and checked by `TMSim::ReadMapFile
 built in as Godot has it. The port's own large map, Crown Keep (20x16), and four view-only themes
 (`Content/Data/Themes`) are described in `Docs/Maps.md`.
 Not yet ported (see `Docs/backlog.md`): Godot's other four maps, and saved teams.
+**Deliberate divergence from Godot** (the human's decision, 2026-09-28): the computer player respects
+Root, Freeze, Knockdown and Taunt (`FAIPlayer::NextCommand`, `BestAction`). Godot's (`ai_player.gd:43-50`)
+ignores them, asks for orders the rules refuse, and stalls until its turn runs out. No recorded Godot
+battle has these statuses in play, so every parity test still matches decision for decision.
 Kept bug-for-bug from Godot, with a comment at each: a toggle in slot 3 skips the ultimate-meter and
 cooldown gates (`AbilityBlockedReason`; reachable now that loaded classes have toggles).
 
