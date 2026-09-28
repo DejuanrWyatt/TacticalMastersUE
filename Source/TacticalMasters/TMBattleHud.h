@@ -56,6 +56,8 @@ enum class ETMHudAction : uint8
 	SetupVictory,
 	SetupTime,
 	SetupPlanning,
+	SetupMap,
+	SetupTheme,
 	PlanningReady,
 	SetupStart,
 	SetupBack,

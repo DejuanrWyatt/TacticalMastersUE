@@ -1,0 +1,13 @@
+{
+  "format": "tactical-masters-theme",
+  "name": "Winter Pass",
+  "ground": {"tops": ["#e6ecf2", "#eef2f6", "#f4f7fa", "#f8fafc", "#ffffff"], "side": "#7d8590", "jitter": 0.03},
+  "rock": {"colour": "#8f9aa8", "style": "boulders"},
+  "water": {"colour": "#9fd6ea", "opacity": 0.85},
+  "embers": {"colour": "#2f2220", "glow": "#ff8a3a"},
+  "spring": {"colour": "#5fd0d8", "glow": "#9ffcff"},
+  "around": {"ground": "#dfe7ee", "trees": "pine", "treeCount": 80, "leaves": "#2f4a3a", "trunk": "#3d2e25", "rockCount": 25},
+  "sun": {"pitch": -30, "yaw": -20, "intensity": 6, "colour": "#e6efff"},
+  "sky": {"intensity": 5},
+  "fog": {"density": 0.035, "colour": "#cfdcea"}
+}

@@ -106,4 +106,41 @@ namespace TMSim
 
 	/** Highlands: rolling hills with a high ridge on each flank. */
 	TMSIM_API const std::vector<std::string>& HighlandsRows();
+
+	/**
+	 * A map as the game offers it: the top half of its ground (the rest is that
+	 * turned about, as BuildMirrored does), where blue's four stand (red stands
+	 * at the same spots turned about), and the look it is shown with.
+	 *
+	 * The five Godot maps are written in map_data.gd; Highlands is built in here
+	 * exactly as Godot has it, and further maps are files
+	 * (Content/Data/Maps/<id>.tmmap.json) read by ReadMapFile.
+	 */
+	struct FMapDef
+	{
+		std::string Id;
+		std::string Name;
+		std::string Desc;
+		/** The look the view dresses it in, unless the player picks another. Never read by the rules. */
+		std::string Theme;
+		std::vector<std::string> Top;
+		/** Blue's starting spots in metres, on navigation node centres. */
+		std::vector<FVec2> Spawns;
+	};
+
+	/**
+	 * Reads a map file. "" if it is a good map, otherwise every problem found,
+	 * a line each. A map is refused if any blue spawn cannot walk to every red
+	 * one: a battle on it could never be decided.
+	 */
+	TMSIM_API std::string ReadMapFile(const std::string& Text, FMapDef& Out);
+	/** Checks a map however it was made. "" if it is good. */
+	TMSIM_API std::string CheckMap(const FMapDef& Map);
+	/** Adds a map, or replaces one of the same id. "" if it was taken. */
+	TMSIM_API std::string RegisterMap(const FMapDef& Map);
+	/** A map by id, Highlands for one not known. */
+	TMSIM_API const FMapDef& FindMap(const std::string& Id);
+	TMSIM_API bool HasMap(const std::string& Id);
+	/** Every map, Highlands first, then in the order they were added. */
+	TMSIM_API const std::vector<FMapDef>& AllMaps();
 }

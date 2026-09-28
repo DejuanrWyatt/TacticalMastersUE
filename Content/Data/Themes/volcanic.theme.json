@@ -1,0 +1,13 @@
+{
+  "format": "tactical-masters-theme",
+  "name": "Ashen Caldera",
+  "ground": {"tops": ["#3d3834", "#4a433d", "#574e46", "#655a50", "#72665a"], "side": "#2a2522", "jitter": 0.05},
+  "rock": {"colour": "#4a3f4f", "style": "crystals"},
+  "water": {"colour": "#ff5a14", "opacity": 1.0, "glows": true},
+  "embers": {"colour": "#401a0e", "glow": "#ff5a14"},
+  "spring": {"colour": "#46b8a8", "glow": "#7fffe0"},
+  "around": {"ground": "#2e2926", "trees": "dead", "treeCount": 35, "leaves": "#2a2420", "trunk": "#2b211b", "rockCount": 45},
+  "sun": {"pitch": -18, "yaw": -75, "intensity": 5, "colour": "#ffb07a"},
+  "sky": {"intensity": 2.5},
+  "fog": {"density": 0.04, "colour": "#8a5a45"}
+}

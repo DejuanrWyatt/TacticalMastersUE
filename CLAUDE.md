@@ -85,11 +85,13 @@ be hard to kill (`Stop-Process` and `taskkill` may both refuse; WMI `Terminate` 
 | Build the editor target | `scripts\build.bat` (**close the editor first**, or Live Coding blocks the build) |
 | Wiring test: sim ↔ Unreal, in a real level | `scripts\wiring-test.bat` (runs `Tools/play_battle.py` headless) |
 | The class lab (the rules alone, for the class creator: check + playtest a class file) | `Tools\ClassLab\Build.bat` → `Binaries\ClassLab\TMClassLab.exe` |
+| The map analyser (the rules alone: routes, sight, height, hazards of a map file; `--battles N` adds computer-vs-computer games with heatmaps) | `scripts\map-analyze.bat [map.txt] [--battles N] [--capture S]` (builds `Tools\MapAnalyzer`; maps in `Tools\MapAnalyzer\maps`; see its README) |
 | Film every particle effect in the project for the class creator | `Tools\VfxCatalog.bat` (runs the game off-screen with `-tmvfxcatalog`; writes `Saved\VfxCatalog`; about 2 minutes; ends itself) |
 | Film every animation clip on every body, for the class creator's motion picker | `Tools\AnimCatalog.bat` (`-tmanimcatalog`; writes `Saved\AnimCatalog`; about 3 minutes; ends itself; add `-tmanimyaw=90` to a game run to film from the side) |
 | Make a Paragon hero from Fab into a body classes can wear | `Tools\AddHero.bat <hero folder> <body> [look ...] [--write]` (reads the hero's clips by name, writes only `characters.json`; see `Docs/CharacterSetup.md`) |
 | Bring the Godot game's class and ability icons in as PNGs for the HUD | `python Tools/import_icons.py` (reads Godot's `assets/icons`, writes `Content/Data/Icons`; needs Edge and Pillow) |
 | Robot playtester: plays three sessions through the real controls (title → setup → battle, vs computer as blue and red with planning and hold-the-middle, two players), checking every step did what it should | add `-tmrobot` to a windowed game run (not `-nullrhi`); report and a picture per problem in `Saved\Robot\` (about 10 minutes; ends itself) |
+| Play a chosen map and theme | add `-tmmap=crown_keep -tmtheme=winter` to a game run (`Docs/Maps.md`) |
 | Watch chosen classes fight | add `-tmroster=a,b,c,d` to a game run: both sides field those four; `-tmhold=30` / `-tmtime=180` switch on the other ways to win, `-tmplan=30` planning time |
 | A whole battle in a real game world | `scriptsattle-test.bat` (no window, no rendering; ends itself) |
 
@@ -105,11 +107,15 @@ Paths on this machine: engine `E:\UE_5.8`, Visual Studio `E:\VS2022`.
   check the checksum notices. There is no wrong-seed probe in the code yet. Once abilities consume dice,
   add one: replaying with a different seed must fail.
 - **Adding a `.cpp` to TMSim means adding it to every compile line in `Tests\RunTests.bat`** that carries the
-  sim sources. All but `SimRandomTest` do (it compiles alone). A failed compile stops the whole run
+  sim sources, and to `Tools\ClassLab\Build.bat` and `Tools\MapAnalyzer\Build.bat`. All but `SimRandomTest` do (it compiles alone). A failed compile stops the whole run
   there, so later tests don't run. `RunTests.bat` hides compiler output, so check `/W4` on new files by
   compiling them once by hand.
 - New rules need a parity test from a Godot dump, not only hand-written expectations.
 - Unreal Automation Tests are not used. Don't introduce them without asking.
+- **Computer-vs-computer measurements must alternate which side is listed first.** Units are taken in id
+  order, and the side listed first loses noticeably more (Highlands: 64–126 over 200 games; alternating gives
+  97–93). The class lab and the map analyser both alternate. Even then some maps lean
+  (`sim-side-bias` in the backlog), so compare a change against the same map, not against 50%.
 
 ## Porting status (keep this section current)
 Ported and parity-tested against Godot: dice (`SimRandomTest`), the clock with no orders
@@ -142,7 +148,10 @@ exactly as Godot settles them. Easy and medium make Godot's random mistakes with
 `RandiRange`, both measured against Godot (`SimRandomTest`): randf is two draws, and randi_range draws
 nothing for equal ends and rejects biased draws as PCG's bounded draw does.
 
-Not yet ported (see `Docs/backlog.md`): other maps, and saved teams.
+Maps are files now (`Content/Data/Maps`, read and checked by `TMSim::ReadMapFile`; `SimMapTest`), with Highlands
+built in as Godot has it. The port's own large map, Crown Keep (20x16), and four view-only themes
+(`Content/Data/Themes`) are described in `Docs/Maps.md`.
+Not yet ported (see `Docs/backlog.md`): Godot's other four maps, and saved teams.
 Kept bug-for-bug from Godot, with a comment at each: a toggle in slot 3 skips the ultimate-meter and
 cooldown gates (`AbilityBlockedReason`; reachable now that loaded classes have toggles).
 
@@ -153,6 +162,8 @@ cooldown gates (`AbilityBlockedReason`; reachable now that loaded classes have t
 - `Docs/qa/<id>-testplan.md`, `Docs/qa/bugs.md` (qa-engineer). `Docs/reviews/<id>.md` (code-reviewer).
 - Existing: `Docs/CharacterPipeline.md` (one canonical skeleton, SK_Mannequin; how heroes are brought in),
   `Content/Data/Classes/README.md` (class data format).
+- `Docs/AssetShortlist.md`: free Fab assets that suit the game (Paragon heroes by class, effects, animations on Manny).
+- `Tools/MapAnalyzer/README.md`: the map file format and how to read the analyser's report.
 
 ## Definition of done
 1. Spec approved by the human (`Status: Approved`).

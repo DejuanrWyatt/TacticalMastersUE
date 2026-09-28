@@ -1,0 +1,19 @@
+{
+  "format": "tactical-masters-map",
+  "version": 1,
+  "id": "crown_keep",
+  "name": "Crown Keep",
+  "desc": "A walled keep stands in the middle, climbed by one ramp from each side. Ruined pillars shelter one flank, a stream the other; springs sit out in the open.",
+  "theme": "ruined_keep",
+  "top": [
+    "11111111111111111111",
+    "1+11#11111111#111~11",
+    "1111111111111111~111",
+    "111#1111#111122~1111",
+    "11111211113111~~1#11",
+    "111122111131~~111111",
+    "11111111144441111#11",
+    "1#111x11144441111111"
+  ],
+  "spawns": [[2.75, 4.75], [0.75, 6.75], [4.75, 5.75], [2.75, 8.75]]
+}

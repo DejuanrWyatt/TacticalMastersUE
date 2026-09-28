@@ -1,0 +1,52 @@
+{
+  "format": "tactical-masters-theme",
+  "name": "Summer Meadow",
+  "ground": {
+    "tops": [
+      "#4c7a2c",
+      "#588636",
+      "#6a9241",
+      "#7d9a4f",
+      "#8f9d62"
+    ],
+    "side": "#6b5b45",
+    "jitter": 0.05
+  },
+  "rock": {
+    "colour": "#8a867c",
+    "style": "boulders"
+  },
+  "water": {
+    "colour": "#3a86b0",
+    "opacity": 0.7
+  },
+  "embers": {
+    "colour": "#3b2418",
+    "glow": "#ff7a2a"
+  },
+  "spring": {
+    "colour": "#4fc6b0",
+    "glow": "#7fffe8"
+  },
+  "around": {
+    "ground": "#557f33",
+    "trees": "round",
+    "treeCount": 70,
+    "leaves": "#3f7a2f",
+    "trunk": "#5a4130",
+    "rockCount": 20
+  },
+  "sun": {
+    "pitch": -48,
+    "yaw": -35,
+    "intensity": 8,
+    "colour": "#fff4e0"
+  },
+  "sky": {
+    "intensity": 4
+  },
+  "fog": {
+    "density": 0.015,
+    "colour": "#9fc3e6"
+  }
+}

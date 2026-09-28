@@ -394,6 +394,9 @@ private:
 		/** Seconds before the fighting to place units in (battle_setup.gd:44); 0 is none. */
 		double PlanningSeconds = 0.0;
 		uint64 FixedSeed = 12345;
+		/** The map, by id (TMSim::FindMap), and the look it is dressed in: empty for the map's own. */
+		std::string MapId = "highlands";
+		FString ThemeId;
 	};
 
 	FMatchSetup Setup;
@@ -852,6 +855,75 @@ private:
 	UPROPERTY()
 	TArray<TObjectPtr<UObject>> CharacterAssets;
 	TArray<FTMMotion> Motions;
+
+	// ------------------------------------------------ the board and its look
+	// (TMBattleDirectorBoard.cpp). The ground the rules give, dressed in a theme
+	// from Content/Data/Themes: colours for the ground by height, rock, water,
+	// embers and springs, the land around the board, and the sun, sky and fog.
+	// None of it is read by the rules.
+
+	struct FTMTheme
+	{
+		FString Id;
+		FString Name;
+		/** The top of the ground at each height, from level 1 up; the highest is used above it. */
+		TArray<FLinearColor> Tops;
+		FLinearColor Side = FLinearColor(0.35f, 0.33f, 0.3f);
+		/** How much each tile's colour wanders, so the ground is not a chessboard. */
+		float Jitter = 0.05f;
+		FLinearColor Rock = FLinearColor(0.45f, 0.43f, 0.4f);
+		/** pillars, boulders or crystals. */
+		FString RockStyle = TEXT("boulders");
+		FLinearColor Water = FLinearColor(0.15f, 0.4f, 0.55f);
+		float WaterOpacity = 0.75f;
+		/** Water that gives off light: lava, a glowing marsh. */
+		bool bWaterGlows = false;
+		FLinearColor Embers = FLinearColor(0.2f, 0.08f, 0.05f);
+		FLinearColor EmberGlow = FLinearColor(1.0f, 0.4f, 0.1f);
+		FLinearColor Spring = FLinearColor(0.2f, 0.6f, 0.55f);
+		FLinearColor SpringGlow = FLinearColor(0.4f, 1.0f, 0.9f);
+		FLinearColor Outside = FLinearColor(0.25f, 0.35f, 0.18f);
+		/** What grows around the board: pine, round, dead or none; and how much of it. */
+		FString Trees = TEXT("pine");
+		int32 TreeCount = 60;
+		FLinearColor Leaves = FLinearColor(0.12f, 0.3f, 0.12f);
+		FLinearColor Trunk = FLinearColor(0.3f, 0.2f, 0.12f);
+		int32 RockCount = 25;
+		float SunPitch = -40.0f;
+		float SunYaw = -40.0f;
+		float SunIntensity = 8.0f;
+		FLinearColor SunColour = FLinearColor(1.0f, 0.96f, 0.88f);
+		float SkyIntensity = 4.0f;
+		float FogDensity = 0.02f;
+		FLinearColor FogColour = FLinearColor(0.45f, 0.55f, 0.7f);
+	};
+
+	/** Reads every theme file once per run. */
+	void LoadThemes();
+	/** The theme the next or current battle is dressed in. */
+	const FTMTheme& ActiveTheme() const;
+	/** Every theme, in the order the setup screen offers them. */
+	TArray<FString> ThemeIds;
+	TMap<FString, FTMTheme> Themes;
+	/** Sun, sky and fog, from the level's own lights, set to the theme. */
+	void ApplyThemeLighting();
+	/** Embers flicker and lava breathes. */
+	void AdvanceBoard(float DeltaSeconds);
+	/** A colour on the engine's basic shape material, made once per colour. */
+	class UMaterialInstanceDynamic* Paint(const FLinearColor& Colour);
+	/** A basic shape on the board: Cube, Sphere, Cylinder or Cone, in centimetres. */
+	UStaticMeshComponent* Shape(const TCHAR* Name, const FVector& Where, const FVector& Size, const FRotator& Turn, const FLinearColor& Colour);
+
+	UPROPERTY()
+	TArray<TObjectPtr<USceneComponent>> BoardProps;
+	UPROPERTY()
+	TArray<TObjectPtr<class UPointLightComponent>> BoardLights;
+	TArray<float> BoardLightBase;
+	UPROPERTY()
+	TMap<uint32, TObjectPtr<class UMaterialInstanceDynamic>> Paints;
+	UPROPERTY()
+	TObjectPtr<class UTextureRenderTarget2D> WhitePixels = nullptr;
+	bool bThemesRead = false;
 
 	// ------------------------------------------------ how units look to the player
 	// (TMBattleDirectorLooks.cpp): allies blue and enemies red, a ring under each

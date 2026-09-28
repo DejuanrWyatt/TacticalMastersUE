@@ -1,0 +1,52 @@
+{
+  "format": "tactical-masters-theme",
+  "name": "Autumn Ruins",
+  "ground": {
+    "tops": [
+      "#6b6a2e",
+      "#7a7036",
+      "#86794a",
+      "#9a968c",
+      "#aaa596"
+    ],
+    "side": "#76705f",
+    "jitter": 0.06
+  },
+  "rock": {
+    "colour": "#a09a8b",
+    "style": "pillars"
+  },
+  "water": {
+    "colour": "#35607a",
+    "opacity": 0.75
+  },
+  "embers": {
+    "colour": "#3a2016",
+    "glow": "#ff6a1f"
+  },
+  "spring": {
+    "colour": "#3fb7a6",
+    "glow": "#77ffe3"
+  },
+  "around": {
+    "ground": "#6e6a36",
+    "trees": "round",
+    "treeCount": 55,
+    "leaves": "#b5602a",
+    "trunk": "#4a3526",
+    "rockCount": 35
+  },
+  "sun": {
+    "pitch": -32,
+    "yaw": -60,
+    "intensity": 7,
+    "colour": "#ffd9a8"
+  },
+  "sky": {
+    "intensity": 3.5
+  },
+  "fog": {
+    "density": 0.008,
+    "colour": "#d8b894"
+  }
+}

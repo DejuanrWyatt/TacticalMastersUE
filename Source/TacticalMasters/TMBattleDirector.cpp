@@ -75,6 +75,16 @@ void ATMBattleDirector::BeginPlay()
 		return;
 	}
 
+	// -tmmap=crown_keep and -tmtheme=winter: the battle on that map, in that look,
+	// without anyone at the setup screen.
+	FString MapSwitch;
+	if (FParse::Value(FCommandLine::Get(), TEXT("tmmap="), MapSwitch))
+	{
+		Setup.MapId = TCHAR_TO_UTF8(*MapSwitch);
+		bBuilt = false;
+	}
+	FParse::Value(FCommandLine::Get(), TEXT("tmtheme="), Setup.ThemeId);
+
 	// -tmroster=a,b,c,d: both sides field these four classes, by id, instead of
 	// the default four. How a class made in the creator is watched in a real
 	// battle without anyone at the setup screen.
@@ -196,6 +206,13 @@ void ATMBattleDirector::ClearBattle()
 		if (Tile) { Tile->DestroyComponent(); }
 	}
 	TileVisuals.Reset();
+	for (TObjectPtr<USceneComponent>& Prop : BoardProps)
+	{
+		if (Prop) { Prop->DestroyComponent(); }
+	}
+	BoardProps.Reset();
+	BoardLights.Reset();
+	BoardLightBase.Reset();
 	for (TObjectPtr<UPointLightComponent>& Light : ReadyLights)
 	{
 		if (Light) { Light->DestroyComponent(); }
@@ -264,11 +281,47 @@ namespace
 		UE_LOG(LogTemp, Log, TEXT("loaded %d of %d class files; %d classes in all"),
 			Loaded, Files.Num(), static_cast<int32>(TMSim::AllJobs().size()));
 	}
+
+	/**
+	 * Every map file in Content/Data/Maps, once per run. The rules read and check
+	 * each (TMSim::ReadMapFile); one they refuse is left out and said so.
+	 */
+	void LoadMapFiles()
+	{
+		static bool bLoaded = false;
+		if (bLoaded)
+		{
+			return;
+		}
+		bLoaded = true;
+		const FString Dir = FPaths::ProjectContentDir() / TEXT("Data/Maps");
+		TArray<FString> Files;
+		IFileManager::Get().FindFiles(Files, *(Dir / TEXT("*.tmmap.json")), true, false);
+		Files.Sort();
+		for (const FString& File : Files)
+		{
+			FString Text;
+			TMSim::FMapDef Def;
+			std::string Refused = FFileHelper::LoadFileToString(Text, *(Dir / File))
+				? TMSim::ReadMapFile(TCHAR_TO_UTF8(*Text), Def) : std::string("could not be read");
+			if (Refused.empty())
+			{
+				Refused = TMSim::RegisterMap(Def);
+			}
+			if (!Refused.empty())
+			{
+				UE_LOG(LogTemp, Warning, TEXT("map file %s left out: %hs"), *File, Refused.c_str());
+			}
+		}
+		UE_LOG(LogTemp, Log, TEXT("%d maps"), static_cast<int32>(TMSim::AllMaps().size()));
+	}
 }
 
 void ATMBattleDirector::BuildBattle()
 {
 	LoadClassFiles();
+	LoadMapFiles();
+	LoadThemes();
 	ClearBattle();
 
 	// Two sides of four, as the Godot game sets up, with the classes the setup
@@ -282,16 +335,16 @@ void ATMBattleDirector::BuildBattle()
 
 	// The map first: units stand on it, and the pathfinder needs it before
 	// anything can be asked about where a unit could walk.
-	Battle.Map.BuildMirrored(TMSim::HighlandsRows());
+	const TMSim::FMapDef& MapDef = TMSim::FindMap(Setup.MapId);
+	Battle.Map.BuildMirrored(MapDef.Top);
 
-	// Where the maps put the two sides, in metres. Blue as written, red at the
-	// mirrored spots, which is how a symmetric map is laid out.
-	const TMSim::FVec2 BlueSpawns[4] =
-	{
-		TMSim::FVec2(2.75f, 4.75f), TMSim::FVec2(0.75f, 8.75f),
-		TMSim::FVec2(4.75f, 6.75f), TMSim::FVec2(2.75f, 10.75f)
-	};
+	// Where the map puts the two sides, in metres. Blue as written, red at the
+	// mirrored spots, which is how a symmetric map is laid out; the first of
+	// each is the side's spawn point (map_data.gd:152).
+	const TMSim::FVec2 BlueSpawns[4] = { MapDef.Spawns[0], MapDef.Spawns[1], MapDef.Spawns[2], MapDef.Spawns[3] };
 	const TMSim::FVec2 Size = Battle.Map.SizeMeters();
+	Battle.SpawnPoints[0] = BlueSpawns[0];
+	Battle.SpawnPoints[1] = TMSim::FVec2(Size.X - BlueSpawns[0].X, Size.Y - BlueSpawns[0].Y);
 
 	for (int32 Index = 0; Index < 8; ++Index)
 	{
@@ -436,66 +489,6 @@ FVector ATMBattleDirector::WorldFor(const TMSim::FUnit& Unit) const
 {
 	const int Level = Battle.Map.NodeLevel(TMSim::FMap::NodeOf(Unit.Pos));
 	return WorldFromMetres(Unit.Pos, Level);
-}
-
-void ATMBattleDirector::BuildBoard()
-{
-	UStaticMesh* Mesh = TileMesh.LoadSynchronous();
-	if (!Mesh)
-	{
-		Mesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cube"));
-	}
-	if (!Mesh)
-	{
-		UE_LOG(LogTemp, Warning, TEXT("No tile mesh; the board will not be built"));
-		return;
-	}
-
-	const float TileMetres = TMSim::Ground::TileSize;
-	for (int32 Y = 0; Y < Battle.Map.TilesY; ++Y)
-	{
-		for (int32 X = 0; X < Battle.Map.TilesX; ++X)
-		{
-			const int Level = Battle.Map.TileLevel(X, Y);
-			if (Level <= 0)
-			{
-				continue;  // water and rock: nothing to stand on
-			}
-
-			UStaticMeshComponent* Tile = NewObject<UStaticMeshComponent>(
-				this, *FString::Printf(TEXT("Tile_%d_%d"), X, Y),
-				RF_Transient);
-			// Movable, and set before attaching. A static component refuses to
-			// attach to a movable parent outright -- it does not warn and carry
-			// on, it aborts the attach -- so a static tile built here ends up
-			// unparented, and the board comes apart when the director moves.
-			//
-			// Transient too, along with the units and their lights. All of it is
-			// built from the simulation whenever a battle starts, so saving it
-			// into the level only leaves a stale copy to be loaded and thrown
-			// away next time -- which is exactly what the flood of attach
-			// warnings on load turned out to be.
-			Tile->SetMobility(EComponentMobility::Movable);
-			Tile->SetupAttachment(RootComponent);
-			Tile->RegisterComponent();
-			Tile->SetStaticMesh(Mesh);
-
-			// A column from the ground up to this tile's height, so there is no
-			// daylight under the edge of a raised one.
-			const float TopMetres = Level * TMSim::Ground::LevelHeight;
-			const FVector Centre(
-				(X + 0.5f) * TileMetres * TileSize,
-				(Y + 0.5f) * TileMetres * TileSize,
-				TopMetres * TileSize * 0.5f);
-			Tile->SetRelativeLocation(Centre);
-			// The engine cube is 100 units across; a hair under a tile leaves a
-			// seam, so the grid reads without anything drawn on it.
-			const float Across = TileMetres * TileSize / 100.0f;
-			Tile->SetRelativeScale3D(FVector(Across * 0.98f, Across * 0.98f, TopMetres * TileSize / 100.0f));
-			TileVisuals.Add(Tile);
-		}
-	}
-	UE_LOG(LogTemp, Log, TEXT("Board built: %d tiles"), TileVisuals.Num());
 }
 
 void ATMBattleDirector::RefreshPlates()
@@ -1223,6 +1216,7 @@ void ATMBattleDirector::Tick(float DeltaSeconds)
 	{
 		AdvanceMotion(DeltaSeconds);
 		AdvanceTurnRings();
+		AdvanceBoard(DeltaSeconds);
 		UpdateCamera(DeltaSeconds);
 		if (TunePendingFor >= 0.0f && DragSlider < 0)
 		{
@@ -2677,6 +2671,27 @@ void ATMBattleDirector::PressMenuButton(const FTMHudButton& Button)
 			}
 		}
 		Setup.BattleSeconds = Choices[(At + 1) % 4];
+		break;
+	}
+	case ETMHudAction::SetupMap:
+	{
+		const std::vector<TMSim::FMapDef>& Maps = TMSim::AllMaps();
+		int32 At = 0;
+		for (int32 i = 0; i < static_cast<int32>(Maps.size()); ++i)
+		{
+			At = Maps[i].Id == Setup.MapId ? i : At;
+		}
+		Setup.MapId = Maps[(At + 1) % Maps.size()].Id;
+		bBuilt = false;
+		break;
+	}
+	case ETMHudAction::SetupTheme:
+	{
+		// The map's own look first, then each theme.
+		LoadThemes();
+		int32 At = ThemeIds.IndexOfByKey(Setup.ThemeId);
+		Setup.ThemeId = At + 1 < ThemeIds.Num() ? ThemeIds[At + 1] : FString();
+		bBuilt = false;
 		break;
 	}
 	case ETMHudAction::SetupPlanning:

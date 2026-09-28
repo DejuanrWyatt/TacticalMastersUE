@@ -995,8 +995,18 @@ void ATMBattleHud::DrawSetup(ATMBattleDirector& From)
 	}
 	Row(TEXT("Seed"), Setup.bRandomSeed ? FString(TEXT("New each battle"))
 		: FString::Printf(TEXT("Fixed: %llu"), Setup.FixedSeed), ETMHudAction::SetupSeed, -1);
-	Text(TEXT("Map"), RowX, Y + 2.0f * S, Dim, Font, 0.62f * S);
-	Text(TEXT("Highlands"), RowX + LabelW, Y + 2.0f * S, TextColour, Font, 0.62f * S);
+	{
+		const TMSim::FMapDef& Map = TMSim::FindMap(Setup.MapId);
+		Row(TEXT("Map"), UTF8_TO_TCHAR(Map.Name.c_str()), ETMHudAction::SetupMap, -1);
+		AddTip(RowX, Y - 46.0f * S, LabelW + ValueW, 38.0f * S, FString::Printf(TEXT("%hs\n%d x %d tiles"),
+			Map.Desc.c_str(), static_cast<int32>(Map.Top[0].size()), static_cast<int32>(Map.Top.size() * 2)));
+		const FString Look = Setup.ThemeId.IsEmpty() ? FString(UTF8_TO_TCHAR(Map.Theme.c_str())) : Setup.ThemeId;
+		const ATMBattleDirector::FTMTheme* Theme = From.Themes.Find(Look);
+		Row(TEXT("Theme"), (Theme ? Theme->Name : Look) + (Setup.ThemeId.IsEmpty() ? TEXT(" (the map's own)") : TEXT("")),
+			ETMHudAction::SetupTheme, -1);
+		AddTip(RowX, Y - 46.0f * S, LabelW + ValueW, 38.0f * S,
+			TEXT("How the battlefield looks: the ground, the land around it, the sun and the sky. It changes nothing in the rules."));
+	}
 
 	// How the battle can be won, on the right under red's team.
 	const float NoteX = PX + PW * 0.5f + 40.0f * S;
@@ -1033,7 +1043,7 @@ void ATMBattleHud::DrawSetup(ATMBattleDirector& From)
 	const TCHAR* Notes[] =
 	{
 		TEXT("Not ported yet:"),
-		TEXT("  other maps, and saved teams"),
+		TEXT("  Godot's other four maps, and saved teams"),
 
 	};
 	for (const TCHAR* Note : Notes)
