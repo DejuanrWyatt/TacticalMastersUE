@@ -62,5 +62,7 @@ Not yet broken down; run `/plan-milestone` to split it into slices.
 |----|------|-----------|-------|--------|
 | parity-status-ticks | A Godot parity dump of statuses ticking with damage (burn, bleed) and waking (sleep), with the dice and orders of a whole battle, so TickStatuses is measured against Godot and not only against itself | – | qa-engineer | Todo. TickStatuses read freed memory on every damage tick until 2026-09-27 (found by AddressSanitizer through the class lab); no parity test covered it |
 
+| ai-root-taunt | The computer player ignores Root and Taunt on its own units: it orders a rooted unit to walk ("It can't walk.") and a taunted one to attack someone else. The rules refuse, and the turn is lost | – | sim-engineer | Todo. The same in Godot (ai_player.gd never checks either), so fixing it is a Godot change first or a deliberate divergence. Found 2026-09-27 playtesting the Interrupter (Pin roots) and Duellist (Challenge taunts): 44 and 50 refused orders in 32 games. No built-in class roots or taunts, which is why it never showed |
+
 ## Later (not yet broken down)
 Ultimates · animation from events on the canonical skeleton · CharacterMap data · networking over `Submit` + checksums.
