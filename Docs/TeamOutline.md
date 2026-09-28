@@ -8,7 +8,9 @@ director adds `/Game/UI/M_TeamOutline` to the camera as a post-process when that
 material exists, and hands it the colours. Until it exists, units have no
 outline and the log says so once.
 
-The material is editor work (human-only in this project). About ten minutes:
+It exists now: `Tools/make_outline_material.py` made it, at the human's request
+(materials are otherwise human-only work here). Run that script again to
+remake it, or build it by hand from the steps below, about ten minutes:
 
 1. **Create it.** In the Content Browser, make a folder `UI` under `Content`.
    Right-click in it, **Material**, name it exactly `M_TeamOutline`, and open it.
