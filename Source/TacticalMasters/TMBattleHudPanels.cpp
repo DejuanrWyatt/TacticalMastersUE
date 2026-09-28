@@ -635,9 +635,14 @@ void ATMBattleHud::DrawTurnSquares(ATMBattleDirector& From)
 				Row.AddUnique(&Unit);
 			}
 		}
+		// Centred at the top, a row either side of the middle, as Atlas Reactor
+		// lays its teams out: the player's side on the left, the enemy's on the right.
 		const FVector2D Moved = Nudge(Team == 0 ? TEXT("turn_cards_blue") : TEXT("turn_cards_red"));
-		const float BlueS = BaseS * FTMSettings::Get().ScaleOf(TEXT("turn_cards_blue"));
-		const float RowX = 16.0f * BaseS + Team * (4.0f * 61.0f * BlueS + 24.0f * BaseS) + Moved.X;
+		const float RowW = FMath::Max(0, Row.Num()) * (SW + Gap) - Gap;
+		const float Middle = Canvas->ClipX * 0.5f;
+		const float Apart = 36.0f * BaseS;
+		const bool bLeft = Team == From.FriendTeam();
+		const float RowX = (bLeft ? Middle - Apart - RowW : Middle + Apart) + Moved.X;
 		const float RowY = 12.0f * S + Moved.Y;
 		float X = RowX;
 		for (const TMSim::FUnit* Unit : Row)
@@ -675,12 +680,24 @@ void ATMBattleHud::DrawTurnSquares(ATMBattleDirector& From)
 			}
 			Panel(X, RowY, SW, SH, Fill, Edge, Thick);
 			DrawRect(Meter, X + 2.0f, RowY + SH - SH * Level, SW - 4.0f, SH * Level - 2.0f);
-			// A strip of the side's colour along the top, so the rows read apart.
-			DrawRect(TeamColour(Team) * FLinearColor(1, 1, 1, 0.8f * Alpha), X + 2.0f, RowY + 2.0f, SW - 4.0f, 3.0f * S);
-			const FString Mark = bFogged ? FString(TEXT("?")) : Initials(JobName(*Unit));
-			const float Letters = 0.62f * S;
-			const FVector2D MarkSize = TextSize(Mark, Font, Letters);
-			Text(Mark, X + (SW - MarkSize.X) * 0.5f, RowY + 8.0f * S, (Unit->bReady ? TextColour : Dim) * FLinearColor(1, 1, 1, Alpha), Font, Letters);
+			// A strip of the side's colour along the top, so the rows read apart:
+			// blue for the player's side, red for the enemy's, as everywhere else.
+			DrawRect(SideColour(From.IsFriend(*Unit)) * FLinearColor(1, 1, 1, 0.9f * Alpha), X + 2.0f, RowY + 2.0f, SW - 4.0f, 4.0f * S);
+			// Its class's icon; a question mark for one hidden in the fog.
+			const float Face = 34.0f * S;
+			UTexture2D* Picture0 = bFogged ? nullptr : ClassIcon(*Unit);
+			if (Picture0)
+			{
+				Picture(Picture0, X + (SW - Face) * 0.5f, RowY + 7.0f * S, Face, Face,
+					FLinearColor(1, 1, 1, (Unit->bReady ? 1.0f : 0.8f) * Alpha));
+			}
+			else
+			{
+				const FString Mark = bFogged ? FString(TEXT("?")) : Initials(JobName(*Unit));
+				const float Letters = 0.62f * S;
+				const FVector2D MarkSize = TextSize(Mark, Font, Letters);
+				Text(Mark, X + (SW - MarkSize.X) * 0.5f, RowY + 8.0f * S, (Unit->bReady ? TextColour : Dim) * FLinearColor(1, 1, 1, Alpha), Font, Letters);
+			}
 			const float BadgeScale = 0.42f * S;
 			const FVector2D BadgeSize = TextSize(Badge, Font, BadgeScale);
 			Text(Badge, X + (SW - BadgeSize.X) * 0.5f, RowY + SH - BadgeSize.Y - 2.0f * S, BadgeColour * FLinearColor(1, 1, 1, Alpha), Font, BadgeScale);
