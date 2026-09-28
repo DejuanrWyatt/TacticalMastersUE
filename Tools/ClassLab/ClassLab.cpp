@@ -239,7 +239,7 @@ namespace
 
 	// ---------------------------------------------------------------- commands
 
-	std::string AbilityJson(const FAbility& A)
+	std::string AbilityJson(const FAbility& A, int Slot)
 	{
 		std::string Out = "{\"id\":" + Quote(A.Id) + ",\"name\":" + Quote(A.Name) + ",\"kind\":" + Quote(A.Kind);
 		const char* Effects[] = { "damage", "heal", "revive", "support" };
@@ -251,6 +251,9 @@ namespace
 		Out += ",\"power\":" + Number(A.Power) + ",\"min_range\":" + Number(A.MinRange) + ",\"max_range\":" + Number(A.MaxRange);
 		Out += ",\"aoe\":" + Number(A.Aoe) + ",\"cooldown\":" + Number(A.Cooldown) + ",\"cast\":" + Number(A.Cast);
 		Out += ",\"tg\":" + Number(A.TgChange);
+		// How the body moves when it goes off, as the game works it out: what the
+		// creator shows, and checks its own reckoning against.
+		Out += ",\"motion\":" + Quote(MotionOf(A, Slot));
 		if (!A.StatusId.empty())
 		{
 			Out += ",\"status\":{\"id\":" + Quote(A.StatusId) + ",\"turns\":" + Number(A.StatusTurns) + "}";
@@ -322,7 +325,7 @@ namespace
 			Out += "},\"abilities\":[";
 			for (size_t i = 0; i < Abilities.size(); ++i)
 			{
-				Out += std::string(i ? "," : "") + AbilityJson(Abilities[i]);
+				Out += std::string(i ? "," : "") + AbilityJson(Abilities[i], static_cast<int>(i));
 			}
 			Out += "]";
 			if (bBattle)

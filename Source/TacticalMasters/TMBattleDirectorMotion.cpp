@@ -135,6 +135,11 @@ bool ATMBattleDirector::LoadCharacterMap()
 					Into.Intro = Clip(TEXT("intro"));
 					Into.Windup = Clip(TEXT("windup"));
 					Into.CastRelease = Clip(TEXT("castRelease"));
+					double Impact = -1.0;
+					if (Clips->TryGetNumberField(TEXT("impact"), Impact))
+					{
+						Into.Impact = FMath::Clamp(static_cast<float>(Impact), 0.0f, 1.0f);
+					}
 					const TArray<TSharedPtr<FJsonValue>>* Releases = nullptr;
 					if (Clips->TryGetArrayField(TEXT("release"), Releases))
 					{
@@ -154,6 +159,34 @@ bool ATMBattleDirector::LoadCharacterMap()
 			}
 			Many(TEXT("hit"), Out.Hit);
 			Many(TEXT("death"), Out.Death);
+			// Reactions, statuses and moments: a name, or a list of names.
+			for (const FString& Key : ExtraKeys())
+			{
+				TArray<UAnimSequence*> Clips;
+				Many(*Key, Clips);
+				if (Clips.Num() == 0)
+				{
+					if (UAnimSequence* Single = One(*Key))
+					{
+						Clips.Add(Single);
+					}
+				}
+				if (Clips.Num() > 0)
+				{
+					Out.Extras.Add(Key, Clips);
+				}
+			}
+			const TSharedPtr<FJsonObject>* Idles = nullptr;
+			if (Set->TryGetObjectField(TEXT("idles"), Idles))
+			{
+				for (const TPair<FString, TSharedPtr<FJsonValue>>& Idle : (*Idles)->Values)
+				{
+					if (UAnimSequence* Loaded = LoadNamed<UAnimSequence>(Idle.Value->AsString(), CharacterAssets))
+					{
+						Out.Extras.Add(TEXT("idle:") + Idle.Key, { Loaded });
+					}
+				}
+			}
 			double Speed = 0.0;
 			if (Set->TryGetNumberField(TEXT("walkSpeed"), Speed) && Speed > 0.0)
 			{
@@ -242,6 +275,8 @@ const ATMBattleDirector::FTMBody* ATMBattleDirector::BodyFor(const TMSim::FUnit&
 
 void ATMBattleDirector::ResetMotion()
 {
+	ClearBlows();
+	bCelebrated = false;
 	Motions.Reset();
 	Motions.SetNum(Battle.Units.size());
 	for (int32 i = 0; i < Motions.Num(); ++i)
@@ -334,6 +369,21 @@ UAnimSequence* ATMBattleDirector::StandingClip(int32 Index) const
 		return nullptr;
 	}
 	const TMSim::FUnit& Unit = Battle.Units[Index];
+	// Stunned or asleep, if the set has a way to show it.
+	if (Unit.HasStatus("stun"))
+	{
+		if (UAnimSequence* Dazed = Set->Extra(TEXT("stunned")))
+		{
+			return Dazed;
+		}
+	}
+	if (Unit.HasStatus("sleep"))
+	{
+		if (UAnimSequence* Asleep = Set->Extra(TEXT("sleep")))
+		{
+			return Asleep;
+		}
+	}
 	// Charging a cast, or between the turns of a channel: its loop, if it has one.
 	int32 Slot = Unit.IsCasting() ? Unit.Casting.Slot : (Unit.IsChanneling() ? Unit.Channeling.Slot : -1);
 	if (Slot >= 0)
@@ -345,6 +395,15 @@ UAnimSequence* ATMBattleDirector::StandingClip(int32 Index) const
 			{
 				return Clips->Windup;
 			}
+		}
+	}
+	// A stance that suits the class: its first ability's motion says whether it
+	// is a fighter, an archer or a caster.
+	if (const TMSim::FAbility* First = TMSim::JobAbility(Unit.Job, 0))
+	{
+		if (UAnimSequence* Own = Set->Extra(*(TEXT("idle:") + FString(UTF8_TO_TCHAR(TMSim::MotionOf(*First, 0).c_str())))))
+		{
+			return Own;
 		}
 	}
 	return Set->Idle;
@@ -419,7 +478,13 @@ void ATMBattleDirector::AnimateEvents(const TMSim::FTickReport& Report)
 				continue;
 			}
 			UAnimSequence* Clip = nullptr;
-			if (const FTMMotionClips* Clips = FindMotion(Set, Named))
+			// An ultimate may have clips of its own: "<motion>_ult".
+			const FTMMotionClips* Ultimate = Event.Slot == 3 ? Set.Motions.Find(Named + TEXT("_ult")) : nullptr;
+			if (Ultimate && Ultimate->Release.Num() > 0)
+			{
+				Clip = Ultimate->Release[0];
+			}
+			else if (const FTMMotionClips* Clips = FindMotion(Set, Named))
 			{
 				if (bCharged && Clips->CastRelease)
 				{
@@ -437,6 +502,7 @@ void ATMBattleDirector::AnimateEvents(const TMSim::FTickReport& Report)
 				const bool bWeapon = Named == TEXT("melee") || Named == TEXT("heavy") || Named == TEXT("dash") || Named == TEXT("shoot");
 				Clip = bWeapon && Set.Attack.Num() > 0 ? Set.Attack[FMath::Max(0, Event.Slot) % Set.Attack.Num()] : Set.Cast;
 			}
+			Motion.LastRelease = Clip;
 			const TMSim::FVec2 Toward = Event.Where - Unit.Pos;
 			const float Yaw = Toward.Length() > 0.05f ? YawOf(Toward) : YawOf(Unit.Facing);
 			if (Motion.Path.Num() > 0)
@@ -451,10 +517,14 @@ void ATMBattleDirector::AnimateEvents(const TMSim::FTickReport& Report)
 				Animate(i, Clip, false);
 			}
 		}
-		else if (Event.Kind == TMSim::EEventKind::Hit && Event.By >= 0 && Event.Amount > 0 && Unit.IsAlive()
-			&& Motion.Path.Num() == 0 && Motion.OneShotLeft <= 0.0f && Set.Hit.Num() > 0)
+		else if (Event.Kind == TMSim::EEventKind::BecameReady && Unit.IsAlive()
+			&& Motion.Path.Num() == 0 && Motion.OneShotLeft <= 0.0f && !Unit.IsCasting())
 		{
-			Animate(i, Set.Hit[Event.Amount % Set.Hit.Num()], false);
+			// Its turn: a small gesture, if the set has one.
+			if (UAnimSequence* Ready = Set.Extra(TEXT("ready"), Unit.Id))
+			{
+				Animate(i, Ready, false);
+			}
 		}
 	}
 }
@@ -503,20 +573,26 @@ void ATMBattleDirector::AdvanceMotion(float DeltaSeconds)
 			Motion.OneShotLeft = 0.0f;
 		}
 
-		// Knocked out: fall, once, and lie there until raised or gone.
-		if (!Unit.IsAlive())
+		// Knocked out: fall, once, and lie there until raised or gone. Not before
+		// the blow that did it has landed, though, nor up again before the spell
+		// that raised it has.
+		if (Motion.HeldBlows > 0)
 		{
-			if (!Motion.bDown && Unit.IsKo() && Set && Set->Death.Num() > 0)
+		}
+		else if (!Unit.IsAlive())
+		{
+			if (!Motion.bDown && Unit.IsKo() && Set && (Motion.DeathClip || Set->Death.Num() > 0))
 			{
 				Motion.bDown = true;
 				Motion.Path.Reset();
-				Animate(i, Set->Death[Unit.Id % Set->Death.Num()], false);
+				Animate(i, Motion.DeathClip ? Motion.DeathClip : Set->Death[Unit.Id % Set->Death.Num()], false);
 			}
 			Motion.bDown = Motion.bDown || Unit.IsKo();
 		}
 		else if (Motion.bDown)
 		{
 			Motion.bDown = false;
+			Motion.DeathClip = nullptr;
 			Animate(i, Set ? (Set->Rise ? Set->Rise : Set->Idle) : nullptr, Set && !Set->Rise);
 		}
 
@@ -551,7 +627,8 @@ void ATMBattleDirector::AdvanceMotion(float DeltaSeconds)
 			}
 			if (Motion.Path.Num() == 0 && Motion.Queued)
 			{
-				// Arrived with something to do: turn to it and do it.
+				// Arrived with something to do: turn to it and do it. Its blow
+				// starts counting towards landing now (AdvanceBlows).
 				Motion.Yaw = Motion.QueuedYaw;
 				Animate(i, Motion.Queued, false);
 				Motion.Queued = nullptr;
@@ -567,9 +644,10 @@ void ATMBattleDirector::AdvanceMotion(float DeltaSeconds)
 			}
 		}
 
+		ShowStatuses(i, DeltaSeconds);
 		if (Motion.OneShotLeft > 0.0f)
 		{
-			Motion.OneShotLeft -= DeltaSeconds;
+			Motion.OneShotLeft -= DeltaSeconds * Motion.PlayRate;
 			if (Motion.OneShotLeft <= 0.0f && !Motion.bDown && Set)
 			{
 				Animate(i, Motion.Path.Num() > 0 ? (Motion.bRun && Set->Run ? Set->Run : Set->Walk) : StandingClip(i), true);
@@ -580,19 +658,53 @@ void ATMBattleDirector::AdvanceMotion(float DeltaSeconds)
 			Animate(i, StandingClip(i), true);
 		}
 
-		// The body and everything that stands with it.
+		// The body and everything that stands with it, nudged by a blow and
+		// lifted if it flies.
+		FVector Offset = FVector::ZeroVector;
+		if (Motion.JoltAge >= 0.0f)
+		{
+			Motion.JoltAge += DeltaSeconds;
+			// Out fast, back slowly.
+			const float Out = 0.07f;
+			const float Back = 0.35f;
+			const float Part = Motion.JoltAge < Out ? Motion.JoltAge / Out : FMath::Max(0.0f, 1.0f - (Motion.JoltAge - Out) / Back);
+			Offset += Motion.JoltDir * Motion.JoltSize * FMath::InterpEaseOut(0.0f, 1.0f, Part, 2.0f);
+			if (Motion.JoltAge >= Out + Back)
+			{
+				Motion.JoltAge = -1.0f;
+			}
+		}
+		float Sway = 0.0f;
+		if (Unit.IsAlive() && Unit.HasStatus("fly"))
+		{
+			Offset.Z += 60.0f + 8.0f * FMath::Sin(Motion.Clock * 2.2f);
+		}
+		if (Unit.IsAlive() && Unit.HasStatus("stun") && !(Set && Set->Extra(TEXT("stunned"))))
+		{
+			// Dazed, with no clip to show it: a slow reel on the spot.
+			Sway = 7.0f * FMath::Sin(Motion.Clock * 3.0f);
+		}
 		if (UnitVisuals[i])
 		{
-			UnitVisuals[i]->SetRelativeLocation(Motion.Shown);
-			UnitVisuals[i]->SetRelativeRotation(FRotator(0.0f, Motion.Yaw + (Motion.Body ? Motion.Body->Yaw : 180.0f), 0.0f));
+			UnitVisuals[i]->SetRelativeLocation(Motion.Shown + Offset);
+			UnitVisuals[i]->SetRelativeRotation(FRotator(0.0f, Motion.Yaw + Sway + (Motion.Body ? Motion.Body->Yaw : 180.0f), 0.0f));
 		}
 		if (Plates.IsValidIndex(i) && Plates[i])
 		{
-			Plates[i]->SetRelativeLocation(Motion.Shown + FVector(0.0f, 0.0f, 150.0f));
+			Plates[i]->SetRelativeLocation(Motion.Shown + Offset + FVector(0.0f, 0.0f, 150.0f));
 		}
 		if (ReadyLights.IsValidIndex(i) && ReadyLights[i])
 		{
 			ReadyLights[i]->SetRelativeLocation(Motion.Shown + FVector(0.0f, 0.0f, 55.0f));
 		}
+		if (StatusLights.IsValidIndex(i) && StatusLights[i])
+		{
+			StatusLights[i]->SetRelativeLocation(Motion.Shown + Offset + FVector(0.0f, 0.0f, 110.0f));
+		}
+	}
+	AdvanceBlows(DeltaSeconds);
+	if (Battle.Winner != -1 && Blows.Num() == 0 && !bCelebrated)
+	{
+		Celebrate();
 	}
 }

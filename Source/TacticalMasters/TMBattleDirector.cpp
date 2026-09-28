@@ -18,6 +18,7 @@
 #include "Components/InputComponent.h"
 #include "TMBattleHud.h"
 #include "TMVfxStudio.h"
+#include "TMAnimStudio.h"
 #include "TMRobotPlayer.h"
 #include "TMSettings.h"
 #include "NiagaraFunctionLibrary.h"
@@ -53,6 +54,22 @@ void ATMBattleDirector::BeginPlay()
 		if (UWorld* World = GetWorld())
 		{
 			World->SpawnActor<ATMVfxStudio>();
+		}
+		SetActorTickEnabled(false);
+		return;
+	}
+
+	// -tmanimcatalog: the same, for the animation clips the character map
+	// names, filmed on the bodies that wear them (TMAnimStudio.h).
+	if (FParse::Param(FCommandLine::Get(), TEXT("tmanimcatalog")))
+	{
+		LoadCharacterMap();
+		if (UWorld* World = GetWorld())
+		{
+			if (ATMAnimStudio* Studio = World->SpawnActor<ATMAnimStudio>())
+			{
+				Studio->Begin(this);
+			}
 		}
 		SetActorTickEnabled(false);
 		return;
@@ -184,6 +201,12 @@ void ATMBattleDirector::ClearBattle()
 		if (Light) { Light->DestroyComponent(); }
 	}
 	ReadyLights.Reset();
+	for (TObjectPtr<UPointLightComponent>& Light : StatusLights)
+	{
+		if (Light) { Light->DestroyComponent(); }
+	}
+	StatusLights.Reset();
+	ClearBlows();
 	for (TObjectPtr<UTextRenderComponent>& Plate : Plates)
 	{
 		if (Plate) { Plate->DestroyComponent(); }
@@ -378,6 +401,16 @@ void ATMBattleDirector::BuildBattle()
 		Light->SetCastShadows(false);
 		Light->SetVisibility(false);
 		ReadyLights.Add(Light);
+
+		// A second light for what it carries: the glow of a burn, a shield, a freeze.
+		UPointLightComponent* Glow = NewObject<UPointLightComponent>(
+			this, *FString::Printf(TEXT("Status_%d"), Battle.Units[i].Id), RF_Transient);
+		Glow->SetupAttachment(RootComponent);
+		Glow->RegisterComponent();
+		Glow->SetAttenuationRadius(180.0f);
+		Glow->SetCastShadows(false);
+		Glow->SetVisibility(false);
+		StatusLights.Add(Glow);
 	}
 
 	BuildBoard();
@@ -542,7 +575,8 @@ void ATMBattleDirector::RefreshVisuals()
 		}
 		// A body that can fall lies where it fell while it can still be raised.
 		const bool bCanFall = Motions.IsValidIndex(i) && Motions[i].Body && Motions[i].Body->Animations;
-		UnitVisuals[i]->SetVisibility((Unit.IsAlive() || (bCanFall && Unit.IsKo())) && IsSeen(Unit));
+		const bool bStillFalling = Motions.IsValidIndex(i) && Motions[i].HeldBlows > 0;
+		UnitVisuals[i]->SetVisibility((Unit.IsAlive() || bStillFalling || (bCanFall && Unit.IsKo())) && IsSeen(Unit));
 
 		if (ReadyLights.IsValidIndex(i) && ReadyLights[i])
 		{
@@ -698,139 +732,9 @@ void ATMBattleDirector::ShowEvents(const TMSim::FTickReport& Report)
 		return;
 	}
 	AnimateEvents(Report);
-
-	// The particle effect an ability names, if any, played as it goes off: on the
-	// user, on the spot aimed at, or once on each unit it touched. Which units
-	// it touched is read from the events that follow its Resolved, up to the
-	// next one.
-	const TMSim::FAbility* Showing = nullptr;
-	TArray<int32> ShownOn;
-	for (const TMSim::FEvent& Event : Report.Events)
-	{
-		if (Event.Kind == TMSim::EEventKind::Resolved)
-		{
-			Showing = TMSim::FindAbility(Event.Id);
-			ShownOn.Reset();
-			if (Showing && !Showing->VfxSystem.empty())
-			{
-				const TMSim::FUnit* User = Battle.FindUnit(Event.Unit);
-				if (Showing->VfxAt == "user" && User && IsSeen(*User))
-				{
-					PlayVfx(*Showing, WorldFor(*User) + FVector(0.0f, 0.0f, VfxHeight));
-				}
-				else if (Showing->VfxAt == "point")
-				{
-					const int Level = Battle.Map.NodeLevel(TMSim::FMap::NodeOf(Event.Where));
-					PlayVfx(*Showing, WorldFromMetres(Event.Where, Level) + FVector(0.0f, 0.0f, BoardHeight));
-				}
-			}
-		}
-		else if (Showing && Showing->VfxAt == "targets" && !Showing->VfxSystem.empty()
-			&& (Event.Kind == TMSim::EEventKind::Hit || Event.Kind == TMSim::EEventKind::Evaded
-				|| Event.Kind == TMSim::EEventKind::Absorbed || Event.Kind == TMSim::EEventKind::Revived
-				|| Event.Kind == TMSim::EEventKind::StatusApplied)
-			&& !ShownOn.Contains(Event.Unit))
-		{
-			ShownOn.Add(Event.Unit);
-			const TMSim::FUnit* Struck = Battle.FindUnit(Event.Unit);
-			if (Struck && IsSeen(*Struck))
-			{
-				PlayVfx(*Showing, WorldFor(*Struck) + FVector(0.0f, 0.0f, VfxHeight));
-			}
-		}
-
-		FString What;
-		FColor Tint = FColor::White;
-		switch (Event.Kind)
-		{
-		case TMSim::EEventKind::Hit:
-			// Damage has somebody behind it; healing and the ground do not, which
-			// is the difference between a number going down and one going up.
-			if (Event.By >= 0)
-			{
-				What = FString::Printf(TEXT("-%d"), Event.Amount);
-				Tint = FColor(255, 115, 90);
-			}
-			else
-			{
-				What = FString::Printf(TEXT("+%d"), Event.Amount);
-				Tint = FColor(115, 255, 128);
-			}
-			break;
-		case TMSim::EEventKind::Evaded:
-			What = TEXT("miss");
-			Tint = FColor(215, 224, 255);
-			break;
-		case TMSim::EEventKind::Critical:
-			What = TEXT("critical!");
-			Tint = FColor(255, 217, 77);
-			break;
-		case TMSim::EEventKind::Absorbed:
-			What = FString::Printf(TEXT("soaked %d"), Event.Amount);
-			Tint = FColor(153, 217, 255);
-			break;
-		case TMSim::EEventKind::StatusApplied:
-			What = UTF8_TO_TCHAR(Event.Id.c_str());
-			Tint = FColor(224, 153, 255);
-			break;
-		case TMSim::EEventKind::Knocked:
-			What = TEXT("down");
-			Tint = FColor(255, 77, 77);
-			break;
-		case TMSim::EEventKind::Revived:
-			What = TEXT("up again");
-			Tint = FColor(255, 242, 153);
-			break;
-		default:
-			break;
-		}
-		if (What.IsEmpty())
-		{
-			continue;
-		}
-
-		const TMSim::FUnit* Unit = Battle.FindUnit(Event.Unit);
-		// Nothing rises off a unit this side cannot see (battle.gd:450-452).
-		if (!Unit || !IsSeen(*Unit))
-		{
-			continue;
-		}
-		// Above the head, and nudged along by however many are already in flight
-		// for this unit, so two numbers in the same instant do not sit on top of
-		// one another.
-		int32 Stacked = 0;
-		for (const FTMFloater& Other : Floaters)
-		{
-			if (Other.UnitId == Event.Unit)
-			{
-				++Stacked;
-			}
-		}
-		const FVector Where = WorldFor(*Unit)
-			+ FVector(0.0f, 0.0f, 190.0f + Stacked * 26.0f);
-
-		UTextRenderComponent* Text = NewObject<UTextRenderComponent>(this, NAME_None, RF_Transient);
-		Text->SetMobility(EComponentMobility::Movable);
-		Text->SetupAttachment(RootComponent);
-		Text->RegisterComponent();
-		Text->SetText(FText::FromString(What));
-		Text->SetTextRenderColor(Tint);
-		Text->SetWorldSize(FloaterSize);
-		Text->SetHorizontalAlignment(EHTA_Center);
-		Text->SetRelativeLocation(Where);
-		// Facing the camera is a per-frame job; billboarded below in Tick.
-		Floaters.Add({ Text, Event.Unit, 0.0f });
-		++NumbersShown;
-
-		if (Event.Kind == TMSim::EEventKind::Hit && Event.By >= 0)
-		{
-			Flashes.Add({ Event.Unit, 0.0f });
-			// Worth a picture: a timed capture almost never lands on the second
-			// and a half a number is up for, so the interesting frames were all
-			// of eight people standing about.
-			bWorthSeeing = true;
-		}
-	}
+	// What an ability did waits until it lands; the rest shows now
+	// (TMBattleDirectorBlows.cpp).
+	GatherBlows(Report);
 }
 
 void ATMBattleDirector::PlayVfx(const TMSim::FAbility& Ability, const FVector& Where)
@@ -1034,7 +938,7 @@ void ATMBattleDirector::AdvanceFloaters(float DeltaSeconds)
 		}
 		const float Left = 1.0f - Flash.Age / FlashSeconds;
 		Light->SetVisibility(true);
-		Light->SetLightColor(FLinearColor(1.0f, 0.25f, 0.2f));
+		Light->SetLightColor(Flash.Colour);
 		Light->SetIntensity(ReadyLightBrightness * (1.0f + 2.5f * Left));
 	}
 }
@@ -1066,7 +970,7 @@ void ATMBattleDirector::Narrate(const TMSim::FTickReport& Report)
 			// A minus sign for damage and a plus for healing, which is the whole of
 			// what a person needs to read a fight going past.
 			Line = FString::Printf(TEXT("    %s %s%d"), *NameOf(Event.Unit),
-				Event.By >= 0 ? TEXT("-") : TEXT("+"), Event.Amount);
+				Harms(Event) ? TEXT("-") : TEXT("+"), Event.Amount);
 			break;
 		case TMSim::EEventKind::Evaded:
 			Line = FString::Printf(TEXT("    %s evades"), *NameOf(Event.Unit));
@@ -1282,6 +1186,24 @@ void ATMBattleDirector::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
 
+	// An ultimate slows the world for a beat (UltimateBeat). Only the look of it:
+	// the battle's clock below is given real time, so the beat costs nobody a
+	// moment of their turn.
+	float RealDelta = DeltaSeconds;
+	if (GetWorld() && GetWorld()->GetWorldSettings())
+	{
+		const float Dilation = GetWorld()->GetWorldSettings()->GetEffectiveTimeDilation();
+		if (Dilation > 0.01f)
+		{
+			RealDelta = DeltaSeconds / Dilation;
+		}
+		if (SlowUntil > 0.0 && FPlatformTime::Seconds() >= SlowUntil)
+		{
+			SlowUntil = 0.0;
+			UGameplayStatics::SetGlobalTimeDilation(this, 1.0f);
+		}
+	}
+
 	AdvanceFloaters(DeltaSeconds);
 	AdvanceVfx(DeltaSeconds);
 	if (GetWorld() && GetWorld()->IsGameWorld())
@@ -1473,7 +1395,7 @@ void ATMBattleDirector::Tick(float DeltaSeconds)
 	// not a detail: the same battle has to play out the same way on both
 	// machines in an online match, and on a replay.
 	const float SecondsPerTick = 1.0f / static_cast<float>(TMSim::Pace::TicksPerSecond);
-	TickRemainder += DeltaSeconds;
+	TickRemainder += RealDelta;
 	int32 Steps = 0;
 	while (TickRemainder >= SecondsPerTick && Steps < 30)
 	{

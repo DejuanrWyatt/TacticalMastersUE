@@ -12,7 +12,7 @@ Unreal's mannequin, and every animation is authored for it.
   which body each class wears. A class is looked up by its id under `classes`,
   then by its look (`squire`, `knight`, `archer`, `monk`, `black_mage`,
   `white_mage`) under `looks`, then `default`. Today squires, knights and monks
-  wear Manny; archers and mages wear Quinn.
+  wear Manny, archers wear Sparrow (on her own clips), and mages wear Quinn.
 - **Units animate from the battle.** A unit idles when it stands. It walks its
   actual path, and runs if the walk is long. It swings a weapon for a physical
   attack and makes the charged two-handed move for everything else. It flinches
@@ -29,7 +29,49 @@ having only when you want blending, such as a walk that eases into a swing, or
 an upper body that aims while the legs walk. The last section covers that, and
 it's optional.
 
-## Step 1: Paragon heroes, animated (retargeting)
+## The quick way: a Paragon hero on its own clips
+
+Every Paragon hero on Fab ships with its own skeleton **and** a full set of
+clips made for it: idles, jogs, attacks, casts, deaths, stuns, emotes. The
+character map allows one animation set per skeleton, so a hero can be used on
+its own clips with no retargeting at all. That is how Sparrow works today.
+
+Which hero for which look, as a suggestion (how many classes wear it in
+brackets):
+
+| look | hero on Fab | why |
+|---|---|---|
+| `black_mage` (28) | **Paragon: Gideon** | a sorcerer: bolts, a big area cast |
+| `knight` (20) | **Paragon: Greystone** | sword and armour, heavy swings |
+| `squire` (19) | **Paragon: Kwang** | a lighter swordsman |
+| `monk` (11) | **Paragon: Yin** or **Paragon: Crunch** | fists and feet |
+| `white_mage` (5) | **Paragon: Muriel** | a healer and protector |
+| `archer` (8) | Sparrow | already done |
+
+For each hero (your part, in the editor or the Epic launcher):
+
+1. On Fab, find the hero (for example "Paragon: Greystone") and add it to
+   this project. It lands in `Content/ParagonGreystone/`.
+2. Close the editor.
+
+Then one command does the rest (anyone can run it, and it only writes the
+character map, never an asset):
+
+```
+Tools\AddHero.bat /Game/ParagonGreystone/Characters/Heroes/Greystone greystone knight
+```
+
+Leave off `--write` the first time: it lists what it found for each role
+(idle, walk, attacks, deaths, stun, emotes, and each ability motion) without
+writing anything. Add `--write` to put the body and its set in
+`characters.json` and hand it the looks you named. Then run
+`Tools\AnimCatalog.bat` and look at the new body's strips in the class
+creator's Effects tab. The tool guesses by the names Epic gave the clips, so a
+guess can be wrong. The map is plain JSON to correct. The walk and run speeds
+start at Sparrow's; if feet slide on the board, change `walkSpeed` and
+`runSpeed`.
+
+## Step 1 (optional): mannequin clips on a Paragon hero (retargeting)
 
 Sparrow is already in the project, but on Paragon's own skeleton. That's why
 the mannequin's animations can't play on her, and why units stood in a T-pose
@@ -159,6 +201,11 @@ An animation set maps motions to clips under `"motions"`:
 | `windup` | loops for as long as it charges, or while a channel goes on |
 | `castRelease` | a *charged* ability goes off (instead of `release`) |
 
+A motion may also say `"impact": 0.4`: how far into its release the blow
+connects, as a share of the clip. The number, the flinch and the fall wait for
+that moment, or for the arrow, bolt or stone to arrive. Left out, each motion
+has a usual moment (a swing 0.4, a heavy blow 0.5, a shot 0.3).
+
 A set doesn't need every motion. A missing one falls back to a close relative:
 `heavy` to `melee`, `dash` to `heavy` or `melee`, `shoot` and `area` to `bolt`,
 `heal`, `buff` and `revive` to each other and then `bolt`, and `channel` to
@@ -166,6 +213,25 @@ A set doesn't need every motion. A missing one falls back to a close relative:
 set's `attack` clips and anything else uses `cast`. A cast that fizzles stops,
 and the set's first `hit` clip plays. Additive clips are refused here too; the
 log says which.
+
+### Reactions, statuses and moments
+
+A set may also name clips for these, each a clip or a list. All are optional;
+without them the body is still shoved by a blow and glows with its statuses.
+
+| key | when it plays |
+|---|---|
+| `hitFront`, `hitBack`, `hitLeft`, `hitRight` | struck from that side |
+| `hitHeavy` | struck by a critical |
+| `evade`, `block` | dodging, and a shield soaking a blow |
+| `deathFront`, `deathBack`, `deathLeft`, `deathRight` | felled from that side: from the front, it falls over backwards |
+| `stunned`, `sleep` | looped while the status lasts |
+| `ready` | its turn begins (keep it short) |
+| `victory`, `defeat` | the battle is decided |
+| `idles` | `{"shoot": clip, ...}`: a stance for classes whose first ability has that motion |
+
+Film them with `Tools\AnimCatalog.bat` before you trust a name. Mannequin's
+and Sparrow's hit reactions are additive and can't be used here.
 
 ## Step 4 (optional): an Animation Blueprint
 

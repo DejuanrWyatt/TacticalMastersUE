@@ -491,6 +491,7 @@ private:
 	/** The HUD reads the selection, the aim and the log straight from here. */
 	friend class ATMBattleHud;
 	friend class ATMRobotPlayer;
+	friend class ATMAnimStudio;
 
 	/** Something the person should read: why an order was refused, mostly. */
 	void Tell(const FString& What);
@@ -582,6 +583,8 @@ private:
 	{
 		int32 UnitId = -1;
 		float Age = 0.0f;
+		/** Red for a wound, blue for a soak, green for healing, gold for a return. */
+		FLinearColor Colour = FLinearColor(1.0f, 0.25f, 0.2f);
 	};
 
 	UPROPERTY()
@@ -659,6 +662,8 @@ private:
 		UAnimSequence* Intro = nullptr;
 		UAnimSequence* Windup = nullptr;
 		UAnimSequence* CastRelease = nullptr;
+		/** How far into the release the blow lands, as a share of the clip; below zero, the motion's usual. */
+		float Impact = -1.0f;
 	};
 
 	/** One animation set: the clips for one skeleton. */
@@ -676,6 +681,19 @@ private:
 		/** How fast a walk and a run cover the ground, in cm/s, to match the clips. */
 		float WalkSpeed = 170.0f;
 		float RunSpeed = 380.0f;
+		/**
+		 * The clips a set may have for reactions, statuses and moments --
+		 * hitFront, evade, deathBack, stunned, victory and the rest (ExtraKeys) --
+		 * and "idle:<motion>" for an idle that suits a class whose first ability
+		 * has that motion. Every one is optional.
+		 */
+		TMap<FString, TArray<UAnimSequence*>> Extras;
+		/** One of the named extras, or null; with several, Pick chooses among them. */
+		UAnimSequence* Extra(const TCHAR* Key, int32 Pick = 0) const
+		{
+			const TArray<UAnimSequence*>* Found = Extras.Find(Key);
+			return Found && Found->Num() > 0 ? (*Found)[FMath::Abs(Pick) % Found->Num()] : nullptr;
+		}
 	};
 
 	/** A body: a mesh, which way it faces, and the set it animates with. */
@@ -708,7 +726,103 @@ private:
 		bool bDown = false;
 		/** Its ability was charged before it went off, so the charged release plays. */
 		bool bWasCasting = false;
+		/** The release it last began, or will begin when its walk ends. */
+		UAnimSequence* LastRelease = nullptr;
+		/**
+		 * Blows on their way that will knock it down or raise it. Until they
+		 * land it stays as it was, so nobody falls before the arrow reaches them.
+		 */
+		int32 HeldBlows = 0;
+		/** The fall chosen for it by the blow that felled it: backwards when struck from the front. */
+		UAnimSequence* DeathClip = nullptr;
+		/** The last blow landing was a critical one, for a heavier reaction. */
+		bool bCritPending = false;
+		/** A shove from a blow or a dodge: which way, how far, and how long ago. */
+		FVector JoltDir = FVector::ZeroVector;
+		float JoltSize = 0.0f;
+		float JoltAge = -1.0f;
+		/** Seconds on screen, for anything that bobs or pulses. */
+		float Clock = 0.0f;
+		/** A burning unit winces now and then. */
+		float NextWince = 0.0f;
+		/** How fast its clips play: slowed, or frozen still. */
+		float PlayRate = 1.0f;
 	};
+
+	// ------------------------------------------------ how blows land
+	// (TMBattleDirectorBlows.cpp). The rules settle a whole ability in an
+	// instant; the view spreads it out. The numbers, the flinches and the falls
+	// wait for the swing to connect, or for the arrow or bolt to arrive.
+
+	/** Something thrown: an arrow, a bolt of magic, a stone. */
+	struct FTMShot
+	{
+		TWeakObjectPtr<UStaticMeshComponent> Mesh;
+		TWeakObjectPtr<class UPointLightComponent> Glow;
+		FVector From = FVector::ZeroVector;
+		FVector To = FVector::ZeroVector;
+		float Flight = 0.3f;
+		float Arc = 0.0f;
+		float Age = 0.0f;
+	};
+
+	/** One ability that went off, and everything it did, waiting to land. */
+	struct FTMBlow
+	{
+		int32 Caster = -1;
+		const TMSim::FAbility* Ability = nullptr;
+		FString Motion;
+		/** What it did, in the order the rules said, shown when it lands. */
+		TArray<TMSim::FEvent> Events;
+		TMSim::FVec2 Aim;
+		/** The release it waits on, and how long after that begins it connects. */
+		UAnimSequence* Release = nullptr;
+		float ImpactAt = 0.0f;
+		bool bStarted = false;
+		bool bLaunched = false;
+		float Since = 0.0f;
+		float Age = 0.0f;
+		TArray<FTMShot> Shots;
+		/** Units whose fall or rise waits for this. */
+		TArray<int32> Held;
+	};
+	TArray<FTMBlow> Blows;
+
+	/** The reactions, statuses and moments a set may name clips for. */
+	static const TArray<FString>& ExtraKeys();
+	/** Whether a Hit took health away: damage, a burn, a bleed. */
+	static bool Harms(const TMSim::FEvent& Event);
+	/** Sorts a report's events into blows to land later and the rest to show now. */
+	void GatherBlows(const TMSim::FTickReport& Report);
+	void AdvanceBlows(float DeltaSeconds);
+	void LaunchShots(FTMBlow& Blow);
+	void LandBlow(FTMBlow& Blow);
+	void ClearBlows();
+	/** One event made visible: its number, its light, its effect, the body's reaction. */
+	void ShowOne(const TMSim::FEvent& Event, const TMSim::FAbility* Ability, int32 CasterId, TArray<int32>* ShownOn);
+	void React(const TMSim::FEvent& Event, int32 CasterId);
+	void Jolt(int32 Index, const FVector& Dir, float Size);
+	void AddFloater(int32 UnitId, const FString& What, const FColor& Tint, bool bCount = true);
+	/** Front, back, left or right of a unit, as seen from a point. */
+	FString SideOf(int32 Index, const FVector& From) const;
+	/** Glows, bobbing, slowing and freezing, from the statuses a unit carries. */
+	void ShowStatuses(int32 Index, float DeltaSeconds);
+	/** An ultimate: the world slows for a beat, and its name rises in gold. */
+	void UltimateBeat(const TMSim::FEvent& Event);
+	/** The battle is decided and every blow has landed: the winners celebrate. */
+	void Celebrate();
+	bool bCelebrated = false;
+	/** When the slow beat of an ultimate ends, in platform seconds; 0 when none. */
+	double SlowUntil = 0.0;
+
+	UPROPERTY()
+	TArray<TObjectPtr<class UPointLightComponent>> StatusLights;
+	UPROPERTY()
+	TObjectPtr<UStaticMesh> ShotSphere = nullptr;
+	UPROPERTY()
+	TObjectPtr<UStaticMesh> ShotRod = nullptr;
+	UPROPERTY()
+	TObjectPtr<class UMaterialInterface> ShotMaterial = nullptr;
 
 	/** A motion's clips in this set, or the nearest motion it has (heavy to melee, area to bolt...). */
 	static const FTMMotionClips* FindMotion(const FTMAnimSet& Set, const FString& Motion);
