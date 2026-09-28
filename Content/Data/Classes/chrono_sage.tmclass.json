@@ -1,0 +1,176 @@
+{
+  "format": "tactical-masters-class",
+  "version": 1,
+  "id": "chrono_sage",
+  "name": "Chrono Sage",
+  "color": "#d6c27a",
+  "look": "white_mage",
+  "roles": [
+    "support",
+    "special"
+  ],
+  "stats": {
+    "hp": 58,
+    "attdef": 5,
+    "magdef": 12,
+    "aeva": 6,
+    "meva": 14,
+    "crit": 6,
+    "speed": 11,
+    "move": 6,
+    "patience": 9,
+    "sight": 11
+  },
+  "abilities": [
+    {
+      "id": "chrono_sage_tick_bolt",
+      "name": "Tick Bolt",
+      "desc": "A bolt at an enemy 1-7 m away that sets its Turn Gauge back 15%.",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "mag",
+      "target": "enemy",
+      "shape": "unit",
+      "power": 23,
+      "min_range": 1,
+      "max_range": 7,
+      "aoe": 0,
+      "cooldown": 0,
+      "cast": 0,
+      "tg": -15,
+      "fx": "pin_shot"
+    },
+    {
+      "id": "chrono_sage_quicken",
+      "name": "Quicken",
+      "desc": "An ally up to 6 m away strides for 2 turns (walks half again as far) and its Turn Gauge jumps 25%.",
+      "kind": "active",
+      "effect": "support",
+      "scale": "mag",
+      "target": "ally",
+      "shape": "unit",
+      "power": 0,
+      "min_range": 0,
+      "max_range": 6,
+      "aoe": 0,
+      "cooldown": 2,
+      "cast": 0,
+      "tg": 15,
+      "status": {
+        "id": "stride",
+        "turns": 2
+      },
+      "fx": "haste"
+    },
+    {
+      "id": "chrono_sage_borrowed_time",
+      "name": "Borrowed Time",
+      "desc": "An ally up to 6 m away is Relentless: when its turn ends, it takes another. (1 s)",
+      "kind": "active",
+      "effect": "support",
+      "scale": "mag",
+      "target": "ally",
+      "shape": "unit",
+      "power": 0,
+      "min_range": 0,
+      "max_range": 6,
+      "aoe": 0,
+      "cooldown": 6,
+      "cast": 2,
+      "status": {
+        "id": "relentless",
+        "turns": 1
+      },
+      "fx": "focus"
+    },
+    {
+      "id": "chrono_sage_stasis_field",
+      "name": "Stasis Field",
+      "desc": "ULTIMATE: Every enemy on the field has its Turn Gauge set back 35% and is slowed for 2 turns. (3 s)",
+      "kind": "active",
+      "effect": "support",
+      "scale": "mag",
+      "target": "enemy",
+      "shape": "global",
+      "power": 0,
+      "min_range": 0,
+      "max_range": 0,
+      "aoe": 0,
+      "cooldown": 0,
+      "cast": 3,
+      "tg": -25,
+      "status": {
+        "id": "slow",
+        "turns": 2
+      },
+      "fx": "blizzard"
+    }
+  ],
+  "creator": {
+    "description": "Time is its only weapon. It hands allies a second turn, lets them outrun the clock, and at the last stops the whole enemy side in its tracks.",
+    "damageTypes": [
+      "lightning"
+    ],
+    "icons": {
+      "class": {
+        "backing": "hex",
+        "glyph": "hourglass",
+        "colour": "#f2d24b",
+        "style": "light",
+        "mark": "none",
+        "scale": 1,
+        "rotate": 0
+      },
+      "abilities": [
+        {
+          "backing": "circle",
+          "glyph": "damage",
+          "colour": "#f2d24b",
+          "style": "light",
+          "mark": "none",
+          "scale": 1,
+          "rotate": 0
+        },
+        {
+          "backing": "circle",
+          "glyph": "buff",
+          "colour": "#f2d24b",
+          "style": "light",
+          "mark": "none",
+          "scale": 1,
+          "rotate": 0
+        },
+        {
+          "backing": "circle",
+          "glyph": "hourglass",
+          "colour": "#77dba0",
+          "style": "light",
+          "mark": "none",
+          "scale": 1,
+          "rotate": 0
+        },
+        {
+          "backing": "hex",
+          "glyph": "spiral",
+          "colour": "#f2d24b",
+          "style": "light",
+          "mark": "none",
+          "scale": 1,
+          "rotate": 0
+        }
+      ]
+    },
+    "measured": {
+      "margin": -11.7,
+      "win": 41,
+      "games": 64,
+      "uses": [
+        220,
+        173,
+        49,
+        74
+      ],
+      "against": "reference team, medium"
+    }
+  }
+}

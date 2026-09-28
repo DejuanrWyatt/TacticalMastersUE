@@ -1,0 +1,179 @@
+{
+  "format": "tactical-masters-class",
+  "version": 1,
+  "id": "grave_warden",
+  "name": "Grave Warden",
+  "color": "#6b7d8f",
+  "look": "black_mage",
+  "roles": [
+    "special"
+  ],
+  "stats": {
+    "hp": 74,
+    "attdef": 5,
+    "magdef": 13,
+    "aeva": 8,
+    "meva": 14,
+    "crit": 8,
+    "speed": 8,
+    "move": 5,
+    "patience": 9,
+    "sight": 11
+  },
+  "abilities": [
+    {
+      "id": "grave_warden_grave_bolt",
+      "name": "Grave Bolt",
+      "desc": "A cold bolt at an enemy 1-7 m away.",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "mag",
+      "target": "enemy",
+      "shape": "unit",
+      "power": 38,
+      "min_range": 1,
+      "max_range": 7,
+      "aoe": 0,
+      "cooldown": 0,
+      "cast": 0,
+      "fx": "pin_shot"
+    },
+    {
+      "id": "grave_warden_rend_soul",
+      "name": "Rend Soul",
+      "desc": "Tears at an enemy 2-7 m away: AttDef and MagDef cut to 60% for 2 turns.",
+      "kind": "active",
+      "effect": "support",
+      "scale": "mag",
+      "target": "enemy",
+      "shape": "unit",
+      "power": 0,
+      "min_range": 2,
+      "max_range": 7,
+      "aoe": 0,
+      "cooldown": 3,
+      "cast": 0,
+      "status": {
+        "id": "shred",
+        "turns": 2
+      },
+      "fx": "pin_shot"
+    },
+    {
+      "id": "grave_warden_deathless",
+      "name": "Deathless",
+      "desc": "Always on: M-Eva +8 and MagDef +2. Death has already looked at it once.",
+      "kind": "passive",
+      "effect": "support",
+      "scale": "mag",
+      "target": "ally",
+      "shape": "self",
+      "power": 0,
+      "min_range": 0,
+      "max_range": 0,
+      "aoe": 0,
+      "cooldown": 0,
+      "cast": 0,
+      "buffs": [
+        {
+          "stat": "meva",
+          "amount": 8,
+          "turns": 1
+        },
+        {
+          "stat": "magdef",
+          "amount": 2,
+          "turns": 1
+        }
+      ]
+    },
+    {
+      "id": "grave_warden_death_knell",
+      "name": "Death Knell",
+      "desc": "ULTIMATE: Tolls for an enemy 2-8 m away. When 3 of its turns have passed it falls, whatever its health. (2.5 s)",
+      "kind": "active",
+      "effect": "support",
+      "scale": "mag",
+      "target": "enemy",
+      "shape": "unit",
+      "power": 0,
+      "min_range": 2,
+      "max_range": 8,
+      "aoe": 0,
+      "cooldown": 0,
+      "cast": 2.5,
+      "status": {
+        "id": "doom",
+        "turns": 3
+      },
+      "fx": "meteor"
+    }
+  ],
+  "creator": {
+    "description": "A keeper of the dead who needs no strength of arm: it marks a foe, and time does the rest. Its Death Knell fells anyone still standing three turns later, unless an ally clears it with Immunity.",
+    "damageTypes": [
+      "shadow"
+    ],
+    "icons": {
+      "class": {
+        "backing": "shield",
+        "glyph": "skull",
+        "colour": "#8fa3b8",
+        "style": "light",
+        "mark": "none",
+        "scale": 1,
+        "rotate": 0
+      },
+      "abilities": [
+        {
+          "backing": "circle",
+          "glyph": "moon",
+          "colour": "#9a7ad6",
+          "style": "light",
+          "mark": "none",
+          "scale": 1,
+          "rotate": 0
+        },
+        {
+          "backing": "circle",
+          "glyph": "debuff",
+          "colour": "#9a7ad6",
+          "style": "light",
+          "mark": "none",
+          "scale": 1,
+          "rotate": 0
+        },
+        {
+          "backing": "none",
+          "glyph": "eye",
+          "colour": "#9a7ad6",
+          "style": "light",
+          "mark": "none",
+          "scale": 1,
+          "rotate": 0
+        },
+        {
+          "backing": "hex",
+          "glyph": "skull",
+          "colour": "#b48cff",
+          "style": "light",
+          "mark": "none",
+          "scale": 1,
+          "rotate": 0
+        }
+      ]
+    },
+    "measured": {
+      "margin": -32.9,
+      "win": 28,
+      "games": 64,
+      "uses": [
+        168,
+        84,
+        0,
+        46
+      ],
+      "against": "reference team, medium"
+    }
+  }
+}

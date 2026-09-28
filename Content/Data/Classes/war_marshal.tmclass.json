@@ -1,0 +1,195 @@
+{
+  "format": "tactical-masters-class",
+  "version": 1,
+  "id": "war_marshal",
+  "name": "War Marshal",
+  "color": "#c96a4a",
+  "look": "knight",
+  "roles": [
+    "tank",
+    "support"
+  ],
+  "stats": {
+    "hp": 112,
+    "attdef": 12,
+    "magdef": 8,
+    "aeva": 5,
+    "meva": 6,
+    "crit": 6,
+    "speed": 7,
+    "move": 6,
+    "patience": 9,
+    "sight": 10
+  },
+  "abilities": [
+    {
+      "id": "war_marshal_cleave",
+      "name": "Cleave",
+      "desc": "A heavy cut at arm's length.",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "att",
+      "target": "enemy",
+      "shape": "unit",
+      "power": 38,
+      "min_range": 0,
+      "max_range": 1.8,
+      "aoe": 0,
+      "cooldown": 0,
+      "cast": 0,
+      "fx": "brave_slash"
+    },
+    {
+      "id": "war_marshal_shield_slam",
+      "name": "Shield Slam",
+      "desc": "Slams an enemy at arm's length to the ground: next turn it may walk or act, not both.",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "att",
+      "target": "enemy",
+      "shape": "unit",
+      "power": 26,
+      "min_range": 0,
+      "max_range": 1.8,
+      "aoe": 0,
+      "cooldown": 2,
+      "cast": 0,
+      "status": {
+        "id": "knockdown",
+        "turns": 1
+      },
+      "fx": "shield_bash"
+    },
+    {
+      "id": "war_marshal_battle_standard",
+      "name": "Battle Standard",
+      "desc": "Always on for the Marshal: Patience +3, AttDef +4, Speed +1. Planted: every ally within 3 m gains the same for 2 turns.",
+      "kind": "active_passive",
+      "effect": "support",
+      "scale": "mag",
+      "target": "ally",
+      "shape": "circle",
+      "power": 0,
+      "min_range": 0,
+      "max_range": 0,
+      "aoe": 3,
+      "cooldown": 3,
+      "cast": 0,
+      "buffs": [
+        {
+          "stat": "patience",
+          "amount": 3,
+          "turns": 2
+        },
+        {
+          "stat": "attdef",
+          "amount": 4,
+          "turns": 2
+        },
+        {
+          "stat": "speed",
+          "amount": 1,
+          "turns": 2
+        }
+      ],
+      "fx": "guard"
+    },
+    {
+      "id": "war_marshal_rally_the_line",
+      "name": "Rally the Line",
+      "desc": "ULTIMATE: Every ally on the field gains Patience +4 and Speed +2 for 3 turns, and its Turn Gauge jumps 20%.",
+      "kind": "active",
+      "effect": "support",
+      "scale": "mag",
+      "target": "ally",
+      "shape": "global",
+      "power": 0,
+      "min_range": 0,
+      "max_range": 0,
+      "aoe": 0,
+      "cooldown": 0,
+      "cast": 0,
+      "tg": 20,
+      "buffs": [
+        {
+          "stat": "patience",
+          "amount": 4,
+          "turns": 3
+        },
+        {
+          "stat": "speed",
+          "amount": 2,
+          "turns": 3
+        }
+      ],
+      "fx": "haste"
+    }
+  ],
+  "creator": {
+    "description": "A commander in the line. Its standard steadies everyone near it, its shield puts foes on the ground, and one shout hurries the whole army.",
+    "damageTypes": [
+      "physical"
+    ],
+    "icons": {
+      "class": {
+        "backing": "shield",
+        "glyph": "crown",
+        "colour": "#e0625a",
+        "style": "light",
+        "mark": "none",
+        "scale": 1,
+        "rotate": 0
+      },
+      "abilities": [
+        {
+          "backing": "circle",
+          "glyph": "axe",
+          "colour": "#c9ced9",
+          "style": "light",
+          "mark": "none",
+          "scale": 1,
+          "rotate": 0
+        },
+        {
+          "backing": "circle",
+          "glyph": "hammer",
+          "colour": "#c9ced9",
+          "style": "light",
+          "mark": "none",
+          "scale": 1,
+          "rotate": 0
+        },
+        {
+          "backing": "square",
+          "glyph": "crown",
+          "colour": "#f2d24b",
+          "style": "light",
+          "mark": "none",
+          "scale": 1,
+          "rotate": 0
+        },
+        {
+          "backing": "hex",
+          "glyph": "crown",
+          "colour": "#f2d24b",
+          "style": "light",
+          "mark": "none",
+          "scale": 1,
+          "rotate": 0
+        }
+      ]
+    },
+    "measured": {
+      "margin": -38.1,
+      "win": 27,
+      "games": 64,
+      "uses": [
+        95,
+        98,
+        98,
+        58
+      ],
+      "against": "reference team, medium"
+    }
+  }
+}

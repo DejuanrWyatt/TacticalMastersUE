@@ -1,0 +1,172 @@
+{
+  "format": "tactical-masters-class",
+  "version": 1,
+  "id": "null_monk",
+  "name": "Null Monk",
+  "color": "#b7a3d6",
+  "look": "monk",
+  "roles": [
+    "special"
+  ],
+  "stats": {
+    "hp": 70,
+    "attdef": 8,
+    "magdef": 10,
+    "aeva": 14,
+    "meva": 12,
+    "crit": 10,
+    "speed": 11,
+    "move": 7,
+    "patience": 6,
+    "sight": 9
+  },
+  "abilities": [
+    {
+      "id": "null_monk_palm_strike",
+      "name": "Palm Strike",
+      "desc": "An open-palm blow at arm's length.",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "att",
+      "target": "enemy",
+      "shape": "unit",
+      "power": 26,
+      "min_range": 0,
+      "max_range": 1.8,
+      "aoe": 0,
+      "cooldown": 0,
+      "cast": 0,
+      "fx": "punch"
+    },
+    {
+      "id": "null_monk_hush",
+      "name": "Hush",
+      "desc": "Silences an enemy 1-6 m away for 2 turns: no abilities but its plain attack.",
+      "kind": "active",
+      "effect": "support",
+      "scale": "mag",
+      "target": "enemy",
+      "shape": "unit",
+      "power": 0,
+      "min_range": 1,
+      "max_range": 6,
+      "aoe": 0,
+      "cooldown": 4,
+      "cast": 0,
+      "status": {
+        "id": "silence",
+        "turns": 2
+      },
+      "fx": "chakra"
+    },
+    {
+      "id": "null_monk_null_ward",
+      "name": "Null Ward",
+      "desc": "An ally up to 5 m away is cleansed of every harmful status and turns new ones away for 2 turns.",
+      "kind": "active",
+      "effect": "support",
+      "scale": "mag",
+      "target": "ally",
+      "shape": "unit",
+      "power": 0,
+      "min_range": 0,
+      "max_range": 5,
+      "aoe": 0,
+      "cooldown": 4,
+      "cast": 0,
+      "status": {
+        "id": "immunity",
+        "turns": 2
+      },
+      "fx": "chakra"
+    },
+    {
+      "id": "null_monk_void_mantra",
+      "name": "Void Mantra",
+      "desc": "ULTIMATE: Every enemy within 3.5 m of the monk is struck and silenced for 2 turns.",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "mag",
+      "target": "enemy",
+      "shape": "circle",
+      "power": 32,
+      "min_range": 0,
+      "max_range": 0,
+      "aoe": 3.5,
+      "cooldown": 0,
+      "cast": 0,
+      "status": {
+        "id": "silence",
+        "turns": 2
+      },
+      "fx": "wave_fist"
+    }
+  ],
+  "creator": {
+    "description": "A monk who fights the spell, not the caster. It strikes casters dumb, and wipes a friend clean of every curse -- Doom included.",
+    "damageTypes": [
+      "holy"
+    ],
+    "icons": {
+      "class": {
+        "backing": "circle",
+        "glyph": "fist",
+        "colour": "#d8c8f0",
+        "style": "light",
+        "mark": "none",
+        "scale": 1,
+        "rotate": 0
+      },
+      "abilities": [
+        {
+          "backing": "circle",
+          "glyph": "fist",
+          "colour": "#c9ced9",
+          "style": "light",
+          "mark": "none",
+          "scale": 1,
+          "rotate": 0
+        },
+        {
+          "backing": "circle",
+          "glyph": "note",
+          "colour": "#b98adf",
+          "style": "light",
+          "mark": "none",
+          "scale": 1,
+          "rotate": 20
+        },
+        {
+          "backing": "circle",
+          "glyph": "sun",
+          "colour": "#f4e2a0",
+          "style": "light",
+          "mark": "none",
+          "scale": 1,
+          "rotate": 0
+        },
+        {
+          "backing": "hex",
+          "glyph": "spiral",
+          "colour": "#b98adf",
+          "style": "light",
+          "mark": "none",
+          "scale": 1,
+          "rotate": 0
+        }
+      ]
+    },
+    "measured": {
+      "margin": -5.5,
+      "win": 47,
+      "games": 64,
+      "uses": [
+        235,
+        118,
+        110,
+        98
+      ],
+      "against": "reference team, medium"
+    }
+  }
+}

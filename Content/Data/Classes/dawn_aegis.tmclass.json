@@ -1,0 +1,168 @@
+{
+  "format": "tactical-masters-class",
+  "version": 1,
+  "id": "dawn_aegis",
+  "name": "Dawn Aegis",
+  "color": "#f0d890",
+  "look": "white_mage",
+  "roles": [
+    "support"
+  ],
+  "stats": {
+    "hp": 74,
+    "attdef": 7,
+    "magdef": 13,
+    "aeva": 5,
+    "meva": 14,
+    "crit": 5,
+    "speed": 8,
+    "move": 6,
+    "patience": 9,
+    "sight": 10
+  },
+  "abilities": [
+    {
+      "id": "dawn_aegis_radiant_lance",
+      "name": "Radiant Lance",
+      "desc": "A lance of light at an enemy 1-6 m away.",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "mag",
+      "target": "enemy",
+      "shape": "unit",
+      "power": 32,
+      "min_range": 1,
+      "max_range": 6,
+      "aoe": 0,
+      "cooldown": 0,
+      "cast": 0,
+      "fx": "holy_blade"
+    },
+    {
+      "id": "dawn_aegis_sun_shield",
+      "name": "Sun Shield",
+      "desc": "A shield on an ally up to 6 m away that soaks 35 damage, for 2 turns.",
+      "kind": "active",
+      "effect": "support",
+      "scale": "mag",
+      "target": "ally",
+      "shape": "unit",
+      "power": 35,
+      "min_range": 0,
+      "max_range": 6,
+      "aoe": 0,
+      "cooldown": 2,
+      "cast": 0,
+      "status": {
+        "id": "shield",
+        "turns": 2
+      },
+      "fx": "guard"
+    },
+    {
+      "id": "dawn_aegis_dawnlight",
+      "name": "Dawnlight",
+      "desc": "Heals every ally within 2.5 m of a point up to 6 m away for 26.",
+      "kind": "active",
+      "effect": "heal",
+      "scale": "mag",
+      "target": "ally",
+      "shape": "circle",
+      "power": 30,
+      "min_range": 0,
+      "max_range": 6,
+      "aoe": 2.5,
+      "cooldown": 2,
+      "cast": 0,
+      "fx": "sanctuary"
+    },
+    {
+      "id": "dawn_aegis_aegis_of_dawn",
+      "name": "Aegis of Dawn",
+      "desc": "ULTIMATE: An ally up to 7 m away takes no damage at all for 2 turns. (1 s)",
+      "kind": "active",
+      "effect": "support",
+      "scale": "mag",
+      "target": "ally",
+      "shape": "unit",
+      "power": 0,
+      "min_range": 0,
+      "max_range": 7,
+      "aoe": 0,
+      "cooldown": 0,
+      "cast": 1,
+      "status": {
+        "id": "invuln",
+        "turns": 2
+      },
+      "fx": "holy_blade"
+    }
+  ],
+  "creator": {
+    "description": "A guardian of the morning. Shields, light that mends, and once a fight an Aegis under which a friend cannot be hurt at all.",
+    "damageTypes": [
+      "holy"
+    ],
+    "icons": {
+      "class": {
+        "backing": "shield",
+        "glyph": "sun",
+        "colour": "#f4e2a0",
+        "style": "light",
+        "mark": "none",
+        "scale": 1,
+        "rotate": 0
+      },
+      "abilities": [
+        {
+          "backing": "circle",
+          "glyph": "sun",
+          "colour": "#f4e2a0",
+          "style": "light",
+          "mark": "none",
+          "scale": 1,
+          "rotate": 0
+        },
+        {
+          "backing": "circle",
+          "glyph": "shield",
+          "colour": "#f4e2a0",
+          "style": "light",
+          "mark": "none",
+          "scale": 1,
+          "rotate": 0
+        },
+        {
+          "backing": "circle",
+          "glyph": "heal",
+          "colour": "#77dba0",
+          "style": "light",
+          "mark": "circle",
+          "scale": 1,
+          "rotate": 0
+        },
+        {
+          "backing": "hex",
+          "glyph": "crown",
+          "colour": "#fff2c0",
+          "style": "light",
+          "mark": "none",
+          "scale": 1,
+          "rotate": 0
+        }
+      ]
+    },
+    "measured": {
+      "margin": -39.1,
+      "win": 22,
+      "games": 64,
+      "uses": [
+        190,
+        181,
+        190,
+        18
+      ],
+      "against": "reference team, medium"
+    }
+  }
+}

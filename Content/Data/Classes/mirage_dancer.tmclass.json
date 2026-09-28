@@ -1,0 +1,181 @@
+{
+  "format": "tactical-masters-class",
+  "version": 1,
+  "id": "mirage_dancer",
+  "name": "Mirage Dancer",
+  "color": "#e0a560",
+  "look": "monk",
+  "roles": [
+    "damage"
+  ],
+  "stats": {
+    "hp": 72,
+    "attdef": 6,
+    "magdef": 7,
+    "aeva": 20,
+    "meva": 10,
+    "crit": 16,
+    "speed": 12,
+    "move": 8,
+    "patience": 5,
+    "sight": 10
+  },
+  "abilities": [
+    {
+      "id": "mirage_dancer_twin_fans",
+      "name": "Twin Fans",
+      "desc": "Two quick cuts at arm's length.",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "att",
+      "target": "enemy",
+      "shape": "unit",
+      "power": 34,
+      "min_range": 0,
+      "max_range": 1.8,
+      "aoe": 0,
+      "cooldown": 0,
+      "cast": 0,
+      "fx": "attack"
+    },
+    {
+      "id": "mirage_dancer_sand_veil",
+      "name": "Sand Veil",
+      "desc": "Wraps itself in blowing sand for 2 turns: A-Eva +15, M-Eva +10.",
+      "kind": "active",
+      "effect": "support",
+      "scale": "mag",
+      "target": "ally",
+      "shape": "self",
+      "power": 0,
+      "min_range": 0,
+      "max_range": 0,
+      "aoe": 0,
+      "cooldown": 3,
+      "cast": 0,
+      "buffs": [
+        {
+          "stat": "aeva",
+          "amount": 15,
+          "turns": 2
+        },
+        {
+          "stat": "meva",
+          "amount": 10,
+          "turns": 2
+        }
+      ],
+      "fx": "focus"
+    },
+    {
+      "id": "mirage_dancer_sirocco",
+      "name": "Sirocco",
+      "desc": "A blast of sand in a 70-degree cone 5 m ahead: struck and blinded for 2 turns (its attacks miss 25% more).",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "mag",
+      "target": "enemy",
+      "shape": "cone",
+      "power": 27,
+      "min_range": 0,
+      "max_range": 5,
+      "aoe": 0,
+      "angle": 70,
+      "cooldown": 3,
+      "cast": 0,
+      "status": {
+        "id": "blind",
+        "turns": 2
+      },
+      "fx": "earth_slash"
+    },
+    {
+      "id": "mirage_dancer_thousand_veils",
+      "name": "Thousand Veils",
+      "desc": "ULTIMATE: Everyone within 2.5 m is cut and blinded for 2 turns.",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "att",
+      "target": "enemy",
+      "shape": "circle",
+      "power": 48,
+      "min_range": 0,
+      "max_range": 0,
+      "aoe": 2.5,
+      "cooldown": 0,
+      "cast": 0,
+      "status": {
+        "id": "blind",
+        "turns": 2
+      },
+      "fx": "brave_slash"
+    }
+  ],
+  "creator": {
+    "description": "Never where the blade lands. It veils itself in sand and blinds whole ranks, so the enemy swings at shadows while it cuts.",
+    "damageTypes": [
+      "earth"
+    ],
+    "icons": {
+      "class": {
+        "backing": "diamond",
+        "glyph": "swirl",
+        "colour": "#e0a560",
+        "style": "light",
+        "mark": "none",
+        "scale": 1,
+        "rotate": 0
+      },
+      "abilities": [
+        {
+          "backing": "circle",
+          "glyph": "dagger",
+          "colour": "#e0a560",
+          "style": "light",
+          "mark": "none",
+          "scale": 1,
+          "rotate": 0
+        },
+        {
+          "backing": "circle",
+          "glyph": "swirl",
+          "colour": "#e0a560",
+          "style": "light",
+          "mark": "none",
+          "scale": 1,
+          "rotate": 0
+        },
+        {
+          "backing": "circle",
+          "glyph": "eye",
+          "colour": "#a98a5f",
+          "style": "light",
+          "mark": "cone",
+          "scale": 1,
+          "rotate": 0
+        },
+        {
+          "backing": "hex",
+          "glyph": "burst",
+          "colour": "#e0a560",
+          "style": "light",
+          "mark": "none",
+          "scale": 1,
+          "rotate": 0
+        }
+      ]
+    },
+    "measured": {
+      "margin": 5.5,
+      "win": 49,
+      "games": 64,
+      "uses": [
+        230,
+        164,
+        128,
+        88
+      ],
+      "against": "reference team, medium"
+    }
+  }
+}
