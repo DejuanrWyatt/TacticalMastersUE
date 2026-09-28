@@ -83,6 +83,54 @@ Everything is built from the engine's basic shapes and material, so a theme
 needs no editor work. Real meshes from Fab (the Paragon Agora and Monolith
 environment, say) can replace the shapes later without changing the files.
 
+## Real meshes from Fab: a theme's kit
+
+A theme can name a **kit**: meshes to build with instead of the basic shapes.
+
+```json
+"kit": {
+  "top": ["/Game/Pack/Meshes/SM_Floor_01.SM_Floor_01"],
+  "rock": ["/Game/Pack/Meshes/SM_Pillar_01.SM_Pillar_01", "..."],
+  "tree": ["/Game/Pack/Meshes/SM_Tree_01.SM_Tree_01"],
+  "boulder": ["/Game/Pack/Meshes/SM_Rock_03.SM_Rock_03"],
+  "rockFill": 0.9, "treeHeight": 6, "boulderSize": 2
+}
+```
+
+- **top**: the walkable ground's surface, stretched to exactly a tile. The
+  painted slab under it stays, hidden, because it is what a click on the board
+  finds. Embers and springs keep their own look.
+- **rock**: what stands on a rock tile, scaled to fill `rockFill` of the tile
+  and never shorter than 1.8 m, so it always reads as cover.
+- **tree**, **boulder**: what stands around the board, `treeHeight` and
+  `boulderSize` metres.
+
+Each piece is fitted by the mesh's own size and stood on its own base,
+wherever its pivot is, and turned at random. A list gives variety: one is
+picked per piece. A mesh that is not in the project is said once in the log,
+and the basic shape stands in for it. The cliff faces and the land around stay
+painted in the theme's colours.
+
+**Your part: getting a pack.** Downloads are yours (editor work is human-only
+here). Good free starting points:
+
+| pack on Fab | what it gives | theme to start from |
+|---|---|---|
+| **Paragon: Agora and Monolith Environment** (Epic) | stone arena pieces: floors, pillars, ruins, rocks | `ruined_keep` |
+| any free nature pack with trees and rocks (search Fab with the Free filter; Fab's limited-time-free rotation changes every two weeks) | trees, bushes, boulders | `meadow` or `winter` |
+
+Then, with the editor closed:
+
+1. Add the pack to this project from Fab. Note its folder under Content, e.g.
+   `Content/ParagonAgora`.
+2. See what the tool finds, writing nothing:
+   `Tools\AddKit.bat /Game/ParagonAgora agora --base ruined_keep --name "Agora"`
+   It lists the meshes it would use for each part, chosen by their names
+   (Floor, Pillar, Rock, Tree...) and shapes (floors are flat, cover is tall).
+3. Add `--write` to write `Content/Data/Themes/agora.theme.json`.
+4. Play a battle in it: Theme on the setup screen, or `-tmtheme=agora`.
+   A guess by name can be wrong; the theme is plain JSON to correct.
+
 ## Making maps: the map maker
 
 The class creator (`E:\TacticsClassCreator`) has a map maker: **Map maker** in

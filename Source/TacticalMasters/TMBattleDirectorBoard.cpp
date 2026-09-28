@@ -165,6 +165,26 @@ void ATMBattleDirector::LoadThemes()
 		Theme.FogDensity = Number(Fog, TEXT("density"), Theme.FogDensity);
 		Theme.FogColour = Hex(Fog, TEXT("colour"), Theme.FogColour);
 
+		const TSharedPtr<FJsonObject> Kit = Part(TEXT("kit"));
+		auto Paths = [&Kit](const TCHAR* Key, TArray<FString>& Into)
+		{
+			const TArray<TSharedPtr<FJsonValue>>* List = nullptr;
+			if (Kit.IsValid() && Kit->TryGetArrayField(Key, List))
+			{
+				for (const TSharedPtr<FJsonValue>& Item : *List)
+				{
+					Into.Add(Item->AsString());
+				}
+			}
+		};
+		Paths(TEXT("top"), Theme.KitTop);
+		Paths(TEXT("rock"), Theme.KitRock);
+		Paths(TEXT("tree"), Theme.KitTree);
+		Paths(TEXT("boulder"), Theme.KitBoulder);
+		Theme.KitRockFill = Number(Kit, TEXT("rockFill"), Theme.KitRockFill);
+		Theme.KitTreeHeight = Number(Kit, TEXT("treeHeight"), Theme.KitTreeHeight);
+		Theme.KitBoulderSize = Number(Kit, TEXT("boulderSize"), Theme.KitBoulderSize);
+
 		ThemeIds.Add(Theme.Id);
 		Themes.Add(Theme.Id, Theme);
 	}
@@ -228,6 +248,57 @@ UStaticMeshComponent* ATMBattleDirector::Shape(const TCHAR* Name, const FVector&
 	return Part;
 }
 
+UStaticMeshComponent* ATMBattleDirector::KitPiece(const FString& Path, const FVector& Foot, float Footprint, float Height, float Yaw, bool bStretch, float MinHeight)
+{
+	TObjectPtr<UStaticMesh>* Known = KitMeshes.Find(Path);
+	if (!Known)
+	{
+		UStaticMesh* Loaded = LoadObject<UStaticMesh>(nullptr, *Path, nullptr, LOAD_NoWarn | LOAD_Quiet);
+		if (!Loaded)
+		{
+			UE_LOG(LogTemp, Warning, TEXT("theme kit: no mesh at %s; the basic shape stands in"), *Path);
+		}
+		Known = &KitMeshes.Add(Path, Loaded);
+	}
+	UStaticMesh* Mesh = *Known;
+	if (!Mesh)
+	{
+		return nullptr;
+	}
+	const FBox Bounds = Mesh->GetBoundingBox();
+	const FVector Size = Bounds.GetSize().ComponentMax(FVector(1.0));
+	FVector Scale;
+	if (bStretch)
+	{
+		// Floor pieces: exactly a tile across, and as thick as asked.
+		Scale = FVector(Footprint / Size.X, Footprint / Size.Y, Height > 0.0f ? Height / Size.Z : (Footprint / Size.X + Footprint / Size.Y) * 0.5);
+	}
+	else
+	{
+		double Uniform = Height > 0.0f ? Height / Size.Z : Footprint / FMath::Max(Size.X, Size.Y);
+		// Cover has to look like cover: never shorter than asked.
+		if (MinHeight > 0.0f && Size.Z * Uniform < MinHeight)
+		{
+			Uniform = MinHeight / Size.Z;
+		}
+		Scale = FVector(Uniform);
+	}
+	// Stood on its bottom middle, wherever the mesh's own pivot is.
+	const FRotator Turn(0.0f, Yaw, 0.0f);
+	const FVector Pivot(Bounds.GetCenter().X, Bounds.GetCenter().Y, Bounds.Min.Z);
+	UStaticMeshComponent* Part = NewObject<UStaticMeshComponent>(this, NAME_None, RF_Transient);
+	Part->SetMobility(EComponentMobility::Movable);
+	Part->SetupAttachment(RootComponent);
+	Part->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	Part->RegisterComponent();
+	Part->SetStaticMesh(Mesh);
+	Part->SetRelativeScale3D(Scale);
+	Part->SetRelativeRotation(Turn);
+	Part->SetRelativeLocation(Foot - Turn.RotateVector(Pivot * Scale));
+	BoardProps.Add(Part);
+	return Part;
+}
+
 void ATMBattleDirector::BuildBoard()
 {
 	LoadThemes();
@@ -268,8 +339,16 @@ void ATMBattleDirector::BuildBoard()
 				{
 					Surface = Theme.Spring;
 				}
-				Solid(Shape(TEXT("Cube"), Centre + FVector(0, 0, Top - SlabMetres * M * 0.5f), FVector(Across, Across, SlabMetres * M),
-					FRotator::ZeroRotator, Surface));
+				UStaticMeshComponent* Slab = Shape(TEXT("Cube"), Centre + FVector(0, 0, Top - SlabMetres * M * 0.5f), FVector(Across, Across, SlabMetres * M),
+					FRotator::ZeroRotator, Surface);
+				Solid(Slab);
+				if (Hazard == 0 && Theme.KitTop.Num() > 0 && Slab
+					&& KitPiece(Theme.KitTop[Dice.RandHelper(Theme.KitTop.Num())], Centre + FVector(0, 0, Top - SlabMetres * M), Across,
+						SlabMetres * M, 90.0f * Dice.RandHelper(4), true))
+				{
+					// Hidden, not gone: it is still what a click on the board finds.
+					Slab->SetHiddenInGame(true);
+				}
 
 				if (Hazard != 0)
 				{
@@ -310,7 +389,13 @@ void ATMBattleDirector::BuildBoard()
 				Shape(TEXT("Cube"), Centre + FVector(0, 0, Level * 0.5f), FVector(Across, Across, Level), FRotator::ZeroRotator,
 					Wander(Theme.Side, Theme.Jitter * 0.6f, Seed + 1));
 				const FLinearColor Stone = Wander(Theme.Rock, Theme.Jitter, Seed + 2);
-				if (Theme.RockStyle == TEXT("pillars"))
+				if (Theme.KitRock.Num() > 0
+					&& KitPiece(Theme.KitRock[Dice.RandHelper(Theme.KitRock.Num())], Centre + FVector(0, 0, Level), Tile * Theme.KitRockFill,
+						0.0f, Dice.FRandRange(0.0f, 360.0f), false, 1.8f * M))
+				{
+					// The kit's rock stands here; nothing else is needed.
+				}
+				else if (Theme.RockStyle == TEXT("pillars"))
 				{
 					// A ruin: a pillar, some broken off, with a fallen block beside.
 					const float Tall = Dice.FRandRange(2.2f, 3.4f) * M * (Dice.FRand() < 0.3f ? 0.55f : 1.0f);
@@ -410,6 +495,12 @@ void ATMBattleDirector::BuildBoard()
 			const float Scale = Dice.FRandRange(0.8f, 1.5f);
 			const FVector Foot(Spot.X, Spot.Y, 0.0f);
 			const FLinearColor Leaves = Wander(Theme.Leaves, 0.06f, i);
+			if (Theme.KitTree.Num() > 0
+				&& KitPiece(Theme.KitTree[Dice.RandHelper(Theme.KitTree.Num())], Foot, 0.0f, Theme.KitTreeHeight * M * Scale * 0.8f,
+					Dice.FRandRange(0.0f, 360.0f), false))
+			{
+				continue;
+			}
 			Shape(TEXT("Cylinder"), Foot + FVector(0, 0, 70.0f * Scale), FVector(28.0f, 28.0f, 140.0f) * Scale, FRotator::ZeroRotator, Theme.Trunk);
 			if (Theme.Trees == TEXT("pine"))
 			{
@@ -433,6 +524,12 @@ void ATMBattleDirector::BuildBoard()
 	{
 		const FVector2D Spot = OutsideSpot(2.5f * M, 35.0f * M);
 		const float Scale = Dice.FRandRange(0.6f, 2.2f);
+		if (Theme.KitBoulder.Num() > 0
+			&& KitPiece(Theme.KitBoulder[Dice.RandHelper(Theme.KitBoulder.Num())], FVector(Spot.X, Spot.Y, 0.0f),
+				Theme.KitBoulderSize * M * Scale * 0.6f, 0.0f, Dice.FRandRange(0.0f, 360.0f), false))
+		{
+			continue;
+		}
 		Shape(TEXT("Sphere"), FVector(Spot.X, Spot.Y, 20.0f * Scale), FVector(160.0f, 130.0f, 110.0f) * Scale,
 			FRotator(0, Dice.FRandRange(0.0f, 360.0f), 0), Wander(Theme.Rock, Theme.Jitter, 5000 + i));
 	}

@@ -896,7 +896,30 @@ private:
 		float SkyIntensity = 4.0f;
 		float FogDensity = 0.02f;
 		FLinearColor FogColour = FLinearColor(0.45f, 0.55f, 0.7f);
+
+		/**
+		 * Meshes to build with instead of the basic shapes -- from a Fab pack,
+		 * say (Tools/add_env_kit.py writes these). Each is a list of object
+		 * paths; one is picked per piece. Any left empty is built from shapes.
+		 */
+		TArray<FString> KitTop;      // the walkable ground's surface, stretched to a tile
+		TArray<FString> KitRock;     // what stands on a rock tile
+		TArray<FString> KitTree;     // what grows around the board
+		TArray<FString> KitBoulder;  // rocks around the board
+		/** How much of a tile a rock fills, how tall a tree stands, how big a boulder is, in metres. */
+		float KitRockFill = 0.9f;
+		float KitTreeHeight = 6.0f;
+		float KitBoulderSize = 2.0f;
 	};
+
+	/**
+	 * A mesh from a theme's kit, fitted by its own bounds: its footprint to
+	 * Footprint (stretched, or uniformly), or its height to Height, standing on
+	 * Foot. Null if the mesh is not in the project (said once).
+	 */
+	UStaticMeshComponent* KitPiece(const FString& Path, const FVector& Foot, float Footprint, float Height, float Yaw, bool bStretch, float MinHeight = 0.0f);
+	UPROPERTY()
+	TMap<FString, TObjectPtr<UStaticMesh>> KitMeshes;
 
 	/** Reads every theme file once per run. */
 	void LoadThemes();
