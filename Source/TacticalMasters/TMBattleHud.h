@@ -50,6 +50,8 @@ enum class ETMHudAction : uint8
 	SetupSide,
 	SetupDifficulty,
 	SetupSeed,
+	SetupVictory,
+	SetupTime,
 	SetupStart,
 	SetupBack,
 

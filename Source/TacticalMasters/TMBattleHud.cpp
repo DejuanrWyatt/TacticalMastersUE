@@ -196,6 +196,26 @@ void ATMBattleHud::DrawHUD()
 
 void ATMBattleHud::DrawBoardAids(ATMBattleDirector& From)
 {
+	// The middle, while holding it can win: a ring on the board, in the colour of
+	// whoever is holding it alone, grey while it is contested or empty
+	// (board_view.gd:91).
+	if (From.Battle.Tuning.CaptureSeconds > 0.0)
+	{
+		int32 Standing[2] = { 0, 0 };
+		const TMSim::FVec2 Middle = From.Battle.CapturePoint();
+		for (const TMSim::FUnit& Unit : From.Battle.Units)
+		{
+			if (Unit.IsAlive() && static_cast<double>(Unit.Pos.DistanceTo(Middle)) <= TMSim::FBattle::CaptureRadius)
+			{
+				++Standing[Unit.Team];
+			}
+		}
+		const FLinearColor Ring = (Standing[0] > 0) == (Standing[1] > 0)
+			? FLinearColor(0.85f, 0.85f, 0.9f, 0.7f)
+			: TeamColour(Standing[0] > 0 ? 0 : 1);
+		BoardRing(From, Middle, static_cast<float>(TMSim::FBattle::CaptureRadius), Ring, 3.0f);
+	}
+
 	// What an inspected enemy could do next: the ground it can walk to, and the
 	// reach of its longest attack from where it stands (battle.gd:512-527).
 	if (!From.ThreatNodes.empty())
@@ -444,6 +464,33 @@ void ATMBattleHud::DrawBanners(ATMBattleDirector& From)
 	UFont* Big = GEngine->GetLargeFont();
 	const float CentreX = Canvas->ClipX * 0.5f;
 
+	// The other ways to win, under the turn order: the time left, and how long
+	// each side has held the middle out of what it needs (battle.gd:1326-1340).
+	{
+		const TMSim::FBattle& Battle = From.Battle;
+		FString Rules;
+		if (Battle.Tuning.BattleSeconds > 0.0)
+		{
+			const int32 Left = FMath::Max(0, TMSim::RoundToInt(Battle.Tuning.BattleSeconds * Tps) - Battle.TickCount);
+			const int32 Seconds = FMath::CeilToInt(Left / Tps);
+			Rules += FString::Printf(TEXT("Time %d:%02d"), Seconds / 60, Seconds % 60);
+		}
+		if (Battle.Tuning.CaptureSeconds > 0.0)
+		{
+			const int32 Needed = FMath::Max(1, TMSim::RoundToInt(Battle.Tuning.CaptureSeconds * Tps));
+			Rules += FString::Printf(TEXT("%sMiddle  Blue %d%%  Red %d%%"), Rules.IsEmpty() ? TEXT("") : TEXT("     "),
+				FMath::Min(100, Battle.CaptureTicks[0] * 100 / Needed), FMath::Min(100, Battle.CaptureTicks[1] * 100 / Needed));
+		}
+		if (!Rules.IsEmpty())
+		{
+			const FVector2D Size = TextSize(Rules, Font, 0.62f * S);
+			const float RY = 118.0f * S;
+			Panel(CentreX - Size.X * 0.5f - 12.0f * S, RY - 4.0f * S, Size.X + 24.0f * S, Size.Y + 8.0f * S,
+				FLinearColor(0.05f, 0.06f, 0.1f, 0.75f), FLinearColor(0.3f, 0.32f, 0.4f, 1.0f), 1.0f);
+			Text(Rules, CentreX - Size.X * 0.5f, RY, TextColour, Font, 0.62f * S);
+		}
+	}
+
 	// The hover preview, just above the action bar: what a click here would do.
 	FString Preview;
 	FLinearColor PreviewColour = TextColour;
@@ -574,7 +621,7 @@ void ATMBattleHud::DrawBanners(ATMBattleDirector& From)
 		FLinearColor Colour = Gold;
 		if (From.Battle.Winner == TMSim::FBattle::Draw)
 		{
-			Line = TEXT("Nobody is left standing");
+			Line = From.HowWon().IsEmpty() ? TEXT("Nobody is left standing") : TEXT("A draw");
 			Colour = Dim;
 		}
 		else if (From.ComputerPlays(0) == From.ComputerPlays(1))
@@ -588,7 +635,9 @@ void ATMBattleHud::DrawBanners(ATMBattleDirector& From)
 			Line = From.ComputerPlays(From.Battle.Winner) ? TEXT("The computer wins") : TEXT("You win!");
 			Colour = From.ComputerPlays(From.Battle.Winner) ? Urgent : Gold;
 		}
-		const FString Time = FString::Printf(TEXT("after %.0f seconds   seed %llu"), From.Battle.TickCount / Tps, From.BattleSeed);
+		const FString How = From.HowWon();
+		const FString Time = FString::Printf(TEXT("%safter %.0f seconds   seed %llu"),
+			How.IsEmpty() ? TEXT("") : *(How + TEXT("   ")), From.Battle.TickCount / Tps, From.BattleSeed);
 		const FVector2D Size = TextSize(Line, Big, 1.0f * S);
 		const float PW = FMath::Max(Size.X + 80.0f * S, 560.0f * S);
 		const float PH = 190.0f * S;
@@ -749,8 +798,8 @@ void ATMBattleHud::DrawSetup(ATMBattleDirector& From)
 
 	// Who plays, how hard, and the seed.
 	float Y = ColumnTop + 36.0f * S + 4.0f * 64.0f * S + 60.0f * S;
-	const float RowX = PX + 30.0f * S;
-	const float LabelW = 230.0f * S;
+	float RowX = PX + 30.0f * S;
+	const float LabelW = 150.0f * S;
 	const float ValueW = 300.0f * S;
 	auto Row = [&](const FString& Label, const FString& Value, ETMHudAction Action, int32 ActionValue)
 	{
@@ -776,14 +825,39 @@ void ATMBattleHud::DrawSetup(ATMBattleDirector& From)
 	Text(TEXT("Map"), RowX, Y + 2.0f * S, Dim, Font, 0.62f * S);
 	Text(TEXT("Highlands"), RowX + LabelW, Y + 2.0f * S, TextColour, Font, 0.62f * S);
 
-	// What the Godot setup offers that is not here yet, said where it would be.
+	// How the battle can be won, on the right under red's team.
 	const float NoteX = PX + PW * 0.5f + 40.0f * S;
-	float NoteY = ColumnTop + 36.0f * S + 4.0f * 64.0f * S + 64.0f * S;
+	{
+		const float LeftY = Y;
+		Y = ColumnTop + 36.0f * S + 4.0f * 64.0f * S + 60.0f * S;
+		const float LeftRowX = RowX;
+		RowX = NoteX;
+		auto Seconds = [](double Value)
+		{
+			return FMath::Fmod(Value, 60.0) == 0.0
+				? FString::Printf(TEXT("%.0f minutes"), Value / 60.0)
+				: FString::Printf(TEXT("%.0f seconds"), Value);
+		};
+		Row(TEXT("Victory"), Setup.CaptureSeconds > 0.0
+				? FString::Printf(TEXT("Hold the middle: %.0fs"), Setup.CaptureSeconds)
+				: FString(TEXT("Last team standing")), ETMHudAction::SetupVictory, -1);
+		AddTip(RowX, Y - 46.0f * S, LabelW + ValueW, 38.0f * S,
+			TEXT("Hold the middle: a side that stands alone in the ring in the middle of the map for this long wins. While both sides are in it, neither gains; a side pushed out keeps what it held."));
+		Row(TEXT("Time"), Setup.BattleSeconds > 0.0 ? Seconds(Setup.BattleSeconds) : FString(TEXT("No time limit")),
+			ETMHudAction::SetupTime, -1);
+		AddTip(RowX, Y - 46.0f * S, LabelW + ValueW, 38.0f * S,
+			TEXT("When time runs out, the side with more of its health left wins. Within a point of each other is a draw."));
+		RowX = LeftRowX;
+		Y = LeftY;
+	}
+
+	// What the Godot setup offers that is not here yet, said where it would be.
+	float NoteY = ColumnTop + 36.0f * S + 4.0f * 64.0f * S + 64.0f * S + 2.0f * 46.0f * S + 10.0f * S;
 	const TCHAR* Notes[] =
 	{
 		TEXT("Not ported yet:"),
 		TEXT("  other maps, and saved teams"),
-		TEXT("  hold-the-middle, time limits, planning time"),
+		TEXT("  planning time"),
 		TEXT("Easy and medium think more simply than hard, but"),
 		TEXT("  do not yet make Godot's random mistakes."),
 	};

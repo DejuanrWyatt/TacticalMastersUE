@@ -1,5 +1,7 @@
 #include "SimUnit.h"
 
+#include "SimAbility.h"
+
 namespace TMSim
 {
 	int FUnit::Stat(EStat Which) const
@@ -18,8 +20,32 @@ namespace TMSim
 			}
 		}
 
-		// Always-on abilities add to a stat too. Not ported yet: that needs the
-		// ability table, which arrives with the rest of the rules.
+		// Always-on abilities add to a stat too: a passive, an active + passive,
+		// and a toggle while it is switched on -- but only their buffs meant for
+		// the owner's side, since one aimed at the enemy is what it does to them
+		// (unit.gd:70-87). Auras are not counted here: they reach units, the
+		// owner included, as timed buffs at the start of each turn (ApplyAuras).
+		for (int Slot = 0; Slot < 4; ++Slot)
+		{
+			const FAbility* Ability = JobAbility(Job, Slot);
+			if (!Ability || Ability->Buffs.empty() || Ability->Target == ETargetSide::Enemy)
+			{
+				continue;
+			}
+			const bool bOn = Ability->Kind == "passive" || Ability->Kind == "active_passive"
+				|| (Ability->Kind == "toggle" && Toggled[Slot]);
+			if (!bOn)
+			{
+				continue;
+			}
+			for (const FBuff& Buff : Ability->Buffs)
+			{
+				if (Buff.Stat == Which)
+				{
+					Value += Buff.Amount;
+				}
+			}
+		}
 
 		// Shred cuts the defences and Freeze multiplies them, so those scale what
 		// everything else has added up to rather than adding to it.

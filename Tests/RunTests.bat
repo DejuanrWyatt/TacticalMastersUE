@@ -73,6 +73,12 @@ if errorlevel 1 (echo BUILD FAILED & exit /b 1)
 "%OUT%\SimClassTest.exe" "%HERE%..\Content\Data\Classes" "%HERE%GodotClassTable.txt" || set FAILED=1
 
 echo.
+echo === whole battles, replayed from Godot's orders ===
+cl /nologo /EHsc /std:c++17 /W4 /D_CRT_SECURE_NO_WARNINGS /I"%PUB%" "%HERE%SimTraceTest.cpp" "%PRIV%\SimTypes.cpp" "%PRIV%\SimUnit.cpp" "%PRIV%\SimAbility.cpp" "%PRIV%\SimMap.cpp" "%PRIV%\SimMovement.cpp" "%PRIV%\SimWorld.cpp" "%PRIV%\SimTargeting.cpp" "%PRIV%\SimResolve.cpp" "%PRIV%\SimAI.cpp" "%PRIV%\SimBattle.cpp" "%PRIV%\SimJson.cpp" "%PRIV%\SimClassFile.cpp" /Fo:"%OUT%\obj\\" /Fe:"%OUT%\SimTraceTest.exe" >nul
+if errorlevel 1 (echo BUILD FAILED & exit /b 1)
+"%OUT%\SimTraceTest.exe" "%HERE%..\Content\Data\Classes" "%HERE%GodotBattleTrace.txt" || set FAILED=1
+
+echo.
 if "%FAILED%"=="1" (echo SOME TESTS FAILED & exit /b 1)
 echo ALL TESTS PASSED
 exit /b 0

@@ -194,6 +194,16 @@ namespace TMSim
 		double RegenPercent = 5.0;
 		/** Turns it must go unhurt before that starts. */
 		double RegenAfterTurns = 2.0;
+		/**
+		 * Seconds before the battle is called for the healthier side; 0 is no
+		 * limit. The Godot setup screen offers 3, 5 and 10 minutes.
+		 */
+		double BattleSeconds = 0.0;
+		/**
+		 * Seconds a side must stand alone in the middle of the map to win; 0 is
+		 * off. The Godot setup screen offers 30 and 60.
+		 */
+		double CaptureSeconds = 0.0;
 	};
 
 	namespace Combat

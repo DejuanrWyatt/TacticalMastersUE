@@ -29,6 +29,13 @@ namespace TMSim
 		EStat Stat = EStat::Count;
 		int Amount = 0;
 		int Turns = 0;
+		/**
+		 * The name of the aura that keeps it topped up, or empty for a buff
+		 * that was simply given. An aura finds its own buff by this to refresh
+		 * it rather than stack another (game_state.gd:1305-1316). It is the
+		 * ability's name, not its id, because that is what Godot keys it by.
+		 */
+		std::string Aura;
 	};
 
 	/** A status on a unit: which one, and how many of its own turns are left. */

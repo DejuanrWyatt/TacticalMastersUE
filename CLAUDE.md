@@ -63,7 +63,7 @@ be hard to kill (`Stop-Process` and `taskkill` may both refuse; WMI `Terminate` 
 6. **Any new state field must be mixed into `FBattle::Checksum()`** (`SimWorld.cpp`), or desyncs go undetected.
    The gaps F7 listed (RNG state, `KoTicks`, `bHustling`, `UnharmedTurns`) are closed, along with casting,
    channelling and toggles. `SimPlayTest` has a probe per field that changes it and insists the checksum
-   notices — 31 of them. Add one with any new field.
+   notices — 34 of them. Add one with any new field.
 7. Orders carry the unit's `Serial`, and stale orders are refused. Note that `Validate` skips the check when
    `Serial < 0`, so never send orders with `-1` from player or network paths.
 
@@ -83,7 +83,7 @@ be hard to kill (`Stop-Process` and `taskkill` may both refuse; WMI `Terminate` 
 | Wiring test: sim ↔ Unreal, in a real level | `scripts\wiring-test.bat` (runs `Tools/play_battle.py` headless) |
 | The class lab (the rules alone, for the class creator: check + playtest a class file) | `Tools\ClassLab\Build.bat` → `Binaries\ClassLab\TMClassLab.exe` |
 | Film every particle effect in the project for the class creator | `Tools\VfxCatalog.bat` (runs the game off-screen with `-tmvfxcatalog`; writes `Saved\VfxCatalog`; about 2 minutes; ends itself) |
-| Watch chosen classes fight | add `-tmroster=a,b,c,d` to a game run: both sides field those four |
+| Watch chosen classes fight | add `-tmroster=a,b,c,d` to a game run: both sides field those four; `-tmhold=30` / `-tmtime=180` switch on the other ways to win |
 | A whole battle in a real game world | `scriptsattle-test.bat` (no window, no rendering; ends itself) |
 
 Paths on this machine: engine `E:\UE_5.8`, Visual Studio `E:\VS2022`.
@@ -120,9 +120,13 @@ field for field (`GodotClassTable.txt`), and every one plays a battle with no re
 Particle effects are presentation only. An ability's `vfx` field names a Niagara or Cascade system under
 `/Game` (a Fab pack, say). The rules read it and ignore it, and the director plays it when the ability
 resolves. `ATMVfxStudio` films every effect for the class creator.
-Not yet ported (see `Docs/backlog.md`): auras and passive/toggle stat contributions (`FUnit::Stat`
-says so where the gap is — several of the 81 loaded classes have them, so those play weaker than in
-Godot), `Randf` (easy/medium mistakes), the battle time limit and the hold-the-middle rule.
+Ported, with a Godot check waiting on its golden file: passive and toggle buffs in `FUnit::Stat`,
+auras refreshed at the start of a turn (20 of the 81 classes have one, 11 a toggle), a toggle switched
+once a turn, the battle time limit and holding the middle (setup screen: Victory, Time).
+`SimTraceTest` replays whole battles from Godot's own orders (`tests/dump_battle_trace.gd` →
+`Tests/GodotBattleTrace.txt`) and compares every unit after every step; until that file exists it says
+NOT CHECKED. The two victory rules also pass Godot's own smoke-test cases (in `SimPlayTest`).
+Not yet ported (see `Docs/backlog.md`): `Randf` (easy/medium mistakes), planning time.
 Kept bug-for-bug from Godot, with a comment at each: a toggle in slot 3 skips the ultimate-meter and
 cooldown gates (`AbilityBlockedReason`; reachable now that loaded classes have toggles).
 

@@ -73,6 +73,20 @@ void ATMBattleDirector::BeginPlay()
 		bBuilt = false;
 	}
 
+	// -tmhold=30 and -tmtime=180: the setup screen's other ways to win, for a
+	// battle nobody sets up -- seconds holding the middle, and a time limit.
+	double RuleSeconds = 0.0;
+	if (FParse::Value(FCommandLine::Get(), TEXT("tmhold="), RuleSeconds))
+	{
+		Setup.CaptureSeconds = RuleSeconds;
+		bBuilt = false;
+	}
+	if (FParse::Value(FCommandLine::Get(), TEXT("tmtime="), RuleSeconds))
+	{
+		Setup.BattleSeconds = RuleSeconds;
+		bBuilt = false;
+	}
+
 	if (!bBuilt)
 	{
 		BuildBattle();
@@ -260,6 +274,13 @@ void ATMBattleDirector::BuildBattle()
 
 		Battle.Units.push_back(Unit);
 	}
+
+	// How the battle can be won is a rule like any other, so it goes to the rules
+	// with the battle rather than being watched for here.
+	Battle.Tuning.CaptureSeconds = Setup.CaptureSeconds;
+	Battle.Tuning.BattleSeconds = Setup.BattleSeconds;
+	Battle.CaptureTicks[0] = 0;
+	Battle.CaptureTicks[1] = 0;
 
 	// The seed is part of the battle: the same seed and the same orders give the
 	// same battle. Left alone it is the one the clock was checked against, so a
@@ -1014,9 +1035,11 @@ void ATMBattleDirector::Narrate(const TMSim::FTickReport& Report)
 			Line = FString::Printf(TEXT("    %s is back on its feet"), *NameOf(Event.Unit));
 			break;
 		case TMSim::EEventKind::Won:
-			Line = Event.Unit == TMSim::FBattle::Draw
-				? FString(TEXT("Nobody is left standing."))
-				: FString::Printf(TEXT("Team %d wins."), Event.Unit);
+			Line = HowWon().IsEmpty()
+				? (Event.Unit == TMSim::FBattle::Draw
+					? FString(TEXT("Nobody is left standing."))
+					: FString::Printf(TEXT("Team %d wins."), Event.Unit))
+				: HowWon() + TEXT(".");
 			break;
 		default:
 			break;  // walking and turns ending are not worth a line of their own
@@ -1244,6 +1267,11 @@ void ATMBattleDirector::Tick(float DeltaSeconds)
 			else if (Before < 2.5f && MenuShotsAt >= 2.5f)
 			{
 				Shoot(TEXT("menu_setup.png"));
+			}
+			else if (Before < 3.0f && MenuShotsAt >= 3.0f)
+			{
+				// Opened a moment after the picture above, which is taken when the
+				// frame is drawn: opened in the same frame, it was in the picture.
 				PickerSlot = 0;
 			}
 			else if (Before < 3.5f && MenuShotsAt >= 3.5f)
@@ -2408,6 +2436,35 @@ void ATMBattleDirector::PressMenuButton(const FTMHudButton& Button)
 			Setup.FixedSeed = BattleSeed;
 		}
 		break;
+	case ETMHudAction::SetupVictory:
+	{
+		// Round the three the Godot setup offers (battle_setup.gd:40).
+		const double Choices[3] = { 0.0, 30.0, 60.0 };
+		int32 At = 0;
+		for (int32 i = 0; i < 3; ++i)
+		{
+			if (Setup.CaptureSeconds == Choices[i])
+			{
+				At = i;
+			}
+		}
+		Setup.CaptureSeconds = Choices[(At + 1) % 3];
+		break;
+	}
+	case ETMHudAction::SetupTime:
+	{
+		const double Choices[4] = { 0.0, 180.0, 300.0, 600.0 };
+		int32 At = 0;
+		for (int32 i = 0; i < 4; ++i)
+		{
+			if (Setup.BattleSeconds == Choices[i])
+			{
+				At = i;
+			}
+		}
+		Setup.BattleSeconds = Choices[(At + 1) % 4];
+		break;
+	}
 	case ETMHudAction::SetupStart:
 		StartMatch(true);
 		break;
@@ -2541,6 +2598,30 @@ void ATMBattleDirector::ToggleGuide()
 		}
 	}
 }
+FString ATMBattleDirector::HowWon() const
+{
+	// Read back from the rules' own state rather than remembered as it happened,
+	// so a loaded or replayed battle says the same (game_state.gd:1196, 1556).
+	if (Battle.Winner == -1)
+	{
+		return FString();
+	}
+	const TCHAR* Side = Battle.Winner == 0 ? TEXT("Blue") : TEXT("Red");
+	if (Battle.Tuning.BattleSeconds > 0.0
+		&& Battle.TickCount >= TMSim::RoundToInt(Battle.Tuning.BattleSeconds * TMSim::Pace::TicksPerSecond))
+	{
+		return Battle.Winner == TMSim::FBattle::Draw
+			? FString(TEXT("Time! It's a draw"))
+			: FString::Printf(TEXT("Time! %s wins on health"), Side);
+	}
+	if (Battle.Tuning.CaptureSeconds > 0.0 && Battle.Winner != TMSim::FBattle::Draw
+		&& Battle.CaptureTicks[Battle.Winner] >= TMSim::RoundToInt(Battle.Tuning.CaptureSeconds * TMSim::Pace::TicksPerSecond))
+	{
+		return FString::Printf(TEXT("%s has held the middle"), Side);
+	}
+	return FString();
+}
+
 void ATMBattleDirector::CaptureNamed(const TCHAR* Name)
 {
 	const FString Where = FPaths::ProjectSavedDir() / TEXT("Match") / Name;

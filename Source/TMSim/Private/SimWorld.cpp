@@ -208,6 +208,8 @@ namespace TMSim
 		Mix(static_cast<uint64_t>(TickCount));
 		Mix(static_cast<uint64_t>(Winner + 1));
 		Mix(static_cast<uint64_t>(PlanningTicks));
+		Mix(static_cast<uint64_t>(CaptureTicks[0]));
+		Mix(static_cast<uint64_t>(CaptureTicks[1]));
 		// The dice themselves. Two machines that have drawn a different number of
 		// times still agree about the board for a while, and then disagree about
 		// the very next thing anyone rolls for -- so the generator's own position
@@ -252,6 +254,11 @@ namespace TMSim
 				Mix(static_cast<uint64_t>(Buff.Stat));
 				Mix(static_cast<uint64_t>(Buff.Amount));
 				Mix(static_cast<uint64_t>(Buff.Turns));
+				for (const char Letter : Buff.Aura)
+				{
+					Mix(static_cast<uint64_t>(static_cast<unsigned char>(Letter)));
+				}
+				Mix(0xA0);
 			}
 			for (int Slot = 0; Slot < 4; ++Slot)
 			{
@@ -295,8 +302,12 @@ namespace TMSim
 		}
 		if (Ability->Kind == "toggle")
 		{
-			// Whether it was already switched this turn is not kept yet, so a
-			// toggle counts as available. No ported ability is one.
+			// Once a turn, so it cannot be flicked on and off for nothing; and
+			// nothing else below applies to a switch (game_state.gd:787-790).
+			if (Unit.ToggledTurn[Slot])
+			{
+				return Ability->Name + " was already switched this turn.";
+			}
 			return std::string();
 		}
 		// The fourth slot is the ultimate, and it waits for a full meter. This

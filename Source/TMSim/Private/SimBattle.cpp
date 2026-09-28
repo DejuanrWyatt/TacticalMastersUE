@@ -120,8 +120,19 @@ namespace TMSim
 
 		++TickCount;
 
-		// The original also ends the battle on its time limit here, and runs the
-		// hold-the-middle rule. Both belong with victory conditions.
+		// A battle can have a time limit, so it cannot run for ever; and a side
+		// can win by holding the middle. Both are checked before anybody moves on
+		// this tick (game_state.gd:1192-1200).
+		if (Tuning.BattleSeconds > 0.0 && TickCount >= RoundToInt(Tuning.BattleSeconds * Pace::TicksPerSecond))
+		{
+			FinishOnTime(Report);
+			return;
+		}
+		TickCapture(Report);
+		if (Winner != -1)
+		{
+			return;
+		}
 
 		for (FUnit& Unit : Units)
 		{
@@ -459,7 +470,7 @@ namespace TMSim
 		// The order here is the original's and is load-bearing: a status can kill
 		// the unit before its turn begins, and so can the ground it is standing on,
 		// so each is followed by a check that there is still anybody to give a turn
-		// to. Auras are not ported -- no built-in ability is one.
+		// to.
 
 		// Read before the statuses count down, because the status taking its orders
 		// away costs it this turn and then wears off in the same breath.
@@ -502,6 +513,7 @@ namespace TMSim
 			}
 		}
 		Unit.Buffs.swap(Kept);
+		ApplyAuras(Unit);
 
 		// Channelling: it goes off again, and that is what the turn was for.
 		if (Unit.IsChanneling())
@@ -533,6 +545,143 @@ namespace TMSim
 		}
 
 		Report.Say(EEventKind::BecameReady, Unit.Id);
+	}
+
+	FVec2 FBattle::CapturePoint() const
+	{
+		const FVec2 Size = Map.SizeMeters();
+		return FVec2(Size.X * 0.5f, Size.Y * 0.5f);
+	}
+
+	double FBattle::HealthShare(int Team) const
+	{
+		double Alive = 0.0;
+		double Total = 0.0;
+		for (const FUnit& Unit : Units)
+		{
+			if (Unit.Team == Team)
+			{
+				Total += Unit.MaxHp();
+				Alive += std::max(0, Unit.Hp);
+			}
+		}
+		return Total > 0.0 ? Alive / Total : 0.0;
+	}
+
+	void FBattle::TickCapture(FTickReport& Report)
+	{
+		// While both sides have somebody there it is contested and neither gains,
+		// but nothing is lost either (game_state.gd:1534-1558).
+		if (Tuning.CaptureSeconds <= 0.0)
+		{
+			return;
+		}
+		const FVec2 Middle = CapturePoint();
+		int Standing[2] = { 0, 0 };
+		for (const FUnit& Unit : Units)
+		{
+			// Godot measures in float and compares with the radius as a double.
+			if (Unit.IsAlive() && static_cast<double>(Unit.Pos.DistanceTo(Middle)) <= CaptureRadius)
+			{
+				++Standing[Unit.Team];
+			}
+		}
+		if (Standing[0] > 0 && Standing[1] > 0)
+		{
+			return;
+		}
+		const int Needed = RoundToInt(Tuning.CaptureSeconds * Pace::TicksPerSecond);
+		for (int Team = 0; Team < 2; ++Team)
+		{
+			if (Standing[Team] == 0)
+			{
+				continue;
+			}
+			++CaptureTicks[Team];
+			if (CaptureTicks[Team] >= Needed)
+			{
+				Winner = Team;
+				Report.Say(EEventKind::Won, Winner);
+				return;
+			}
+		}
+	}
+
+	void FBattle::FinishOnTime(FTickReport& Report)
+	{
+		// Level to within a point of a percent is a draw (game_state.gd:1562-1569).
+		const double Blue = HealthShare(0);
+		const double Red = HealthShare(1);
+		if (std::fabs(Blue - Red) < 0.01)
+		{
+			Winner = Draw;
+		}
+		else
+		{
+			Winner = Blue > Red ? 0 : 1;
+		}
+		Report.Say(EEventKind::Won, Winner);
+	}
+
+	void FBattle::ApplyAuras(FUnit& Unit)
+	{
+		// Every living unit's auras, in unit order, that are meant for this one's
+		// side (or against it) and stand close enough. Each tops up its buffs for
+		// two turns: long enough to last until the next turn begins and the aura
+		// is asked again, so standing in one keeps it and walking off loses it a
+		// turn later (game_state.gd:1305-1334). The owner is in its own aura.
+		for (const FUnit& Source : Units)
+		{
+			if (!Source.IsAlive())
+			{
+				continue;
+			}
+			for (int Slot = 0; Slot < 4; ++Slot)
+			{
+				const FAbility* Ability = JobAbility(Source.Job, Slot);
+				if (!Ability || Ability->Kind != "aura")
+				{
+					continue;
+				}
+				const bool bWantsEnemy = Ability->Target == ETargetSide::Enemy;
+				if ((Source.Team != Unit.Team) != bWantsEnemy)
+				{
+					continue;
+				}
+				// Godot measures in float (Vector2) and compares against the aoe
+				// as a GDScript float, a double, with a reach of at least a metre.
+				const double Reach = std::max(static_cast<double>(Ability->Aoe), 1.0);
+				if (static_cast<double>(Source.Pos.DistanceTo(Unit.Pos)) > Reach)
+				{
+					continue;
+				}
+				for (const FBuff& Given : Ability->Buffs)
+				{
+					bool bFound = false;
+					for (FBuff& Existing : Unit.Buffs)
+					{
+						// Every one that matches is refreshed, as Godot does,
+						// rather than the first.
+						if (Existing.Stat == Given.Stat && Existing.Aura == Ability->Name)
+						{
+							Existing.Turns = 2;
+							bFound = true;
+						}
+					}
+					if (!bFound)
+					{
+						FBuff Copy = Given;
+						Copy.Turns = 2;
+						Copy.Aura = Ability->Name;
+						Unit.Buffs.push_back(Copy);
+					}
+				}
+				if (Ability->HasStatus())
+				{
+					AddStatus(Unit, Ability->StatusId, Ability->StatusTurns);
+				}
+			}
+		}
 	}
 
 	void FBattle::EndTurnFor(FUnit& Unit, bool bTimedOut, FTickReport& Report)

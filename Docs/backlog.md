@@ -51,7 +51,8 @@ Not yet broken down; run `/plan-milestone` to split it into slices.
 ## Milestone 3: The whole roster
 | id | goal | depends on | owner | status |
 |----|------|-----------|-------|--------|
-| port-passives-auras | Passive/aura stat contributions in `FUnit::Stat`, auras applied | port-turn-start | sim-engineer | Todo |
+| port-passives-auras | Passive/aura stat contributions in `FUnit::Stat`, auras applied | port-turn-start | sim-engineer | Built: passives and switched-on toggles in `FUnit::Stat`, auras at turn start (buffs tagged by aura name, in the checksum), a toggle once a turn. Waiting on `Tests/GodotBattleTrace.txt` (Godot's `tests/dump_battle_trace.gd`) for `SimTraceTest` to measure it |
+| port-victory-rules | Battle time limit and holding the middle, chosen on the setup screen as in Godot | – | sim-engineer | Built: rules in `FBattle::Tick`, capture timers in the checksum, Godot's own smoke-test cases pass, setup rows, clock and hold meter, ring on the board. Two trace battles run with them on |
 | class-files | Tactical Masters' own class format, made by the class creator; the 81 Astra classes converted once; Unreal loads `*.tmclass.json` (no Astra) | – | sim-engineer | Done: all 81 match Godot field for field, load, refuse bad files, and play legally. Replaces port-astra-import |
 | creator-native | The class creator keeps and writes classes in the new format, and playtests with Unreal's rules (a headless class lab) instead of Godot | class-files | – | Done: creator v2 (Astra-style screen), `Tools/ClassLab`, 144 archetype×element proposals proven identical to the old route |
 | creator-fab-vfx | Particle effects from the project (Fab packs) usable in the class creator: an ability's `vfx` field, played by the director, and filmed by Unreal (`Tools/VfxCatalog.bat`, `ATMVfxStudio`) so the creator can show them | creator-native | – | Done: 76 effects filmed (14 Niagara, 62 Cascade); 26 played in a real battle; SimClassTest reads and refuses the field |
@@ -61,7 +62,7 @@ Not yet broken down; run `/plan-milestone` to split it into slices.
 ## Found along the way
 | id | goal | depends on | owner | status |
 |----|------|-----------|-------|--------|
-| parity-status-ticks | A Godot parity dump of statuses ticking with damage (burn, bleed) and waking (sleep), with the dice and orders of a whole battle, so TickStatuses is measured against Godot and not only against itself | – | qa-engineer | Todo. TickStatuses read freed memory on every damage tick until 2026-09-27 (found by AddressSanitizer through the class lab); no parity test covered it |
+| parity-status-ticks | (Covered by `SimTraceTest` once its golden file exists, for burn, regen and stun; bleed and sleep only appear in creator-made classes Godot does not have.) A Godot parity dump of statuses ticking with damage (burn, bleed) and waking (sleep), with the dice and orders of a whole battle, so TickStatuses is measured against Godot and not only against itself | – | qa-engineer | Todo. TickStatuses read freed memory on every damage tick until 2026-09-27 (found by AddressSanitizer through the class lab); no parity test covered it |
 
 | ai-root-taunt | The computer player ignores Root and Taunt on its own units: it orders a rooted unit to walk ("It can't walk.") and a taunted one to attack someone else. The rules refuse, and the turn is lost | – | sim-engineer | Todo. The same in Godot (ai_player.gd never checks either), so fixing it is a Godot change first or a deliberate divergence. Found 2026-09-27 playtesting the Interrupter (Pin roots) and Duellist (Challenge taunts): 44 and 50 refused orders in 32 games. No built-in class roots or taunts, which is why it never showed |
 

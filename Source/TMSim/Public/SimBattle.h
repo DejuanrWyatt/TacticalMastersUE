@@ -323,6 +323,18 @@ namespace TMSim
 		static constexpr int Draw = 2;
 		/** While the sides are still placing units, nothing else happens. */
 		int PlanningTicks = 0;
+		/**
+		 * Ticks each side has stood alone in the middle. Kept when a side is
+		 * pushed off: holding the middle is won by adding up, not in one go.
+		 */
+		int CaptureTicks[2] = { 0, 0 };
+		/** How far the middle reaches, in metres (game_state.gd:75). */
+		static constexpr double CaptureRadius = 4.0;
+
+		/** The middle of the map, which holding the middle is fought over. */
+		TMSIM_API FVec2 CapturePoint() const;
+		/** How much of its health a side has left, as a share of what it started with. */
+		TMSIM_API double HealthShare(int Team) const;
 
 		TMSIM_API FUnit* FindUnit(int Id);
 
@@ -350,6 +362,12 @@ namespace TMSim
 		void GroundEffect(FUnit& Unit, FTickReport& Report);
 		/** Mends a unit that has been left alone long enough. */
 		void UndamagedRegen(FUnit& Unit, FTickReport& Report);
+		/** A side standing alone in the middle long enough wins. */
+		void TickCapture(FTickReport& Report);
+		/** The time limit ran out: the healthier side wins, level shares draw. */
+		void FinishOnTime(FTickReport& Report);
+		/** The auras of every living unit that reach this one, refreshed as its turn begins. */
+		void ApplyAuras(FUnit& Unit);
 		/** Its turn is over, by choice or because the countdown ran out. */
 		void EndTurn(FUnit& Unit, bool bTimedOut, FTickReport& Report);
 

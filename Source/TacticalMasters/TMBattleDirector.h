@@ -90,6 +90,8 @@ public:
 	/** What the simulation currently says, as text, for checking against it. */
 	UFUNCTION(BlueprintCallable, CallInEditor, Category = "Tactical Masters")
 	FString DescribeBattle() const;
+	/** How the battle was won, in a few words: on time, by holding the middle, or neither. */
+	FString HowWon() const;
 
 	/** Clears the visible units and forgets the battle. */
 	UFUNCTION(BlueprintCallable, CallInEditor, Category = "Tactical Masters")
@@ -303,6 +305,14 @@ private:
 		FString Difficulty[2] = { TEXT("hard"), TEXT("hard") };
 		/** A fresh seed every battle, or the same one every time. */
 		bool bRandomSeed = true;
+		/**
+		 * How else a battle can be won, as the Godot setup offers it
+		 * (battle_setup.gd:40-42): seconds alone in the middle to win (0 is
+		 * off: last team standing), and a time limit after which the healthier
+		 * side wins (0 is none).
+		 */
+		double CaptureSeconds = 0.0;
+		double BattleSeconds = 0.0;
 		uint64 FixedSeed = 12345;
 	};
 

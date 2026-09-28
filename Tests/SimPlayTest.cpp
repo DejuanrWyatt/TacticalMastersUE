@@ -284,9 +284,15 @@ int main()
 	// gauges on it, which an untouched one does not.
 	{
 		int Blind = 0;
-		auto Notices = [&Blind, &Battle](const char* Field, void (*Change)(FBattle&))
+		// Setup, when given, runs before the checksum is taken, so the change can
+		// be to something that has to exist first.
+		auto Notices = [&Blind, &Battle](const char* Field, void (*Change)(FBattle&), void (*Setup)(FBattle&) = nullptr)
 		{
 			FBattle Copy = Battle;
+			if (Setup)
+			{
+				Setup(Copy);
+			}
 			const uint64_t Before = Copy.Checksum();
 			Change(Copy);
 			if (Copy.Checksum() == Before)
@@ -363,7 +369,93 @@ int main()
 				Buff.Turns = 2;
 				B.Units[1].Buffs.push_back(Buff);
 			});
-		std::printf("the checksum notices %d kinds of change\n", 31 - Blind);
+		Notices("which aura keeps a buff topped up",
+			[](FBattle& B) { B.Units[1].Buffs.back().Aura = "Warcry"; },
+			[](FBattle& B)
+			{
+				FBuff Buff;
+				Buff.Stat = EStat::AttDef;
+				Buff.Amount = 3;
+				Buff.Turns = 2;
+				B.Units[1].Buffs.push_back(Buff);
+			});
+		Notices("how long blue has held the middle", [](FBattle& B) { B.CaptureTicks[0] += 1; });
+		Notices("how long red has held the middle", [](FBattle& B) { B.CaptureTicks[1] += 1; });
+		std::printf("the checksum notices %d kinds of change\n", 34 - Blind);
+	}
+
+	// How a battle is won besides by wiping out the other side: the time limit
+	// and holding the middle. The same five checks as the Godot project's own
+	// smoke_test.gd (_test_victory_conditions and the capture checks), on the
+	// same board; GodotBattleTrace.txt then measures them in whole battles.
+	{
+		const int Before = Failures;
+		auto Run = [](FBattle& B, int Ticks)
+		{
+			for (int i = 0; i < Ticks && B.Winner == -1; ++i)
+			{
+				FTickReport Report;
+				B.Apply(FOrder::MakeAdvance(1), Report);
+			}
+		};
+
+		FBattle Timed;
+		Timed.Tuning.BattleSeconds = 5.0;
+		Deal(Timed);
+		Timed.Units[4].Hp = 10;  // red is hurt, so blue should win on health
+		Run(Timed, 200);
+		if (Timed.Winner != 0 || Timed.TickCount != 50)
+		{
+			Fail("the time limit should end the battle at tick 50 for the healthier side (winner "
+				+ std::to_string(Timed.Winner) + " at " + std::to_string(Timed.TickCount) + ")");
+		}
+
+		FBattle Level;
+		Level.Tuning.BattleSeconds = 3.0;
+		Deal(Level);
+		Run(Level, 200);
+		if (Level.Winner != FBattle::Draw)
+		{
+			Fail("an even battle at the time limit should be a draw");
+		}
+
+		FBattle Endless;
+		Deal(Endless);
+		Run(Endless, 50);
+		if (Endless.Winner != -1)
+		{
+			Fail("without a limit a battle should keep going");
+		}
+
+		FBattle Hold;
+		Hold.Tuning.CaptureSeconds = 3.0;
+		Deal(Hold);
+		for (FUnit& Unit : Hold.Units)
+		{
+			Unit.Pos = Unit.Team == 0 ? Hold.CapturePoint() : Hold.CapturePoint() + FVec2(30.0f, 30.0f);
+		}
+		Run(Hold, 40);
+		if (Hold.Winner != 0)
+		{
+			Fail("holding the middle alone should win the battle");
+		}
+
+		FBattle Contested;
+		Contested.Tuning.CaptureSeconds = 3.0;
+		Deal(Contested);
+		for (FUnit& Unit : Contested.Units)
+		{
+			Unit.Pos = Contested.CapturePoint() + FVec2(0.5f * Unit.Team, 0.0f);
+		}
+		Run(Contested, 40);
+		if (Contested.CaptureTicks[0] != 0 || Contested.CaptureTicks[1] != 0)
+		{
+			Fail("a contested middle should count for neither side");
+		}
+		if (Failures == Before)
+		{
+			std::printf("a battle is called on time for the healthier side, and won by holding the middle\n");
+		}
 	}
 
 	// A battle where nothing ever happened would pass everything above, and so
