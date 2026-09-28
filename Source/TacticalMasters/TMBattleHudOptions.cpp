@@ -51,7 +51,7 @@ void ATMBattleHud::DrawOptions(ATMBattleDirector& From)
 	// Game.
 	Text(TEXT("Game"), PX, Y, Gold, Font, 0.8f * S);
 	Y += 36.0f * S;
-	const float LabelW = 300.0f * S;
+	const float LabelW = 480.0f * S;
 	const float RowH = 40.0f * S;
 	const float ControlW = 320.0f * S;
 	auto Label = [&](const FString& Name, float At, float LX, const FString& Tip)
@@ -74,6 +74,10 @@ void ATMBattleHud::DrawOptions(ATMBattleDirector& From)
 	Y += RowH + 8.0f * S;
 	Label(TEXT("Colorblind team colors (blue / orange)"), Y, PX, TEXT("Red becomes orange, for red-green colour blindness."));
 	MenuButton(PX + LabelW, Y, 160.0f * S, RowH, Settings.bColorblind ? TEXT("On") : TEXT("Off"), ETMHudAction::OptionColorblind);
+	Y += RowH + 8.0f * S;
+	Label(TEXT("Turn order as fixed squares instead of sliding bars"), Y, PX,
+		TEXT("A square per unit, filling as its turn comes, instead of chips sliding along two bars. Move and reorder them in Edit layout."));
+	MenuButton(PX + LabelW, Y, 160.0f * S, RowH, Settings.bTurnSquares ? TEXT("On") : TEXT("Off"), ETMHudAction::OptionTurnSquares);
 	Y += RowH + 8.0f * S;
 	Text(TEXT("Sound volumes will be here once the game has sound."), PX, Y, Dim, Font, 0.55f * S);
 	Y += 44.0f * S;

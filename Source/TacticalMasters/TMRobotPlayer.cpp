@@ -2,6 +2,7 @@
 
 #include "TMBattleDirector.h"
 #include "TMBattleHud.h"
+#include "TMSettings.h"
 
 #include "EngineUtils.h"
 #include "Engine/World.h"
@@ -195,6 +196,7 @@ void ATMRobotPlayer::Decide()
 		Session = static_cast<ESession>(static_cast<uint8>(Session) + 1);
 		bSessionStarted = false;
 		bLooked = false;
+		bArranged = false;
 		bPlaced = false;
 		PlannedSerial.Reset();
 		Attempts.Reset();
@@ -223,6 +225,13 @@ void ATMRobotPlayer::Decide()
 	{
 		bLooked = true;
 		PlanLooking();
+		return;
+	}
+	// Once a session, when a unit of ours is up (so its card is on screen).
+	if (!bArranged && Turns >= 3 && Director->SelectedUnit())
+	{
+		bArranged = true;
+		PlanLayout();
 		return;
 	}
 
@@ -402,6 +411,64 @@ void ATMRobotPlayer::PlanLooking()
 	Check([this]() { return !Director->bPaused; }, TEXT("the Pause button again should carry on"));
 }
 
+void ATMRobotPlayer::PlanLayout()
+{
+	Note(TEXT("arranging the screen: Edit layout, move the unit card, reorder a turn square, reset, lock"));
+	Button(ETMHudAction::ToggleLayout);
+	Check([this]() { return Director->bEditingLayout; }, TEXT("the Layout button should start Edit layout"));
+
+	// The unit card, 120 pixels right and 80 up.
+	FStep Grab;
+	Grab.Kind = FStep::EKind::GrabPanel;
+	Grab.Meaning = TEXT("unit_card");
+	Push(MoveTemp(Grab));
+	FStep Slide;
+	Slide.Kind = FStep::EKind::Slide;
+	Slide.Point = TMSim::FVec2(120.0f, -80.0f);
+	Push(MoveTemp(Slide));
+	FStep Let;
+	Let.Kind = FStep::EKind::Release;
+	Push(MoveTemp(Let));
+	Check([this]()
+		{
+			const FVector2D* Moved = FTMSettings::Get().Layout.Find(TEXT("unit_card"));
+			return Moved && Moved->X > 40.0 && Moved->Y < -25.0;
+		}, TEXT("dragging the unit card's handle should move it and remember where"));
+
+	// The first blue square, dropped past the last.
+	FStep Card;
+	Card.Kind = FStep::EKind::GrabSquare;
+	Card.Value = 0;
+	Push(MoveTemp(Card));
+	FStep Along;
+	Along.Kind = FStep::EKind::Slide;
+	Along.Point = TMSim::FVec2(400.0f, 0.0f);
+	Push(MoveTemp(Along));
+	FStep Drop;
+	Drop.Kind = FStep::EKind::Release;
+	Push(MoveTemp(Drop));
+	Check([this]()
+		{
+			const TArray<int32>& Order = FTMSettings::Get().CardOrder[0];
+			return Order.Num() > 1 && Order.Last() == LastGrabbedSquare;
+		}, TEXT("dropping a turn square past the others should put it last in its row"));
+
+	if (Session == ESession::VsComputerBlue)
+	{
+		FStep Shot;
+		Shot.Kind = FStep::EKind::Picture;
+		Shot.Meaning = TEXT("layout_editing.png");
+		Push(MoveTemp(Shot));
+	}
+	Button(ETMHudAction::LayoutReset);
+	Check([]() { return FTMSettings::Get().Layout.Num() == 0 && FTMSettings::Get().CardOrder[0].Num() == 0; },
+		TEXT("Reset layout should put everything back"));
+	Button(ETMHudAction::ToggleLayout);
+	Check([this]() { return !Director->bEditingLayout; }, TEXT("Lock should end Edit layout"));
+	Tally.FindOrAdd(TEXT("layout")).Y += 1;
+	Check([this]() { Tally.FindOrAdd(TEXT("layout")).X += 1; return true; }, TEXT(""));
+}
+
 void ATMRobotPlayer::PlanTurn(const TMSim::FUnit& Unit)
 {
 	// What a sensible person would do with this unit now: the computer player's
@@ -571,8 +638,21 @@ bool ATMRobotPlayer::CoveredByBody(const FVector2D& Screen) const
 	APlayerController* Player = GetWorld()->GetFirstPlayerController();
 	for (const TMSim::FUnit& Unit : Director->Battle.Units)
 	{
-		if (!Unit.IsAlive() || !Director->IsSeen(Unit))
+		if ((!Unit.IsAlive() && !Unit.IsKo()) || !Director->IsSeen(Unit))
 		{
+			continue;
+		}
+		if (!Unit.IsAlive())
+		{
+			// Lying down: only its plate stands up, and the director takes a
+			// click within 18 pixels of it as a click on the fallen unit.
+			FVector2D Plate;
+			if (Player && Player->ProjectWorldLocationToScreen(Director->GetActorTransform().TransformPosition(
+					Director->ShownAt(Unit) + FVector(0.0f, 0.0f, 20.0f)), Plate)
+				&& FVector2D::Distance(Plate, Screen) <= 24.0)
+			{
+				return true;
+			}
 			continue;
 		}
 		const FVector Base = Director->GetActorTransform().TransformPosition(Director->ShownAt(Unit));
@@ -785,6 +865,80 @@ bool ATMRobotPlayer::RunStep(FStep& Step, float DeltaSeconds)
 		}
 		return Aim(At);
 	}
+
+	case EKind::GrabPanel:
+	{
+		const ATMBattleHud* Screen = Hud();
+		if (Screen)
+		{
+			for (int32 i = 0; i < Screen->Movables.Num(); ++i)
+			{
+				if (Screen->Movables[i].Id == Step.Meaning)
+				{
+					return Aim(Screen->Movables[i].Area.GetCenter());
+				}
+			}
+		}
+		Problem(FString::Printf(TEXT("the %s had no handle to take hold of in Edit layout"), *Step.Meaning));
+		Queue.SetNum(1);
+		return true;
+	}
+
+	case EKind::GrabSquare:
+	{
+		// The Nth of this side's squares, left to right.
+		const ATMBattleHud* Screen = Hud();
+		TArray<TPair<double, int32>> Row;
+		if (Screen)
+		{
+			for (const TPair<int32, FBox2D>& Square : Screen->SquareAreas)
+			{
+				const TMSim::FUnit* Unit = Director->Battle.FindUnit(Square.Key);
+				if (Unit && Unit->Team == 0)
+				{
+					Row.Add(TPair<double, int32>(Square.Value.GetCenter().X, Square.Key));
+				}
+			}
+		}
+		Row.Sort([](const TPair<double, int32>& A, const TPair<double, int32>& B) { return A.Key < B.Key; });
+		if (!Row.IsValidIndex(Step.Value))
+		{
+			Problem(TEXT("there was no turn square to take hold of in Edit layout"));
+			Queue.SetNum(1);
+			return true;
+		}
+		LastGrabbedSquare = Row[Step.Value].Value;
+		return Aim(Screen->SquareAreas[LastGrabbedSquare].GetCenter());
+	}
+
+	case EKind::Slide:
+		// Held down and moved a little each frame, as a hand does.
+		if (!bSliding)
+		{
+			bSliding = true;
+			SlideLeft = FVector2D(Step.Point.X, Step.Point.Y);
+		}
+		{
+			const FVector2D Bit = SlideLeft.GetClampedToMaxSize(12.0);
+			Director->RobotCursor += Bit;
+			SlideLeft -= Bit;
+			if (SlideLeft.Size() < 0.5)
+			{
+				bSliding = false;
+				return true;
+			}
+		}
+		return false;
+
+	case EKind::Picture:
+		FScreenshotRequest::RequestScreenshot(OutDir / Step.Meaning, true, false);
+		StepClock = -0.5f;
+		return true;
+
+	case EKind::Release:
+		Director->OnKeyUp(EKeys::LeftMouseButton);
+		StepClock = -Between;
+		return true;
 
 	case EKind::Key:
 		Director->OnKey(Step.Key);

@@ -152,6 +152,19 @@ public:
 	/** Whether a rule number is set on the battle setup screen rather than in Developer Tools. */
 	static bool OnSetupScreen(int32 TuningIndex);
 
+	// ------------------------------------------------------- edit layout
+	// layout_editor.gd: every panel gets a handle and can be dragged anywhere,
+	// the turn squares reordered; one press to start, one to lock.
+	bool bEditingLayout = false;
+	void ToggleLayout();
+	/** The panel being dragged, and where the pointer was last frame. */
+	FString DragPanel;
+	FVector2D DragFrom = FVector2D::ZeroVector;
+	/** The unit whose turn square is being dragged along its row, or -1. */
+	int32 DragCard = -1;
+	/** Puts the dragged square where it was dropped among its side's. */
+	void DropCard();
+
 	/** Clears the visible units and forgets the battle. */
 	UFUNCTION(BlueprintCallable, CallInEditor, Category = "Tactical Masters")
 	void ClearBattle();

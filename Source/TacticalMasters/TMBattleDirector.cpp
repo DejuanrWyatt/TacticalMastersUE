@@ -1672,6 +1672,16 @@ void ATMBattleDirector::OnKey(FKey Key)
 		bMiddleHeld = true;
 		return;
 	}
+	// Edit layout: its key starts it and locks it again; Cancel locks it too.
+	if (Screen == EScreen::Battle && (Is(ETMAction::EditLayout) || (bEditingLayout && Is(ETMAction::Cancel)))
+		&& !bOptionsOpen && !bDevToolsOpen)
+	{
+		if (Is(ETMAction::EditLayout) || bEditingLayout)
+		{
+			ToggleLayout();
+		}
+		return;
+	}
 	// Options and Developer Tools cover the screen: Esc closes them.
 	if (bOptionsOpen || bDevToolsOpen)
 	{
@@ -1869,6 +1879,15 @@ void ATMBattleDirector::OnKeyUp(FKey Key)
 	{
 		DragSlider = -1;
 		FTMSettings::Get().Save();
+	}
+	else if (Key == EKeys::LeftMouseButton && !DragPanel.IsEmpty())
+	{
+		DragPanel.Reset();
+		FTMSettings::Get().Save();
+	}
+	else if (Key == EKeys::LeftMouseButton && DragCard >= 0)
+	{
+		DropCard();
 	}
 }
 
@@ -2267,8 +2286,9 @@ void ATMBattleDirector::OnClick()
 			return;
 		}
 	}
-	// Behind a menu or the guide, the board takes no clicks.
-	if (Screen != EScreen::Battle || bMenuOpen || bGuideOpen)
+	// Behind a menu or the guide, or while the screen is being arranged, the
+	// board takes no clicks.
+	if (Screen != EScreen::Battle || bMenuOpen || bGuideOpen || bEditingLayout)
 	{
 		return;
 	}
@@ -2725,6 +2745,32 @@ void ATMBattleDirector::PressMenuButton(const FTMHudButton& Button)
 	case ETMHudAction::PlanningReady:
 		ReadyToFight();
 		break;
+	case ETMHudAction::ToggleLayout:
+		ToggleLayout();
+		break;
+	case ETMHudAction::LayoutGrab:
+	{
+		const APlayerController* Player = GetWorld() ? GetWorld()->GetFirstPlayerController() : nullptr;
+		const ATMBattleHud* Hud = Player ? Cast<ATMBattleHud>(Player->GetHUD()) : nullptr;
+		float X = 0.0f;
+		float Y = 0.0f;
+		if (Hud && Hud->Movables.IsValidIndex(Button.Value) && CursorPosition(X, Y))
+		{
+			DragPanel = Hud->Movables[Button.Value].Id;
+			DragFrom = FVector2D(X, Y);
+		}
+		break;
+	}
+	case ETMHudAction::LayoutCard:
+		DragCard = Button.Value;
+		break;
+	case ETMHudAction::LayoutReset:
+		FTMSettings::Get().ResetLayout();
+		break;
+	case ETMHudAction::OptionTurnSquares:
+		FTMSettings::Get().bTurnSquares = !FTMSettings::Get().bTurnSquares;
+		FTMSettings::Get().Save();
+		break;
 	case ETMHudAction::OpenOptions:
 		bOptionsOpen = true;
 		bDevToolsOpen = false;
@@ -3006,6 +3052,16 @@ void ATMBattleDirector::UpdateCamera(float DeltaSeconds)
 		return;
 	}
 
+	// A panel being dragged in Edit layout follows the pointer, remembered in
+	// 1080p pixels so it keeps its place at any size or UI scale.
+	if (!DragPanel.IsEmpty() && bHaveCursor)
+	{
+		const ATMBattleHud* Hud = Cast<ATMBattleHud>(Player->GetHUD());
+		const float Scale = Hud ? FMath::Max(0.1f, Hud->Scale()) : 1.0f;
+		FTMSettings::Get().Layout.FindOrAdd(DragPanel) += (Cursor - DragFrom) / Scale;
+		DragFrom = Cursor;
+	}
+
 	// Nothing moves the camera behind a menu, or while a key is being chosen.
 	const bool bFree = bPlayerInput && !bMenuOpen && !bGuideOpen && !bOptionsOpen && !bDevToolsOpen
 		&& CaptureAction < 0 && PickerSlot < 0 && Screen == EScreen::Battle;
@@ -3178,6 +3234,66 @@ void ATMBattleDirector::FlushTuning()
 		const FString Refused = Submit(TMSim::FOrder::MakeTune(Values));
 		Tell(Refused.IsEmpty() ? FString(TEXT("Developer Tools: rule numbers updated.")) : Refused);
 	}
+}
+
+void ATMBattleDirector::ToggleLayout()
+{
+	bEditingLayout = !bEditingLayout;
+	DragPanel.Reset();
+	DragCard = -1;
+	if (bEditingLayout)
+	{
+		CancelAim();
+	}
+	else
+	{
+		FTMSettings::Get().Save();
+		Tell(TEXT("Layout locked."));
+	}
+}
+
+void ATMBattleDirector::DropCard()
+{
+	// hud.gd:386-400: where it is dropped among its side's squares is its new place.
+	const int32 Moving = DragCard;
+	DragCard = -1;
+	const TMSim::FUnit* Unit = Battle.FindUnit(Moving);
+	const UWorld* World = GetWorld();
+	const APlayerController* Player = World ? World->GetFirstPlayerController() : nullptr;
+	const ATMBattleHud* Hud = Player ? Cast<ATMBattleHud>(Player->GetHUD()) : nullptr;
+	float X = 0.0f;
+	float Y = 0.0f;
+	if (!Unit || !Hud || !CursorPosition(X, Y))
+	{
+		return;
+	}
+	TArray<TPair<double, int32>> Row;
+	for (const TPair<int32, FBox2D>& Square : Hud->SquareAreas)
+	{
+		const TMSim::FUnit* Other = Battle.FindUnit(Square.Key);
+		if (Other && Other->Team == Unit->Team && Other->Id != Moving)
+		{
+			Row.Add(TPair<double, int32>(Square.Value.GetCenter().X, Square.Key));
+		}
+	}
+	Row.Sort([](const TPair<double, int32>& A, const TPair<double, int32>& B) { return A.Key < B.Key; });
+	TArray<int32>& Order = FTMSettings::Get().CardOrder[Unit->Team];
+	Order.Reset();
+	bool bPlaced = false;
+	for (const TPair<double, int32>& Entry : Row)
+	{
+		if (!bPlaced && X < Entry.Key)
+		{
+			Order.Add(Moving);
+			bPlaced = true;
+		}
+		Order.Add(Entry.Value);
+	}
+	if (!bPlaced)
+	{
+		Order.Add(Moving);
+	}
+	FTMSettings::Get().Save();
 }
 
 int32 ATMBattleDirector::PlanningTeam() const

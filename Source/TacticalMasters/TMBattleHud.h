@@ -92,6 +92,14 @@ enum class ETMHudAction : uint8
 	ResetOptions,
 	DevReset,
 	DevResetAll,
+	OptionTurnSquares,
+
+	// Edit layout. LayoutGrab's value is the panel's place in this frame's list;
+	// LayoutCard's is the unit whose turn square is being dragged.
+	ToggleLayout,
+	LayoutGrab,
+	LayoutCard,
+	LayoutReset,
 };
 
 /** Words shown when the pointer rests on part of the HUD: how a number is worked out. */
@@ -142,6 +150,14 @@ private:
 	void DrawOptions(ATMBattleDirector& Director);
 	/** Options or Developer Tools, if open, over everything else. */
 	void DrawOverlays(ATMBattleDirector& Director);
+	/** The turn order as a fixed square per unit (hud.gd:318-470). */
+	void DrawTurnSquares(ATMBattleDirector& Director);
+	/** Handles over every movable panel, and the bar that says how (hud.gd:203-240). */
+	void DrawLayoutEditing(ATMBattleDirector& Director);
+	/** How far the player has moved this panel, in this screen's pixels. */
+	FVector2D Nudge(const TCHAR* Id) const;
+	/** Says a panel was drawn here and may be moved in Edit layout. */
+	void Movable(const TCHAR* Id, const TCHAR* Label, float X, float Y, float W, float H);
 	void DrawDevTools(ATMBattleDirector& Director);
 	/** A slider with its track, fill and knob, answering the pointer over all of it. */
 	void Slider(float X, float Y, float W, float H, int32 Id, double Value, double Low, double High);
@@ -196,6 +212,19 @@ public:
 	TMap<int32, FBox2D> SliderAreas;
 	/** Where the log was drawn this frame: the wheel scrolls it there and zooms elsewhere. */
 	FBox2D LogArea = FBox2D(ForceInit);
+
+	/** A panel that can be moved in Edit layout, as drawn this frame. */
+	struct FTMMovable
+	{
+		FString Id;
+		FString Label;
+		FBox2D Area;
+	};
+	TArray<FTMMovable> Movables;
+	/** Where each turn square was drawn this frame, by unit id, for reordering. */
+	TMap<int32, FBox2D> SquareAreas;
+	/** Screen pixels to a 1080p pixel's worth, as this frame was drawn. */
+	float Scale() const { return S; }
 
 private:
 	TArray<FTMHudTip> Tips;

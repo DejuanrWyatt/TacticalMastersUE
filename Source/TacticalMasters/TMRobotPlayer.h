@@ -46,7 +46,11 @@ private:
 	/** One thing a person does, then how to tell it worked. */
 	struct FStep
 	{
-		enum class EKind : uint8 { ClickButton, ClickUnit, ClickGround, ClickTarget, ClickPlaceable, Key, EnsureMove, EnsureAbility, Check, Wait };
+		enum class EKind : uint8 { ClickButton, ClickUnit, ClickGround, ClickTarget, ClickPlaceable, Key, EnsureMove, EnsureAbility, Check, Wait,
+			/** Edit layout: take hold of a panel's handle, or a turn square; slide the pointer; let go. */
+			GrabPanel, GrabSquare, Slide, Release,
+			/** A picture of the screen as it is, named by Meaning. */
+			Picture };
 		EKind Kind = EKind::Wait;
 		ETMHudAction Action = ETMHudAction::None;
 		int32 Value = -1;
@@ -74,6 +78,14 @@ private:
 	void PlanTurn(const struct TMSim::FUnit& Unit);
 	void PlanPlacing(int32 Team);
 	void PlanLooking();
+	/** Edit layout: move a panel, reorder a turn square, reset, lock (hud.gd:203-240). */
+	void PlanLayout();
+	bool bArranged = false;
+	/** The unit whose square was taken hold of, for the reorder check. */
+	int32 LastGrabbedSquare = -1;
+	/** The pointer part way along a slide, and how far is left. */
+	FVector2D SlideLeft = FVector2D::ZeroVector;
+	bool bSliding = false;
 	void Finish();
 
 	// Doing a step, frame by frame.

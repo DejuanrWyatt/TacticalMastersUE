@@ -39,6 +39,8 @@ enum class ETMAction : uint8
 	CamDown,
 	CamRotateLeft,
 	CamRotateRight,
+	/** Customise the screen, and lock it again: one press each. */
+	EditLayout,
 	Count
 };
 
@@ -61,6 +63,22 @@ public:
 	bool bFullscreen = false;
 	/** Blue and orange rather than blue and red, for red-green colour blindness. */
 	bool bColorblind = false;
+
+	/**
+	 * The turn order as a fixed square per unit rather than chips sliding along
+	 * two bars (settings.gd turn_icons). The default here: the squares.
+	 */
+	bool bTurnSquares = true;
+
+	/**
+	 * Where each panel has been moved to in Edit layout, as how far it is
+	 * nudged from where it normally sits, in 1080p pixels -- so it still
+	 * follows its edge or corner when the window changes (layout_editor.gd:6-9).
+	 */
+	TMap<FString, FVector2D> Layout;
+	/** The order each side's turn squares were dragged into, by unit id. */
+	TArray<int32> CardOrder[2];
+	void ResetLayout();
 
 	/** Rule numbers for the next battle, by tuning key; missing means the default. */
 	TMap<FString, double> Tuning;

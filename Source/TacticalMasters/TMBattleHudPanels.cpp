@@ -309,8 +309,8 @@ void ATMBattleHud::DrawTurnOrder(ATMBattleDirector& From)
 	// that would touch merge into a framed group, and each glides rather than
 	// jumps (hud.gd:52-74, 307-311, 1226-1387).
 	const TMSim::FBattle& Battle = From.Battle;
-	const float X0 = 16.0f * S;
-	const float Y0 = 12.0f * S;
+	const float X0 = 16.0f * S + Nudge(TEXT("turn_order")).X;
+	const float Y0 = 12.0f * S + Nudge(TEXT("turn_order")).Y;
 	const float Width = FMath::Max(300.0f * S, Canvas->ClipX - 32.0f * S - CornerWidth * S);
 	const float End = X0 + Width;
 	const float Track = TrackStart * S;
@@ -573,6 +573,8 @@ void ATMBattleHud::DrawTurnOrder(ATMBattleDirector& From)
 		}
 	}
 
+	Movable(TEXT("turn_order"), TEXT("Turn order bars"), X0 - 6.0f * S, Y0 - 3.0f * S, Width + 12.0f * S, 2.0f * RowHeight * S);
+
 	// Units that are gone lose their place, so a new battle starts them fresh.
 	for (auto It = ChipPlace.CreateIterator(); It; ++It)
 	{
@@ -580,6 +582,124 @@ void ATMBattleHud::DrawTurnOrder(ATMBattleDirector& From)
 		{
 			ChipScale.Remove(It.Key());
 			It.RemoveCurrent();
+		}
+	}
+}
+
+// ------------------------------------------------------------ turn squares
+
+void ATMBattleHud::DrawTurnSquares(ATMBattleDirector& From)
+{
+	// hud.gd:318-470. A square per unit, one row per side, each row movable on
+	// its own and its squares reorderable (Edit layout). Waiting, a square is
+	// grey and a red meter fills from the bottom as its gauge fills; on its
+	// turn it goes gold, its border pulses, and the meter drains as its
+	// countdown runs out. The badge is the seconds to either, or to a cast.
+	const TMSim::FBattle& Battle = From.Battle;
+	UFont* Font = GEngine->GetMediumFont();
+	const float SW = 56.0f * S;
+	const float SH = 62.0f * S;
+	const float Gap = 5.0f * S;
+	const float Pulse = 0.55f + 0.45f * FMath::Sin((GetWorld() ? GetWorld()->GetRealTimeSeconds() : 0.0f) * 1000.0f / 180.0f);
+	for (int32 Team = 0; Team < 2; ++Team)
+	{
+		// The order the player left them in, then anyone else by id.
+		TArray<const TMSim::FUnit*> Row;
+		for (int32 Id : FTMSettings::Get().CardOrder[Team])
+		{
+			const TMSim::FUnit* Unit = nullptr;
+			for (const TMSim::FUnit& Each : Battle.Units)
+			{
+				if (Each.Id == Id)
+				{
+					Unit = &Each;
+				}
+			}
+			if (Unit && Unit->Team == Team && Unit->IsAlive())
+			{
+				Row.AddUnique(Unit);
+			}
+		}
+		for (const TMSim::FUnit& Unit : Battle.Units)
+		{
+			if (Unit.Team == Team && Unit.IsAlive())
+			{
+				Row.AddUnique(&Unit);
+			}
+		}
+		const FVector2D Moved = Nudge(Team == 0 ? TEXT("turn_cards_blue") : TEXT("turn_cards_red"));
+		const float RowX = 16.0f * S + Team * (4.0f * (SW + Gap) + 24.0f * S) + Moved.X;
+		const float RowY = 12.0f * S + Moved.Y;
+		float X = RowX;
+		for (const TMSim::FUnit* Unit : Row)
+		{
+			const bool bFogged = !From.IsSeen(*Unit);
+			const float Seconds = SecondsLeft(*Unit, Battle);
+			FLinearColor Fill(0.07f, 0.08f, 0.11f, 0.85f);
+			FLinearColor Edge(1.0f, 1.0f, 1.0f, 0.2f);
+			FLinearColor Meter(0.8f, 0.25f, 0.2f, 0.45f);
+			float Level = static_cast<float>(Unit->Tg) / TMSim::Pace::TgMax;
+			FString Badge = FString::Printf(TEXT("%ds"), FMath::CeilToInt(Seconds));
+			FLinearColor BadgeColour = Dim;
+			if (Unit->bReady)
+			{
+				Fill = FLinearColor(0.45f, 0.35f, 0.08f, 0.9f);
+				Edge = FLinearColor(Gold.R, Gold.G, Gold.B, Pulse);
+				Meter = FLinearColor(1.0f, 0.82f, 0.35f, 0.35f);
+				const int32 Full = FMath::Max(1, Battle.ClockTicks(*Unit));
+				Level = FMath::Clamp(static_cast<float>(Unit->Clock) / Full, 0.0f, 1.0f);
+				BadgeColour = Gold;
+			}
+			else if (Unit->IsCasting())
+			{
+				Badge = FString::Printf(TEXT("%.1fs"), Seconds);
+				BadgeColour = CastColour;
+			}
+			const float Alpha = bFogged ? 0.45f : 1.0f;
+			Fill.A *= Alpha;
+			Meter.A *= Alpha;
+			float Thick = Unit->bReady ? 2.5f : 1.5f;
+			if (Unit->Id == From.SelectedId)
+			{
+				Edge = FLinearColor::White;
+				Thick = 3.5f;
+			}
+			Panel(X, RowY, SW, SH, Fill, Edge, Thick);
+			DrawRect(Meter, X + 2.0f, RowY + SH - SH * Level, SW - 4.0f, SH * Level - 2.0f);
+			// A strip of the side's colour along the top, so the rows read apart.
+			DrawRect(TeamColour(Team) * FLinearColor(1, 1, 1, 0.8f * Alpha), X + 2.0f, RowY + 2.0f, SW - 4.0f, 3.0f * S);
+			const FString Mark = bFogged ? FString(TEXT("?")) : Initials(JobName(*Unit));
+			const float Letters = 0.62f * S;
+			const FVector2D MarkSize = TextSize(Mark, Font, Letters);
+			Text(Mark, X + (SW - MarkSize.X) * 0.5f, RowY + 8.0f * S, (Unit->bReady ? TextColour : Dim) * FLinearColor(1, 1, 1, Alpha), Font, Letters);
+			const float BadgeScale = 0.42f * S;
+			const FVector2D BadgeSize = TextSize(Badge, Font, BadgeScale);
+			Text(Badge, X + (SW - BadgeSize.X) * 0.5f, RowY + SH - BadgeSize.Y - 2.0f * S, BadgeColour * FLinearColor(1, 1, 1, Alpha), Font, BadgeScale);
+			AddButton(X, RowY, SW, SH, ETMHudAction::PickUnit, Unit->Id);
+			SquareAreas.Add(Unit->Id, FBox2D(FVector2D(X, RowY), FVector2D(X + SW, RowY + SH)));
+			FString Tip;
+			if (bFogged)
+			{
+				Tip = TEXT("Hidden by the fog of war");
+			}
+			else
+			{
+				Tip = FString::Printf(TEXT("%s %s %d  hp %d/%d"), Team == 0 ? TEXT("Blue") : TEXT("Red"),
+					*JobName(*Unit), Unit->Id, Unit->Hp, Unit->MaxHp());
+				if (Unit->IsCasting())
+				{
+					const TMSim::FAbility* Ability = TMSim::JobAbility(Unit->Job, Unit->Casting.Slot);
+					Tip += FString::Printf(TEXT("\nCasting %hs"), Ability ? Ability->Name.c_str() : "");
+				}
+				Tip += TEXT("\n\n") + ExplainTurn(From, *Unit) + TEXT("\n") + ExplainCountdown(From, *Unit);
+			}
+			AddTip(X, RowY, SW, SH, Tip);
+			X += SW + Gap;
+		}
+		if (Row.Num() > 0)
+		{
+			Movable(Team == 0 ? TEXT("turn_cards_blue") : TEXT("turn_cards_red"), Team == 0 ? TEXT("Blue squares") : TEXT("Red squares"),
+				RowX - 3.0f * S, RowY - 3.0f * S, X - RowX - Gap + 6.0f * S, SH + 6.0f * S);
 		}
 	}
 }
@@ -600,8 +720,8 @@ void ATMBattleHud::DrawLog(ATMBattleDirector& From)
 	const float Scale = 0.5f * S;
 	const float LineH = TextSize(TEXT("Ag"), Font, Scale).Y;
 	const int32 Shown = From.bLogLarge ? 28 : 10;
-	const float X = 16.0f * S;
-	const float Y = 12.0f * S + 2.0f * RowHeight * S + 18.0f * S;
+	const float X = 16.0f * S + Nudge(TEXT("log")).X;
+	const float Y = 12.0f * S + 2.0f * RowHeight * S + 18.0f * S + Nudge(TEXT("log")).Y;
 	const float W = 520.0f * S;
 	const float Head = 24.0f * S;
 	const int32 Last = FMath::Max(0, From.Log.Num() - From.LogScroll);
@@ -610,6 +730,7 @@ void ATMBattleHud::DrawLog(ATMBattleDirector& From)
 	const float H = Head + FMath::Max(1, Count) * LineH + 8.0f * S;
 	Panel(X - 6.0f * S, Y - 4.0f * S, W, H, FLinearColor(0.06f, 0.08f, 0.12f, 0.62f), FLinearColor(1, 1, 1, 0.12f), 1.0f);
 	LogArea = FBox2D(FVector2D(X - 6.0f * S, Y - 4.0f * S), FVector2D(X - 6.0f * S + W, Y - 4.0f * S + H));
+	Movable(TEXT("log"), TEXT("Combat log"), X - 6.0f * S, Y - 4.0f * S, W, H);
 	LogBottom = Y - 4.0f * S + H;
 	FString Title = TEXT("Log");
 	if (From.LogScroll > 0)
@@ -738,9 +859,10 @@ void ATMBattleHud::DrawUnitCard(ATMBattleDirector& From)
 		Incoming += From.IsSeen(*Caster) ? 1 : 0;
 	}
 	const float H = 238.0f * S + Incoming * 20.0f * S;
-	const float X = 16.0f * S;
-	const float Y = Canvas->ClipY - H - 16.0f * S;
+	const float X = 16.0f * S + Nudge(TEXT("unit_card")).X;
+	const float Y = Canvas->ClipY - H - 16.0f * S + Nudge(TEXT("unit_card")).Y;
 	Panel(X, Y, W, H, PanelFill, TeamColour(Unit->Team) * FLinearColor(1, 1, 1, 0.5f), 1.5f);
+	Movable(TEXT("unit_card"), TEXT("Selected unit"), X, Y, W, H);
 
 	float Row = Y + Pad;
 	Text(FString::Printf(TEXT("%s %d"), *JobName(*Unit), Unit->Id), X + Pad, Row, TeamColour(Unit->Team), Big, 0.85f * S);
@@ -803,9 +925,10 @@ void ATMBattleHud::DrawInspectCard(ATMBattleDirector& From)
 	const float W = 420.0f * S;
 	const float Pad = 10.0f * S;
 	const float H = 214.0f * S + 4.0f * 24.0f * S + 30.0f * S + Incoming * 20.0f * S;
-	const float X = Canvas->ClipX - W - 16.0f * S;
-	const float Y = FMath::Max(12.0f * S + 2.0f * RowHeight * S + 60.0f * S, (Canvas->ClipY - H) * 0.5f);
+	const float X = Canvas->ClipX - W - 16.0f * S + Nudge(TEXT("inspect")).X;
+	const float Y = FMath::Max(12.0f * S + 2.0f * RowHeight * S + 60.0f * S, (Canvas->ClipY - H) * 0.5f) + Nudge(TEXT("inspect")).Y;
 	Panel(X, Y, W, H, PanelFill, TeamColour(Unit->Team) * FLinearColor(1, 1, 1, 0.6f), 1.5f);
+	Movable(TEXT("inspect"), TEXT("Unit card"), X, Y, W, H);
 
 	float Row = Y + Pad;
 	Text(FString::Printf(TEXT("%s %s %d"), Unit->Team == 0 ? TEXT("Blue") : TEXT("Red"), *JobName(*Unit), Unit->Id),
@@ -884,12 +1007,17 @@ void ATMBattleHud::DrawInspectCard(ATMBattleDirector& From)
 
 void ATMBattleHud::DrawCornerButtons(ATMBattleDirector& From)
 {
-	// Log / Field / Units / Pause / Menu, top right (hud.gd:608-623).
+	// Log / Field / Units / Pause / Menu, top right (hud.gd:608-623), and Layout.
 	const float BW = 60.0f * S;
 	const float BH = 30.0f * S;
 	const float Gap = 4.0f * S;
-	float X = Canvas->ClipX - 10.0f * S - 5.0f * BW - 4.0f * Gap;
-	const float Y = 12.0f * S;
+	float X = Canvas->ClipX - 10.0f * S - 6.0f * BW - 5.0f * Gap + Nudge(TEXT("corner")).X;
+	const float Y = 12.0f * S + Nudge(TEXT("corner")).Y;
+	Movable(TEXT("corner"), TEXT("Buttons"), X, Y, 6.0f * BW + 5.0f * Gap, BH);
+	MenuButton(X, Y, BW, BH, TEXT("Layout"), ETMHudAction::ToggleLayout, -1, From.bEditingLayout);
+	AddTip(X, Y, BW, BH, FString::Printf(TEXT("Move the screen's panels where you want them, then lock them again (%s)"),
+		*FTMSettings::Get().KeyName(ETMAction::EditLayout)));
+	X += BW + Gap;
 	MenuButton(X, Y, BW, BH, TEXT("Log"), ETMHudAction::ToggleLog, -1, From.bShowLog);
 	AddTip(X, Y, BW, BH, TEXT("Show or hide the combat log (L). + makes it taller; the wheel scrolls it."));
 	X += BW + Gap;
@@ -925,11 +1053,12 @@ void ATMBattleHud::DrawField(ATMBattleDirector& From)
 		Rows += (Unit.IsAlive() || Unit.IsKo()) ? 1 : 0;
 	}
 	const float H = Rows * RowH + 16.0f * S;
-	const float X = 16.0f * S;
+	const float X = 16.0f * S + Nudge(TEXT("field")).X;
 	// Under the log when it is open, so the two never overlap.
 	const float Top = From.bShowLog ? LogBottom + 16.0f * S : 12.0f * S + 2.0f * RowHeight * S + 18.0f * S;
-	const float Y = FMath::Max(Top, (Canvas->ClipY - H) * 0.5f);
+	const float Y = FMath::Max(Top, (Canvas->ClipY - H) * 0.5f) + Nudge(TEXT("field")).Y;
 	Panel(X - 6.0f * S, Y - 8.0f * S, W, H, FLinearColor(0.03f, 0.05f, 0.08f, 0.9f), FLinearColor(1, 1, 1, 0.12f), 1.0f);
+	Movable(TEXT("field"), TEXT("Field list"), X - 6.0f * S, Y - 8.0f * S, W, H);
 	float Row = Y;
 	for (int32 Team = 0; Team < 2; ++Team)
 	{

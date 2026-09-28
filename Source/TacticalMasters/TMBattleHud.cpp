@@ -16,6 +16,66 @@
 
 using namespace TMHudStyle;
 
+FVector2D ATMBattleHud::Nudge(const TCHAR* Id) const
+{
+	const FVector2D* Moved = FTMSettings::Get().Layout.Find(Id);
+	return Moved ? *Moved * S : FVector2D::ZeroVector;
+}
+
+void ATMBattleHud::Movable(const TCHAR* Id, const TCHAR* Label, float X, float Y, float W, float H)
+{
+	Movables.Add({ Id, Label, FBox2D(FVector2D(X, Y), FVector2D(X + W, Y + H)) });
+}
+
+void ATMBattleHud::DrawLayoutEditing(ATMBattleDirector& From)
+{
+	// Every panel drawn this frame gets a handle over it: blue, with its name,
+	// and the whole of it answers the pointer (layout_editor.gd:33-60). The
+	// turn squares keep their own buttons, to drag one along its row.
+	UFont* Font = GEngine->GetMediumFont();
+	const FLinearColor Fill(0.25f, 0.65f, 1.0f, 0.18f);
+	const FLinearColor Edge(0.45f, 0.8f, 1.0f, 0.9f);
+	TArray<FTMHudButton> Squares;
+	for (const FTMHudButton& Button : Buttons)
+	{
+		if (Button.Action == ETMHudAction::PickUnit && SquareAreas.Contains(Button.Value))
+		{
+			FTMHudButton Card = Button;
+			Card.Action = ETMHudAction::LayoutCard;
+			Squares.Add(Card);
+		}
+	}
+	Buttons.Reset();
+	Tips.Reset();
+	for (int32 i = 0; i < Movables.Num(); ++i)
+	{
+		const FBox2D& Area = Movables[i].Area;
+		const FVector2D Size = Area.GetSize();
+		Panel(Area.Min.X, Area.Min.Y, Size.X, Size.Y, Fill, Edge, 2.0f);
+		// Its name on a tag at the corner, clear of what the panel says.
+		const FVector2D LabelSize = TextSize(Movables[i].Label, Font, 0.45f * S);
+		const float TagY = Area.Min.Y > LabelSize.Y + 8.0f * S ? Area.Min.Y - LabelSize.Y - 6.0f * S : Area.Max.Y + 2.0f * S;
+		Panel(Area.Min.X, TagY, LabelSize.X + 12.0f * S, LabelSize.Y + 4.0f * S, FLinearColor(0.03f, 0.08f, 0.16f, 0.95f), Edge, 1.0f);
+		Text(Movables[i].Label, Area.Min.X + 6.0f * S, TagY + 2.0f * S, Edge, Font, 0.45f * S);
+		AddButton(Area.Min.X, Area.Min.Y, Size.X, Size.Y, ETMHudAction::LayoutGrab, i);
+	}
+	Buttons.Append(Squares);
+
+	// The bar that says what is going on, and how to stop.
+	const FString Hint = TEXT("Edit layout: drag anything to move it, or a turn square to reorder its side");
+	const FVector2D HintSize = TextSize(Hint, Font, 0.6f * S);
+	const float BW = 170.0f * S;
+	const float BH = 38.0f * S;
+	const float W = HintSize.X + 2.0f * BW + 56.0f * S;
+	const float X = (Canvas->ClipX - W) * 0.5f;
+	const float Y = Canvas->ClipY - 170.0f * S;
+	Panel(X, Y, W, BH + 16.0f * S, FLinearColor(0.05f, 0.07f, 0.11f, 0.95f), Edge, 1.5f);
+	Text(Hint, X + 14.0f * S, Y + 8.0f * S + (BH - HintSize.Y) * 0.5f, Edge, Font, 0.6f * S);
+	MenuButton(X + HintSize.X + 28.0f * S, Y + 8.0f * S, BW, BH, TEXT("Reset layout"), ETMHudAction::LayoutReset);
+	MenuButton(X + HintSize.X + BW + 40.0f * S, Y + 8.0f * S, BW, BH,
+		FString::Printf(TEXT("Lock  (%s)"), *FTMSettings::Get().KeyName(ETMAction::EditLayout)), ETMHudAction::ToggleLayout, -1, true);
+}
+
 void ATMBattleHud::DrawOverlays(ATMBattleDirector& From)
 {
 	if (!From.bOptionsOpen && !From.bDevToolsOpen)
@@ -170,6 +230,8 @@ void ATMBattleHud::DrawHUD()
 	Tips.Reset();
 	SliderAreas.Reset();
 	LogArea = FBox2D(ForceInit);
+	Movables.Reset();
+	SquareAreas.Reset();
 	ATMBattleDirector* Found = FindDirector();
 	if (!Canvas || !Found || !Found->bBuilt || !GEngine)
 	{
@@ -208,7 +270,14 @@ void ATMBattleHud::DrawHUD()
 
 	// Under everything else, since it is drawn onto the board.
 	DrawBoardAids(*Found);
-	DrawTurnOrder(*Found);
+	if (FTMSettings::Get().bTurnSquares)
+	{
+		DrawTurnSquares(*Found);
+	}
+	else
+	{
+		DrawTurnOrder(*Found);
+	}
 	DrawLog(*Found);
 	DrawUnitCard(*Found);
 	DrawActionBar(*Found);
@@ -228,6 +297,11 @@ void ATMBattleHud::DrawHUD()
 		Buttons.Reset();
 		Tips.Reset();
 		DrawBattleMenu(*Found);
+	}
+	else if (Found->bEditingLayout)
+	{
+		// Only the handles answer while the screen is being arranged.
+		DrawLayoutEditing(*Found);
 	}
 	DrawOverlays(*Found);
 	DrawTooltip();
@@ -437,9 +511,10 @@ void ATMBattleHud::DrawActionBar(ATMBattleDirector& From)
 	const int32 Count = 7;
 	const float Total = Count * BW + (Count - 1) * Gap;
 	const float CardRight = 16.0f * S + 440.0f * S + 12.0f * S;
-	float X = FMath::Max(CardRight, (Canvas->ClipX - Total) * 0.5f);
-	const float Y = Canvas->ClipY - BH - 16.0f * S;
+	float X = FMath::Max(CardRight, (Canvas->ClipX - Total) * 0.5f) + Nudge(TEXT("action_bar")).X;
+	const float Y = Canvas->ClipY - BH - 16.0f * S + Nudge(TEXT("action_bar")).Y;
 	ActionBarTop = Y;
+	Movable(TEXT("action_bar"), TEXT("Action bar"), X, Y, Total, BH);
 
 	FVector2D Mouse(-1.0f, -1.0f);
 	if (PlayerOwner)
@@ -556,23 +631,32 @@ void ATMBattleHud::DrawBanners(ATMBattleDirector& From)
 				Plan += TEXT("   ·   click one of your units, then click a spot in your area");
 			}
 			const FVector2D Size = TextSize(Plan, Font, 0.7f * S);
-			const float PY = 152.0f * S;
-			Panel(CentreX - Size.X * 0.5f - 16.0f * S, PY - 6.0f * S, Size.X + 32.0f * S, Size.Y + 12.0f * S,
+			const FVector2D Moved = Nudge(TEXT("planning"));
+			const float PY = 152.0f * S + Moved.Y;
+			const float PX = CentreX + Moved.X;
+			Panel(PX - Size.X * 0.5f - 16.0f * S, PY - 6.0f * S, Size.X + 32.0f * S, Size.Y + 12.0f * S,
 				FLinearColor(0.05f, 0.06f, 0.1f, 0.85f), Gold, 1.5f);
-			Text(Plan, CentreX - Size.X * 0.5f, PY, Gold, Font, 0.7f * S);
+			Text(Plan, PX - Size.X * 0.5f, PY, Gold, Font, 0.7f * S);
+			float Bottom = PY + Size.Y + 6.0f * S;
 			if (Team != -1 && !Battle.PlanningDone[Team])
 			{
 				const float BW = 220.0f * S;
-				MenuButton(CentreX - BW * 0.5f, PY + Size.Y + 16.0f * S, BW, 44.0f * S, TEXT("Ready  (Enter)"), ETMHudAction::PlanningReady);
+				MenuButton(PX - BW * 0.5f, PY + Size.Y + 16.0f * S, BW, 44.0f * S,
+					FString::Printf(TEXT("Ready  (%s)"), *FTMSettings::Get().KeyName(ETMAction::EndTurn)), ETMHudAction::PlanningReady);
+				Bottom += 54.0f * S;
 			}
+			Movable(TEXT("planning"), TEXT("Planning banner"), PX - Size.X * 0.5f - 16.0f * S, PY - 6.0f * S, Size.X + 32.0f * S, Bottom - PY + 6.0f * S);
 		}
 		if (!Rules.IsEmpty())
 		{
 			const FVector2D Size = TextSize(Rules, Font, 0.62f * S);
-			const float RY = 118.0f * S;
-			Panel(CentreX - Size.X * 0.5f - 12.0f * S, RY - 4.0f * S, Size.X + 24.0f * S, Size.Y + 8.0f * S,
+			const FVector2D Moved = Nudge(TEXT("objective"));
+			const float RY = 118.0f * S + Moved.Y;
+			const float RX = CentreX + Moved.X;
+			Panel(RX - Size.X * 0.5f - 12.0f * S, RY - 4.0f * S, Size.X + 24.0f * S, Size.Y + 8.0f * S,
 				FLinearColor(0.05f, 0.06f, 0.1f, 0.75f), FLinearColor(0.3f, 0.32f, 0.4f, 1.0f), 1.0f);
-			Text(Rules, CentreX - Size.X * 0.5f, RY, TextColour, Font, 0.62f * S);
+			Text(Rules, RX - Size.X * 0.5f, RY, TextColour, Font, 0.62f * S);
+			Movable(TEXT("objective"), TEXT("Time and middle"), RX - Size.X * 0.5f - 12.0f * S, RY - 4.0f * S, Size.X + 24.0f * S, Size.Y + 8.0f * S);
 		}
 	}
 

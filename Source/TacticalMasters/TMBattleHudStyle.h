@@ -50,7 +50,7 @@ namespace TMHudStyle
 	/** Seconds either side of a turn during which a chip shows its time. */
 	inline constexpr float ShowTimeSeconds = 3.0f;
 	/** Room kept at the top right for the corner buttons (hud.gd:56). */
-	inline constexpr float CornerWidth = 330.0f;
+	inline constexpr float CornerWidth = 394.0f;
 	inline constexpr float TickSeconds[] = { 0.0f, 1.0f, 3.0f, 5.0f, 10.0f, 20.0f, 30.0f };
 
 	inline constexpr float Tps = static_cast<float>(TMSim::Pace::TicksPerSecond);

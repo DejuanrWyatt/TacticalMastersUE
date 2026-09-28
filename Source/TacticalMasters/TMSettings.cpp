@@ -42,6 +42,7 @@ namespace
 			{ TEXT("cam_down"), TEXT("Camera down"), { EKeys::F } },
 			{ TEXT("cam_rotate_left"), TEXT("Rotate camera left"), { EKeys::Q } },
 			{ TEXT("cam_rotate_right"), TEXT("Rotate camera right"), { EKeys::E } },
+			{ TEXT("edit_layout"), TEXT("Edit layout / lock it"), { EKeys::F2 } },
 		};
 		return List;
 	}
@@ -119,12 +120,21 @@ void FTMSettings::ResetKeys()
 	}
 }
 
+void FTMSettings::ResetLayout()
+{
+	Layout.Reset();
+	CardOrder[0].Reset();
+	CardOrder[1].Reset();
+	Save();
+}
+
 void FTMSettings::ResetOptions()
 {
 	CameraSpeed = 1.0f;
 	UiScale = 1.0f;
 	bFullscreen = false;
 	bColorblind = false;
+	bTurnSquares = true;
 	ResetKeys();
 	Save();
 	Apply();
@@ -154,6 +164,30 @@ void FTMSettings::Load()
 	if (Root->TryGetNumberField(TEXT("ui_scale"), Number)) { UiScale = FMath::Clamp(static_cast<float>(Number), 0.9f, 1.3f); }
 	Root->TryGetBoolField(TEXT("fullscreen"), bFullscreen);
 	Root->TryGetBoolField(TEXT("colorblind"), bColorblind);
+	Root->TryGetBoolField(TEXT("turn_squares"), bTurnSquares);
+	const TSharedPtr<FJsonObject>* Places = nullptr;
+	if (Root->TryGetObjectField(TEXT("layout"), Places))
+	{
+		for (const TPair<FString, TSharedPtr<FJsonValue>>& Entry : (*Places)->Values)
+		{
+			const TArray<TSharedPtr<FJsonValue>>& XY = Entry.Value->AsArray();
+			if (XY.Num() == 2)
+			{
+				Layout.Add(Entry.Key, FVector2D(XY[0]->AsNumber(), XY[1]->AsNumber()));
+			}
+		}
+	}
+	const TArray<TSharedPtr<FJsonValue>>* Orders = nullptr;
+	if (Root->TryGetArrayField(TEXT("turn_card_order"), Orders) && Orders->Num() == 2)
+	{
+		for (int32 Team = 0; Team < 2; ++Team)
+		{
+			for (const TSharedPtr<FJsonValue>& Id : (*Orders)[Team]->AsArray())
+			{
+				CardOrder[Team].Add(static_cast<int32>(Id->AsNumber()));
+			}
+		}
+	}
 	const TSharedPtr<FJsonObject>* Keys = nullptr;
 	if (Root->TryGetObjectField(TEXT("keys"), Keys))
 	{
@@ -195,6 +229,24 @@ void FTMSettings::Save() const
 	Root->SetNumberField(TEXT("ui_scale"), UiScale);
 	Root->SetBoolField(TEXT("fullscreen"), bFullscreen);
 	Root->SetBoolField(TEXT("colorblind"), bColorblind);
+	Root->SetBoolField(TEXT("turn_squares"), bTurnSquares);
+	TSharedRef<FJsonObject> Places = MakeShared<FJsonObject>();
+	for (const TPair<FString, FVector2D>& Entry : Layout)
+	{
+		Places->SetArrayField(Entry.Key, { MakeShared<FJsonValueNumber>(Entry.Value.X), MakeShared<FJsonValueNumber>(Entry.Value.Y) });
+	}
+	Root->SetObjectField(TEXT("layout"), Places);
+	TArray<TSharedPtr<FJsonValue>> Orders;
+	for (int32 Team = 0; Team < 2; ++Team)
+	{
+		TArray<TSharedPtr<FJsonValue>> Ids;
+		for (int32 Id : CardOrder[Team])
+		{
+			Ids.Add(MakeShared<FJsonValueNumber>(Id));
+		}
+		Orders.Add(MakeShared<FJsonValueArray>(Ids));
+	}
+	Root->SetArrayField(TEXT("turn_card_order"), Orders);
 	TSharedRef<FJsonObject> Keys = MakeShared<FJsonObject>();
 	for (int32 i = 0; i < static_cast<int32>(ETMAction::Count); ++i)
 	{
