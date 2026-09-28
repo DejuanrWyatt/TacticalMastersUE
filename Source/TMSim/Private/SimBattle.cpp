@@ -305,7 +305,16 @@ namespace TMSim
 		}
 		std::vector<FStatus> Kept;
 		Kept.reserve(Unit.Statuses.size());
-		for (FStatus& Status : Unit.Statuses)
+		// A copy, walked instead of the unit's own list, because Hurt replaces that
+		// list (anything asleep is woken) part-way through this loop. Walking the
+		// live one read freed memory on every burn or bleed tick -- found by
+		// AddressSanitizer when it began crashing the class lab. The copy is also
+		// what Godot does: its `for s in u.statuses` keeps walking the array it
+		// began with after _hurt assigns a new one, and the `u.statuses = kept` at
+		// the end overrides the waking, so a Sleep that damage woke comes back if
+		// it had turns left (game_state.gd:1237-1277, 1339-1350). Kept bug-for-bug.
+		const std::vector<FStatus> Current = Unit.Statuses;
+		for (FStatus Status : Current)
 		{
 			const FStatusDef* Def = FindStatus(Status.Id);
 			if (!Def)

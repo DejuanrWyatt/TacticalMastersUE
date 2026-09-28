@@ -57,5 +57,10 @@ Not yet broken down; run `/plan-milestone` to split it into slices.
 | chore-class-sync-check | Replaced by SimClassTest's match against Godot's own reading (F4) | class-files | qa-engineer | Superseded |
 | chore-packaging-classes | Add `Data/Classes` to non-asset directories to package (F5) | port-astra-import | human | Todo |
 
+## Found along the way
+| id | goal | depends on | owner | status |
+|----|------|-----------|-------|--------|
+| parity-status-ticks | A Godot parity dump of statuses ticking with damage (burn, bleed) and waking (sleep), with the dice and orders of a whole battle, so TickStatuses is measured against Godot and not only against itself | – | qa-engineer | Todo. TickStatuses read freed memory on every damage tick until 2026-09-27 (found by AddressSanitizer through the class lab); no parity test covered it |
+
 ## Later (not yet broken down)
 Ultimates · animation from events on the canonical skeleton · CharacterMap data · networking over `Submit` + checksums.
