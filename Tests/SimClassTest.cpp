@@ -117,7 +117,8 @@ namespace
 			return Value && Value->IsString() ? Value->String : std::string();
 		};
 		if (Job->Name != Text("name")) { Fail(Id + ".name: " + Job->Name + " vs Godot's " + Text("name")); }
-		if (Job->Color != Text("color")) { Fail(Id + ".color: " + Job->Color + " vs Godot's " + Text("color")); }
+		// Godot's to_html(false) writes a colour without the leading #.
+		if (Job->Color != "#" + Text("color")) { Fail(Id + ".color: " + Job->Color + " vs Godot's " + Text("color")); }
 		if (Job->Look != Text("look")) { Fail(Id + ".look: " + Job->Look + " vs Godot's " + Text("look")); }
 		if (Job->Icon != Text("icon")) { Fail(Id + ".icon: " + Job->Icon + " vs Godot's " + Text("icon")); }
 

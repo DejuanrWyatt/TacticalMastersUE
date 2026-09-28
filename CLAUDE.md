@@ -112,8 +112,8 @@ Godot's order, shields, invulnerability, statuses, gauge changes, buffs, KO, and
 costs to use. The order path + replay + checksum is self-checked (`SimPlayTest`), which now plays a
 battle to a decision, and **replaying it with a different seed fails** — the check the determinism
 rules rest on.
-Class files load (`SimClassTest`: read, refuse, and every one of the 81 plays a battle with no refused
-order); the field-for-field match with Godot runs once `Tests/GodotClassTable.txt` exists.
+Class files (`SimClassTest`): all 81 load, broken files are refused, every class matches Godot's own reading
+field for field (`GodotClassTable.txt`), and every one plays a battle with no refused order.
 Not yet ported (see `Docs/backlog.md`): auras and passive/toggle stat contributions (`FUnit::Stat`
 says so where the gap is — several of the 81 loaded classes have them, so those play weaker than in
 Godot), `Randf` (easy/medium mistakes), the battle time limit and the hold-the-middle rule.
