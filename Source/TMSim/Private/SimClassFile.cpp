@@ -28,7 +28,9 @@ namespace TMSim
 
 		const char* const ClassKeys[] = { "format", "version", "id", "name", "color", "look", "icon", "roles", "stats", "abilities", "creator" };
 		const char* const AbilityKeys[] = { "id", "name", "desc", "kind", "effect", "scale", "target", "shape", "power", "min_range",
-			"max_range", "aoe", "angle", "channel", "cooldown", "cast", "tg", "status", "buffs", "fx" };
+			"max_range", "aoe", "angle", "channel", "cooldown", "cast", "tg", "status", "buffs", "fx", "vfx" };
+		const char* const VfxKeys[] = { "system", "at", "scale" };
+		const char* const VfxPlaces[] = { "user", "point", "targets" };
 		const char* const Looks[] = { "squire", "knight", "archer", "monk", "black_mage", "white_mage" };
 		const char* const Roles[] = { "tank", "damage", "support", "special" };
 		const char* const Kinds[] = { "active", "passive", "toggle", "channeled", "active_passive", "aura" };
@@ -79,6 +81,29 @@ namespace TMSim
 			{
 				const char C = Colour[i];
 				if (!((C >= '0' && C <= '9') || (C >= 'a' && C <= 'f')))
+				{
+					return false;
+				}
+			}
+			return true;
+		}
+
+		/**
+		 * An object path in the project's Content folder, as Unreal writes one:
+		 * /Game/Pack/NS_Thing.NS_Thing. Only characters a package path may hold,
+		 * and no way out of /Game, because the game hands it to the asset loader.
+		 */
+		bool ValidAssetPath(const std::string& Path)
+		{
+			if (Path.size() < 7 || Path.size() > 256 || Path.compare(0, 6, "/Game/") != 0
+				|| Path.find("..") != std::string::npos || Path.find("//") != std::string::npos)
+			{
+				return false;
+			}
+			for (char C : Path)
+			{
+				if (!((C >= 'a' && C <= 'z') || (C >= 'A' && C <= 'Z') || (C >= '0' && C <= '9')
+					|| C == '_' || C == '/' || C == '.' || C == '-'))
 				{
 					return false;
 				}
@@ -239,6 +264,50 @@ namespace TMSim
 					}
 					Out.Buffs.push_back({ Which, static_cast<int>(Amount->Number), static_cast<int>(Turns->Number) });
 				}
+			}
+			if (const FJson* Vfx = Json.Find("vfx"))
+			{
+				if (!Vfx->IsObject())
+				{
+					Problems.Say(Where, "\"vfx\" should be an object");
+					return;
+				}
+				for (const std::pair<std::string, FJson>& Member : Vfx->Object)
+				{
+					if (!OneOf(Member.first, VfxKeys))
+					{
+						Problems.Say(Where, "unknown key \"" + Member.first + "\" in \"vfx\"");
+					}
+				}
+				const std::string System = StringOf(*Vfx, "system", Where + ".vfx", Problems, true);
+				if (!System.empty() && !ValidAssetPath(System))
+				{
+					Problems.Say(Where, "\"vfx\" system should be an asset path under /Game/");
+				}
+				std::string At = StringOf(*Vfx, "at", Where + ".vfx", Problems, false);
+				if (At.empty())
+				{
+					At = "targets";
+				}
+				else if (!OneOf(At, VfxPlaces))
+				{
+					Problems.Say(Where, "\"vfx\" at should be user, point or targets");
+				}
+				double Size = 1.0;
+				if (const FJson* Given = Vfx->Find("scale"))
+				{
+					if (!Given->IsNumber() || Given->Number < 0.1 || Given->Number > 5.0)
+					{
+						Problems.Say(Where, "\"vfx\" scale should be a number from 0.1 to 5");
+					}
+					else
+					{
+						Size = Given->Number;
+					}
+				}
+				Out.VfxSystem = System;
+				Out.VfxAt = At;
+				Out.VfxScale = static_cast<float>(Size);
 			}
 		}
 	}

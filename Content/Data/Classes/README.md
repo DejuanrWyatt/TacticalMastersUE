@@ -31,6 +31,30 @@ Unreal reads an Astra file, and nothing needs Astra to make a class.
   by the Godot project's `tests/dump_class_table.gd`). This runs only when that
   table is present.
 
+## Particle effects
+
+An ability may name a particle effect from the project, such as one installed
+from Fab, in its `vfx` field:
+`{"system": "/Game/Pack/NS_Thing.NS_Thing", "at": "targets", "scale": 1}`.
+
+- **Where it plays (`at`):** on the `user`, at the `point` aimed at, or once on
+  each of the `targets` it touched.
+- **What plays it:** the director, when the ability goes off.
+- **The rules:** they read the field and ignore it. It is presentation only, like
+  the damage numbers, and it is not in the checksum.
+- **Looping effects:** the director switches them off after `VfxSeconds`.
+
+The creator shows these effects because the game films them:
+`Tools\VfxCatalog.bat` starts the game with `-tmvfxcatalog`. The game then:
+
+1. plays every Niagara and Cascade system under `/Game` alone in front of a
+   camera (`ATMVfxStudio`);
+2. writes `Saved/VfxCatalog/catalog.json`, with a strip of frames per effect;
+3. exits.
+
+The creator's **Film again** button runs the same script. Run it again after
+installing more effects from Fab.
+
 ## Not ported yet
 
 Passive, aura and toggle abilities load, but what they add to a unit's stats is
@@ -43,3 +67,9 @@ Raw files under `Content/` are not cooked into a packaged build by default. Add
 `Data/Classes` to **Project Settings → Packaging → Additional Non-Asset
 Directories to Package** before shipping, or the game will start with six
 classes and no explanation.
+
+The same goes for particle effects that only a class file names. The cooker
+follows references between assets, not paths written in a JSON file, so the
+effects' folders need adding to **Additional Asset Directories to Cook**. If they
+are missing, the game logs that an ability "names a particle effect that is not
+in the project", and the ability goes off without it.

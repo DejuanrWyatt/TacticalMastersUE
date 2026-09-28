@@ -17,6 +17,13 @@
 #include "Misc/Parse.h"
 #include "Components/InputComponent.h"
 #include "TMBattleHud.h"
+#include "TMVfxStudio.h"
+#include "NiagaraFunctionLibrary.h"
+#include "NiagaraSystem.h"
+#include "Particles/ParticleSystem.h"
+#include "Kismet/GameplayStatics.h"
+#include "Particles/ParticleSystemComponent.h"
+#include "NiagaraComponent.h"
 #include "Kismet/KismetSystemLibrary.h"
 #include "Misc/DateTime.h"
 
@@ -36,6 +43,36 @@ ATMBattleDirector::ATMBattleDirector()
 void ATMBattleDirector::BeginPlay()
 {
 	Super::BeginPlay();
+
+	// -tmvfxcatalog: no battle at all. The studio films every effect in the
+	// project for the class creator, then ends the run itself.
+	if (FParse::Param(FCommandLine::Get(), TEXT("tmvfxcatalog")))
+	{
+		if (UWorld* World = GetWorld())
+		{
+			World->SpawnActor<ATMVfxStudio>();
+		}
+		SetActorTickEnabled(false);
+		return;
+	}
+
+	// -tmroster=a,b,c,d: both sides field these four classes, by id, instead of
+	// the default four. How a class made in the creator is watched in a real
+	// battle without anyone at the setup screen.
+	FString Roster;
+	if (FParse::Value(FCommandLine::Get(), TEXT("tmroster="), Roster, false))
+	{
+		TArray<FString> Ids;
+		Roster.ParseIntoArray(Ids, TEXT(","));
+		for (int32 i = 0; i < 4 && i < Ids.Num(); ++i)
+		{
+			Setup.Rosters[0][i] = TCHAR_TO_UTF8(*Ids[i].TrimStartAndEnd());
+			Setup.Rosters[1][i] = Setup.Rosters[0][i];
+		}
+		UE_LOG(LogTemp, Log, TEXT("both sides field %s"), *Roster);
+		bBuilt = false;
+	}
+
 	if (!bBuilt)
 	{
 		BuildBattle();
@@ -590,8 +627,46 @@ void ATMBattleDirector::ShowEvents(const TMSim::FTickReport& Report)
 		return;
 	}
 
+	// The particle effect an ability names, if any, played as it goes off: on the
+	// user, on the spot aimed at, or once on each unit it touched. Which units
+	// it touched is read from the events that follow its Resolved, up to the
+	// next one.
+	const TMSim::FAbility* Showing = nullptr;
+	TArray<int32> ShownOn;
 	for (const TMSim::FEvent& Event : Report.Events)
 	{
+		if (Event.Kind == TMSim::EEventKind::Resolved)
+		{
+			Showing = TMSim::FindAbility(Event.Id);
+			ShownOn.Reset();
+			if (Showing && !Showing->VfxSystem.empty())
+			{
+				const TMSim::FUnit* User = Battle.FindUnit(Event.Unit);
+				if (Showing->VfxAt == "user" && User && IsSeen(*User))
+				{
+					PlayVfx(*Showing, WorldFor(*User) + FVector(0.0f, 0.0f, VfxHeight));
+				}
+				else if (Showing->VfxAt == "point")
+				{
+					const int Level = Battle.Map.NodeLevel(TMSim::FMap::NodeOf(Event.Where));
+					PlayVfx(*Showing, WorldFromMetres(Event.Where, Level) + FVector(0.0f, 0.0f, BoardHeight));
+				}
+			}
+		}
+		else if (Showing && Showing->VfxAt == "targets" && !Showing->VfxSystem.empty()
+			&& (Event.Kind == TMSim::EEventKind::Hit || Event.Kind == TMSim::EEventKind::Evaded
+				|| Event.Kind == TMSim::EEventKind::Absorbed || Event.Kind == TMSim::EEventKind::Revived
+				|| Event.Kind == TMSim::EEventKind::StatusApplied)
+			&& !ShownOn.Contains(Event.Unit))
+		{
+			ShownOn.Add(Event.Unit);
+			const TMSim::FUnit* Struck = Battle.FindUnit(Event.Unit);
+			if (Struck && IsSeen(*Struck))
+			{
+				PlayVfx(*Showing, WorldFor(*Struck) + FVector(0.0f, 0.0f, VfxHeight));
+			}
+		}
+
 		FString What;
 		FColor Tint = FColor::White;
 		switch (Event.Kind)
@@ -682,6 +757,68 @@ void ATMBattleDirector::ShowEvents(const TMSim::FTickReport& Report)
 			// and a half a number is up for, so the interesting frames were all
 			// of eight people standing about.
 			bWorthSeeing = true;
+		}
+	}
+}
+
+void ATMBattleDirector::PlayVfx(const TMSim::FAbility& Ability, const FVector& Where)
+{
+	// Loaded the first time it is wanted and kept, so a battle loads each effect
+	// once. A path that no longer names an effect -- a Fab pack removed since the
+	// class was made -- is said once and then left alone: the ability still goes
+	// off, it just shows nothing.
+	const FString Path = UTF8_TO_TCHAR(Ability.VfxSystem.c_str());
+	TObjectPtr<UObject>* Known = LoadedVfx.Find(Path);
+	if (!Known)
+	{
+		UObject* System = FSoftObjectPath(Path).TryLoad();
+		if (!System || !(System->IsA<UNiagaraSystem>() || System->IsA<UParticleSystem>()))
+		{
+			UE_LOG(LogTemp, Warning, TEXT("%hs names a particle effect that is not in the project: %s"),
+				Ability.Id.c_str(), *Path);
+			System = nullptr;
+		}
+		Known = &LoadedVfx.Add(Path, System);
+	}
+	if (!*Known)
+	{
+		return;
+	}
+	const FVector Size(Ability.VfxScale);
+	UFXSystemComponent* Playing = nullptr;
+	if (UNiagaraSystem* Niagara = Cast<UNiagaraSystem>(*Known))
+	{
+		Playing = UNiagaraFunctionLibrary::SpawnSystemAtLocation(this, Niagara, Where, FRotator::ZeroRotator, Size);
+	}
+	else if (UParticleSystem* Cascade = Cast<UParticleSystem>(*Known))
+	{
+		Playing = UGameplayStatics::SpawnEmitterAtLocation(this, Cascade, Where, FRotator::ZeroRotator, Size);
+	}
+	if (Playing)
+	{
+		// Much of what Fab sells loops, made to sit on something for as long as
+		// it is wanted, and would go on for ever. So every effect is switched
+		// off after a while (AdvanceVfx); what it has already thrown out fades
+		// as it would, and the component destroys itself once it is quiet.
+		PlayingVfx.Add({ Playing, 0.0f });
+		++EffectsPlayed;
+	}
+}
+
+void ATMBattleDirector::AdvanceVfx(float DeltaSeconds)
+{
+	for (int32 i = PlayingVfx.Num() - 1; i >= 0; --i)
+	{
+		FPlayingVfx& Each = PlayingVfx[i];
+		Each.Age += DeltaSeconds;
+		if (!Each.Component.IsValid())
+		{
+			PlayingVfx.RemoveAtSwap(i);
+		}
+		else if (Each.Age >= VfxSeconds)
+		{
+			Each.Component->Deactivate();
+			PlayingVfx.RemoveAtSwap(i);
 		}
 	}
 }
@@ -1067,6 +1204,7 @@ void ATMBattleDirector::Tick(float DeltaSeconds)
 	Super::Tick(DeltaSeconds);
 
 	AdvanceFloaters(DeltaSeconds);
+	AdvanceVfx(DeltaSeconds);
 	MaybeCapture();
 
 	// Only while playing: in the editor the clock is stepped by hand, so a
@@ -1228,9 +1366,9 @@ void ATMBattleDirector::Tick(float DeltaSeconds)
 		{
 			bSaidWon = true;
 			UE_LOG(LogTemp, Log,
-				TEXT("BATTLE OVER: winner %d after %.1fs, %d orders, %d numbers shown"),
+				TEXT("BATTLE OVER: winner %d after %.1fs, %d orders, %d numbers shown, %d effects played"),
 				Battle.Winner, Battle.TickCount / float(TMSim::Pace::TicksPerSecond),
-				OrdersGiven, NumbersShown);
+				OrdersGiven, NumbersShown, EffectsPlayed);
 			UE_LOG(LogTemp, Log, TEXT("%s"), *DescribeBattle());
 			DecidedFor = 0.0f;
 		}

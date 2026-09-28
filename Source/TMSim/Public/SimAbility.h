@@ -76,6 +76,16 @@ namespace TMSim
 		std::string Desc;
 		/** Which built-in ability's animation it borrows. Never read by the rules. */
 		std::string Fx;
+		/**
+		 * A particle effect from the project -- one bought from Fab, say -- played
+		 * when the ability goes off. VfxSystem is its object path under /Game;
+		 * VfxAt is where it plays ("user", "point" or "targets") and VfxScale how
+		 * big. Empty for none. Never read by the rules: an effect is something to
+		 * watch, and a battle is the same with or without it.
+		 */
+		std::string VfxSystem;
+		std::string VfxAt;
+		float VfxScale = 1.0f;
 
 		bool HasStatus() const { return !StatusId.empty(); }
 	};

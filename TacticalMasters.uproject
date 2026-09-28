@@ -18,6 +18,7 @@
 	],
 	"Plugins": [
 		{ "Name": "RemoteControl", "Enabled": true },
-		{ "Name": "PythonScriptPlugin", "Enabled": true }
+		{ "Name": "PythonScriptPlugin", "Enabled": true },
+		{ "Name": "Niagara", "Enabled": true }
 	]
 }

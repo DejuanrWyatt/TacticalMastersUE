@@ -378,6 +378,12 @@ int main(int ArgCount, char** Args)
 			{ "a newer version", Mutated(Fresh, "\"version\": 1", "\"version\": 2") },
 			{ "not JSON at all", Fresh.substr(0, Fresh.size() / 2) },
 			{ "an id already taken", AnyValid },
+			// The particle effect an ability may name is read strictly too: the game
+			// hands the path to Unreal's asset loader, so only a path under /Game.
+			{ "an effect outside /Game", Mutated(Fresh, "\"kind\": ", "\"vfx\": {\"system\": \"/Game/../Engine/X.X\"}, \"kind\": ") },
+			{ "an effect with an unknown key", Mutated(Fresh, "\"kind\": ", "\"vfx\": {\"system\": \"/Game/A/B.B\", \"colour\": \"red\"}, \"kind\": ") },
+			{ "an effect played nowhere", Mutated(Fresh, "\"kind\": ", "\"vfx\": {\"system\": \"/Game/A/B.B\", \"at\": \"sky\"}, \"kind\": ") },
+			{ "an effect far too big", Mutated(Fresh, "\"kind\": ", "\"vfx\": {\"system\": \"/Game/A/B.B\", \"scale\": 50}, \"kind\": ") },
 		};
 		int Refused = 0;
 		for (const FProbe& Probe : Probes)
@@ -396,6 +402,24 @@ int main(int ArgCount, char** Args)
 			++Refused;
 		}
 		std::printf("refused %d of %zu broken class files, each with a reason\n", Refused, sizeof(Probes) / sizeof(Probes[0]));
+
+		// And a well-formed effect is read as written, with where and how big
+		// defaulting to on the targets at full size.
+		const std::string WithVfx = Mutated(Fresh, "\"kind\": ",
+			"\"vfx\": {\"system\": \"/Game/FreeParticle_SoftTofu/Niagara/NS_leaf.NS_leaf\"}, \"kind\": ");
+		FJobDef VfxJob;
+		std::vector<FAbility> VfxAbilities;
+		const std::string VfxProblems = ReadClassFile(WithVfx, VfxJob, VfxAbilities);
+		if (!VfxProblems.empty() || VfxAbilities.empty()
+			|| VfxAbilities[0].VfxSystem != "/Game/FreeParticle_SoftTofu/Niagara/NS_leaf.NS_leaf"
+			|| VfxAbilities[0].VfxAt != "targets" || VfxAbilities[0].VfxScale != 1.0f)
+		{
+			Fail("a class file naming a particle effect was not read as written: " + VfxProblems);
+		}
+		else
+		{
+			std::printf("read an ability's particle effect as written\n");
+		}
 	}
 
 	// -------------------------------------------------------------- MATCH

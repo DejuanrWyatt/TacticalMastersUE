@@ -82,6 +82,8 @@ be hard to kill (`Stop-Process` and `taskkill` may both refuse; WMI `Terminate` 
 | Build the editor target | `scripts\build.bat` (**close the editor first**, or Live Coding blocks the build) |
 | Wiring test: sim ↔ Unreal, in a real level | `scripts\wiring-test.bat` (runs `Tools/play_battle.py` headless) |
 | The class lab (the rules alone, for the class creator: check + playtest a class file) | `Tools\ClassLab\Build.bat` → `Binaries\ClassLab\TMClassLab.exe` |
+| Film every particle effect in the project for the class creator | `Tools\VfxCatalog.bat` (runs the game off-screen with `-tmvfxcatalog`; writes `Saved\VfxCatalog`; about 2 minutes; ends itself) |
+| Watch chosen classes fight | add `-tmroster=a,b,c,d` to a game run: both sides field those four |
 | A whole battle in a real game world | `scriptsattle-test.bat` (no window, no rendering; ends itself) |
 
 Paths on this machine: engine `E:\UE_5.8`, Visual Studio `E:\VS2022`.
@@ -115,6 +117,9 @@ battle to a decision, and **replaying it with a different seed fails** — the c
 rules rest on.
 Class files (`SimClassTest`): all 81 load, broken files are refused, every class matches Godot's own reading
 field for field (`GodotClassTable.txt`), and every one plays a battle with no refused order.
+Particle effects are presentation only. An ability's `vfx` field names a Niagara or Cascade system under
+`/Game` (a Fab pack, say). The rules read it and ignore it, and the director plays it when the ability
+resolves. `ATMVfxStudio` films every effect for the class creator.
 Not yet ported (see `Docs/backlog.md`): auras and passive/toggle stat contributions (`FUnit::Stat`
 says so where the gap is — several of the 81 loaded classes have them, so those play weaker than in
 Godot), `Randf` (easy/medium mistakes), the battle time limit and the hold-the-middle rule.

@@ -163,6 +163,16 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Tactical Masters|Reading a fight")
 	float FlashSeconds = 0.25f;
 
+	/**
+	 * How long an ability's particle effect plays before it is switched off, and
+	 * how high above a unit's feet it plays, in centimetres.
+	 */
+	UPROPERTY(EditAnywhere, Category = "Tactical Masters|Reading a fight")
+	float VfxSeconds = 2.0f;
+
+	UPROPERTY(EditAnywhere, Category = "Tactical Masters|Reading a fight")
+	float VfxHeight = 90.0f;
+
 	// The view. Back along the diagonal and up, as a share of the board's width,
 	// so the framing holds whatever size map is loaded.
 
@@ -248,6 +258,9 @@ private:
 	 * and losing one would not change a battle by a hair.
 	 */
 	void ShowEvents(const TMSim::FTickReport& Report);
+	/** Plays an ability's particle effect, if it names one, at a place in the world. */
+	void PlayVfx(const TMSim::FAbility& Ability, const FVector& Where);
+	void AdvanceVfx(float DeltaSeconds);
 
 	/** Moves, billboards and fades them, and settles the flash on a struck unit. */
 	void AdvanceFloaters(float DeltaSeconds);
@@ -484,6 +497,21 @@ private:
 	TArray<FTMFloater> Floaters;
 
 	TArray<FFlash> Flashes;
+
+	/** An ability's effect still playing, and for how long it has. */
+	struct FPlayingVfx
+	{
+		TWeakObjectPtr<class UFXSystemComponent> Component;
+		float Age = 0.0f;
+	};
+	TArray<FPlayingVfx> PlayingVfx;
+
+	/** Every effect a class has named, loaded once; null for a path that named nothing. */
+	UPROPERTY()
+	TMap<FString, TObjectPtr<UObject>> LoadedVfx;
+
+	/** How many effects have played, for the log at the end of a battle. */
+	int32 EffectsPlayed = 0;
 
 
 
