@@ -1,0 +1,108 @@
+{
+  "format": "tactical-masters-class",
+  "version": 1,
+  "id": "thunder_fist",
+  "name": "Thunder Fist",
+  "color": "#f2b60f",
+  "look": "monk",
+  "roles": [
+    "damage"
+  ],
+  "stats": {
+    "hp": 75,
+    "attdef": 8,
+    "magdef": 6,
+    "aeva": 18,
+    "meva": 8,
+    "crit": 12,
+    "speed": 14,
+    "move": 8,
+    "patience": 5,
+    "sight": 9
+  },
+  "abilities": [
+    {
+      "id": "thunder_fist_thunder_jab",
+      "name": "Thunder Jab",
+      "desc": "Punch an adjacent enemy.",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "att",
+      "target": "enemy",
+      "shape": "unit",
+      "power": 32,
+      "min_range": 0,
+      "max_range": 1.8,
+      "aoe": 0,
+      "cooldown": 0,
+      "cast": 0,
+      "fx": "punch"
+    },
+    {
+      "id": "thunder_fist_thunder_uppercut",
+      "name": "Thunder Uppercut",
+      "desc": "A rising blow on an adjacent enemy; Stuns for 1 turn.",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "att",
+      "target": "enemy",
+      "shape": "unit",
+      "power": 44,
+      "min_range": 0,
+      "max_range": 1.8,
+      "aoe": 0,
+      "cooldown": 2,
+      "cast": 0,
+      "status": {
+        "id": "stun",
+        "turns": 1
+      },
+      "fx": "wave_fist"
+    },
+    {
+      "id": "thunder_fist_thunder_stance",
+      "name": "Thunder Stance",
+      "desc": "Take a fighting stance; Speed +2 for 2 turns. Switched on and off.",
+      "kind": "toggle",
+      "effect": "support",
+      "scale": "mag",
+      "target": "ally",
+      "shape": "self",
+      "power": 0,
+      "min_range": 0,
+      "max_range": 0,
+      "aoe": 0,
+      "cooldown": 0,
+      "cast": 0,
+      "buffs": [
+        {
+          "stat": "speed",
+          "amount": 2,
+          "turns": 2
+        }
+      ],
+      "fx": "focus"
+    },
+    {
+      "id": "thunder_fist_thunder_fury",
+      "name": "Thunder Fury",
+      "desc": "ULTIMATE: A flurry hitting every enemy within 2.5 m of you; Stuns for 1 turn.",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "att",
+      "target": "enemy",
+      "shape": "self",
+      "power": 49,
+      "min_range": 0,
+      "max_range": 0,
+      "aoe": 2.5,
+      "cooldown": 0,
+      "cast": 0,
+      "status": {
+        "id": "stun",
+        "turns": 1
+      },
+      "fx": "earth_slash"
+    }
+  ]
+}

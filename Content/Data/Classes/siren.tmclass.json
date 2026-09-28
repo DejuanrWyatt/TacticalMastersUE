@@ -1,0 +1,105 @@
+{
+  "format": "tactical-masters-class",
+  "version": 1,
+  "id": "siren",
+  "name": "Siren",
+  "color": "#41a3e4",
+  "look": "squire",
+  "roles": [
+    "support"
+  ],
+  "stats": {
+    "hp": 74,
+    "attdef": 6,
+    "magdef": 11,
+    "aeva": 10,
+    "meva": 12,
+    "crit": 8,
+    "speed": 12,
+    "move": 6,
+    "patience": 7,
+    "sight": 11
+  },
+  "abilities": [
+    {
+      "id": "siren_tide_chord",
+      "name": "Tide Chord",
+      "desc": "A sharp chord at an enemy 1-7 m away.",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "mag",
+      "target": "enemy",
+      "shape": "unit",
+      "power": 25,
+      "min_range": 1,
+      "max_range": 7,
+      "aoe": 0,
+      "cooldown": 0,
+      "cast": 0,
+      "fx": "pin_shot"
+    },
+    {
+      "id": "siren_tide_anthem",
+      "name": "Tide Anthem",
+      "desc": "Every ally within 3 m of a point up to 6 m away gains 25% TG. (1.5 s)",
+      "kind": "active",
+      "effect": "support",
+      "scale": "mag",
+      "target": "ally",
+      "shape": "circle",
+      "power": 0,
+      "min_range": 0,
+      "max_range": 6,
+      "aoe": 3,
+      "cooldown": 3,
+      "cast": 1.5,
+      "tg": 25,
+      "fx": "haste"
+    },
+    {
+      "id": "siren_tide_ballad",
+      "name": "Tide Ballad",
+      "desc": "Every ally within 4 m is inspired; MagDef +5 for 2 turns. Always on, for allies nearby.",
+      "kind": "aura",
+      "effect": "support",
+      "scale": "mag",
+      "target": "ally",
+      "shape": "self",
+      "power": 0,
+      "min_range": 0,
+      "max_range": 0,
+      "aoe": 4,
+      "cooldown": 0,
+      "cast": 0,
+      "buffs": [
+        {
+          "stat": "magdef",
+          "amount": 5,
+          "turns": 2
+        }
+      ],
+      "fx": "haste"
+    },
+    {
+      "id": "siren_tide_finale",
+      "name": "Tide Finale",
+      "desc": "ULTIMATE: Heal every ally within 4 m of you; Regen for 3 turns. (2 s)",
+      "kind": "active",
+      "effect": "heal",
+      "scale": "mag",
+      "target": "ally",
+      "shape": "self",
+      "power": 18,
+      "min_range": 0,
+      "max_range": 0,
+      "aoe": 4,
+      "cooldown": 0,
+      "cast": 2,
+      "status": {
+        "id": "regen",
+        "turns": 3
+      },
+      "fx": "sanctuary"
+    }
+  ]
+}

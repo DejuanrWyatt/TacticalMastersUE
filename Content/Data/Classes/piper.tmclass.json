@@ -1,0 +1,99 @@
+{
+  "format": "tactical-masters-class",
+  "version": 1,
+  "id": "piper",
+  "name": "Piper",
+  "color": "#63d28c",
+  "look": "squire",
+  "roles": [
+    "support"
+  ],
+  "stats": {
+    "hp": 57,
+    "attdef": 6,
+    "magdef": 10,
+    "aeva": 10,
+    "meva": 12,
+    "crit": 8,
+    "speed": 14,
+    "move": 7,
+    "patience": 7,
+    "sight": 11
+  },
+  "abilities": [
+    {
+      "id": "piper_gale_chord",
+      "name": "Gale Chord",
+      "desc": "A sharp chord at an enemy 1-7 m away.",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "mag",
+      "target": "enemy",
+      "shape": "unit",
+      "power": 25,
+      "min_range": 1,
+      "max_range": 7,
+      "aoe": 0,
+      "cooldown": 0,
+      "cast": 0,
+      "fx": "pin_shot"
+    },
+    {
+      "id": "piper_gale_anthem",
+      "name": "Gale Anthem",
+      "desc": "Every ally within 3 m of a point up to 6 m away gains 25% TG. (1.5 s)",
+      "kind": "active",
+      "effect": "support",
+      "scale": "mag",
+      "target": "ally",
+      "shape": "circle",
+      "power": 0,
+      "min_range": 0,
+      "max_range": 6,
+      "aoe": 3,
+      "cooldown": 3,
+      "cast": 1.5,
+      "tg": 25,
+      "fx": "haste"
+    },
+    {
+      "id": "piper_gale_ballad",
+      "name": "Gale Ballad",
+      "desc": "Every ally within 4 m is inspired; TG +20%. Always on, for allies nearby.",
+      "kind": "aura",
+      "effect": "support",
+      "scale": "mag",
+      "target": "ally",
+      "shape": "self",
+      "power": 0,
+      "min_range": 0,
+      "max_range": 0,
+      "aoe": 4,
+      "cooldown": 0,
+      "cast": 0,
+      "tg": 20,
+      "fx": "haste"
+    },
+    {
+      "id": "piper_gale_finale",
+      "name": "Gale Finale",
+      "desc": "ULTIMATE: Heal every ally within 4 m of you; Regen for 3 turns. (2 s)",
+      "kind": "active",
+      "effect": "heal",
+      "scale": "mag",
+      "target": "ally",
+      "shape": "self",
+      "power": 18,
+      "min_range": 0,
+      "max_range": 0,
+      "aoe": 4,
+      "cooldown": 0,
+      "cast": 2,
+      "status": {
+        "id": "regen",
+        "turns": 3
+      },
+      "fx": "sanctuary"
+    }
+  ]
+}

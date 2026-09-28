@@ -163,16 +163,42 @@ namespace TMSim
 			return Out;
 		}
 
-		const std::map<std::string, FAbility>& Abilities()
+		// The registry. Built-ins first, then whatever RegisterJob adds. A std::map
+		// never moves an entry once it is in, which matters: a unit keeps a pointer
+		// to its class's stats for the whole battle.
+		std::map<std::string, FAbility>& Abilities()
 		{
-			static const std::map<std::string, FAbility> Table = BuildAbilities();
+			static std::map<std::string, FAbility> Table = BuildAbilities();
 			return Table;
 		}
 
-		const std::map<std::string, FJobDef>& Jobs()
+		std::map<std::string, FJobDef>& Jobs()
 		{
-			static const std::map<std::string, FJobDef> Table = BuildJobs();
+			static std::map<std::string, FJobDef> Table = BuildJobs();
 			return Table;
+		}
+
+		std::vector<const FJobDef*>& JobList()
+		{
+			static std::vector<const FJobDef*> List;
+			return List;
+		}
+
+		/** The listing, built-ins first so the classes everybody knows lead. */
+		void RebuildJobList()
+		{
+			std::vector<const FJobDef*>& List = JobList();
+			List.clear();
+			for (int Pass = 0; Pass < 2; ++Pass)
+			{
+				for (const auto& Pair : Jobs())
+				{
+					if (Pair.second.bFromFile == (Pass == 1))
+					{
+						List.push_back(&Pair.second);
+					}
+				}
+			}
 		}
 	}
 
@@ -217,15 +243,62 @@ namespace TMSim
 
 	const std::vector<const FJobDef*>& AllJobs()
 	{
-		static const std::vector<const FJobDef*> List = []
+		if (JobList().empty())
 		{
-			std::vector<const FJobDef*> Out;
-			for (const auto& Pair : Jobs())
+			RebuildJobList();
+		}
+		return JobList();
+	}
+
+	std::string RegisterJob(const FJobDef& Job, const std::vector<FAbility>& JobAbilities)
+	{
+		if (Jobs().count(Job.Id))
+		{
+			return "there is already a class called '" + Job.Id + "'";
+		}
+		if (JobAbilities.size() != 4)
+		{
+			return "a class has four abilities";
+		}
+		for (size_t Slot = 0; Slot < JobAbilities.size(); ++Slot)
+		{
+			if (Abilities().count(JobAbilities[Slot].Id))
 			{
-				Out.push_back(&Pair.second);
+				return "there is already an ability called '" + JobAbilities[Slot].Id + "'";
 			}
-			return Out;
-		}();
-		return List;
+			if (JobAbilities[Slot].Id != Job.AbilityIds[Slot])
+			{
+				return "slot " + std::to_string(Slot + 1) + " does not hold ability '" + JobAbilities[Slot].Id + "'";
+			}
+		}
+		for (const FAbility& Ability : JobAbilities)
+		{
+			Abilities()[Ability.Id] = Ability;
+		}
+		FJobDef Added = Job;
+		Added.bFromFile = true;
+		Jobs()[Added.Id] = Added;
+		RebuildJobList();
+		return std::string();
+	}
+
+	void ForgetLoadedJobs()
+	{
+		for (auto It = Jobs().begin(); It != Jobs().end();)
+		{
+			if (It->second.bFromFile)
+			{
+				for (const std::string& AbilityId : It->second.AbilityIds)
+				{
+					Abilities().erase(AbilityId);
+				}
+				It = Jobs().erase(It);
+			}
+			else
+			{
+				++It;
+			}
+		}
+		RebuildJobList();
 	}
 }

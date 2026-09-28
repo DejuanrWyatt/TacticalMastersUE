@@ -1,0 +1,97 @@
+{
+  "format": "tactical-masters-class",
+  "version": 1,
+  "id": "blood_cleric",
+  "name": "Blood Cleric",
+  "color": "#8b43b0",
+  "look": "white_mage",
+  "roles": [
+    "support"
+  ],
+  "stats": {
+    "hp": 66,
+    "attdef": 4,
+    "magdef": 13,
+    "aeva": 5,
+    "meva": 19,
+    "crit": 7,
+    "speed": 8,
+    "move": 6,
+    "patience": 8,
+    "sight": 10
+  },
+  "abilities": [
+    {
+      "id": "blood_cleric_shadow_rod",
+      "name": "Shadow Rod",
+      "desc": "Strike an adjacent enemy.",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "att",
+      "target": "enemy",
+      "shape": "unit",
+      "power": 24,
+      "min_range": 0,
+      "max_range": 1.8,
+      "aoe": 0,
+      "cooldown": 0,
+      "cast": 0,
+      "fx": "attack"
+    },
+    {
+      "id": "blood_cleric_shadow_mend",
+      "name": "Shadow Mend",
+      "desc": "Heal an ally up to 6 m away. (1 s)",
+      "kind": "active",
+      "effect": "heal",
+      "scale": "mag",
+      "target": "ally",
+      "shape": "unit",
+      "power": 22,
+      "min_range": 0,
+      "max_range": 6,
+      "aoe": 0,
+      "cooldown": 0,
+      "cast": 1,
+      "fx": "cure"
+    },
+    {
+      "id": "blood_cleric_shadow_rebirth",
+      "name": "Shadow Rebirth",
+      "desc": "Revive a knocked-out ally up to 5 m away with 30% HP. (2 s)",
+      "kind": "active",
+      "effect": "revive",
+      "scale": "mag",
+      "target": "ko_ally",
+      "shape": "unit",
+      "power": 0.3,
+      "min_range": 0,
+      "max_range": 5,
+      "aoe": 0,
+      "cooldown": 4,
+      "cast": 2,
+      "fx": "raise"
+    },
+    {
+      "id": "blood_cleric_shadow_sanctuary",
+      "name": "Shadow Sanctuary",
+      "desc": "ULTIMATE: Heal every ally within 3.5 m of a point up to 8 m away; Regen for 3 turns. (3 s)",
+      "kind": "active",
+      "effect": "heal",
+      "scale": "mag",
+      "target": "ally",
+      "shape": "circle",
+      "power": 27,
+      "min_range": 0,
+      "max_range": 8,
+      "aoe": 3.5,
+      "cooldown": 0,
+      "cast": 3,
+      "status": {
+        "id": "regen",
+        "turns": 3
+      },
+      "fx": "sanctuary"
+    }
+  ]
+}

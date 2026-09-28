@@ -1,0 +1,104 @@
+{
+  "format": "tactical-masters-class",
+  "version": 1,
+  "id": "sky_warden",
+  "name": "Sky Warden",
+  "color": "#4fcc8e",
+  "look": "knight",
+  "roles": [
+    "tank",
+    "support"
+  ],
+  "stats": {
+    "hp": 106,
+    "attdef": 13,
+    "magdef": 9,
+    "aeva": 6,
+    "meva": 8,
+    "crit": 5,
+    "speed": 8,
+    "move": 7,
+    "patience": 8,
+    "sight": 8
+  },
+  "abilities": [
+    {
+      "id": "sky_warden_gale_mace",
+      "name": "Gale Mace",
+      "desc": "Strike an adjacent enemy.",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "att",
+      "target": "enemy",
+      "shape": "unit",
+      "power": 31,
+      "min_range": 0,
+      "max_range": 1.8,
+      "aoe": 0,
+      "cooldown": 0,
+      "cast": 0,
+      "fx": "attack"
+    },
+    {
+      "id": "sky_warden_gale_bash",
+      "name": "Gale Bash",
+      "desc": "Shield-bash an adjacent enemy; TG -25%.",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "att",
+      "target": "enemy",
+      "shape": "unit",
+      "power": 29,
+      "min_range": 0,
+      "max_range": 1.8,
+      "aoe": 0,
+      "cooldown": 2,
+      "cast": 0,
+      "tg": -25,
+      "fx": "shield_bash"
+    },
+    {
+      "id": "sky_warden_gale_ward",
+      "name": "Gale Ward",
+      "desc": "Every ally within 4 m is shielded; AttDef +5 for 2 turns, TG +20%. Always on, for allies nearby.",
+      "kind": "aura",
+      "effect": "support",
+      "scale": "mag",
+      "target": "ally",
+      "shape": "self",
+      "power": 0,
+      "min_range": 0,
+      "max_range": 0,
+      "aoe": 4,
+      "cooldown": 0,
+      "cast": 0,
+      "tg": 20,
+      "buffs": [
+        {
+          "stat": "attdef",
+          "amount": 5,
+          "turns": 2
+        }
+      ],
+      "fx": "guard"
+    },
+    {
+      "id": "sky_warden_gale_bastion",
+      "name": "Gale Bastion",
+      "desc": "ULTIMATE: Slam the ground, hitting every enemy within 3 m of you; TG -25%. (1 s)",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "att",
+      "target": "enemy",
+      "shape": "self",
+      "power": 38,
+      "min_range": 0,
+      "max_range": 0,
+      "aoe": 3,
+      "cooldown": 0,
+      "cast": 1,
+      "tg": -25,
+      "fx": "holy_blade"
+    }
+  ]
+}

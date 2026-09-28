@@ -1,0 +1,103 @@
+{
+  "format": "tactical-masters-class",
+  "version": 1,
+  "id": "bard",
+  "name": "Bard",
+  "color": "#6fcf97",
+  "look": "archer",
+  "icon": "bard",
+  "roles": [
+    "support"
+  ],
+  "stats": {
+    "hp": 60,
+    "attdef": 6,
+    "magdef": 10,
+    "aeva": 10,
+    "meva": 12,
+    "crit": 8,
+    "speed": 12,
+    "move": 6,
+    "patience": 7,
+    "sight": 11
+  },
+  "abilities": [
+    {
+      "id": "bard_dissonance",
+      "name": "Dissonance",
+      "desc": "A jarring chord at an enemy 1-7 m away.",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "mag",
+      "target": "enemy",
+      "shape": "unit",
+      "power": 21,
+      "min_range": 1,
+      "max_range": 7,
+      "aoe": 0,
+      "cooldown": 0,
+      "cast": 0,
+      "fx": "pin_shot"
+    },
+    {
+      "id": "bard_song_of_haste",
+      "name": "Song of Haste",
+      "desc": "Every ally within 3 m of a point up to 6 m away gains 25% TG (1.5 s).",
+      "kind": "active",
+      "effect": "support",
+      "scale": "mag",
+      "target": "ally",
+      "shape": "circle",
+      "power": 0,
+      "min_range": 0,
+      "max_range": 6,
+      "aoe": 3,
+      "cooldown": 3,
+      "cast": 1.5,
+      "tg": 25,
+      "fx": "haste"
+    },
+    {
+      "id": "bard_lullaby",
+      "name": "Lullaby",
+      "desc": "Slow every enemy within 2.5 m of a point 2-8 m away for 5 s (1.5 s).",
+      "kind": "active",
+      "effect": "support",
+      "scale": "mag",
+      "target": "enemy",
+      "shape": "circle",
+      "power": 0,
+      "min_range": 2,
+      "max_range": 8,
+      "aoe": 2.5,
+      "cooldown": 3,
+      "cast": 1.5,
+      "status": {
+        "id": "slow",
+        "turns": 2
+      },
+      "fx": "blizzard"
+    },
+    {
+      "id": "bard_hymn_of_life",
+      "name": "Hymn of Life",
+      "desc": "ULTIMATE: Heal every ally within 4 m of you, with Regen for 8 s (2 s).",
+      "kind": "active",
+      "effect": "heal",
+      "scale": "mag",
+      "target": "ally",
+      "shape": "self",
+      "power": 31,
+      "min_range": 0,
+      "max_range": 0,
+      "aoe": 4,
+      "cooldown": 0,
+      "cast": 2,
+      "status": {
+        "id": "regen",
+        "turns": 3
+      },
+      "fx": "sanctuary"
+    }
+  ]
+}

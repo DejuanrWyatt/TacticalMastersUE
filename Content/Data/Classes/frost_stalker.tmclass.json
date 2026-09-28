@@ -1,0 +1,105 @@
+{
+  "format": "tactical-masters-class",
+  "version": 1,
+  "id": "frost_stalker",
+  "name": "Frost Stalker",
+  "color": "#65b3e4",
+  "look": "squire",
+  "roles": [
+    "damage"
+  ],
+  "stats": {
+    "hp": 74,
+    "attdef": 8,
+    "magdef": 9,
+    "aeva": 24,
+    "meva": 10,
+    "crit": 20,
+    "speed": 12,
+    "move": 8,
+    "patience": 5,
+    "sight": 10
+  },
+  "abilities": [
+    {
+      "id": "frost_stalker_frost_dagger",
+      "name": "Frost Dagger",
+      "desc": "Stab an adjacent enemy.",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "att",
+      "target": "enemy",
+      "shape": "unit",
+      "power": 37,
+      "min_range": 0,
+      "max_range": 1.8,
+      "aoe": 0,
+      "cooldown": 0,
+      "cast": 0,
+      "fx": "attack"
+    },
+    {
+      "id": "frost_stalker_frost_kunai",
+      "name": "Frost Kunai",
+      "desc": "Throw a blade at an enemy 2-8 m away; Slows for 2 turns.",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "att",
+      "target": "enemy",
+      "shape": "unit",
+      "power": 29,
+      "min_range": 2,
+      "max_range": 8,
+      "aoe": 0,
+      "cooldown": 1,
+      "cast": 0,
+      "status": {
+        "id": "slow",
+        "turns": 2
+      },
+      "fx": "throw_stone"
+    },
+    {
+      "id": "frost_stalker_frost_veil",
+      "name": "Frost Veil",
+      "desc": "Slow every enemy within 2 m of a point 1-5 m away; Slows for 2 turns.",
+      "kind": "active",
+      "effect": "support",
+      "scale": "mag",
+      "target": "enemy",
+      "shape": "circle",
+      "power": 0,
+      "min_range": 1,
+      "max_range": 5,
+      "aoe": 2,
+      "cooldown": 3,
+      "cast": 0,
+      "status": {
+        "id": "slow",
+        "turns": 2
+      },
+      "fx": "haste"
+    },
+    {
+      "id": "frost_stalker_frost_execution",
+      "name": "Frost Execution",
+      "desc": "ULTIMATE: A killing blow on an adjacent enemy; Slows for 2 turns.",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "att",
+      "target": "enemy",
+      "shape": "unit",
+      "power": 70,
+      "min_range": 0,
+      "max_range": 1.8,
+      "aoe": 0,
+      "cooldown": 0,
+      "cast": 0,
+      "status": {
+        "id": "slow",
+        "turns": 2
+      },
+      "fx": "brave_slash"
+    }
+  ]
+}

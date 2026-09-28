@@ -1,0 +1,110 @@
+{
+  "format": "tactical-masters-class",
+  "version": 1,
+  "id": "sylvan_muse",
+  "name": "Sylvan Muse",
+  "color": "#76c843",
+  "look": "squire",
+  "roles": [
+    "support"
+  ],
+  "stats": {
+    "hp": 70,
+    "attdef": 6,
+    "magdef": 10,
+    "aeva": 10,
+    "meva": 12,
+    "crit": 8,
+    "speed": 12,
+    "move": 6,
+    "patience": 8,
+    "sight": 11
+  },
+  "abilities": [
+    {
+      "id": "sylvan_muse_thorn_chord",
+      "name": "Thorn Chord",
+      "desc": "A sharp chord at an enemy 1-7 m away.",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "mag",
+      "target": "enemy",
+      "shape": "unit",
+      "power": 25,
+      "min_range": 1,
+      "max_range": 7,
+      "aoe": 0,
+      "cooldown": 0,
+      "cast": 0,
+      "fx": "pin_shot"
+    },
+    {
+      "id": "sylvan_muse_thorn_anthem",
+      "name": "Thorn Anthem",
+      "desc": "Every ally within 3 m of a point up to 6 m away gains 25% TG. (1.5 s)",
+      "kind": "active",
+      "effect": "support",
+      "scale": "mag",
+      "target": "ally",
+      "shape": "circle",
+      "power": 0,
+      "min_range": 0,
+      "max_range": 6,
+      "aoe": 3,
+      "cooldown": 3,
+      "cast": 1.5,
+      "tg": 25,
+      "fx": "haste"
+    },
+    {
+      "id": "sylvan_muse_thorn_ballad",
+      "name": "Thorn Ballad",
+      "desc": "Every ally within 4 m is inspired; AttDef +3, MagDef +3 for 2 turns. Always on, for allies nearby.",
+      "kind": "aura",
+      "effect": "support",
+      "scale": "mag",
+      "target": "ally",
+      "shape": "self",
+      "power": 0,
+      "min_range": 0,
+      "max_range": 0,
+      "aoe": 4,
+      "cooldown": 0,
+      "cast": 0,
+      "buffs": [
+        {
+          "stat": "attdef",
+          "amount": 3,
+          "turns": 2
+        },
+        {
+          "stat": "magdef",
+          "amount": 3,
+          "turns": 2
+        }
+      ],
+      "fx": "haste"
+    },
+    {
+      "id": "sylvan_muse_thorn_finale",
+      "name": "Thorn Finale",
+      "desc": "ULTIMATE: Heal every ally within 4 m of you; Regen for 3 turns. (2 s)",
+      "kind": "active",
+      "effect": "heal",
+      "scale": "mag",
+      "target": "ally",
+      "shape": "self",
+      "power": 18,
+      "min_range": 0,
+      "max_range": 0,
+      "aoe": 4,
+      "cooldown": 0,
+      "cast": 2,
+      "status": {
+        "id": "regen",
+        "turns": 3
+      },
+      "fx": "sanctuary"
+    }
+  ]
+}

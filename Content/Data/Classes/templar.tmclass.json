@@ -1,0 +1,106 @@
+{
+  "format": "tactical-masters-class",
+  "version": 1,
+  "id": "templar",
+  "name": "Templar",
+  "color": "#f3d46f",
+  "look": "knight",
+  "roles": [
+    "tank",
+    "support"
+  ],
+  "stats": {
+    "hp": 115,
+    "attdef": 13,
+    "magdef": 11,
+    "aeva": 6,
+    "meva": 8,
+    "crit": 5,
+    "speed": 6,
+    "move": 6,
+    "patience": 8,
+    "sight": 8
+  },
+  "abilities": [
+    {
+      "id": "templar_holy_mace",
+      "name": "Holy Mace",
+      "desc": "Strike an adjacent enemy.",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "att",
+      "target": "enemy",
+      "shape": "unit",
+      "power": 31,
+      "min_range": 0,
+      "max_range": 1.8,
+      "aoe": 0,
+      "cooldown": 0,
+      "cast": 0,
+      "fx": "attack"
+    },
+    {
+      "id": "templar_holy_bash",
+      "name": "Holy Bash",
+      "desc": "Shield-bash an adjacent enemy.",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "att",
+      "target": "enemy",
+      "shape": "unit",
+      "power": 30.5,
+      "min_range": 0,
+      "max_range": 1.8,
+      "aoe": 0,
+      "cooldown": 2,
+      "cast": 0,
+      "fx": "shield_bash"
+    },
+    {
+      "id": "templar_holy_ward",
+      "name": "Holy Ward",
+      "desc": "Every ally within 4 m is shielded; AttDef +9, MagDef +4 for 2 turns. Always on, for allies nearby.",
+      "kind": "aura",
+      "effect": "support",
+      "scale": "mag",
+      "target": "ally",
+      "shape": "self",
+      "power": 0,
+      "min_range": 0,
+      "max_range": 0,
+      "aoe": 4,
+      "cooldown": 0,
+      "cast": 0,
+      "buffs": [
+        {
+          "stat": "attdef",
+          "amount": 9,
+          "turns": 2
+        },
+        {
+          "stat": "magdef",
+          "amount": 4,
+          "turns": 2
+        }
+      ],
+      "fx": "guard"
+    },
+    {
+      "id": "templar_holy_bastion",
+      "name": "Holy Bastion",
+      "desc": "ULTIMATE: Slam the ground, hitting every enemy within 3 m of you. (1 s)",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "att",
+      "target": "enemy",
+      "shape": "self",
+      "power": 40.4,
+      "min_range": 0,
+      "max_range": 0,
+      "aoe": 3,
+      "cooldown": 0,
+      "cast": 1,
+      "fx": "holy_blade"
+    }
+  ]
+}

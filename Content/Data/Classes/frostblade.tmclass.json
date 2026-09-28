@@ -1,0 +1,102 @@
+{
+  "format": "tactical-masters-class",
+  "version": 1,
+  "id": "frostblade",
+  "name": "Frostblade",
+  "color": "#4fcfe0",
+  "look": "knight",
+  "roles": [
+    "tank",
+    "damage"
+  ],
+  "stats": {
+    "hp": 95,
+    "attdef": 10,
+    "magdef": 11,
+    "aeva": 10,
+    "meva": 10,
+    "crit": 12,
+    "speed": 8,
+    "move": 7,
+    "patience": 6,
+    "sight": 9
+  },
+  "abilities": [
+    {
+      "id": "frostblade_frost_slash",
+      "name": "Frost Slash",
+      "desc": "Cut an adjacent enemy.",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "att",
+      "target": "enemy",
+      "shape": "unit",
+      "power": 31,
+      "min_range": 0,
+      "max_range": 1.8,
+      "aoe": 0,
+      "cooldown": 0,
+      "cast": 0,
+      "fx": "attack"
+    },
+    {
+      "id": "frostblade_frost_edge",
+      "name": "Frost Edge",
+      "desc": "A spell-charged cut on an adjacent enemy; Slows for 2 turns.",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "mag",
+      "target": "enemy",
+      "shape": "unit",
+      "power": 38,
+      "min_range": 0,
+      "max_range": 1.8,
+      "aoe": 0,
+      "cooldown": 2,
+      "cast": 0,
+      "status": {
+        "id": "slow",
+        "turns": 2
+      },
+      "fx": "holy_blade"
+    },
+    {
+      "id": "frostblade_frost_lance",
+      "name": "Frost Lance",
+      "desc": "A spear of magic through everyone in a line up to 7 m. (1 s)",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "mag",
+      "target": "enemy",
+      "shape": "line",
+      "power": 26,
+      "min_range": 2,
+      "max_range": 7,
+      "aoe": 0.7,
+      "cooldown": 0,
+      "cast": 1,
+      "fx": "blizzard"
+    },
+    {
+      "id": "frostblade_frost_maelstrom",
+      "name": "Frost Maelstrom",
+      "desc": "ULTIMATE: Blade magic hits every enemy within 2.5 m of you; Slows for 2 turns. (1 s)",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "mag",
+      "target": "enemy",
+      "shape": "self",
+      "power": 42,
+      "min_range": 0,
+      "max_range": 0,
+      "aoe": 2.5,
+      "cooldown": 0,
+      "cast": 1,
+      "status": {
+        "id": "slow",
+        "turns": 2
+      },
+      "fx": "blizzard"
+    }
+  ]
+}

@@ -1,0 +1,118 @@
+{
+  "format": "tactical-masters-class",
+  "version": 1,
+  "id": "hexblade",
+  "name": "Hexblade",
+  "color": "#6e43b0",
+  "look": "knight",
+  "roles": [
+    "tank",
+    "damage"
+  ],
+  "stats": {
+    "hp": 90,
+    "attdef": 9,
+    "magdef": 9,
+    "aeva": 10,
+    "meva": 13,
+    "crit": 14,
+    "speed": 10,
+    "move": 7,
+    "patience": 6,
+    "sight": 9
+  },
+  "abilities": [
+    {
+      "id": "hexblade_shadow_slash",
+      "name": "Shadow Slash",
+      "desc": "Cut an adjacent enemy.",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "att",
+      "target": "enemy",
+      "shape": "unit",
+      "power": 31,
+      "min_range": 0,
+      "max_range": 1.8,
+      "aoe": 0,
+      "cooldown": 0,
+      "cast": 0,
+      "fx": "attack"
+    },
+    {
+      "id": "hexblade_shadow_edge",
+      "name": "Shadow Edge",
+      "desc": "A spell-charged cut on an adjacent enemy; MagDef -6, AttDef -3 for 2 turns.",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "mag",
+      "target": "enemy",
+      "shape": "unit",
+      "power": 38,
+      "min_range": 0,
+      "max_range": 1.8,
+      "aoe": 0,
+      "cooldown": 2,
+      "cast": 0,
+      "buffs": [
+        {
+          "stat": "magdef",
+          "amount": -6,
+          "turns": 2
+        },
+        {
+          "stat": "attdef",
+          "amount": -3,
+          "turns": 2
+        }
+      ],
+      "fx": "holy_blade"
+    },
+    {
+      "id": "hexblade_shadow_lance",
+      "name": "Shadow Lance",
+      "desc": "A spear of magic through everyone in a line up to 7 m. (1 s)",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "mag",
+      "target": "enemy",
+      "shape": "line",
+      "power": 26,
+      "min_range": 2,
+      "max_range": 7,
+      "aoe": 0.7,
+      "cooldown": 0,
+      "cast": 1,
+      "fx": "pin_shot"
+    },
+    {
+      "id": "hexblade_shadow_maelstrom",
+      "name": "Shadow Maelstrom",
+      "desc": "ULTIMATE: Blade magic hits every enemy within 2.5 m of you; MagDef -6, AttDef -3 for 2 turns. (1 s)",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "mag",
+      "target": "enemy",
+      "shape": "self",
+      "power": 42,
+      "min_range": 0,
+      "max_range": 0,
+      "aoe": 2.5,
+      "cooldown": 0,
+      "cast": 1,
+      "buffs": [
+        {
+          "stat": "magdef",
+          "amount": -6,
+          "turns": 2
+        },
+        {
+          "stat": "attdef",
+          "amount": -3,
+          "turns": 2
+        }
+      ],
+      "fx": "meteor"
+    }
+  ]
+}

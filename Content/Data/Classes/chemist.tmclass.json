@@ -1,0 +1,98 @@
+{
+  "format": "tactical-masters-class",
+  "version": 1,
+  "id": "chemist",
+  "name": "Chemist",
+  "color": "#8e7cc3",
+  "look": "squire",
+  "icon": "chemist",
+  "roles": [
+    "support"
+  ],
+  "stats": {
+    "hp": 70,
+    "attdef": 7,
+    "magdef": 8,
+    "aeva": 10,
+    "meva": 10,
+    "crit": 8,
+    "speed": 10,
+    "move": 6,
+    "patience": 7,
+    "sight": 9
+  },
+  "abilities": [
+    {
+      "id": "chemist_fire_bomb",
+      "name": "Fire Bomb",
+      "desc": "Throw a bomb hitting enemies within 1.2 m of a point 2-6 m away; Burns for 4 s.",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "att",
+      "target": "enemy",
+      "shape": "circle",
+      "power": 19,
+      "min_range": 2,
+      "max_range": 6,
+      "aoe": 1.2,
+      "cooldown": 0,
+      "cast": 0,
+      "status": {
+        "id": "burn",
+        "turns": 2
+      },
+      "fx": "throw_stone"
+    },
+    {
+      "id": "chemist_potion",
+      "name": "Potion",
+      "desc": "Heal an ally up to 4 m away.",
+      "kind": "active",
+      "effect": "heal",
+      "scale": "mag",
+      "target": "ally",
+      "shape": "unit",
+      "power": 17,
+      "min_range": 0,
+      "max_range": 4,
+      "aoe": 0,
+      "cooldown": 1,
+      "cast": 0,
+      "fx": "cure"
+    },
+    {
+      "id": "chemist_phoenix_down",
+      "name": "Phoenix Down",
+      "desc": "Revive a knocked-out ally up to 4 m away with 40% HP (1 s).",
+      "kind": "active",
+      "effect": "revive",
+      "scale": "mag",
+      "target": "ko_ally",
+      "shape": "unit",
+      "power": 0.4,
+      "min_range": 0,
+      "max_range": 4,
+      "aoe": 0,
+      "cooldown": 4,
+      "cast": 1,
+      "fx": "raise"
+    },
+    {
+      "id": "chemist_elixir_mist",
+      "name": "Elixir Mist",
+      "desc": "ULTIMATE: Heal every ally within 3.5 m of a point up to 6 m away.",
+      "kind": "active",
+      "effect": "heal",
+      "scale": "mag",
+      "target": "ally",
+      "shape": "circle",
+      "power": 14.2,
+      "min_range": 0,
+      "max_range": 6,
+      "aoe": 3.5,
+      "cooldown": 0,
+      "cast": 0,
+      "fx": "sanctuary"
+    }
+  ]
+}

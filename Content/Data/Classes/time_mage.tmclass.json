@@ -1,0 +1,103 @@
+{
+  "format": "tactical-masters-class",
+  "version": 1,
+  "id": "time_mage",
+  "name": "Time Mage",
+  "color": "#8a6cff",
+  "look": "white_mage",
+  "roles": [
+    "special"
+  ],
+  "stats": {
+    "hp": 58,
+    "attdef": 5,
+    "magdef": 11,
+    "aeva": 10,
+    "meva": 16,
+    "crit": 10,
+    "speed": 16,
+    "move": 6,
+    "patience": 7,
+    "sight": 10
+  },
+  "abilities": [
+    {
+      "id": "time_mage_chrono_bolt",
+      "name": "Chrono Bolt",
+      "desc": "Instant bolt of stolen time at an enemy 1-7 m away; knocks its Turn Gauge back 10%.",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "mag",
+      "target": "enemy",
+      "shape": "unit",
+      "power": 38,
+      "min_range": 1,
+      "max_range": 7,
+      "aoe": 0,
+      "cooldown": 0,
+      "cast": 0,
+      "tg": -10,
+      "fx": "pin_shot"
+    },
+    {
+      "id": "time_mage_slowga",
+      "name": "Slowga",
+      "desc": "Every enemy within 2.5 m of a point 2-8 m away is Slowed (Turn Gauge fills at half speed).",
+      "kind": "active",
+      "effect": "support",
+      "scale": "mag",
+      "target": "enemy",
+      "shape": "circle",
+      "power": 0,
+      "min_range": 2,
+      "max_range": 8,
+      "aoe": 2.5,
+      "cooldown": 3,
+      "cast": 1.5,
+      "status": {
+        "id": "slow",
+        "turns": 2
+      },
+      "fx": "haste"
+    },
+    {
+      "id": "time_mage_quicken",
+      "name": "Quicken",
+      "desc": "Push an ally's Turn Gauge forward by 40% (range 6 m) so it acts sooner.",
+      "kind": "active",
+      "effect": "support",
+      "scale": "mag",
+      "target": "ally",
+      "shape": "unit",
+      "power": 0,
+      "min_range": 0,
+      "max_range": 6,
+      "aoe": 0,
+      "cooldown": 3,
+      "cast": 1,
+      "tg": 40,
+      "fx": "haste"
+    },
+    {
+      "id": "time_mage_time_stop",
+      "name": "Time Stop",
+      "desc": "ULTIMATE: Freeze time around a point 3-9 m away: every enemy within 3 m takes damage and is Stunned for 2 s.",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "mag",
+      "target": "enemy",
+      "shape": "circle",
+      "power": 35,
+      "min_range": 3,
+      "max_range": 9,
+      "aoe": 3,
+      "cooldown": 0,
+      "cast": 2.5,
+      "status": {
+        "id": "stun",
+        "turns": 1
+      },
+      "fx": "meteor"
+    }
+  ]
+}

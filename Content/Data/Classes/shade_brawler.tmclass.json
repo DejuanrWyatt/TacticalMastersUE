@@ -1,0 +1,124 @@
+{
+  "format": "tactical-masters-class",
+  "version": 1,
+  "id": "shade_brawler",
+  "name": "Shade Brawler",
+  "color": "#633c9d",
+  "look": "monk",
+  "roles": [
+    "damage"
+  ],
+  "stats": {
+    "hp": 82,
+    "attdef": 7,
+    "magdef": 6,
+    "aeva": 18,
+    "meva": 11,
+    "crit": 14,
+    "speed": 12,
+    "move": 8,
+    "patience": 5,
+    "sight": 9
+  },
+  "abilities": [
+    {
+      "id": "shade_brawler_shadow_jab",
+      "name": "Shadow Jab",
+      "desc": "Punch an adjacent enemy.",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "att",
+      "target": "enemy",
+      "shape": "unit",
+      "power": 32,
+      "min_range": 0,
+      "max_range": 1.8,
+      "aoe": 0,
+      "cooldown": 0,
+      "cast": 0,
+      "fx": "punch"
+    },
+    {
+      "id": "shade_brawler_shadow_uppercut",
+      "name": "Shadow Uppercut",
+      "desc": "A rising blow on an adjacent enemy; MagDef -6, AttDef -3 for 2 turns.",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "att",
+      "target": "enemy",
+      "shape": "unit",
+      "power": 44,
+      "min_range": 0,
+      "max_range": 1.8,
+      "aoe": 0,
+      "cooldown": 2,
+      "cast": 0,
+      "buffs": [
+        {
+          "stat": "magdef",
+          "amount": -6,
+          "turns": 2
+        },
+        {
+          "stat": "attdef",
+          "amount": -3,
+          "turns": 2
+        }
+      ],
+      "fx": "wave_fist"
+    },
+    {
+      "id": "shade_brawler_shadow_stance",
+      "name": "Shadow Stance",
+      "desc": "Take a fighting stance; Power +4 for 2 turns. Switched on and off.",
+      "kind": "toggle",
+      "effect": "support",
+      "scale": "mag",
+      "target": "ally",
+      "shape": "self",
+      "power": 0,
+      "min_range": 0,
+      "max_range": 0,
+      "aoe": 0,
+      "cooldown": 0,
+      "cast": 0,
+      "buffs": [
+        {
+          "stat": "crit",
+          "amount": 8,
+          "turns": 2
+        }
+      ],
+      "fx": "focus"
+    },
+    {
+      "id": "shade_brawler_shadow_fury",
+      "name": "Shadow Fury",
+      "desc": "ULTIMATE: A flurry hitting every enemy within 2.5 m of you; MagDef -6, AttDef -3 for 2 turns.",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "att",
+      "target": "enemy",
+      "shape": "self",
+      "power": 49,
+      "min_range": 0,
+      "max_range": 0,
+      "aoe": 2.5,
+      "cooldown": 0,
+      "cast": 0,
+      "buffs": [
+        {
+          "stat": "magdef",
+          "amount": -6,
+          "turns": 2
+        },
+        {
+          "stat": "attdef",
+          "amount": -3,
+          "turns": 2
+        }
+      ],
+      "fx": "earth_slash"
+    }
+  ]
+}

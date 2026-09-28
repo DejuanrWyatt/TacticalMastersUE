@@ -314,6 +314,11 @@ private:
 	void OpenSetup();
 	/** One of the buttons on the title, setup or in-battle menu. */
 	void PressMenuButton(const struct FTMHudButton& Button);
+	/** The setup slot a class is being picked for (team * 4 + slot), or -1 (class_picker.gd). */
+	int32 PickerSlot = -1;
+	/** The role the picker shows, as an index into tank, damage, support, special, or -1 for every class. */
+	int32 PickerRole = -1;
+
 	/** A tank, two damage dealers and someone to keep them standing (class_list.gd:62-77). */
 	void RandomTeam(int32 Team);
 

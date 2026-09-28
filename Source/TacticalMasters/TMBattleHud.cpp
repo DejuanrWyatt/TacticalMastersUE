@@ -150,6 +150,12 @@ void ATMBattleHud::DrawHUD()
 		else
 		{
 			DrawSetup(*Found);
+			if (Found->PickerSlot >= 0)
+			{
+				Buttons.Reset();
+				Tips.Reset();
+				DrawClassPicker(*Found);
+			}
 		}
 		// The Unit Guide can be opened from the title too, over everything.
 		if (Found->bGuideOpen)
@@ -733,7 +739,7 @@ void ATMBattleHud::DrawSetup(ATMBattleDirector& From)
 				}
 			}
 			MenuButton(CX, Y, ColumnW, 56.0f * S, Name, ETMHudAction::SetupClass, Team * 4 + Slot, false,
-				Roles.IsEmpty() ? FString(TEXT("click to change")) : Roles + TEXT("   (click to change)"));
+				Roles.IsEmpty() ? FString(TEXT("click to choose")) : Roles + TEXT("   (click to choose)"));
 			Y += 64.0f * S;
 		}
 		const float Half = (ColumnW - 10.0f * S) * 0.5f;
@@ -778,7 +784,6 @@ void ATMBattleHud::DrawSetup(ATMBattleDirector& From)
 		TEXT("Not ported yet:"),
 		TEXT("  other maps, and saved teams"),
 		TEXT("  hold-the-middle, time limits, planning time"),
-		TEXT("  the other 81 classes (they wait on the importer)"),
 		TEXT("Easy and medium think more simply than hard, but"),
 		TEXT("  do not yet make Godot's random mistakes."),
 	};

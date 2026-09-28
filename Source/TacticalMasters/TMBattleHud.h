@@ -69,6 +69,11 @@ enum class ETMHudAction : uint8
 	CloseCard,
 	GuideJob,
 	GuideAgainst,
+
+	// The class picker on the setup screen. PickerChoose's value is the class's index, PickerRole's the role's (-1 for all).
+	PickerChoose,
+	PickerRole,
+	PickerClose,
 };
 
 /** Words shown when the pointer rests on part of the HUD: how a number is worked out. */
@@ -114,6 +119,7 @@ private:
 	void DrawField(ATMBattleDirector& Director);
 	void DrawInspectCard(ATMBattleDirector& Director);
 	void DrawGuide(ATMBattleDirector& Director);
+	void DrawClassPicker(ATMBattleDirector& Director);
 	void DrawTooltip();
 
 	/** Who is casting what at this unit, as a line per caster (hud.gd:1123-1150). Returns the height used. */

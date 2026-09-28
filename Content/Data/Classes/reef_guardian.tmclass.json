@@ -1,0 +1,114 @@
+{
+  "format": "tactical-masters-class",
+  "version": 1,
+  "id": "reef_guardian",
+  "name": "Reef Guardian",
+  "color": "#2b80e1",
+  "look": "knight",
+  "roles": [
+    "tank",
+    "support"
+  ],
+  "stats": {
+    "hp": 123,
+    "attdef": 13,
+    "magdef": 10,
+    "aeva": 6,
+    "meva": 8,
+    "crit": 5,
+    "speed": 6,
+    "move": 6,
+    "patience": 8,
+    "sight": 8
+  },
+  "abilities": [
+    {
+      "id": "reef_guardian_tide_mace",
+      "name": "Tide Mace",
+      "desc": "Strike an adjacent enemy.",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "att",
+      "target": "enemy",
+      "shape": "unit",
+      "power": 31,
+      "min_range": 0,
+      "max_range": 1.8,
+      "aoe": 0,
+      "cooldown": 0,
+      "cast": 0,
+      "fx": "attack"
+    },
+    {
+      "id": "reef_guardian_tide_bash",
+      "name": "Tide Bash",
+      "desc": "Shield-bash an adjacent enemy; Slows for 2 turns.",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "att",
+      "target": "enemy",
+      "shape": "unit",
+      "power": 29,
+      "min_range": 0,
+      "max_range": 1.8,
+      "aoe": 0,
+      "cooldown": 2,
+      "cast": 0,
+      "status": {
+        "id": "slow",
+        "turns": 2
+      },
+      "fx": "shield_bash"
+    },
+    {
+      "id": "reef_guardian_tide_ward",
+      "name": "Tide Ward",
+      "desc": "Every ally within 4 m is shielded; AttDef +5, MagDef +5 for 2 turns. Always on, for allies nearby.",
+      "kind": "aura",
+      "effect": "support",
+      "scale": "mag",
+      "target": "ally",
+      "shape": "self",
+      "power": 0,
+      "min_range": 0,
+      "max_range": 0,
+      "aoe": 4,
+      "cooldown": 0,
+      "cast": 0,
+      "buffs": [
+        {
+          "stat": "attdef",
+          "amount": 5,
+          "turns": 2
+        },
+        {
+          "stat": "magdef",
+          "amount": 5,
+          "turns": 2
+        }
+      ],
+      "fx": "guard"
+    },
+    {
+      "id": "reef_guardian_tide_bastion",
+      "name": "Tide Bastion",
+      "desc": "ULTIMATE: Slam the ground, hitting every enemy within 3 m of you; Slows for 2 turns. (1 s)",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "att",
+      "target": "enemy",
+      "shape": "self",
+      "power": 38,
+      "min_range": 0,
+      "max_range": 0,
+      "aoe": 3,
+      "cooldown": 0,
+      "cast": 1,
+      "status": {
+        "id": "slow",
+        "turns": 2
+      },
+      "fx": "holy_blade"
+    }
+  ]
+}

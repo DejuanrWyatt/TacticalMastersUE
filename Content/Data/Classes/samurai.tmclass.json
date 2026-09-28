@@ -1,0 +1,111 @@
+{
+  "format": "tactical-masters-class",
+  "version": 1,
+  "id": "samurai",
+  "name": "Samurai",
+  "color": "#e25b4a",
+  "look": "knight",
+  "icon": "samurai",
+  "roles": [
+    "damage",
+    "support"
+  ],
+  "stats": {
+    "hp": 85,
+    "attdef": 9,
+    "magdef": 8,
+    "aeva": 14,
+    "meva": 10,
+    "crit": 16,
+    "speed": 10,
+    "move": 7,
+    "patience": 6,
+    "sight": 9
+  },
+  "abilities": [
+    {
+      "id": "samurai_iaido_slash",
+      "name": "Iaido Slash",
+      "desc": "Quick-draw strike on an adjacent enemy.",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "att",
+      "target": "enemy",
+      "shape": "unit",
+      "power": 37,
+      "min_range": 0,
+      "max_range": 1.8,
+      "aoe": 0,
+      "cooldown": 0,
+      "cast": 0,
+      "fx": "attack"
+    },
+    {
+      "id": "samurai_draw_out",
+      "name": "Draw Out",
+      "desc": "Spirit blade hits every enemy within 2 m of you (1 s).",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "att",
+      "target": "enemy",
+      "shape": "self",
+      "power": 32,
+      "min_range": 0,
+      "max_range": 0,
+      "aoe": 2,
+      "cooldown": 2,
+      "cast": 1,
+      "fx": "holy_blade"
+    },
+    {
+      "id": "samurai_meditate",
+      "name": "Meditate",
+      "desc": "AttPwr +6 and MagDef +4 for 2 turns.",
+      "kind": "active",
+      "effect": "support",
+      "scale": "mag",
+      "target": "ally",
+      "shape": "self",
+      "power": 0,
+      "min_range": 0,
+      "max_range": 0,
+      "aoe": 0,
+      "cooldown": 3,
+      "cast": 0,
+      "buffs": [
+        {
+          "stat": "crit",
+          "amount": 10,
+          "turns": 2
+        },
+        {
+          "stat": "magdef",
+          "amount": 4,
+          "turns": 2
+        }
+      ],
+      "fx": "focus"
+    },
+    {
+      "id": "samurai_masamune",
+      "name": "Masamune",
+      "desc": "ULTIMATE: Every ally within 4 m of you heals and gains Regen for 8 s.",
+      "kind": "active",
+      "effect": "heal",
+      "scale": "mag",
+      "target": "ally",
+      "shape": "self",
+      "power": 26,
+      "min_range": 0,
+      "max_range": 0,
+      "aoe": 4,
+      "cooldown": 0,
+      "cast": 0,
+      "status": {
+        "id": "regen",
+        "turns": 3
+      },
+      "fx": "sanctuary"
+    }
+  ]
+}

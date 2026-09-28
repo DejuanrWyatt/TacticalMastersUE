@@ -1,0 +1,113 @@
+{
+  "format": "tactical-masters-class",
+  "version": 1,
+  "id": "thorn_brawler",
+  "name": "Thorn Brawler",
+  "color": "#5ea831",
+  "look": "monk",
+  "roles": [
+    "damage"
+  ],
+  "stats": {
+    "hp": 88,
+    "attdef": 8,
+    "magdef": 6,
+    "aeva": 18,
+    "meva": 8,
+    "crit": 12,
+    "speed": 12,
+    "move": 8,
+    "patience": 6,
+    "sight": 9
+  },
+  "abilities": [
+    {
+      "id": "thorn_brawler_thorn_jab",
+      "name": "Thorn Jab",
+      "desc": "Punch an adjacent enemy.",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "att",
+      "target": "enemy",
+      "shape": "unit",
+      "power": 32,
+      "min_range": 0,
+      "max_range": 1.8,
+      "aoe": 0,
+      "cooldown": 0,
+      "cast": 0,
+      "fx": "punch"
+    },
+    {
+      "id": "thorn_brawler_thorn_uppercut",
+      "name": "Thorn Uppercut",
+      "desc": "A rising blow on an adjacent enemy; Burns for 2 turns.",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "att",
+      "target": "enemy",
+      "shape": "unit",
+      "power": 44,
+      "min_range": 0,
+      "max_range": 1.8,
+      "aoe": 0,
+      "cooldown": 2,
+      "cast": 0,
+      "status": {
+        "id": "burn",
+        "turns": 2
+      },
+      "fx": "wave_fist"
+    },
+    {
+      "id": "thorn_brawler_thorn_stance",
+      "name": "Thorn Stance",
+      "desc": "Take a fighting stance; AttDef +3, MagDef +3 for 2 turns. Switched on and off.",
+      "kind": "toggle",
+      "effect": "support",
+      "scale": "mag",
+      "target": "ally",
+      "shape": "self",
+      "power": 0,
+      "min_range": 0,
+      "max_range": 0,
+      "aoe": 0,
+      "cooldown": 0,
+      "cast": 0,
+      "buffs": [
+        {
+          "stat": "attdef",
+          "amount": 3,
+          "turns": 2
+        },
+        {
+          "stat": "magdef",
+          "amount": 3,
+          "turns": 2
+        }
+      ],
+      "fx": "focus"
+    },
+    {
+      "id": "thorn_brawler_thorn_fury",
+      "name": "Thorn Fury",
+      "desc": "ULTIMATE: A flurry hitting every enemy within 2.5 m of you; Burns for 2 turns.",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "att",
+      "target": "enemy",
+      "shape": "self",
+      "power": 49,
+      "min_range": 0,
+      "max_range": 0,
+      "aoe": 2.5,
+      "cooldown": 0,
+      "cast": 0,
+      "status": {
+        "id": "burn",
+        "turns": 2
+      },
+      "fx": "earth_slash"
+    }
+  ]
+}

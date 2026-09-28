@@ -14,8 +14,11 @@ mistake and somewhere else. When in doubt, preserve determinism over elegance or
 - **Rules:** the Godot project at `D:\ProgramsByMe\TacticalMasters` (`scripts/core/game_state.gd`,
   `unit.gd`, `jobs.gd`, `ai_player.gd`, `astra_import.gd`, …). Until a rule is ported *and* verified
   against Godot, Godot is right and the port is wrong.
-- **Class data:** authored in `D:\ProgramsByMe\TacticalMasters\data\classes\`, copied (not linked) to
-  `Content/Data/Classes/*.astra.json` (81 files + 6 built-in jobs in code = 87 classes).
+- **Class data:** Tactical Masters' own format, `Content/Data/Classes/<id>.tmclass.json` (81 files + 6 built-in
+  jobs in code = 87 classes). Made and installed by the class creator (`E:\TacticsClassCreator`, its own repo;
+  `FORMAT.md` there). The 81 were converted once from Godot's Astra files; **nothing in Unreal reads Astra**.
+  Godot keeps its Astra files as the reference, and `SimClassTest` compares against
+  `Tests/GodotClassTable.txt` (from Godot's `tests/dump_class_table.gd`) when present.
 - Port comments cite the Godot source with line numbers (e.g. `game_state.gd:1730-1867`). Keep doing that.
 
 ## Game in one paragraph
@@ -92,8 +95,9 @@ Paths on this machine: engine `E:\UE_5.8`, Visual Studio `E:\VS2022`.
   check the checksum notices. There is no wrong-seed probe in the code yet. Once abilities consume dice,
   add one: replaying with a different seed must fail.
 - **Adding a `.cpp` to TMSim means adding it to every compile line in `Tests\RunTests.bat`** that carries the
-  sim sources. Five of the six do (`SimRandomTest` compiles alone). A failed compile stops the whole run
-  there, so later tests don't run.
+  sim sources. All but `SimRandomTest` do (it compiles alone). A failed compile stops the whole run
+  there, so later tests don't run. `RunTests.bat` hides compiler output, so check `/W4` on new files by
+  compiling them once by hand.
 - New rules need a parity test from a Godot dump, not only hand-written expectations.
 - Unreal Automation Tests are not used. Don't introduce them without asking.
 
@@ -108,12 +112,13 @@ Godot's order, shields, invulnerability, statuses, gauge changes, buffs, KO, and
 costs to use. The order path + replay + checksum is self-checked (`SimPlayTest`), which now plays a
 battle to a decision, and **replaying it with a different seed fails** — the check the determinism
 rules rest on.
+Class files load (`SimClassTest`: read, refuse, and every one of the 81 plays a battle with no refused
+order); the field-for-field match with Godot runs once `Tests/GodotClassTable.txt` exists.
 Not yet ported (see `Docs/backlog.md`): auras and passive/toggle stat contributions (`FUnit::Stat`
-says so where the gap is — no built-in ability is one), the Astra class importer, AI ability choice
-(and `Randf`), the class-data sync check, the battle time limit and the hold-the-middle rule, and
-the director playing the `FTickReport` events back on screen.
+says so where the gap is — several of the 81 loaded classes have them, so those play weaker than in
+Godot), `Randf` (easy/medium mistakes), the battle time limit and the hold-the-middle rule.
 Kept bug-for-bug from Godot, with a comment at each: a toggle in slot 3 skips the ultimate-meter and
-cooldown gates (`AbilityBlockedReason`, unreachable while no built-in class has a toggle).
+cooldown gates (`AbilityBlockedReason`; reachable now that loaded classes have toggles).
 
 **One deliberate divergence**, in the AI's choice of action. Godot sorts its scored options and takes
 the first, with `sort_custom`, which is *not* a stable sort — so when two options score identically it

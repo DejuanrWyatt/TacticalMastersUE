@@ -1,0 +1,114 @@
+{
+  "format": "tactical-masters-class",
+  "version": 1,
+  "id": "flame_warden",
+  "name": "Flame Warden",
+  "color": "#e75925",
+  "look": "knight",
+  "roles": [
+    "tank",
+    "support"
+  ],
+  "stats": {
+    "hp": 113,
+    "attdef": 13,
+    "magdef": 8,
+    "aeva": 6,
+    "meva": 8,
+    "crit": 5,
+    "speed": 6,
+    "move": 6,
+    "patience": 8,
+    "sight": 8
+  },
+  "abilities": [
+    {
+      "id": "flame_warden_flame_mace",
+      "name": "Flame Mace",
+      "desc": "Strike an adjacent enemy.",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "att",
+      "target": "enemy",
+      "shape": "unit",
+      "power": 31,
+      "min_range": 0,
+      "max_range": 1.8,
+      "aoe": 0,
+      "cooldown": 0,
+      "cast": 0,
+      "fx": "attack"
+    },
+    {
+      "id": "flame_warden_flame_bash",
+      "name": "Flame Bash",
+      "desc": "Shield-bash an adjacent enemy; Burns for 2 turns.",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "att",
+      "target": "enemy",
+      "shape": "unit",
+      "power": 29,
+      "min_range": 0,
+      "max_range": 1.8,
+      "aoe": 0,
+      "cooldown": 2,
+      "cast": 0,
+      "status": {
+        "id": "burn",
+        "turns": 2
+      },
+      "fx": "shield_bash"
+    },
+    {
+      "id": "flame_warden_flame_ward",
+      "name": "Flame Ward",
+      "desc": "Every ally within 4 m is shielded; AttDef +5, Power +5 for 2 turns. Always on, for allies nearby.",
+      "kind": "aura",
+      "effect": "support",
+      "scale": "mag",
+      "target": "ally",
+      "shape": "self",
+      "power": 0,
+      "min_range": 0,
+      "max_range": 0,
+      "aoe": 4,
+      "cooldown": 0,
+      "cast": 0,
+      "buffs": [
+        {
+          "stat": "attdef",
+          "amount": 5,
+          "turns": 2
+        },
+        {
+          "stat": "crit",
+          "amount": 10,
+          "turns": 2
+        }
+      ],
+      "fx": "guard"
+    },
+    {
+      "id": "flame_warden_flame_bastion",
+      "name": "Flame Bastion",
+      "desc": "ULTIMATE: Slam the ground, hitting every enemy within 3 m of you; Burns for 2 turns. (1 s)",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "att",
+      "target": "enemy",
+      "shape": "self",
+      "power": 38,
+      "min_range": 0,
+      "max_range": 0,
+      "aoe": 3,
+      "cooldown": 0,
+      "cast": 1,
+      "status": {
+        "id": "burn",
+        "turns": 2
+      },
+      "fx": "holy_blade"
+    }
+  ]
+}

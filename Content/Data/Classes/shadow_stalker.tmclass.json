@@ -1,0 +1,121 @@
+{
+  "format": "tactical-masters-class",
+  "version": 1,
+  "id": "shadow_stalker",
+  "name": "Shadow Stalker",
+  "color": "#984fbc",
+  "look": "squire",
+  "roles": [
+    "damage"
+  ],
+  "stats": {
+    "hp": 69,
+    "attdef": 7,
+    "magdef": 7,
+    "aeva": 24,
+    "meva": 13,
+    "crit": 22,
+    "speed": 14,
+    "move": 8,
+    "patience": 5,
+    "sight": 10
+  },
+  "abilities": [
+    {
+      "id": "shadow_stalker_shadow_dagger",
+      "name": "Shadow Dagger",
+      "desc": "Stab an adjacent enemy.",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "att",
+      "target": "enemy",
+      "shape": "unit",
+      "power": 37,
+      "min_range": 0,
+      "max_range": 1.8,
+      "aoe": 0,
+      "cooldown": 0,
+      "cast": 0,
+      "fx": "attack"
+    },
+    {
+      "id": "shadow_stalker_shadow_kunai",
+      "name": "Shadow Kunai",
+      "desc": "Throw a blade at an enemy 2-8 m away; MagDef -6, AttDef -3 for 2 turns.",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "att",
+      "target": "enemy",
+      "shape": "unit",
+      "power": 29,
+      "min_range": 2,
+      "max_range": 8,
+      "aoe": 0,
+      "cooldown": 1,
+      "cast": 0,
+      "buffs": [
+        {
+          "stat": "magdef",
+          "amount": -6,
+          "turns": 2
+        },
+        {
+          "stat": "attdef",
+          "amount": -3,
+          "turns": 2
+        }
+      ],
+      "fx": "throw_stone"
+    },
+    {
+      "id": "shadow_stalker_shadow_veil",
+      "name": "Shadow Veil",
+      "desc": "Slow every enemy within 2 m of a point 1-5 m away; Slows for 2 turns.",
+      "kind": "active",
+      "effect": "support",
+      "scale": "mag",
+      "target": "enemy",
+      "shape": "circle",
+      "power": 0,
+      "min_range": 1,
+      "max_range": 5,
+      "aoe": 2,
+      "cooldown": 3,
+      "cast": 0,
+      "status": {
+        "id": "slow",
+        "turns": 2
+      },
+      "fx": "haste"
+    },
+    {
+      "id": "shadow_stalker_shadow_execution",
+      "name": "Shadow Execution",
+      "desc": "ULTIMATE: A killing blow on an adjacent enemy; MagDef -6, AttDef -3 for 2 turns.",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "att",
+      "target": "enemy",
+      "shape": "unit",
+      "power": 70,
+      "min_range": 0,
+      "max_range": 1.8,
+      "aoe": 0,
+      "cooldown": 0,
+      "cast": 0,
+      "buffs": [
+        {
+          "stat": "magdef",
+          "amount": -6,
+          "turns": 2
+        },
+        {
+          "stat": "attdef",
+          "amount": -3,
+          "turns": 2
+        }
+      ],
+      "fx": "brave_slash"
+    }
+  ]
+}

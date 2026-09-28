@@ -21,6 +21,9 @@
 #include "Misc/DateTime.h"
 
 #include "SimAbility.h"
+#include "SimClassFile.h"
+#include "HAL/FileManager.h"
+#include "Misc/FileHelper.h"
 
 #include <algorithm>
 
@@ -127,8 +130,51 @@ void ATMBattleDirector::ClearBattle()
 	bSaidWon = false;
 }
 
+namespace
+{
+	/**
+	 * Loads every class file in Content/Data/Classes into the rules, once per run.
+	 * The files are Tactical Masters' own format, written by the class creator;
+	 * the rules read them (SimClassFile.cpp) and this only finds them. A file the
+	 * rules refuse is left out and said so, never half-loaded.
+	 */
+	void LoadClassFiles()
+	{
+		static bool bLoaded = false;
+		if (bLoaded)
+		{
+			return;
+		}
+		bLoaded = true;
+		const FString Dir = FPaths::ProjectContentDir() / TEXT("Data/Classes");
+		TArray<FString> Files;
+		IFileManager::Get().FindFiles(Files, *(Dir / TEXT("*.tmclass.json")), true, false);
+		Files.Sort();
+		int32 Loaded = 0;
+		for (const FString& File : Files)
+		{
+			FString Text;
+			if (!FFileHelper::LoadFileToString(Text, *(Dir / File)))
+			{
+				UE_LOG(LogTemp, Warning, TEXT("could not read class file %s"), *File);
+				continue;
+			}
+			const std::string Refused = TMSim::LoadClassFile(TCHAR_TO_UTF8(*Text));
+			if (!Refused.empty())
+			{
+				UE_LOG(LogTemp, Warning, TEXT("class file %s left out: %hs"), *File, Refused.c_str());
+				continue;
+			}
+			++Loaded;
+		}
+		UE_LOG(LogTemp, Log, TEXT("loaded %d of %d class files; %d classes in all"),
+			Loaded, Files.Num(), static_cast<int32>(TMSim::AllJobs().size()));
+	}
+}
+
 void ATMBattleDirector::BuildBattle()
 {
+	LoadClassFiles();
 	ClearBattle();
 
 	// Two sides of four, as the Godot game sets up, with the classes the setup
@@ -1060,8 +1106,18 @@ void ATMBattleDirector::Tick(float DeltaSeconds)
 			else if (Before < 2.5f && MenuShotsAt >= 2.5f)
 			{
 				Shoot(TEXT("menu_setup.png"));
+				PickerSlot = 0;
 			}
-			else if (MenuShotsAt >= 3.0f)
+			else if (Before < 3.5f && MenuShotsAt >= 3.5f)
+			{
+				// Closed a moment later: the picture is taken when the frame is drawn.
+				Shoot(TEXT("menu_picker.png"));
+			}
+			else if (Before < 4.5f && MenuShotsAt >= 4.5f)
+			{
+				PickerSlot = -1;
+			}
+			else if (MenuShotsAt >= 5.0f)
 			{
 				MenuShotsAt = -1.0f;
 				StartMatch(false);
@@ -1327,7 +1383,11 @@ void ATMBattleDirector::OnKey(FKey Key)
 	// from the setup to the title.
 	if (Screen != EScreen::Battle)
 	{
-		if (Key == EKeys::Escape && Screen == EScreen::Setup)
+		if (Key == EKeys::Escape && PickerSlot >= 0)
+		{
+			PickerSlot = -1;
+		}
+		else if (Key == EKeys::Escape && Screen == EScreen::Setup)
 		{
 			OpenTitle();
 		}
@@ -2150,23 +2210,27 @@ void ATMBattleDirector::PressMenuButton(const FTMHudButton& Button)
 
 	// The setup screen (battle_setup.gd).
 	case ETMHudAction::SetupClass:
+		// With every class loaded there are far too many to step through, so a
+		// slot opens the picker (class_picker.gd).
+		PickerSlot = Button.Value;
+		break;
+	case ETMHudAction::PickerChoose:
 	{
-		// Each click moves a slot on to the next class.
-		const int32 Team = Button.Value / 4;
-		const int32 Slot = Button.Value % 4;
 		const std::vector<const TMSim::FJobDef*>& Jobs = TMSim::AllJobs();
-		size_t Next = 0;
-		for (size_t i = 0; i < Jobs.size(); ++i)
+		if (PickerSlot >= 0 && Button.Value >= 0 && Button.Value < static_cast<int32>(Jobs.size()))
 		{
-			if (Jobs[i]->Id == Setup.Rosters[Team][Slot])
-			{
-				Next = (i + 1) % Jobs.size();
-			}
+			Setup.Rosters[PickerSlot / 4][PickerSlot % 4] = Jobs[Button.Value]->Id;
+			BuildBattle();
 		}
-		Setup.Rosters[Team][Slot] = Jobs[Next]->Id;
-		BuildBattle();
+		PickerSlot = -1;
 		break;
 	}
+	case ETMHudAction::PickerRole:
+		PickerRole = Button.Value;
+		break;
+	case ETMHudAction::PickerClose:
+		PickerSlot = -1;
+		break;
 	case ETMHudAction::SetupRandom:
 		RandomTeam(Button.Value);
 		break;

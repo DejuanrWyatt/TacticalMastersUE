@@ -72,6 +72,11 @@ namespace TMSim
 		int StatusTurns = 0;
 		std::vector<FBuff> Buffs;
 
+		/** What it does, in words, for the guide and tooltips. Never read by the rules. */
+		std::string Desc;
+		/** Which built-in ability's animation it borrows. Never read by the rules. */
+		std::string Fx;
+
 		bool HasStatus() const { return !StatusId.empty(); }
 	};
 
@@ -91,6 +96,17 @@ namespace TMSim
 		 * which the imported classes will need; that arrives with the importer.
 		 */
 		std::vector<std::string> Roles;
+
+		// How it looks. None of these is read by the rules.
+
+		/** Which of the six built-in bodies it wears. */
+		std::string Look;
+		/** Its colour, as #rrggbb. */
+		std::string Color;
+		/** Its icon's name, or empty for the class id's own. */
+		std::string Icon;
+		/** True for a class loaded from a file rather than written in code. */
+		bool bFromFile = false;
 	};
 
 	/** Null if nothing is registered under that id. */
@@ -103,6 +119,22 @@ namespace TMSim
 	/** Whether this class counts as that role. */
 	TMSIM_API bool JobHasRole(const std::string& JobId, const std::string& Role);
 
-	/** Every class the game knows, for listings. */
+	/** Every class the game knows, for listings: the built-in six, then any loaded, each in id order. */
 	TMSIM_API const std::vector<const FJobDef*>& AllJobs();
+
+	/**
+	 * Adds a class, and its four abilities, to what the game knows. "" when it is
+	 * added, otherwise why not: a class may not take a built-in's id or one
+	 * already loaded, and its abilities may not take ids already in use.
+	 *
+	 * Loading classes is part of setting up a game, not part of a battle. Every
+	 * machine in a match must have loaded the same classes before one starts,
+	 * because a battle's checksum covers the units, not the definitions of their
+	 * classes; two machines holding different numbers under the same class id
+	 * would come apart and only notice a step later.
+	 */
+	TMSIM_API std::string RegisterJob(const FJobDef& Job, const std::vector<FAbility>& JobAbilities);
+
+	/** Forgets every loaded class, leaving the built-in six. For tests. */
+	TMSIM_API void ForgetLoadedJobs();
 }

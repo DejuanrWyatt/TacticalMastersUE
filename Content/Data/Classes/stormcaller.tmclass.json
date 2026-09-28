@@ -1,0 +1,102 @@
+{
+  "format": "tactical-masters-class",
+  "version": 1,
+  "id": "stormcaller",
+  "name": "Stormcaller",
+  "color": "#f2d40f",
+  "look": "black_mage",
+  "roles": [
+    "damage"
+  ],
+  "stats": {
+    "hp": 57,
+    "attdef": 4,
+    "magdef": 12,
+    "aeva": 5,
+    "meva": 14,
+    "crit": 12,
+    "speed": 10,
+    "move": 6,
+    "patience": 8,
+    "sight": 10
+  },
+  "abilities": [
+    {
+      "id": "stormcaller_thunder_bolt",
+      "name": "Thunder Bolt",
+      "desc": "A bolt at an enemy 2-8 m away. (1 s)",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "mag",
+      "target": "enemy",
+      "shape": "unit",
+      "power": 47,
+      "min_range": 2,
+      "max_range": 8,
+      "aoe": 0,
+      "cooldown": 0,
+      "cast": 1,
+      "fx": "holy_blade"
+    },
+    {
+      "id": "stormcaller_chain_lightning",
+      "name": "Chain Lightning",
+      "desc": "Every enemy within 2 m of a point 2-8 m away; Stuns for 1 turn. (2 s)",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "mag",
+      "target": "enemy",
+      "shape": "circle",
+      "power": 36,
+      "min_range": 2,
+      "max_range": 8,
+      "aoe": 2,
+      "cooldown": 2,
+      "cast": 2,
+      "status": {
+        "id": "stun",
+        "turns": 1
+      },
+      "fx": "holy_blade"
+    },
+    {
+      "id": "stormcaller_thunder_staff",
+      "name": "Thunder Staff",
+      "desc": "Strike an adjacent enemy.",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "att",
+      "target": "enemy",
+      "shape": "unit",
+      "power": 29,
+      "min_range": 0,
+      "max_range": 1.8,
+      "aoe": 0,
+      "cooldown": 0,
+      "cast": 0,
+      "fx": "attack"
+    },
+    {
+      "id": "stormcaller_tempest",
+      "name": "Tempest",
+      "desc": "ULTIMATE: Every enemy within 3.5 m of a point 4-11 m away; Stuns for 1 turn. (1 s) Repeats for 2 turns; the unit can't act meanwhile.",
+      "kind": "channeled",
+      "effect": "damage",
+      "scale": "mag",
+      "target": "enemy",
+      "shape": "circle",
+      "power": 40,
+      "min_range": 4,
+      "max_range": 11,
+      "aoe": 3.5,
+      "channel": 2,
+      "cooldown": 0,
+      "cast": 1,
+      "status": {
+        "id": "stun",
+        "turns": 1
+      },
+      "fx": "holy_blade"
+    }
+  ]
+}

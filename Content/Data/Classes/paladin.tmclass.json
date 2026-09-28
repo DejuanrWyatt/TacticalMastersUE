@@ -1,0 +1,102 @@
+{
+  "format": "tactical-masters-class",
+  "version": 1,
+  "id": "paladin",
+  "name": "Paladin",
+  "color": "#f0d27a",
+  "look": "knight",
+  "icon": "paladin",
+  "roles": [
+    "tank",
+    "support"
+  ],
+  "stats": {
+    "hp": 105,
+    "attdef": 13,
+    "magdef": 9,
+    "aeva": 6,
+    "meva": 10,
+    "crit": 5,
+    "speed": 8,
+    "move": 6,
+    "patience": 8,
+    "sight": 8
+  },
+  "abilities": [
+    {
+      "id": "paladin_holy_strike",
+      "name": "Holy Strike",
+      "desc": "Strike an adjacent enemy.",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "att",
+      "target": "enemy",
+      "shape": "unit",
+      "power": 31,
+      "min_range": 0,
+      "max_range": 1.8,
+      "aoe": 0,
+      "cooldown": 0,
+      "cast": 0,
+      "fx": "attack"
+    },
+    {
+      "id": "paladin_aegis",
+      "name": "Aegis",
+      "desc": "Raise an ally's AttDef by 8 for 2 turns (up to 5 m).",
+      "kind": "active",
+      "effect": "support",
+      "scale": "mag",
+      "target": "ally",
+      "shape": "unit",
+      "power": 0,
+      "min_range": 0,
+      "max_range": 5,
+      "aoe": 0,
+      "cooldown": 3,
+      "cast": 0,
+      "buffs": [
+        {
+          "stat": "attdef",
+          "amount": 8,
+          "turns": 2
+        }
+      ],
+      "fx": "guard"
+    },
+    {
+      "id": "paladin_lay_on_hands",
+      "name": "Lay on Hands",
+      "desc": "Heal an ally up to 3 m away (1 s).",
+      "kind": "active",
+      "effect": "heal",
+      "scale": "mag",
+      "target": "ally",
+      "shape": "unit",
+      "power": 22,
+      "min_range": 0,
+      "max_range": 3,
+      "aoe": 0,
+      "cooldown": 2,
+      "cast": 1,
+      "fx": "cure"
+    },
+    {
+      "id": "paladin_judgment",
+      "name": "Judgment",
+      "desc": "ULTIMATE: Holy light on every enemy within 3 m of you (1.5 s).",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "mag",
+      "target": "enemy",
+      "shape": "self",
+      "power": 36,
+      "min_range": 0,
+      "max_range": 0,
+      "aoe": 3,
+      "cooldown": 0,
+      "cast": 1.5,
+      "fx": "holy_blade"
+    }
+  ]
+}

@@ -1,37 +1,41 @@
 # Class data
 
-The 81 classes the game reads at startup, copied from the Godot project. These
-are Astra library exports: each file holds one class as a `profile` ability
-carrying its stats, plus four abilities tagged `slot:1` to `slot:4`.
+The classes the game loads at startup, one `<id>.tmclass.json` file each, in
+Tactical Masters' own class format. With the six built-in classes written in
+code, that is the 87 the game offers.
 
-These files are **a copy, not a link**. The Godot project at
-`D:\ProgramsByMe\TacticalMasters\data\classes\` is where they are authored; this
-directory is what Unreal ships. To refresh after changing a class there:
+## Where they come from
 
-    cp D:\ProgramsByMe\TacticalMasters\data\classes\*.astra.json .
+The **class creator** (`E:\TacticsClassCreator`) makes them and installs them
+here. Its `FORMAT.md` describes the format. Every number in a file is the number
+the rules use: ten stats, the roles, a look, and four abilities in the engine's
+own terms. There are no formulas and no tags to interpret, and nothing is quietly
+ignored. The rules' reader (`Source/TMSim/Private/SimClassFile.cpp`) refuses a
+file with a key it doesn't know, rather than skipping it.
 
-Nothing checks that the two are in step, so a class changed in one and not the
-other will quietly differ. Worth a test once the importer is ported: read both
-directories and compare.
+The 81 files here were converted once from the Godot project's Astra class files
+by the creator's `tools/convert-astra.mjs`. The Godot project keeps its Astra
+files, and they remain the reference the port is checked against. Nothing in
+Unreal reads an Astra file, and nothing needs Astra to make a class.
 
-## What is not here
+## How they are checked
 
-The six built-in jobs — Squire, Knight, Archer, Monk, Black Mage and White
-Mage — are not data. They are written out in `scripts/core/jobs.gd` in the Godot
-project, along with every built-in ability, and will be ported as C++ with the
-rest of the rules. 81 files here plus those 6 is the 87 classes the game offers.
+`Tests/SimClassTest.cpp` (in `scripts\test.bat`):
 
-## Reading them
+- **Read:** loads every file here through the rules' own reader.
+- **Refuse:** checks that broken files are refused.
+- **Play:** plays each class in a battle and requires every order the computer
+  gives to be legal.
+- **Match:** compares each class, field for field, with how the Godot game's
+  importer reads the Astra file it came from (`Tests/GodotClassTable.txt`, printed
+  by the Godot project's `tests/dump_class_table.gd`). This runs only when that
+  table is present.
 
-The format is Astra's, not the game's. `astra_import.gd` in the Godot project
-turns a profile into stats and four abilities, and that is the piece to port
-next to this data. Two details in it are easy to miss:
+## Not ported yet
 
-- A profile may still declare `power`. The Power stat was removed; what it was
-  worth is folded into each of the class's own abilities as they are read, so
-  the numbers come out the same as before.
-- `buff_power` on an ability becomes a Crit buff at twice the number, since
-  Crit multiplies the ability's own damage rather than adding to it.
+Passive, aura and toggle abilities load, but what they add to a unit's stats is
+not applied yet (`FUnit::Stat` says so where the gap is). Classes that rely on
+them play weaker in Unreal than in Godot until that is ported.
 
 ## Packaging
 

@@ -1,0 +1,114 @@
+{
+  "format": "tactical-masters-class",
+  "version": 1,
+  "id": "oracle",
+  "name": "Oracle",
+  "color": "#b55db3",
+  "look": "white_mage",
+  "icon": "oracle",
+  "roles": [
+    "special"
+  ],
+  "stats": {
+    "hp": 65,
+    "attdef": 5,
+    "magdef": 14,
+    "aeva": 6,
+    "meva": 20,
+    "crit": 8,
+    "speed": 10,
+    "move": 6,
+    "patience": 9,
+    "sight": 11
+  },
+  "abilities": [
+    {
+      "id": "oracle_hex",
+      "name": "Hex",
+      "desc": "Dark bolt at an enemy 1-7 m away.",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "mag",
+      "target": "enemy",
+      "shape": "unit",
+      "power": 36,
+      "min_range": 1,
+      "max_range": 7,
+      "aoe": 0,
+      "cooldown": 0,
+      "cast": 0,
+      "fx": "pin_shot"
+    },
+    {
+      "id": "oracle_curse",
+      "name": "Curse",
+      "desc": "Lower an enemy's AttDef and MagDef by 6 for 2 turns (2-8 m, 1 s).",
+      "kind": "active",
+      "effect": "support",
+      "scale": "mag",
+      "target": "enemy",
+      "shape": "unit",
+      "power": 0,
+      "min_range": 2,
+      "max_range": 8,
+      "aoe": 0,
+      "cooldown": 3,
+      "cast": 1,
+      "buffs": [
+        {
+          "stat": "attdef",
+          "amount": -6,
+          "turns": 2
+        },
+        {
+          "stat": "magdef",
+          "amount": -6,
+          "turns": 2
+        }
+      ],
+      "fx": "pin_shot"
+    },
+    {
+      "id": "oracle_sleep",
+      "name": "Sleep",
+      "desc": "Put an enemy 2-7 m away to sleep (Stun) for 3 s (2 s).",
+      "kind": "active",
+      "effect": "support",
+      "scale": "mag",
+      "target": "enemy",
+      "shape": "unit",
+      "power": 0,
+      "min_range": 2,
+      "max_range": 7,
+      "aoe": 0,
+      "cooldown": 3,
+      "cast": 2,
+      "status": {
+        "id": "stun",
+        "turns": 1
+      },
+      "fx": "haste"
+    },
+    {
+      "id": "oracle_divination",
+      "name": "Divination",
+      "desc": "ULTIMATE: Every enemy on the field takes damage and is Slowed (2.5 s).",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "mag",
+      "target": "enemy",
+      "shape": "global",
+      "power": 27,
+      "min_range": 0,
+      "max_range": 20,
+      "aoe": 0,
+      "cooldown": 0,
+      "cast": 2.5,
+      "status": {
+        "id": "slow",
+        "turns": 3
+      },
+      "fx": "blizzard"
+    }
+  ]
+}

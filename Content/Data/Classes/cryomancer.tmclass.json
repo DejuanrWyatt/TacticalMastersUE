@@ -1,0 +1,102 @@
+{
+  "format": "tactical-masters-class",
+  "version": 1,
+  "id": "cryomancer",
+  "name": "Cryomancer",
+  "color": "#3ab4dc",
+  "look": "black_mage",
+  "roles": [
+    "damage"
+  ],
+  "stats": {
+    "hp": 69,
+    "attdef": 4,
+    "magdef": 14,
+    "aeva": 5,
+    "meva": 14,
+    "crit": 12,
+    "speed": 6,
+    "move": 6,
+    "patience": 8,
+    "sight": 10
+  },
+  "abilities": [
+    {
+      "id": "cryomancer_frost_bolt",
+      "name": "Frost Bolt",
+      "desc": "A bolt at an enemy 2-8 m away. (1 s)",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "mag",
+      "target": "enemy",
+      "shape": "unit",
+      "power": 47,
+      "min_range": 2,
+      "max_range": 8,
+      "aoe": 0,
+      "cooldown": 0,
+      "cast": 1,
+      "fx": "blizzard"
+    },
+    {
+      "id": "cryomancer_hailstorm",
+      "name": "Hailstorm",
+      "desc": "Every enemy within 2 m of a point 2-8 m away; Slows for 2 turns. (2 s)",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "mag",
+      "target": "enemy",
+      "shape": "circle",
+      "power": 36,
+      "min_range": 2,
+      "max_range": 8,
+      "aoe": 2,
+      "cooldown": 2,
+      "cast": 2,
+      "status": {
+        "id": "slow",
+        "turns": 2
+      },
+      "fx": "blizzard"
+    },
+    {
+      "id": "cryomancer_frost_staff",
+      "name": "Frost Staff",
+      "desc": "Strike an adjacent enemy.",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "att",
+      "target": "enemy",
+      "shape": "unit",
+      "power": 29,
+      "min_range": 0,
+      "max_range": 1.8,
+      "aoe": 0,
+      "cooldown": 0,
+      "cast": 0,
+      "fx": "attack"
+    },
+    {
+      "id": "cryomancer_absolute_zero",
+      "name": "Absolute Zero",
+      "desc": "ULTIMATE: Every enemy within 3.5 m of a point 4-11 m away; Slows for 2 turns. (1 s) Repeats for 2 turns; the unit can't act meanwhile.",
+      "kind": "channeled",
+      "effect": "damage",
+      "scale": "mag",
+      "target": "enemy",
+      "shape": "circle",
+      "power": 40,
+      "min_range": 4,
+      "max_range": 11,
+      "aoe": 3.5,
+      "channel": 2,
+      "cooldown": 0,
+      "cast": 1,
+      "status": {
+        "id": "slow",
+        "turns": 2
+      },
+      "fx": "blizzard"
+    }
+  ]
+}

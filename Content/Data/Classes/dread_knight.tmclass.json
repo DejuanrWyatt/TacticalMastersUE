@@ -1,0 +1,130 @@
+{
+  "format": "tactical-masters-class",
+  "version": 1,
+  "id": "dread_knight",
+  "name": "Dread Knight",
+  "color": "#7d43b0",
+  "look": "knight",
+  "roles": [
+    "tank",
+    "support"
+  ],
+  "stats": {
+    "hp": 113,
+    "attdef": 12,
+    "magdef": 9,
+    "aeva": 6,
+    "meva": 11,
+    "crit": 7,
+    "speed": 6,
+    "move": 6,
+    "patience": 8,
+    "sight": 8
+  },
+  "abilities": [
+    {
+      "id": "dread_knight_shadow_mace",
+      "name": "Shadow Mace",
+      "desc": "Strike an adjacent enemy.",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "att",
+      "target": "enemy",
+      "shape": "unit",
+      "power": 31,
+      "min_range": 0,
+      "max_range": 1.8,
+      "aoe": 0,
+      "cooldown": 0,
+      "cast": 0,
+      "fx": "attack"
+    },
+    {
+      "id": "dread_knight_shadow_bash",
+      "name": "Shadow Bash",
+      "desc": "Shield-bash an adjacent enemy; MagDef -6, AttDef -3 for 2 turns.",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "att",
+      "target": "enemy",
+      "shape": "unit",
+      "power": 29,
+      "min_range": 0,
+      "max_range": 1.8,
+      "aoe": 0,
+      "cooldown": 2,
+      "cast": 0,
+      "buffs": [
+        {
+          "stat": "magdef",
+          "amount": -6,
+          "turns": 2
+        },
+        {
+          "stat": "attdef",
+          "amount": -3,
+          "turns": 2
+        }
+      ],
+      "fx": "shield_bash"
+    },
+    {
+      "id": "dread_knight_shadow_ward",
+      "name": "Shadow Ward",
+      "desc": "Every ally within 4 m is shielded; AttDef +5, Power +4 for 2 turns. Always on, for allies nearby.",
+      "kind": "aura",
+      "effect": "support",
+      "scale": "mag",
+      "target": "ally",
+      "shape": "self",
+      "power": 0,
+      "min_range": 0,
+      "max_range": 0,
+      "aoe": 4,
+      "cooldown": 0,
+      "cast": 0,
+      "buffs": [
+        {
+          "stat": "attdef",
+          "amount": 5,
+          "turns": 2
+        },
+        {
+          "stat": "crit",
+          "amount": 8,
+          "turns": 2
+        }
+      ],
+      "fx": "guard"
+    },
+    {
+      "id": "dread_knight_shadow_bastion",
+      "name": "Shadow Bastion",
+      "desc": "ULTIMATE: Slam the ground, hitting every enemy within 3 m of you; MagDef -6, AttDef -3 for 2 turns. (1 s)",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "att",
+      "target": "enemy",
+      "shape": "self",
+      "power": 38,
+      "min_range": 0,
+      "max_range": 0,
+      "aoe": 3,
+      "cooldown": 0,
+      "cast": 1,
+      "buffs": [
+        {
+          "stat": "magdef",
+          "amount": -6,
+          "turns": 2
+        },
+        {
+          "stat": "attdef",
+          "amount": -3,
+          "turns": 2
+        }
+      ],
+      "fx": "holy_blade"
+    }
+  ]
+}

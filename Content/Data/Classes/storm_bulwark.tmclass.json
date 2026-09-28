@@ -1,0 +1,114 @@
+{
+  "format": "tactical-masters-class",
+  "version": 1,
+  "id": "storm_bulwark",
+  "name": "Storm Bulwark",
+  "color": "#f4d827",
+  "look": "knight",
+  "roles": [
+    "tank",
+    "support"
+  ],
+  "stats": {
+    "hp": 106,
+    "attdef": 13,
+    "magdef": 9,
+    "aeva": 6,
+    "meva": 8,
+    "crit": 5,
+    "speed": 8,
+    "move": 6,
+    "patience": 8,
+    "sight": 8
+  },
+  "abilities": [
+    {
+      "id": "storm_bulwark_thunder_mace",
+      "name": "Thunder Mace",
+      "desc": "Strike an adjacent enemy.",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "att",
+      "target": "enemy",
+      "shape": "unit",
+      "power": 31,
+      "min_range": 0,
+      "max_range": 1.8,
+      "aoe": 0,
+      "cooldown": 0,
+      "cast": 0,
+      "fx": "attack"
+    },
+    {
+      "id": "storm_bulwark_thunder_bash",
+      "name": "Thunder Bash",
+      "desc": "Shield-bash an adjacent enemy; Stuns for 1 turn.",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "att",
+      "target": "enemy",
+      "shape": "unit",
+      "power": 29,
+      "min_range": 0,
+      "max_range": 1.8,
+      "aoe": 0,
+      "cooldown": 2,
+      "cast": 0,
+      "status": {
+        "id": "stun",
+        "turns": 1
+      },
+      "fx": "shield_bash"
+    },
+    {
+      "id": "storm_bulwark_thunder_ward",
+      "name": "Thunder Ward",
+      "desc": "Every ally within 4 m is shielded; AttDef +5, Speed +2 for 2 turns. Always on, for allies nearby.",
+      "kind": "aura",
+      "effect": "support",
+      "scale": "mag",
+      "target": "ally",
+      "shape": "self",
+      "power": 0,
+      "min_range": 0,
+      "max_range": 0,
+      "aoe": 4,
+      "cooldown": 0,
+      "cast": 0,
+      "buffs": [
+        {
+          "stat": "attdef",
+          "amount": 5,
+          "turns": 2
+        },
+        {
+          "stat": "speed",
+          "amount": 2,
+          "turns": 2
+        }
+      ],
+      "fx": "guard"
+    },
+    {
+      "id": "storm_bulwark_thunder_bastion",
+      "name": "Thunder Bastion",
+      "desc": "ULTIMATE: Slam the ground, hitting every enemy within 3 m of you; Stuns for 1 turn. (1 s)",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "att",
+      "target": "enemy",
+      "shape": "self",
+      "power": 38,
+      "min_range": 0,
+      "max_range": 0,
+      "aoe": 3,
+      "cooldown": 0,
+      "cast": 1,
+      "status": {
+        "id": "stun",
+        "turns": 1
+      },
+      "fx": "holy_blade"
+    }
+  ]
+}

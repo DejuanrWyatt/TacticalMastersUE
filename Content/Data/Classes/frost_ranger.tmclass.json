@@ -1,0 +1,101 @@
+{
+  "format": "tactical-masters-class",
+  "version": 1,
+  "id": "frost_ranger",
+  "name": "Frost Ranger",
+  "color": "#7bdbe8",
+  "look": "archer",
+  "roles": [
+    "damage"
+  ],
+  "stats": {
+    "hp": 67,
+    "attdef": 6,
+    "magdef": 9,
+    "aeva": 15,
+    "meva": 8,
+    "crit": 18,
+    "speed": 10,
+    "move": 7,
+    "patience": 6,
+    "sight": 13
+  },
+  "abilities": [
+    {
+      "id": "frost_ranger_frost_arrow",
+      "name": "Frost Arrow",
+      "desc": "Shoot an enemy 2-10 m away.",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "att",
+      "target": "enemy",
+      "shape": "unit",
+      "power": 26,
+      "min_range": 2,
+      "max_range": 10,
+      "aoe": 0,
+      "cooldown": 0,
+      "cast": 0,
+      "fx": "bow_shot"
+    },
+    {
+      "id": "frost_ranger_frost_snipe",
+      "name": "Frost Snipe",
+      "desc": "A shot that pierces everyone in a line up to 13 m. (1 s)",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "att",
+      "target": "enemy",
+      "shape": "line",
+      "power": 38,
+      "min_range": 3,
+      "max_range": 13,
+      "aoe": 0.7,
+      "cooldown": 1,
+      "cast": 1,
+      "fx": "aimed_shot"
+    },
+    {
+      "id": "frost_ranger_frost_barb",
+      "name": "Frost Barb",
+      "desc": "A barbed arrow at an enemy 2-10 m away; Slows for 2 turns.",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "att",
+      "target": "enemy",
+      "shape": "unit",
+      "power": 24,
+      "min_range": 2,
+      "max_range": 10,
+      "aoe": 0,
+      "cooldown": 2,
+      "cast": 0,
+      "status": {
+        "id": "slow",
+        "turns": 2
+      },
+      "fx": "pin_shot"
+    },
+    {
+      "id": "frost_ranger_hailstorm_volley",
+      "name": "Hailstorm Volley",
+      "desc": "ULTIMATE: Arrows fall on every enemy within 2.5 m of a point 4-13 m away; Slows for 2 turns. (2 s)",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "att",
+      "target": "enemy",
+      "shape": "circle",
+      "power": 36,
+      "min_range": 4,
+      "max_range": 13,
+      "aoe": 2.5,
+      "cooldown": 0,
+      "cast": 2,
+      "status": {
+        "id": "slow",
+        "turns": 2
+      },
+      "fx": "arrow_rain"
+    }
+  ]
+}

@@ -1,0 +1,98 @@
+{
+  "format": "tactical-masters-class",
+  "version": 1,
+  "id": "ninja",
+  "name": "Ninja",
+  "color": "#8a90b8",
+  "look": "squire",
+  "icon": "ninja",
+  "roles": [
+    "damage"
+  ],
+  "stats": {
+    "hp": 80,
+    "attdef": 10,
+    "magdef": 7,
+    "aeva": 26,
+    "meva": 10,
+    "crit": 22,
+    "speed": 14,
+    "move": 8,
+    "patience": 5,
+    "sight": 10
+  },
+  "abilities": [
+    {
+      "id": "ninja_twin_strike",
+      "name": "Twin Strike",
+      "desc": "Two quick blades on an adjacent enemy.",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "att",
+      "target": "enemy",
+      "shape": "unit",
+      "power": 40,
+      "min_range": 0,
+      "max_range": 1.8,
+      "aoe": 0,
+      "cooldown": 0,
+      "cast": 0,
+      "fx": "attack"
+    },
+    {
+      "id": "ninja_shuriken",
+      "name": "Shuriken",
+      "desc": "Throw a star at an enemy 2-8 m away.",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "att",
+      "target": "enemy",
+      "shape": "unit",
+      "power": 29,
+      "min_range": 2,
+      "max_range": 8,
+      "aoe": 0,
+      "cooldown": 0,
+      "cast": 0,
+      "fx": "throw_stone"
+    },
+    {
+      "id": "ninja_smoke_bomb",
+      "name": "Smoke Bomb",
+      "desc": "Slow every enemy within 2 m of a point 1-5 m away for 4 s.",
+      "kind": "active",
+      "effect": "support",
+      "scale": "mag",
+      "target": "enemy",
+      "shape": "circle",
+      "power": 0,
+      "min_range": 1,
+      "max_range": 5,
+      "aoe": 2,
+      "cooldown": 3,
+      "cast": 0,
+      "status": {
+        "id": "slow",
+        "turns": 2
+      },
+      "fx": "haste"
+    },
+    {
+      "id": "ninja_assassinate",
+      "name": "Assassinate",
+      "desc": "ULTIMATE: A killing blow on an adjacent enemy.",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "att",
+      "target": "enemy",
+      "shape": "unit",
+      "power": 74,
+      "min_range": 0,
+      "max_range": 1.8,
+      "aoe": 0,
+      "cooldown": 0,
+      "cast": 0,
+      "fx": "brave_slash"
+    }
+  ]
+}

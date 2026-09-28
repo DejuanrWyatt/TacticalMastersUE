@@ -1,0 +1,114 @@
+{
+  "format": "tactical-masters-class",
+  "version": 1,
+  "id": "treant_caller",
+  "name": "Treant Caller",
+  "color": "#3fa831",
+  "look": "black_mage",
+  "roles": [
+    "damage",
+    "support"
+  ],
+  "stats": {
+    "hp": 73,
+    "attdef": 4,
+    "magdef": 12,
+    "aeva": 5,
+    "meva": 14,
+    "crit": 10,
+    "speed": 6,
+    "move": 6,
+    "patience": 10,
+    "sight": 10
+  },
+  "abilities": [
+    {
+      "id": "treant_caller_thorn_rod",
+      "name": "Thorn Rod",
+      "desc": "Strike an adjacent enemy.",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "att",
+      "target": "enemy",
+      "shape": "unit",
+      "power": 34,
+      "min_range": 0,
+      "max_range": 1.8,
+      "aoe": 0,
+      "cooldown": 0,
+      "cast": 0,
+      "fx": "attack"
+    },
+    {
+      "id": "treant_caller_summon_treant",
+      "name": "Summon Treant",
+      "desc": "The Treant strikes every enemy within 2 m of a point 3-9 m away; Burns for 2 turns. (2 s)",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "mag",
+      "target": "enemy",
+      "shape": "circle",
+      "power": 46,
+      "min_range": 3,
+      "max_range": 9,
+      "aoe": 2,
+      "cooldown": 2,
+      "cast": 2,
+      "status": {
+        "id": "burn",
+        "turns": 2
+      },
+      "fx": "throw_stone"
+    },
+    {
+      "id": "treant_caller_treant_pact",
+      "name": "Treant Pact",
+      "desc": "Bless every ally within 3 m of a point up to 6 m away; AttDef +3, MagDef +3 for 2 turns. (1 s)",
+      "kind": "active",
+      "effect": "support",
+      "scale": "mag",
+      "target": "ally",
+      "shape": "circle",
+      "power": 0,
+      "min_range": 0,
+      "max_range": 6,
+      "aoe": 3,
+      "cooldown": 3,
+      "cast": 1,
+      "buffs": [
+        {
+          "stat": "attdef",
+          "amount": 3,
+          "turns": 2
+        },
+        {
+          "stat": "magdef",
+          "amount": 3,
+          "turns": 2
+        }
+      ],
+      "fx": "haste"
+    },
+    {
+      "id": "treant_caller_treant_ascendant",
+      "name": "Treant Ascendant",
+      "desc": "ULTIMATE: Every enemy within 4 m of a point 4-11 m away; Burns for 2 turns. (4 s)",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "mag",
+      "target": "enemy",
+      "shape": "circle",
+      "power": 61,
+      "min_range": 4,
+      "max_range": 11,
+      "aoe": 4,
+      "cooldown": 0,
+      "cast": 4,
+      "status": {
+        "id": "burn",
+        "turns": 2
+      },
+      "fx": "chakra"
+    }
+  ]
+}

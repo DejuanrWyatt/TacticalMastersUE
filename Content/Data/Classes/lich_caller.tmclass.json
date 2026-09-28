@@ -1,0 +1,125 @@
+{
+  "format": "tactical-masters-class",
+  "version": 1,
+  "id": "lich_caller",
+  "name": "Lich Caller",
+  "color": "#7d3c9d",
+  "look": "black_mage",
+  "roles": [
+    "damage",
+    "support"
+  ],
+  "stats": {
+    "hp": 67,
+    "attdef": 3,
+    "magdef": 12,
+    "aeva": 5,
+    "meva": 17,
+    "crit": 12,
+    "speed": 6,
+    "move": 6,
+    "patience": 9,
+    "sight": 10
+  },
+  "abilities": [
+    {
+      "id": "lich_caller_shadow_rod",
+      "name": "Shadow Rod",
+      "desc": "Strike an adjacent enemy.",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "att",
+      "target": "enemy",
+      "shape": "unit",
+      "power": 34,
+      "min_range": 0,
+      "max_range": 1.8,
+      "aoe": 0,
+      "cooldown": 0,
+      "cast": 0,
+      "fx": "attack"
+    },
+    {
+      "id": "lich_caller_summon_lich",
+      "name": "Summon Lich",
+      "desc": "The Lich strikes every enemy within 2 m of a point 3-9 m away; MagDef -6, AttDef -3 for 2 turns. (2 s)",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "mag",
+      "target": "enemy",
+      "shape": "circle",
+      "power": 46,
+      "min_range": 3,
+      "max_range": 9,
+      "aoe": 2,
+      "cooldown": 2,
+      "cast": 2,
+      "buffs": [
+        {
+          "stat": "magdef",
+          "amount": -6,
+          "turns": 2
+        },
+        {
+          "stat": "attdef",
+          "amount": -3,
+          "turns": 2
+        }
+      ],
+      "fx": "pin_shot"
+    },
+    {
+      "id": "lich_caller_lich_pact",
+      "name": "Lich Pact",
+      "desc": "Bless every ally within 3 m of a point up to 6 m away; Power +4 for 2 turns. (1 s)",
+      "kind": "active",
+      "effect": "support",
+      "scale": "mag",
+      "target": "ally",
+      "shape": "circle",
+      "power": 0,
+      "min_range": 0,
+      "max_range": 6,
+      "aoe": 3,
+      "cooldown": 3,
+      "cast": 1,
+      "buffs": [
+        {
+          "stat": "crit",
+          "amount": 8,
+          "turns": 2
+        }
+      ],
+      "fx": "haste"
+    },
+    {
+      "id": "lich_caller_lich_ascendant",
+      "name": "Lich Ascendant",
+      "desc": "ULTIMATE: Every enemy within 4 m of a point 4-11 m away; MagDef -6, AttDef -3 for 2 turns. (4 s)",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "mag",
+      "target": "enemy",
+      "shape": "circle",
+      "power": 61,
+      "min_range": 4,
+      "max_range": 11,
+      "aoe": 4,
+      "cooldown": 0,
+      "cast": 4,
+      "buffs": [
+        {
+          "stat": "magdef",
+          "amount": -6,
+          "turns": 2
+        },
+        {
+          "stat": "attdef",
+          "amount": -3,
+          "turns": 2
+        }
+      ],
+      "fx": "meteor"
+    }
+  ]
+}

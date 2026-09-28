@@ -1,0 +1,105 @@
+{
+  "format": "tactical-masters-class",
+  "version": 1,
+  "id": "temple_fist",
+  "name": "Temple Fist",
+  "color": "#f1b958",
+  "look": "monk",
+  "roles": [
+    "damage"
+  ],
+  "stats": {
+    "hp": 84,
+    "attdef": 8,
+    "magdef": 8,
+    "aeva": 18,
+    "meva": 8,
+    "crit": 12,
+    "speed": 12,
+    "move": 8,
+    "patience": 5,
+    "sight": 9
+  },
+  "abilities": [
+    {
+      "id": "temple_fist_holy_jab",
+      "name": "Holy Jab",
+      "desc": "Punch an adjacent enemy.",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "att",
+      "target": "enemy",
+      "shape": "unit",
+      "power": 32,
+      "min_range": 0,
+      "max_range": 1.8,
+      "aoe": 0,
+      "cooldown": 0,
+      "cast": 0,
+      "fx": "punch"
+    },
+    {
+      "id": "temple_fist_holy_uppercut",
+      "name": "Holy Uppercut",
+      "desc": "A rising blow on an adjacent enemy.",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "att",
+      "target": "enemy",
+      "shape": "unit",
+      "power": 46.7,
+      "min_range": 0,
+      "max_range": 1.8,
+      "aoe": 0,
+      "cooldown": 2,
+      "cast": 0,
+      "fx": "wave_fist"
+    },
+    {
+      "id": "temple_fist_holy_stance",
+      "name": "Holy Stance",
+      "desc": "Take a fighting stance; AttDef +4, MagDef +4 for 2 turns. Switched on and off.",
+      "kind": "toggle",
+      "effect": "support",
+      "scale": "mag",
+      "target": "ally",
+      "shape": "self",
+      "power": 0,
+      "min_range": 0,
+      "max_range": 0,
+      "aoe": 0,
+      "cooldown": 0,
+      "cast": 0,
+      "buffs": [
+        {
+          "stat": "attdef",
+          "amount": 4,
+          "turns": 2
+        },
+        {
+          "stat": "magdef",
+          "amount": 4,
+          "turns": 2
+        }
+      ],
+      "fx": "focus"
+    },
+    {
+      "id": "temple_fist_holy_fury",
+      "name": "Holy Fury",
+      "desc": "ULTIMATE: A flurry hitting every enemy within 2.5 m of you.",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "att",
+      "target": "enemy",
+      "shape": "self",
+      "power": 52.2,
+      "min_range": 0,
+      "max_range": 0,
+      "aoe": 2.5,
+      "cooldown": 0,
+      "cast": 0,
+      "fx": "earth_slash"
+    }
+  ]
+}

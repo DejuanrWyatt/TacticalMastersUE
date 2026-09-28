@@ -1148,3 +1148,77 @@ void ATMBattleHud::DrawGuide(ATMBattleDirector& From)
 	Text(TEXT("Rest the pointer on a row to see how its numbers are worked out. The other 81 classes arrive with the class importer."),
 		X, PY + PH - 34.0f * S, Dim, Font, 0.46f * S);
 }
+
+// ------------------------------------------------------------ class picker
+
+void ATMBattleHud::DrawClassPicker(ATMBattleDirector& From)
+{
+	// Every class the game has loaded, as a grid, for one setup slot
+	// (class_picker.gd). A role filter along the top, because there are dozens.
+	const std::vector<const TMSim::FJobDef*>& Jobs = TMSim::AllJobs();
+	UFont* Font = GEngine->GetMediumFont();
+	UFont* Big = GEngine->GetLargeFont();
+	const int32 Team = From.PickerSlot / 4;
+	const int32 Slot = From.PickerSlot % 4;
+	const char* Roles[4] = { "tank", "damage", "support", "special" };
+
+	DrawRect(FLinearColor(0.02f, 0.03f, 0.06f, 0.7f), 0.0f, 0.0f, Canvas->ClipX, Canvas->ClipY);
+	const float PW = FMath::Min(Canvas->ClipX - 40.0f * S, 1560.0f * S);
+	const float PH = Canvas->ClipY - 60.0f * S;
+	const float PX = (Canvas->ClipX - PW) * 0.5f;
+	const float PY = 30.0f * S;
+	Panel(PX, PY, PW, PH, FLinearColor(0.05f, 0.06f, 0.1f, 0.97f), TeamColour(Team) * FLinearColor(1, 1, 1, 0.7f), 1.5f);
+	Text(FString::Printf(TEXT("%s, slot %d: choose a class"), Team == 0 ? TEXT("Blue") : TEXT("Red"), Slot + 1),
+		PX + 24.0f * S, PY + 16.0f * S, TeamColour(Team), Big, 0.8f * S);
+	MenuButton(PX + PW - 150.0f * S, PY + 16.0f * S, 126.0f * S, 36.0f * S, TEXT("Close  (Esc)"), ETMHudAction::PickerClose);
+
+	// The role filter.
+	float FX = PX + 24.0f * S;
+	const float FY = PY + 64.0f * S;
+	MenuButton(FX, FY, 110.0f * S, 32.0f * S, TEXT("All"), ETMHudAction::PickerRole, -1, From.PickerRole < 0);
+	FX += 118.0f * S;
+	for (int32 r = 0; r < 4; ++r)
+	{
+		MenuButton(FX, FY, 110.0f * S, 32.0f * S, FString(UTF8_TO_TCHAR(Roles[r])), ETMHudAction::PickerRole, r, From.PickerRole == r);
+		FX += 118.0f * S;
+	}
+
+	// The grid.
+	const int32 Columns = 6;
+	const float Gap = 6.0f * S;
+	const float CellW = (PW - 48.0f * S - (Columns - 1) * Gap) / Columns;
+	const float CellH = 40.0f * S;
+	float Y = FY + 48.0f * S;
+	int32 Column = 0;
+	for (int32 j = 0; j < static_cast<int32>(Jobs.size()); ++j)
+	{
+		const TMSim::FJobDef& Job = *Jobs[j];
+		if (From.PickerRole >= 0 && !TMSim::JobHasRole(Job.Id, Roles[From.PickerRole]))
+		{
+			continue;
+		}
+		FString RoleText;
+		for (const std::string& JobRole : Job.Roles)
+		{
+			RoleText += (RoleText.IsEmpty() ? TEXT("") : TEXT(", ")) + FString(UTF8_TO_TCHAR(JobRole.c_str()));
+		}
+		const float X = PX + 24.0f * S + Column * (CellW + Gap);
+		const bool bCurrent = Job.Id == From.Setup.Rosters[Team][Slot];
+		MenuButton(X, Y, CellW, CellH, UTF8_TO_TCHAR(Job.Name.c_str()), ETMHudAction::PickerChoose, j, bCurrent, RoleText);
+		// The numbers that tell classes apart at a glance.
+		AddTip(X, Y, CellW, CellH, FString::Printf(TEXT("%hs  (%s)\nHP %d  AttDef %d  MagDef %d  Speed %d  Move %d\n%hs, %hs, %hs, %hs"),
+			Job.Name.c_str(), *RoleText, Job.Stats.Get(TMSim::EStat::Hp), Job.Stats.Get(TMSim::EStat::AttDef),
+			Job.Stats.Get(TMSim::EStat::MagDef), Job.Stats.Get(TMSim::EStat::Speed), Job.Stats.Get(TMSim::EStat::Move),
+			TMSim::JobAbility(Job.Id, 0) ? TMSim::JobAbility(Job.Id, 0)->Name.c_str() : "",
+			TMSim::JobAbility(Job.Id, 1) ? TMSim::JobAbility(Job.Id, 1)->Name.c_str() : "",
+			TMSim::JobAbility(Job.Id, 2) ? TMSim::JobAbility(Job.Id, 2)->Name.c_str() : "",
+			TMSim::JobAbility(Job.Id, 3) ? TMSim::JobAbility(Job.Id, 3)->Name.c_str() : ""));
+		if (++Column == Columns)
+		{
+			Column = 0;
+			Y += CellH + Gap;
+		}
+	}
+	Text(TEXT("Rest the pointer on a class for its numbers. Classes are made in the class creator (E:\\TacticsClassCreator)."),
+		PX + 24.0f * S, PY + PH - 32.0f * S, Dim, Font, 0.46f * S);
+}

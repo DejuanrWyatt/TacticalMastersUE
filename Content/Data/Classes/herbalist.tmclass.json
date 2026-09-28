@@ -1,0 +1,101 @@
+{
+  "format": "tactical-masters-class",
+  "version": 1,
+  "id": "herbalist",
+  "name": "Herbalist",
+  "color": "#46bc37",
+  "look": "white_mage",
+  "roles": [
+    "support"
+  ],
+  "stats": {
+    "hp": 72,
+    "attdef": 5,
+    "magdef": 13,
+    "aeva": 5,
+    "meva": 16,
+    "crit": 5,
+    "speed": 8,
+    "move": 6,
+    "patience": 9,
+    "sight": 10
+  },
+  "abilities": [
+    {
+      "id": "herbalist_thorn_rod",
+      "name": "Thorn Rod",
+      "desc": "Strike an adjacent enemy.",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "att",
+      "target": "enemy",
+      "shape": "unit",
+      "power": 24,
+      "min_range": 0,
+      "max_range": 1.8,
+      "aoe": 0,
+      "cooldown": 0,
+      "cast": 0,
+      "fx": "attack"
+    },
+    {
+      "id": "herbalist_thorn_mend",
+      "name": "Thorn Mend",
+      "desc": "Heal an ally up to 6 m away; Regen for 2 turns. (1 s)",
+      "kind": "active",
+      "effect": "heal",
+      "scale": "mag",
+      "target": "ally",
+      "shape": "unit",
+      "power": 22,
+      "min_range": 0,
+      "max_range": 6,
+      "aoe": 0,
+      "cooldown": 0,
+      "cast": 1,
+      "status": {
+        "id": "regen",
+        "turns": 2
+      },
+      "fx": "cure"
+    },
+    {
+      "id": "herbalist_thorn_rebirth",
+      "name": "Thorn Rebirth",
+      "desc": "Revive a knocked-out ally up to 5 m away with 30% HP. (2 s)",
+      "kind": "active",
+      "effect": "revive",
+      "scale": "mag",
+      "target": "ko_ally",
+      "shape": "unit",
+      "power": 0.3,
+      "min_range": 0,
+      "max_range": 5,
+      "aoe": 0,
+      "cooldown": 4,
+      "cast": 2,
+      "fx": "raise"
+    },
+    {
+      "id": "herbalist_thorn_sanctuary",
+      "name": "Thorn Sanctuary",
+      "desc": "ULTIMATE: Heal every ally within 3.5 m of a point up to 8 m away; Regen for 3 turns. (3 s)",
+      "kind": "active",
+      "effect": "heal",
+      "scale": "mag",
+      "target": "ally",
+      "shape": "circle",
+      "power": 27,
+      "min_range": 0,
+      "max_range": 8,
+      "aoe": 3.5,
+      "cooldown": 0,
+      "cast": 3,
+      "status": {
+        "id": "regen",
+        "turns": 3
+      },
+      "fx": "sanctuary"
+    }
+  ]
+}
