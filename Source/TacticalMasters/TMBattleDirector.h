@@ -157,9 +157,15 @@ public:
 	// the turn squares reordered; one press to start, one to lock.
 	bool bEditingLayout = false;
 	void ToggleLayout();
-	/** The panel being dragged, and where the pointer was last frame. */
+	/** The panel being dragged: where it and the pointer started, and where it would sit unmoved. */
 	FString DragPanel;
 	FVector2D DragFrom = FVector2D::ZeroVector;
+	FVector2D DragStartMin = FVector2D::ZeroVector;
+	FVector2D DragHomeMin = FVector2D::ZeroVector;
+	/** The panel being resized by its grip, its size and width when taken hold of. */
+	FString ResizePanel;
+	float ResizeStartScale = 1.0f;
+	float ResizeStartWidth = 1.0f;
 	/** The unit whose turn square is being dragged along its row, or -1. */
 	int32 DragCard = -1;
 	/** Puts the dragged square where it was dropped among its side's. */

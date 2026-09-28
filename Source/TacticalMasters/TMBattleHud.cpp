@@ -19,7 +19,7 @@ using namespace TMHudStyle;
 FVector2D ATMBattleHud::Nudge(const TCHAR* Id) const
 {
 	const FVector2D* Moved = FTMSettings::Get().Layout.Find(Id);
-	return Moved ? *Moved * S : FVector2D::ZeroVector;
+	return Moved ? *Moved * BaseS : FVector2D::ZeroVector;
 }
 
 void ATMBattleHud::Movable(const TCHAR* Id, const TCHAR* Label, float X, float Y, float W, float H)
@@ -47,32 +47,64 @@ void ATMBattleHud::DrawLayoutEditing(ATMBattleDirector& From)
 	}
 	Buttons.Reset();
 	Tips.Reset();
+
+	// The grid, under the handles: what a dragged panel's corner snaps to.
+	const FTMSettings& Settings = FTMSettings::Get();
+	if (Settings.bLayoutGrid)
+	{
+		const float Step = FMath::Max(4.0f, Settings.GridSize * BaseS);
+		int32 Line = 0;
+		for (float GX = 0.0f; GX < Canvas->ClipX; GX += Step, ++Line)
+		{
+			DrawRect(FLinearColor(0.45f, 0.8f, 1.0f, Line % 5 == 0 ? 0.16f : 0.07f), GX, 0.0f, 1.0f, Canvas->ClipY);
+		}
+		Line = 0;
+		for (float GY = 0.0f; GY < Canvas->ClipY; GY += Step, ++Line)
+		{
+			DrawRect(FLinearColor(0.45f, 0.8f, 1.0f, Line % 5 == 0 ? 0.16f : 0.07f), 0.0f, GY, Canvas->ClipX, 1.0f);
+		}
+	}
+
+	const float Grip = 16.0f * BaseS;
 	for (int32 i = 0; i < Movables.Num(); ++i)
 	{
 		const FBox2D& Area = Movables[i].Area;
 		const FVector2D Size = Area.GetSize();
 		Panel(Area.Min.X, Area.Min.Y, Size.X, Size.Y, Fill, Edge, 2.0f);
-		// Its name on a tag at the corner, clear of what the panel says.
-		const FVector2D LabelSize = TextSize(Movables[i].Label, Font, 0.45f * S);
-		const float TagY = Area.Min.Y > LabelSize.Y + 8.0f * S ? Area.Min.Y - LabelSize.Y - 6.0f * S : Area.Max.Y + 2.0f * S;
-		Panel(Area.Min.X, TagY, LabelSize.X + 12.0f * S, LabelSize.Y + 4.0f * S, FLinearColor(0.03f, 0.08f, 0.16f, 0.95f), Edge, 1.0f);
-		Text(Movables[i].Label, Area.Min.X + 6.0f * S, TagY + 2.0f * S, Edge, Font, 0.45f * S);
+		// Its name and size on a tag at the corner, clear of what the panel says.
+		const FString Tag = FString::Printf(TEXT("%s  %.0f%%"), *Movables[i].Label, Settings.ScaleOf(*Movables[i].Id) * 100.0f);
+		const FVector2D LabelSize = TextSize(Tag, Font, 0.45f * BaseS);
+		const float TagY = Area.Min.Y > LabelSize.Y + 8.0f * BaseS ? Area.Min.Y - LabelSize.Y - 6.0f * BaseS : Area.Max.Y + 2.0f * BaseS;
+		Panel(Area.Min.X, TagY, LabelSize.X + 12.0f * BaseS, LabelSize.Y + 4.0f * BaseS, FLinearColor(0.03f, 0.08f, 0.16f, 0.95f), Edge, 1.0f);
+		Text(Tag, Area.Min.X + 6.0f * BaseS, TagY + 2.0f * BaseS, Edge, Font, 0.45f * BaseS);
 		AddButton(Area.Min.X, Area.Min.Y, Size.X, Size.Y, ETMHudAction::LayoutGrab, i);
+		AddTip(Area.Min.X, Area.Min.Y, Size.X, Size.Y, TEXT("Drag to move. Drag the corner grip, or turn the wheel over it, to make it bigger or smaller."));
+		// The grip at the bottom right, which resizes (added last, so on top).
+		Panel(Area.Max.X - Grip, Area.Max.Y - Grip, Grip, Grip, Edge, FLinearColor(0.03f, 0.08f, 0.16f, 1.0f), 1.0f);
+		AddButton(Area.Max.X - Grip, Area.Max.Y - Grip, Grip, Grip, ETMHudAction::LayoutResize, i);
 	}
 	Buttons.Append(Squares);
 
 	// The bar that says what is going on, and how to stop.
-	const FString Hint = TEXT("Edit layout: drag anything to move it, or a turn square to reorder its side");
-	const FVector2D HintSize = TextSize(Hint, Font, 0.6f * S);
-	const float BW = 170.0f * S;
+	const FString Hint = TEXT("Drag to move, the corner grip to resize, a turn square to reorder its side");
+	const FVector2D HintSize = TextSize(Hint, Font, 0.55f * S);
+	const float BW = 150.0f * S;
 	const float BH = 38.0f * S;
-	const float W = HintSize.X + 2.0f * BW + 56.0f * S;
+	const float W = HintSize.X + 4.0f * BW + 80.0f * S;
 	const float X = (Canvas->ClipX - W) * 0.5f;
 	const float Y = Canvas->ClipY - 170.0f * S;
 	Panel(X, Y, W, BH + 16.0f * S, FLinearColor(0.05f, 0.07f, 0.11f, 0.95f), Edge, 1.5f);
-	Text(Hint, X + 14.0f * S, Y + 8.0f * S + (BH - HintSize.Y) * 0.5f, Edge, Font, 0.6f * S);
-	MenuButton(X + HintSize.X + 28.0f * S, Y + 8.0f * S, BW, BH, TEXT("Reset layout"), ETMHudAction::LayoutReset);
-	MenuButton(X + HintSize.X + BW + 40.0f * S, Y + 8.0f * S, BW, BH,
+	Text(Hint, X + 14.0f * S, Y + 8.0f * S + (BH - HintSize.Y) * 0.5f, Edge, Font, 0.55f * S);
+	float BX = X + HintSize.X + 28.0f * S;
+	MenuButton(BX, Y + 8.0f * S, BW, BH, Settings.bLayoutGrid ? TEXT("Grid: on") : TEXT("Grid: off"), ETMHudAction::LayoutGrid, -1, Settings.bLayoutGrid);
+	AddTip(BX, Y + 8.0f * S, BW, BH, TEXT("A grid to line panels up on: a dragged panel's corner snaps to it."));
+	BX += BW + 12.0f * S;
+	MenuButton(BX, Y + 8.0f * S, BW, BH, FString::Printf(TEXT("Grid %.0f px"), Settings.GridSize), ETMHudAction::LayoutGridSize);
+	AddTip(BX, Y + 8.0f * S, BW, BH, TEXT("How far apart the grid's lines are: finer for more precision."));
+	BX += BW + 12.0f * S;
+	MenuButton(BX, Y + 8.0f * S, BW, BH, TEXT("Reset layout"), ETMHudAction::LayoutReset);
+	BX += BW + 12.0f * S;
+	MenuButton(BX, Y + 8.0f * S, BW, BH,
 		FString::Printf(TEXT("Lock  (%s)"), *FTMSettings::Get().KeyName(ETMAction::EditLayout)), ETMHudAction::ToggleLayout, -1, true);
 }
 
@@ -238,6 +270,7 @@ void ATMBattleHud::DrawHUD()
 		return;
 	}
 	S = Canvas->ClipY / 1080.0f * FTMSettings::Get().UiScale;
+	BaseS = S;
 
 	// Away from a battle, the menu is the whole screen, over the board.
 	if (Found->Screen != ATMBattleDirector::EScreen::Battle)
@@ -495,6 +528,7 @@ void ATMBattleHud::DrawBoardAids(ATMBattleDirector& From)
 
 void ATMBattleHud::DrawActionBar(ATMBattleDirector& From)
 {
+	const FPanelScale Sized(*this, TEXT("action_bar"));
 	// Move, Sprint, the four abilities and End Turn (hud.gd:866-909, 1429-1474).
 	const TMSim::FUnit* Unit = From.SelectedUnit();
 	ActionBarTop = Canvas->ClipY - 16.0f * S;
@@ -630,6 +664,7 @@ void ATMBattleHud::DrawBanners(ATMBattleDirector& From)
 			{
 				Plan += TEXT("   ·   click one of your units, then click a spot in your area");
 			}
+			const FPanelScale Sized(*this, TEXT("planning"));
 			const FVector2D Size = TextSize(Plan, Font, 0.7f * S);
 			const FVector2D Moved = Nudge(TEXT("planning"));
 			const float PY = 152.0f * S + Moved.Y;
@@ -649,6 +684,7 @@ void ATMBattleHud::DrawBanners(ATMBattleDirector& From)
 		}
 		if (!Rules.IsEmpty())
 		{
+			const FPanelScale Sized(*this, TEXT("objective"));
 			const FVector2D Size = TextSize(Rules, Font, 0.62f * S);
 			const FVector2D Moved = Nudge(TEXT("objective"));
 			const float RY = 118.0f * S + Moved.Y;

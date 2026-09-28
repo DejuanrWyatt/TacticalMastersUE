@@ -28,6 +28,8 @@
 #include "SimAbility.h"
 #include "SimMap.h"
 
+#include <type_traits>
+
 namespace
 {
 	/** Degrees a unit turns a second, walking or turning to face a target. */
@@ -54,9 +56,9 @@ namespace
 			return nullptr;
 		}
 		// A clip made to be layered over another pose cannot play on its own.
-		if (const UAnimSequence* Clip = Cast<UAnimSequence>(Found))
+		if constexpr (std::is_same_v<T, UAnimSequence>)
 		{
-			if (Clip->IsValidAdditive())
+			if (Found->IsValidAdditive())
 			{
 				UE_LOG(LogTemp, Warning, TEXT("character map: %s is additive, made to be layered, and cannot play alone; left out"), *Path);
 				return nullptr;

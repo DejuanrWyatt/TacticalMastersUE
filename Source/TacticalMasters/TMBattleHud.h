@@ -15,6 +15,8 @@
 #include "CoreMinimal.h"
 #include "GameFramework/HUD.h"
 
+#include "TMSettings.h"
+
 #include "TMBattleHud.generated.h"
 
 class ATMBattleDirector;
@@ -100,6 +102,10 @@ enum class ETMHudAction : uint8
 	LayoutGrab,
 	LayoutCard,
 	LayoutReset,
+	// LayoutResize's value is the panel's place in this frame's list.
+	LayoutResize,
+	LayoutGrid,
+	LayoutGridSize,
 };
 
 /** Words shown when the pointer rests on part of the HUD: how a number is worked out. */
@@ -204,6 +210,22 @@ private:
 
 	/** Pixels per design pixel: the layout is drawn for 1080 lines and scaled. */
 	float S = 1.0f;
+	/** The screen's own scale; S is this times the size of the panel being drawn. */
+	float BaseS = 1.0f;
+
+	/**
+	 * While a panel is drawn, everything in it is drawn at its own size: S is
+	 * scaled for the panel, and put back when it is done. Its anchor to its
+	 * edge or corner is worked out in the scaled S too, so a bigger action bar
+	 * still sits at the bottom of the screen.
+	 */
+	struct FPanelScale
+	{
+		ATMBattleHud& Hud;
+		float Saved;
+		FPanelScale(ATMBattleHud& In, const TCHAR* Id) : Hud(In), Saved(In.S) { In.S = In.BaseS * FTMSettings::Get().ScaleOf(Id); }
+		~FPanelScale() { Hud.S = Saved; }
+	};
 
 	TArray<FTMHudButton> Buttons;
 
@@ -223,8 +245,8 @@ public:
 	TArray<FTMMovable> Movables;
 	/** Where each turn square was drawn this frame, by unit id, for reordering. */
 	TMap<int32, FBox2D> SquareAreas;
-	/** Screen pixels to a 1080p pixel's worth, as this frame was drawn. */
-	float Scale() const { return S; }
+	/** Screen pixels to a 1080p pixel's worth, as this frame was drawn -- before any panel's own size. */
+	float Scale() const { return BaseS; }
 
 private:
 	TArray<FTMHudTip> Tips;

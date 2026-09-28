@@ -1702,6 +1702,20 @@ void ATMBattleDirector::OnKey(FKey Key)
 		float Y = 0.0f;
 		const APlayerController* Player = GetWorld() ? GetWorld()->GetFirstPlayerController() : nullptr;
 		const ATMBattleHud* Hud = Player ? Cast<ATMBattleHud>(Player->GetHUD()) : nullptr;
+		if (bEditingLayout && Hud && CursorPosition(X, Y))
+		{
+			for (int32 i = Hud->Movables.Num() - 1; i >= 0; --i)
+			{
+				if (Hud->Movables[i].Area.IsInside(FVector2D(X, Y)))
+				{
+					FTMSettings& Settings = FTMSettings::Get();
+					const float Now = Settings.ScaleOf(*Hud->Movables[i].Id);
+					Settings.LayoutScale.Add(Hud->Movables[i].Id, FMath::Clamp(Now + (Key == EKeys::MouseScrollUp ? 0.05f : -0.05f), 0.5f, 2.5f));
+					Settings.Save();
+					return;
+				}
+			}
+		}
 		if (Screen == EScreen::Battle && Hud && CursorPosition(X, Y) && Hud->LogArea.bIsValid && Hud->LogArea.IsInside(FVector2D(X, Y)))
 		{
 			// The newest line is never more than a few turns of the wheel away.
@@ -1880,9 +1894,10 @@ void ATMBattleDirector::OnKeyUp(FKey Key)
 		DragSlider = -1;
 		FTMSettings::Get().Save();
 	}
-	else if (Key == EKeys::LeftMouseButton && !DragPanel.IsEmpty())
+	else if (Key == EKeys::LeftMouseButton && (!DragPanel.IsEmpty() || !ResizePanel.IsEmpty()))
 	{
 		DragPanel.Reset();
+		ResizePanel.Reset();
 		FTMSettings::Get().Save();
 	}
 	else if (Key == EKeys::LeftMouseButton && DragCard >= 0)
@@ -2758,7 +2773,45 @@ void ATMBattleDirector::PressMenuButton(const FTMHudButton& Button)
 		{
 			DragPanel = Hud->Movables[Button.Value].Id;
 			DragFrom = FVector2D(X, Y);
+			DragStartMin = Hud->Movables[Button.Value].Area.Min;
+			const FVector2D* Moved = FTMSettings::Get().Layout.Find(DragPanel);
+			DragHomeMin = DragStartMin - (Moved ? *Moved : FVector2D::ZeroVector) * Hud->Scale();
 		}
+		break;
+	}
+	case ETMHudAction::LayoutResize:
+	{
+		const APlayerController* Player = GetWorld() ? GetWorld()->GetFirstPlayerController() : nullptr;
+		const ATMBattleHud* Hud = Player ? Cast<ATMBattleHud>(Player->GetHUD()) : nullptr;
+		float X = 0.0f;
+		float Y = 0.0f;
+		if (Hud && Hud->Movables.IsValidIndex(Button.Value) && CursorPosition(X, Y))
+		{
+			ResizePanel = Hud->Movables[Button.Value].Id;
+			DragFrom = FVector2D(X, Y);
+			ResizeStartScale = FTMSettings::Get().ScaleOf(*ResizePanel);
+			ResizeStartWidth = FMath::Max(20.0f, static_cast<float>(Hud->Movables[Button.Value].Area.GetSize().X));
+		}
+		break;
+	}
+	case ETMHudAction::LayoutGrid:
+		FTMSettings::Get().bLayoutGrid = !FTMSettings::Get().bLayoutGrid;
+		FTMSettings::Get().Save();
+		break;
+	case ETMHudAction::LayoutGridSize:
+	{
+		// Finer for more precision, coarser for quick lining up.
+		const float Sizes[4] = { 5.0f, 10.0f, 20.0f, 40.0f };
+		int32 At = 2;
+		for (int32 i = 0; i < 4; ++i)
+		{
+			if (FMath::IsNearlyEqual(FTMSettings::Get().GridSize, Sizes[i]))
+			{
+				At = i;
+			}
+		}
+		FTMSettings::Get().GridSize = Sizes[(At + 1) % 4];
+		FTMSettings::Get().Save();
 		break;
 	}
 	case ETMHudAction::LayoutCard:
@@ -3056,10 +3109,23 @@ void ATMBattleDirector::UpdateCamera(float DeltaSeconds)
 	// 1080p pixels so it keeps its place at any size or UI scale.
 	if (!DragPanel.IsEmpty() && bHaveCursor)
 	{
+		// Where its corner would go; on the grid, the nearest line crossing.
 		const ATMBattleHud* Hud = Cast<ATMBattleHud>(Player->GetHUD());
 		const float Scale = Hud ? FMath::Max(0.1f, Hud->Scale()) : 1.0f;
-		FTMSettings::Get().Layout.FindOrAdd(DragPanel) += (Cursor - DragFrom) / Scale;
-		DragFrom = Cursor;
+		FVector2D Corner = DragStartMin + (Cursor - DragFrom);
+		if (Settings.bLayoutGrid)
+		{
+			const double Step = FMath::Max(4.0, Settings.GridSize * Scale);
+			Corner.X = FMath::RoundToDouble(Corner.X / Step) * Step;
+			Corner.Y = FMath::RoundToDouble(Corner.Y / Step) * Step;
+		}
+		FTMSettings::Get().Layout.Add(DragPanel, (Corner - DragHomeMin) / Scale);
+	}
+	if (!ResizePanel.IsEmpty() && bHaveCursor)
+	{
+		// Wider by as much as the grip has been pulled, in steps of 5%.
+		const float Wanted = ResizeStartScale * (ResizeStartWidth + static_cast<float>(Cursor.X - DragFrom.X)) / ResizeStartWidth;
+		FTMSettings::Get().LayoutScale.Add(ResizePanel, FMath::Clamp(FMath::RoundToFloat(Wanted * 20.0f) / 20.0f, 0.5f, 2.5f));
 	}
 
 	// Nothing moves the camera behind a menu, or while a key is being chosen.
@@ -3240,6 +3306,7 @@ void ATMBattleDirector::ToggleLayout()
 {
 	bEditingLayout = !bEditingLayout;
 	DragPanel.Reset();
+	ResizePanel.Reset();
 	DragCard = -1;
 	if (bEditingLayout)
 	{

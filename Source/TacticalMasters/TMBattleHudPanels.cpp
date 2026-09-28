@@ -303,6 +303,7 @@ void ATMBattleHud::DrawTooltip()
 
 void ATMBattleHud::DrawTurnOrder(ATMBattleDirector& From)
 {
+	const FPanelScale Sized(*this, TEXT("turn_order"));
 	// Two bars, one per team. A chip slides along its team's bar toward the READY
 	// zone at the left, placed by seconds until ready on a square-root scale so
 	// the last seconds get the most room; far-off turns are drawn smaller, chips
@@ -597,12 +598,13 @@ void ATMBattleHud::DrawTurnSquares(ATMBattleDirector& From)
 	// countdown runs out. The badge is the seconds to either, or to a cast.
 	const TMSim::FBattle& Battle = From.Battle;
 	UFont* Font = GEngine->GetMediumFont();
-	const float SW = 56.0f * S;
-	const float SH = 62.0f * S;
-	const float Gap = 5.0f * S;
 	const float Pulse = 0.55f + 0.45f * FMath::Sin((GetWorld() ? GetWorld()->GetRealTimeSeconds() : 0.0f) * 1000.0f / 180.0f);
 	for (int32 Team = 0; Team < 2; ++Team)
 	{
+		const FPanelScale Sized(*this, Team == 0 ? TEXT("turn_cards_blue") : TEXT("turn_cards_red"));
+		const float SW = 56.0f * S;
+		const float SH = 62.0f * S;
+		const float Gap = 5.0f * S;
 		// The order the player left them in, then anyone else by id.
 		TArray<const TMSim::FUnit*> Row;
 		for (int32 Id : FTMSettings::Get().CardOrder[Team])
@@ -628,7 +630,8 @@ void ATMBattleHud::DrawTurnSquares(ATMBattleDirector& From)
 			}
 		}
 		const FVector2D Moved = Nudge(Team == 0 ? TEXT("turn_cards_blue") : TEXT("turn_cards_red"));
-		const float RowX = 16.0f * S + Team * (4.0f * (SW + Gap) + 24.0f * S) + Moved.X;
+		const float BlueS = BaseS * FTMSettings::Get().ScaleOf(TEXT("turn_cards_blue"));
+		const float RowX = 16.0f * BaseS + Team * (4.0f * 61.0f * BlueS + 24.0f * BaseS) + Moved.X;
 		const float RowY = 12.0f * S + Moved.Y;
 		float X = RowX;
 		for (const TMSim::FUnit* Unit : Row)
@@ -708,6 +711,7 @@ void ATMBattleHud::DrawTurnSquares(ATMBattleDirector& From)
 
 void ATMBattleHud::DrawLog(ATMBattleDirector& From)
 {
+	const FPanelScale Sized(*this, TEXT("log"));
 	// The combat log under the turn order: the last lines of the fight, older
 	// ones fading. L or the Log button shows or hides it, + makes it taller, and
 	// the mouse wheel scrolls back through the fight. Godot's can be dragged and
@@ -834,6 +838,7 @@ float ATMBattleHud::DrawUnitBody(ATMBattleDirector& From, const TMSim::FUnit& Un
 
 void ATMBattleHud::DrawUnitCard(ATMBattleDirector& From)
 {
+	const FPanelScale Sized(*this, TEXT("unit_card"));
 	// The selected unit; while watching, the unit whose turn it is; otherwise the
 	// one under the pointer (hud.gd:1390-1427).
 	const TMSim::FUnit* Unit = From.SelectedUnit();
@@ -908,6 +913,7 @@ void ATMBattleHud::DrawUnitCard(ATMBattleDirector& From)
 
 void ATMBattleHud::DrawInspectCard(ATMBattleDirector& From)
 {
+	const FPanelScale Sized(*this, TEXT("inspect"));
 	// A clicked unit that is not taking orders, on its own card at the right
 	// (hud.gd:708-863), with its four abilities coloured by what they are for.
 	const TMSim::FUnit* Unit = From.Battle.FindUnit(From.InspectedId);
@@ -1007,6 +1013,7 @@ void ATMBattleHud::DrawInspectCard(ATMBattleDirector& From)
 
 void ATMBattleHud::DrawCornerButtons(ATMBattleDirector& From)
 {
+	const FPanelScale Sized(*this, TEXT("corner"));
 	// Log / Field / Units / Pause / Menu, top right (hud.gd:608-623), and Layout.
 	const float BW = 60.0f * S;
 	const float BH = 30.0f * S;
@@ -1036,6 +1043,7 @@ void ATMBattleHud::DrawCornerButtons(ATMBattleDirector& From)
 
 void ATMBattleHud::DrawField(ATMBattleDirector& From)
 {
+	const FPanelScale Sized(*this, TEXT("field"));
 	// Both teams down the left edge: name, health, and whether each is ready,
 	// casting or waiting. Clicking a row picks that unit, like its chip
 	// (hud.gd:515-606). A unit hidden by the fog shows as a question.

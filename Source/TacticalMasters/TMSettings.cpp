@@ -123,6 +123,7 @@ void FTMSettings::ResetKeys()
 void FTMSettings::ResetLayout()
 {
 	Layout.Reset();
+	LayoutScale.Reset();
 	CardOrder[0].Reset();
 	CardOrder[1].Reset();
 	Save();
@@ -159,12 +160,28 @@ void FTMSettings::Load()
 	{
 		return;
 	}
+	// What the file says, and nothing left over from before it was read.
+	Layout.Reset();
+	LayoutScale.Reset();
+	CardOrder[0].Reset();
+	CardOrder[1].Reset();
+	Tuning.Reset();
 	double Number = 0.0;
 	if (Root->TryGetNumberField(TEXT("camera_speed"), Number)) { CameraSpeed = FMath::Clamp(static_cast<float>(Number), 0.5f, 2.0f); }
 	if (Root->TryGetNumberField(TEXT("ui_scale"), Number)) { UiScale = FMath::Clamp(static_cast<float>(Number), 0.9f, 1.3f); }
 	Root->TryGetBoolField(TEXT("fullscreen"), bFullscreen);
 	Root->TryGetBoolField(TEXT("colorblind"), bColorblind);
 	Root->TryGetBoolField(TEXT("turn_squares"), bTurnSquares);
+	Root->TryGetBoolField(TEXT("layout_grid"), bLayoutGrid);
+	if (Root->TryGetNumberField(TEXT("grid_size"), Number)) { GridSize = FMath::Clamp(static_cast<float>(Number), 5.0f, 80.0f); }
+	const TSharedPtr<FJsonObject>* Sizes = nullptr;
+	if (Root->TryGetObjectField(TEXT("layout_scale"), Sizes))
+	{
+		for (const TPair<FString, TSharedPtr<FJsonValue>>& Entry : (*Sizes)->Values)
+		{
+			LayoutScale.Add(Entry.Key, FMath::Clamp(static_cast<float>(Entry.Value->AsNumber()), 0.5f, 2.5f));
+		}
+	}
 	const TSharedPtr<FJsonObject>* Places = nullptr;
 	if (Root->TryGetObjectField(TEXT("layout"), Places))
 	{
@@ -230,6 +247,14 @@ void FTMSettings::Save() const
 	Root->SetBoolField(TEXT("fullscreen"), bFullscreen);
 	Root->SetBoolField(TEXT("colorblind"), bColorblind);
 	Root->SetBoolField(TEXT("turn_squares"), bTurnSquares);
+	Root->SetBoolField(TEXT("layout_grid"), bLayoutGrid);
+	Root->SetNumberField(TEXT("grid_size"), GridSize);
+	TSharedRef<FJsonObject> Sizes = MakeShared<FJsonObject>();
+	for (const TPair<FString, float>& Entry : LayoutScale)
+	{
+		Sizes->SetNumberField(Entry.Key, Entry.Value);
+	}
+	Root->SetObjectField(TEXT("layout_scale"), Sizes);
 	TSharedRef<FJsonObject> Places = MakeShared<FJsonObject>();
 	for (const TPair<FString, FVector2D>& Entry : Layout)
 	{

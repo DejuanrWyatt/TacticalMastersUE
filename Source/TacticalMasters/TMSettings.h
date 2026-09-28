@@ -78,6 +78,12 @@ public:
 	TMap<FString, FVector2D> Layout;
 	/** The order each side's turn squares were dragged into, by unit id. */
 	TArray<int32> CardOrder[2];
+	/** How big each panel is drawn, as a share of its normal size; missing means 1. */
+	TMap<FString, float> LayoutScale;
+	float ScaleOf(const TCHAR* Id) const { const float* Found = LayoutScale.Find(Id); return Found ? *Found : 1.0f; }
+	/** While arranging: a grid to line panels up on, and how far apart its lines are (1080p pixels). */
+	bool bLayoutGrid = true;
+	float GridSize = 20.0f;
 	void ResetLayout();
 
 	/** Rule numbers for the next battle, by tuning key; missing means the default. */

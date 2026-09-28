@@ -41,10 +41,27 @@ void ATMRobotPlayer::BeginPlay()
 		Director = *It;
 		break;
 	}
+	bHadSettings = FFileHelper::LoadFileToString(SettingsBefore, *(FPaths::ProjectSavedDir() / TEXT("TacticalMasters/settings.json")));
 	OutDir = FPaths::ProjectSavedDir() / TEXT("Robot");
 	IFileManager::Get().DeleteDirectory(*OutDir, false, true);
 	IFileManager::Get().MakeDirectory(*OutDir, true);
 	Note(TEXT("robot playtester starting at the title screen"));
+}
+
+void ATMRobotPlayer::EndPlay(const EEndPlayReason::Type Reason)
+{
+	// Whatever the robot changed about the player's settings, put back.
+	const FString File = FPaths::ProjectSavedDir() / TEXT("TacticalMasters/settings.json");
+	if (bHadSettings)
+	{
+		FFileHelper::SaveStringToFile(SettingsBefore, *File);
+	}
+	else
+	{
+		IFileManager::Get().Delete(*File);
+	}
+	FTMSettings::Get().Load();
+	Super::EndPlay(Reason);
 }
 
 ATMBattleHud* ATMRobotPlayer::Hud() const
@@ -434,6 +451,41 @@ void ATMRobotPlayer::PlanLayout()
 			const FVector2D* Moved = FTMSettings::Get().Layout.Find(TEXT("unit_card"));
 			return Moved && Moved->X > 40.0 && Moved->Y < -25.0;
 		}, TEXT("dragging the unit card's handle should move it and remember where"));
+	// With the grid on, its corner lands on a line crossing.
+	Check([this]()
+		{
+			const ATMBattleHud* Screen = Hud();
+			if (!Screen || !FTMSettings::Get().bLayoutGrid)
+			{
+				return true;
+			}
+			const double Step = FMath::Max(4.0, FTMSettings::Get().GridSize * Screen->Scale());
+			for (const ATMBattleHud::FTMMovable& Panel : Screen->Movables)
+			{
+				if (Panel.Id == TEXT("unit_card"))
+				{
+					const double OffX = FMath::Fmod(Panel.Area.Min.X + Step * 0.5, Step) - Step * 0.5;
+					const double OffY = FMath::Fmod(Panel.Area.Min.Y + Step * 0.5, Step) - Step * 0.5;
+					return FMath::Abs(OffX) < 1.5 && FMath::Abs(OffY) < 1.5;
+				}
+			}
+			return false;
+		}, TEXT("with the grid on, a dragged panel's corner should snap to the grid"));
+
+	// Bigger, by its corner grip.
+	FStep Grip;
+	Grip.Kind = FStep::EKind::GrabGrip;
+	Grip.Meaning = TEXT("unit_card");
+	Push(MoveTemp(Grip));
+	FStep Pull;
+	Pull.Kind = FStep::EKind::Slide;
+	Pull.Point = TMSim::FVec2(110.0f, 40.0f);
+	Push(MoveTemp(Pull));
+	FStep LetGo;
+	LetGo.Kind = FStep::EKind::Release;
+	Push(MoveTemp(LetGo));
+	Check([]() { return FTMSettings::Get().ScaleOf(TEXT("unit_card")) >= 1.15f; },
+		TEXT("pulling the unit card's corner grip should make it bigger"));
 
 	// The first blue square, dropped past the last.
 	FStep Card;
@@ -461,7 +513,7 @@ void ATMRobotPlayer::PlanLayout()
 		Push(MoveTemp(Shot));
 	}
 	Button(ETMHudAction::LayoutReset);
-	Check([]() { return FTMSettings::Get().Layout.Num() == 0 && FTMSettings::Get().CardOrder[0].Num() == 0; },
+	Check([]() { return FTMSettings::Get().Layout.Num() == 0 && FTMSettings::Get().CardOrder[0].Num() == 0 && FTMSettings::Get().LayoutScale.Num() == 0; },
 		TEXT("Reset layout should put everything back"));
 	Button(ETMHudAction::ToggleLayout);
 	Check([this]() { return !Director->bEditingLayout; }, TEXT("Lock should end Edit layout"));
@@ -880,6 +932,25 @@ bool ATMRobotPlayer::RunStep(FStep& Step, float DeltaSeconds)
 			}
 		}
 		Problem(FString::Printf(TEXT("the %s had no handle to take hold of in Edit layout"), *Step.Meaning));
+		Queue.SetNum(1);
+		return true;
+	}
+
+	case EKind::GrabGrip:
+	{
+		// The grip sits in the handle's bottom-right corner.
+		const ATMBattleHud* Screen = Hud();
+		if (Screen)
+		{
+			for (int32 i = 0; i < Screen->Movables.Num(); ++i)
+			{
+				if (Screen->Movables[i].Id == Step.Meaning)
+				{
+					return Aim(Screen->Movables[i].Area.Max - FVector2D(6.0, 6.0) * Screen->Scale());
+				}
+			}
+		}
+		Problem(FString::Printf(TEXT("the %s had no grip to resize it by"), *Step.Meaning));
 		Queue.SetNum(1);
 		return true;
 	}

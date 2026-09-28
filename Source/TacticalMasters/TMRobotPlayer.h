@@ -40,6 +40,7 @@ class TACTICALMASTERS_API ATMRobotPlayer : public AActor
 public:
 	ATMRobotPlayer();
 	virtual void BeginPlay() override;
+	virtual void EndPlay(const EEndPlayReason::Type Reason) override;
 	virtual void Tick(float DeltaSeconds) override;
 
 private:
@@ -48,7 +49,7 @@ private:
 	{
 		enum class EKind : uint8 { ClickButton, ClickUnit, ClickGround, ClickTarget, ClickPlaceable, Key, EnsureMove, EnsureAbility, Check, Wait,
 			/** Edit layout: take hold of a panel's handle, or a turn square; slide the pointer; let go. */
-			GrabPanel, GrabSquare, Slide, Release,
+			GrabPanel, GrabSquare, Slide, Release, GrabGrip,
 			/** A picture of the screen as it is, named by Meaning. */
 			Picture };
 		EKind Kind = EKind::Wait;
@@ -146,4 +147,12 @@ private:
 	TArray<FString> Log;
 	TMap<FString, FIntPoint> Tally;  // what was tried: (worked, tried)
 	FString OutDir;
+	/**
+	 * The player's settings file as it was when the robot started. The robot
+	 * plays with the real controls, so it moves panels, resets the layout and
+	 * the like; all of that is put back exactly as the player left it when it
+	 * stops, however it stops.
+	 */
+	FString SettingsBefore;
+	bool bHadSettings = false;
 };
