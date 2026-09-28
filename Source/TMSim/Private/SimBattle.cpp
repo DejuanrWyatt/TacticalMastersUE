@@ -24,6 +24,10 @@ namespace TMSim
 		Rng.Seed(InSeed);
 		TickCount = 0;
 		Winner = -1;
+		// Time to place units first, if the battle has any (game_state.gd:292-293).
+		PlanningTicks = RoundToInt(Tuning.PlanningSeconds * Pace::TicksPerSecond);
+		PlanningDone[0] = false;
+		PlanningDone[1] = false;
 		const FVec2 Size = Map.SizeMeters();
 		const FVec2 Middle(Size.X * 0.5f, Size.Y * 0.5f);
 		for (FUnit& Unit : Units)
@@ -120,8 +124,9 @@ namespace TMSim
 		// While the sides are still placing their units, nothing else happens.
 		if (PlanningTicks > 0)
 		{
+			// Reaching zero is the fighting starting; Godot also logs it
+			// (game_state.gd:1186-1190, 1516-1518).
 			--PlanningTicks;
-			// The original starts the fighting here once this reaches zero.
 			return;
 		}
 

@@ -5,12 +5,15 @@
 // turn begins, auras reaching whoever stands near, toggles switched on and off,
 // casts landing, units falling, one after another over a few thousand ticks.
 //
+// The port's own computer player is asked for every order too, before Godot's
+// is applied, and must ask for the same one -- at hard, and at medium and easy,
+// whose mistakes are random draws from their own generator.
+//
 // Godot's computer player chose the orders (tests/dump_battle_trace.gd in the
 // Godot project wrote them, with the state after each, into
-// GodotBattleTrace.txt). The port replays exactly those orders rather than
-// choosing its own, so the two cannot drift apart over a choice both consider
-// equally good -- the one known way their computer players differ. Any
-// difference here is a rule.
+// GodotBattleTrace.txt). The battle goes on with Godot's order, whatever the
+// port's player asked for, so a difference in a rule and a difference in a
+// choice are told apart: each is reported as what it is.
 //
 // Each order must be one the port's rules accept, and after each order and
 // each run of ticks every unit must be in the state Godot printed: position,
@@ -191,10 +194,11 @@ namespace
 
 	/** Two sides on the default map, as MapData.build deals them. */
 	bool Deal(FBattle& Battle, const std::vector<std::string>& Blue, const std::vector<std::string>& Red, uint64_t Seed,
-		double CaptureSeconds, double BattleSeconds)
+		double CaptureSeconds, double BattleSeconds, double PlanningSeconds)
 	{
 		Battle.Tuning.CaptureSeconds = CaptureSeconds;
 		Battle.Tuning.BattleSeconds = BattleSeconds;
+		Battle.Tuning.PlanningSeconds = PlanningSeconds;
 		Battle.Map.BuildMirrored(HighlandsRows());
 		const FVec2 Size = Battle.Map.SizeMeters();
 		for (int Index = 0; Index < 8; ++Index)
@@ -218,6 +222,67 @@ namespace
 		return true;
 	}
 
+	/** An order, in the shape dump_battle_trace.gd's _order prints one (after the first word). */
+	std::string OrderText(const FOrder& Order)
+	{
+		const char* Type = Order.Type == EOrderType::Move ? "move"
+			: Order.Type == EOrderType::UseAbility ? "ability" : "end_turn";
+		std::string Out = std::string(Type) + " unit=" + std::to_string(Order.UnitId) + " serial=" + std::to_string(Order.Serial);
+		if (Order.Type == EOrderType::Move)
+		{
+			Out += " to=" + Vec(Order.To) + " sprint=" + (Order.bSprint ? "1" : "0");
+		}
+		if (Order.Type == EOrderType::UseAbility)
+		{
+			Out += " slot=" + std::to_string(Order.Slot) + " target=" + Vec(Order.Target) + " follow=" + std::to_string(Order.Follow);
+		}
+		return Out;
+	}
+
+	/**
+	 * Whether the port's computer player asked for what Godot's did. Godot's
+	 * orders leave out what they do not need (a walk only says sprint when it
+	 * might be one), so each field Godot gives must agree, and a sprint Godot
+	 * does not mention must not be one.
+	 */
+	bool SameOrder(const std::string& Godot, const FOrder& Port)
+	{
+		const std::string Mine = OrderText(Port);
+		if (Split(Godot, ' ').size() < 2 || Split(Godot, ' ')[1] != Split(Mine, ' ')[0])
+		{
+			return false;
+		}
+		std::map<std::string, std::string> Want = Fields(Godot);
+		const std::map<std::string, std::string> Have = Fields(Mine);
+		Want.erase("refused");
+		if (!Want.count("sprint") && Port.bSprint)
+		{
+			return false;
+		}
+		for (const auto& Field : Want)
+		{
+			const auto Found = Have.find(Field.first);
+			if (Found == Have.end() || !Agree(Field.second, Found->second))
+			{
+				return false;
+			}
+		}
+		return true;
+	}
+
+	/** The first unit waiting on an order, as Godot's orderable_units() lists them. */
+	const FUnit* FirstOrderable(const FBattle& Battle)
+	{
+		for (const FUnit& Unit : Battle.Units)
+		{
+			if (Unit.IsAlive() && Unit.bReady && !Unit.IsStunned())
+			{
+				return &Unit;
+			}
+		}
+		return nullptr;
+	}
+
 	FOrder OrderOf(const std::string& Line)
 	{
 		const std::vector<std::string> Words = Split(Line, ' ');
@@ -225,6 +290,14 @@ namespace
 		std::map<std::string, std::string> F = Fields(Line);
 		const int Unit = std::atoi(F["unit"].c_str());
 		const int Serial = std::atoi(F["serial"].c_str());
+		if (Type == "place")
+		{
+			return FOrder::MakePlace(Unit, Serial, VecOf(F["to"]));
+		}
+		if (Type == "ready")
+		{
+			return FOrder::MakeReady(std::atoi(F["team"].c_str()));
+		}
 		if (Type == "move")
 		{
 			return FOrder::MakeMove(Unit, Serial, VecOf(F["to"]), F["sprint"] == "1");
@@ -278,6 +351,15 @@ int main(int ArgCount, char** Args)
 	int Battles = 0;
 	std::string Version;
 	std::string LastOrder;
+	// The port's own computer player, seeded as Godot's was, asked for every
+	// order before Godot's is applied: it must ask for the same one.
+	FAIPlayer Computer("hard");
+	std::string Wanted;
+	std::string Level;
+	int Decisions = 0;
+	int DecisionsAgreed = 0;
+	std::map<std::string, int> LevelDecisions;
+	int PlaceChecks = 0;
 	std::vector<std::string> Expected;  // the U lines of the STATE being read
 	std::string ExpectedState;
 
@@ -294,12 +376,13 @@ int main(int ArgCount, char** Args)
 		}
 		++Checked;
 		std::map<std::string, std::string> Want = Fields(ExpectedState);
-		char Have[192];
-		std::snprintf(Have, sizeof(Have), "tick=%d winner=%d capture=%d,%d rng=%lld", Battle.TickCount, Battle.Winner,
-			Battle.CaptureTicks[0], Battle.CaptureTicks[1], static_cast<long long>(Battle.Rng.GetState()));
+		char Have[256];
+		std::snprintf(Have, sizeof(Have), "tick=%d winner=%d capture=%d,%d planning=%d done=%d,%d rng=%lld", Battle.TickCount, Battle.Winner,
+			Battle.CaptureTicks[0], Battle.CaptureTicks[1], Battle.PlanningTicks, Battle.PlanningDone[0] ? 1 : 0,
+			Battle.PlanningDone[1] ? 1 : 0, static_cast<long long>(Battle.Rng.GetState()));
 		const std::map<std::string, std::string> HaveFields = Fields(Have);
 		std::string Wrong;
-		for (const char* Key : { "tick", "winner", "capture", "rng" })
+		for (const char* Key : { "tick", "winner", "capture", "planning", "done", "rng" })
 		{
 			if (Want[Key] != HaveFields.at(Key))
 			{
@@ -348,8 +431,13 @@ int main(int ArgCount, char** Args)
 			std::map<std::string, std::string> F = Fields(Line);
 			BattleNumber = std::atoi(Split(Line, ' ')[1].c_str());
 			Battle = FBattle();
+			Level = F.count("ai") ? F["ai"] : std::string("hard");
+			Computer.SetDifficulty(Level.c_str());
+			Computer.Rng.Seed(std::strtoull(F["seed"].c_str(), nullptr, 10));
+			Wanted.clear();
 			bFollowing = Deal(Battle, Split(F["blue"], ','), Split(F["red"], ','), std::strtoull(F["seed"].c_str(), nullptr, 10),
-				std::strtod(F["capture"].c_str(), nullptr), std::strtod(F["time"].c_str(), nullptr));
+				std::strtod(F["capture"].c_str(), nullptr), std::strtod(F["time"].c_str(), nullptr),
+				std::strtod(F["planning"].c_str(), nullptr));
 			LastOrder.clear();
 			++Battles;
 		}
@@ -364,8 +452,72 @@ int main(int ArgCount, char** Args)
 			}
 			LastOrder = Line;
 		}
+		else if (Line.rfind("WANTED ", 0) == 0)
+		{
+			Wanted = Line;
+		}
+		else if (Line.rfind("PLACEABLE ", 0) == 0 && bFollowing)
+		{
+			// Every spot Godot would let this unit be put down on, in its order.
+			std::map<std::string, std::string> F = Fields(Line);
+			const FUnit* Unit = Battle.FindUnit(std::atoi(F["unit"].c_str()));
+			std::string Mine;
+			if (Unit)
+			{
+				for (const FNode& Node : Battle.PlaceableNodes(*Unit))
+				{
+					Mine += (Mine.empty() ? "" : "|") + std::to_string(Node.X) + "," + std::to_string(Node.Y);
+				}
+			}
+			++PlaceChecks;
+			if ((Mine.empty() ? std::string("-") : Mine) != F["nodes"])
+			{
+				Fail("battle " + std::to_string(BattleNumber) + ": the spots unit " + F["unit"]
+					+ " may be placed on differ from Godot's");
+				bFollowing = false;
+			}
+		}
+		else if (Line.rfind("ORDER ", 0) == 0 && bFollowing && Line.find(" scripted=1") != std::string::npos)
+		{
+			// Placing is scripted, not chosen: nobody's computer player places,
+			// so it is only applied, and must be accepted.
+			const FOrder Order = OrderOf(Line);
+			const std::string Refused = Battle.Validate(Order);
+			LastOrder = Line;
+			if (!Refused.empty())
+			{
+				Fail("battle " + std::to_string(BattleNumber) + ": the port refuses " + Line + " -- \"" + Refused + "\"");
+				bFollowing = false;
+				continue;
+			}
+			FTickReport Report;
+			Battle.Apply(Order, Report);
+		}
 		else if (Line.rfind("ORDER ", 0) == 0 && bFollowing)
 		{
+			// First what the port's computer player would do here.
+			const bool bRefused = Line.find(" refused=1") != std::string::npos;
+			const std::string GodotAsked = bRefused ? Wanted : Line;
+			Wanted.clear();
+			const FUnit* Ready = FirstOrderable(Battle);
+			if (!Ready)
+			{
+				Fail("battle " + std::to_string(BattleNumber) + ": Godot gave an order at tick " + std::to_string(Battle.TickCount)
+					+ " while the port has nobody waiting on one");
+				bFollowing = false;
+				continue;
+			}
+			const FOrder Mine = Computer.NextCommand(Battle, *Ready);
+			++Decisions;
+			++LevelDecisions[Level];
+			if (!SameOrder(GodotAsked, Mine))
+			{
+				Fail("battle " + std::to_string(BattleNumber) + " (" + Level + "): the computer player chooses differently at tick "
+					+ std::to_string(Battle.TickCount) + "\n    Godot " + GodotAsked + "\n    port  ORDER " + OrderText(Mine));
+				bFollowing = false;
+				continue;
+			}
+			++DecisionsAgreed;
 			const FOrder Order = OrderOf(Line);
 			const std::string Refused = Battle.Validate(Order);
 			LastOrder = Line;
@@ -393,6 +545,15 @@ int main(int ArgCount, char** Args)
 
 	std::printf("%d battles from Godot %s: %d orders, %d states compared\n", Battles, Version.c_str(), Orders, Checked);
 	std::printf("%d of %d battles agree with Godot from the first tick to the last\n", Agreed, Battles);
+	std::printf("every spot a unit may be placed on agrees for %d units\n", PlaceChecks);
+	std::printf("the computer player chose as Godot's did %d times out of %d (", DecisionsAgreed, Decisions);
+	bool bFirst = true;
+	for (const auto& Each : LevelDecisions)
+	{
+		std::printf("%s%d at %s", bFirst ? "" : ", ", Each.second, Each.first.c_str());
+		bFirst = false;
+	}
+	std::printf(")\n");
 	if (Battles == 0)
 	{
 		Fail("the trace has no battles in it");

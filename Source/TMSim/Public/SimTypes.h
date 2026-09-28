@@ -204,6 +204,11 @@ namespace TMSim
 		 * off. The Godot setup screen offers 30 and 60.
 		 */
 		double CaptureSeconds = 0.0;
+		/**
+		 * Seconds before the fighting in which each side places its units in its
+		 * own spawn area; 0 is none. The Godot setup offers 30, 60 and 90.
+		 */
+		double PlanningSeconds = 0.0;
 	};
 
 	namespace Combat

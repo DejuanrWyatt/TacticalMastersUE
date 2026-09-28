@@ -92,6 +92,15 @@ public:
 	FString DescribeBattle() const;
 	/** How the battle was won, in a few words: on time, by holding the middle, or neither. */
 	FString HowWon() const;
+	/**
+	 * Which side this machine places units for while planning, or -1 when it
+	 * places for nobody, as when watching two computers (battle.gd:340-351).
+	 */
+	int32 PlanningTeam() const;
+	/** The unit being placed while planning, or -1. */
+	int32 PlaceId = -1;
+	/** Done placing: tells the rules this side is ready to fight. */
+	void ReadyToFight();
 
 	/** Clears the visible units and forgets the battle. */
 	UFUNCTION(BlueprintCallable, CallInEditor, Category = "Tactical Masters")
@@ -313,6 +322,8 @@ private:
 		 */
 		double CaptureSeconds = 0.0;
 		double BattleSeconds = 0.0;
+		/** Seconds before the fighting to place units in (battle_setup.gd:44); 0 is none. */
+		double PlanningSeconds = 0.0;
 		uint64 FixedSeed = 12345;
 	};
 

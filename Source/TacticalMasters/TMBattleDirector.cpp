@@ -86,6 +86,11 @@ void ATMBattleDirector::BeginPlay()
 		Setup.BattleSeconds = RuleSeconds;
 		bBuilt = false;
 	}
+	if (FParse::Value(FCommandLine::Get(), TEXT("tmplan="), RuleSeconds))
+	{
+		Setup.PlanningSeconds = RuleSeconds;
+		bBuilt = false;
+	}
 
 	if (!bBuilt)
 	{
@@ -277,6 +282,8 @@ void ATMBattleDirector::BuildBattle()
 	// with the battle rather than being watched for here.
 	Battle.Tuning.CaptureSeconds = Setup.CaptureSeconds;
 	Battle.Tuning.BattleSeconds = Setup.BattleSeconds;
+	Battle.Tuning.PlanningSeconds = Setup.PlanningSeconds;
+	PlaceId = -1;
 	Battle.CaptureTicks[0] = 0;
 	Battle.CaptureTicks[1] = 0;
 
@@ -1292,7 +1299,20 @@ void ATMBattleDirector::Tick(float DeltaSeconds)
 
 	if (bPlayerInput)
 	{
-		MaintainSelection();
+		// While planning nobody has a turn, so there is no turn's selection to
+		// keep; the unit being placed is kept apart from it.
+		if (Battle.IsPlanning())
+		{
+			if (SelectedId != -1)
+			{
+				Deselect();
+			}
+		}
+		else
+		{
+			PlaceId = -1;
+			MaintainSelection();
+		}
 		PickUnderCursor();
 		UpdateHoverPath();
 	}
@@ -1559,6 +1579,11 @@ void ATMBattleDirector::OnKey(FKey Key)
 		{
 			ToggleGuide();
 		}
+		return;
+	}
+	if (Key == EKeys::Enter && Battle.IsPlanning())
+	{
+		ReadyToFight();
 		return;
 	}
 	if (Key == EKeys::Escape)
@@ -2058,6 +2083,32 @@ void ATMBattleDirector::OnClick()
 	{
 		return;
 	}
+	// While planning a click puts the picked-up unit down instead of ordering
+	// it; a click on another of this side's units picks that one up instead
+	// (battle.gd:771-781).
+	if (Battle.IsPlanning())
+	{
+		const int32 Team = PlanningTeam();
+		if (Team == -1 || Battle.PlanningDone[Team])
+		{
+			return;
+		}
+		const TMSim::FUnit* Clicked = FindIn(Battle, HoverUnitId);
+		if (Clicked && Clicked->Team == Team)
+		{
+			PlaceId = Clicked->Id;
+			return;
+		}
+		if (const TMSim::FUnit* Placing = FindIn(Battle, PlaceId))
+		{
+			const FString Refused = Submit(TMSim::FOrder::MakePlace(Placing->Id, Placing->Serial, TMSim::FMap::Snap(HoverPoint)));
+			if (!Refused.IsEmpty())
+			{
+				Tell(Refused);
+			}
+		}
+		return;
+	}
 	const TMSim::FUnit* Unit = SelectedUnit();
 	if (PlayerCanOrder(Unit))
 	{
@@ -2463,6 +2514,23 @@ void ATMBattleDirector::PressMenuButton(const FTMHudButton& Button)
 		Setup.BattleSeconds = Choices[(At + 1) % 4];
 		break;
 	}
+	case ETMHudAction::SetupPlanning:
+	{
+		const double Choices[4] = { 0.0, 30.0, 60.0, 90.0 };
+		int32 At = 0;
+		for (int32 i = 0; i < 4; ++i)
+		{
+			if (Setup.PlanningSeconds == Choices[i])
+			{
+				At = i;
+			}
+		}
+		Setup.PlanningSeconds = Choices[(At + 1) % 4];
+		break;
+	}
+	case ETMHudAction::PlanningReady:
+		ReadyToFight();
+		break;
 	case ETMHudAction::SetupStart:
 		StartMatch(true);
 		break;
@@ -2618,6 +2686,37 @@ FString ATMBattleDirector::HowWon() const
 		return FString::Printf(TEXT("%s has held the middle"), Side);
 	}
 	return FString();
+}
+
+int32 ATMBattleDirector::PlanningTeam() const
+{
+	// Nobody watching places anybody: the computer's side is left where it
+	// spawned, as in Godot, whose computer player never places or says it is
+	// ready -- so against the computer the planning time always runs out.
+	if (!bPlayerInput || Screen != EScreen::Battle)
+	{
+		return -1;
+	}
+	if (Setup.Mode == TEXT("ai"))
+	{
+		return Setup.PlayerTeam;
+	}
+	if (Setup.Mode == TEXT("cpu"))
+	{
+		return -1;
+	}
+	// Two people at one machine: Godot places for blue only (battle.gd:351).
+	return 0;
+}
+
+void ATMBattleDirector::ReadyToFight()
+{
+	const int32 Team = PlanningTeam();
+	if (Battle.IsPlanning() && Team != -1)
+	{
+		Submit(TMSim::FOrder::MakeReady(Team));
+		PlaceId = -1;
+	}
 }
 
 void ATMBattleDirector::CaptureNamed(const TCHAR* Name)

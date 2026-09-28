@@ -1,5 +1,7 @@
 #include "SimAI.h"
 
+#include "SimSort.h"
+
 #include "SimAbility.h"
 #include "SimMap.h"
 #include "SimBattle.h"
@@ -384,7 +386,9 @@ namespace TMSim
 	FChoice FAIPlayer::BestAction(FBattle& Battle, const FUnit& Unit,
 		const std::vector<std::pair<FNode, double>>& Reach)
 	{
-		FChoice Best;
+		// Every option worth anything, in the order Godot builds them: slot, then
+		// spot, then target (ai_player.gd:118-148).
+		std::vector<FChoice> Options;
 		const std::vector<FVec2> Stands = Spots(Unit, Reach);
 		const double Sight = Battle.SightOf(Unit);
 
@@ -501,25 +505,38 @@ namespace TMSim
 						continue;
 					}
 
-					// Strictly better, so the first of equals wins, and the first
-					// is the earliest slot, then the earliest spot, then the
-					// earliest target: the order the original builds them in. Its
-					// own sort is not a stable one, so a tie at the top could fall
-					// either way there. Rather than pretend to know which way, the
-					// count below lets the test insist there was no tie.
-					if (Value > Best.Score)
-					{
-						Best.Score = Value;
-						Best.Slot = Slot;
-						Best.Spot = Spot;
-						Best.Target = Target;
-						Best.Ties = 1;
-					}
-					else if (Best.Slot >= 0 && Value == Best.Score)
-					{
-						++Best.Ties;
-					}
+					FChoice Option;
+					Option.Score = Value;
+					Option.Slot = Slot;
+					Option.Spot = Spot;
+					Option.Target = Target;
+					Options.push_back(Option);
 				}
+			}
+		}
+		if (Options.empty())
+		{
+			return FChoice();
+		}
+
+		// Best first, with Godot's own sort: it is not a stable one, but it is a
+		// fixed one, so given the same options in the same order it settles a tie
+		// the same way every time (SimSort.h). Then an easy or medium player may
+		// settle for one of the few best instead (ai_player.gd:151-155).
+		GodotSort(Options, [](const FChoice& A, const FChoice& B) { return A.Score > B.Score; });
+		FChoice Best = Options[0];
+		if (Level.Mistakes > 0.0 && static_cast<double>(Rng.Randf()) < Level.Mistakes)
+		{
+			const int64_t Among = std::min<int64_t>(Level.Top, static_cast<int64_t>(Options.size()));
+			Best = Options[static_cast<size_t>(Rng.RandiRange(0, Among - 1))];
+		}
+		// How many shared the top score, for the parity test to report.
+		Best.Ties = 0;
+		for (const FChoice& Option : Options)
+		{
+			if (Option.Score == Options[0].Score)
+			{
+				++Best.Ties;
 			}
 		}
 

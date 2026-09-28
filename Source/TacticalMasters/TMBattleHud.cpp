@@ -196,6 +196,24 @@ void ATMBattleHud::DrawHUD()
 
 void ATMBattleHud::DrawBoardAids(ATMBattleDirector& From)
 {
+	// While planning: where the unit being placed may go (battle.gd:381-384).
+	if (From.Battle.IsPlanning())
+	{
+		if (const TMSim::FUnit* Placing = From.Battle.FindUnit(From.PlaceId))
+		{
+			const float Dot = FMath::Max(4.0f, 6.0f * S);
+			for (const TMSim::FNode& Node : From.Battle.PlaceableNodes(*Placing))
+			{
+				FVector2D At;
+				if (ToScreen(From, TMSim::FMap::NodePos(Node), 4.0f, At))
+				{
+					DrawRect(FLinearColor(0.45f, 0.8f, 1.0f, 0.7f), At.X - Dot * 0.5f, At.Y - Dot * 0.5f, Dot, Dot);
+				}
+			}
+			BoardRing(From, Placing->Pos, 0.45f, Gold, 3.0f);
+		}
+	}
+
 	// The middle, while holding it can win: a ring on the board, in the colour of
 	// whoever is holding it alone, grey while it is contested or empty
 	// (board_view.gd:91).
@@ -481,6 +499,34 @@ void ATMBattleHud::DrawBanners(ATMBattleDirector& From)
 			Rules += FString::Printf(TEXT("%sMiddle  Blue %d%%  Red %d%%"), Rules.IsEmpty() ? TEXT("") : TEXT("     "),
 				FMath::Min(100, Battle.CaptureTicks[0] * 100 / Needed), FMath::Min(100, Battle.CaptureTicks[1] * 100 / Needed));
 		}
+		if (Battle.IsPlanning())
+		{
+			// battle.gd:362-380, the planning banner.
+			const int32 Team = From.PlanningTeam();
+			FString Plan = FString::Printf(TEXT("Planning: %ds"), FMath::CeilToInt(Battle.PlanningTicks / Tps));
+			if (Team == -1)
+			{
+				Plan += TEXT("   ·   both sides are placing their units");
+			}
+			else if (Battle.PlanningDone[Team])
+			{
+				Plan += TEXT("   ·   waiting for the other side");
+			}
+			else
+			{
+				Plan += TEXT("   ·   click one of your units, then click a spot in your area");
+			}
+			const FVector2D Size = TextSize(Plan, Font, 0.7f * S);
+			const float PY = 152.0f * S;
+			Panel(CentreX - Size.X * 0.5f - 16.0f * S, PY - 6.0f * S, Size.X + 32.0f * S, Size.Y + 12.0f * S,
+				FLinearColor(0.05f, 0.06f, 0.1f, 0.85f), Gold, 1.5f);
+			Text(Plan, CentreX - Size.X * 0.5f, PY, Gold, Font, 0.7f * S);
+			if (Team != -1 && !Battle.PlanningDone[Team])
+			{
+				const float BW = 220.0f * S;
+				MenuButton(CentreX - BW * 0.5f, PY + Size.Y + 16.0f * S, BW, 44.0f * S, TEXT("Ready  (Enter)"), ETMHudAction::PlanningReady);
+			}
+		}
 		if (!Rules.IsEmpty())
 		{
 			const FVector2D Size = TextSize(Rules, Font, 0.62f * S);
@@ -576,8 +622,9 @@ void ATMBattleHud::DrawBanners(ATMBattleDirector& From)
 		Text(From.Notice, CentreX - Size.X * 0.5f, Above, Gold, Font, Scale);
 	}
 
-	// Nobody of ours is ready: say who is next, and when.
-	if (From.bPlayerInput && !Unit && From.Battle.Winner == -1)
+	// Nobody of ours is ready: say who is next, and when. Not while planning,
+	// when no time passes and the banner says what to do.
+	if (From.bPlayerInput && !Unit && From.Battle.Winner == -1 && !From.Battle.IsPlanning())
 	{
 		const TMSim::FUnit* Next = nullptr;
 		int32 Soonest = 0;
@@ -847,19 +894,21 @@ void ATMBattleHud::DrawSetup(ATMBattleDirector& From)
 			ETMHudAction::SetupTime, -1);
 		AddTip(RowX, Y - 46.0f * S, LabelW + ValueW, 38.0f * S,
 			TEXT("When time runs out, the side with more of its health left wins. Within a point of each other is a draw."));
+		Row(TEXT("Planning"), Setup.PlanningSeconds > 0.0 ? FString::Printf(TEXT("%.0f seconds"), Setup.PlanningSeconds)
+			: FString(TEXT("No planning")), ETMHudAction::SetupPlanning, -1);
+		AddTip(RowX, Y - 46.0f * S, LabelW + ValueW, 38.0f * S,
+			TEXT("Time before the fighting to put your units where you want them in your own spawn area. It ends early once both sides are ready; the computer never says it is, so against it the time runs out."));
 		RowX = LeftRowX;
 		Y = LeftY;
 	}
 
 	// What the Godot setup offers that is not here yet, said where it would be.
-	float NoteY = ColumnTop + 36.0f * S + 4.0f * 64.0f * S + 64.0f * S + 2.0f * 46.0f * S + 10.0f * S;
+	float NoteY = ColumnTop + 36.0f * S + 4.0f * 64.0f * S + 64.0f * S + 3.0f * 46.0f * S + 10.0f * S;
 	const TCHAR* Notes[] =
 	{
 		TEXT("Not ported yet:"),
 		TEXT("  other maps, and saved teams"),
-		TEXT("  planning time"),
-		TEXT("Easy and medium think more simply than hard, but"),
-		TEXT("  do not yet make Godot's random mistakes."),
+
 	};
 	for (const TCHAR* Note : Notes)
 	{

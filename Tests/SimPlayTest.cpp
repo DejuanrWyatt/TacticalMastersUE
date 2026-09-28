@@ -381,7 +381,9 @@ int main()
 			});
 		Notices("how long blue has held the middle", [](FBattle& B) { B.CaptureTicks[0] += 1; });
 		Notices("how long red has held the middle", [](FBattle& B) { B.CaptureTicks[1] += 1; });
-		std::printf("the checksum notices %d kinds of change\n", 34 - Blind);
+		Notices("whether blue is done placing", [](FBattle& B) { B.PlanningDone[0] = !B.PlanningDone[0]; });
+		Notices("whether red is done placing", [](FBattle& B) { B.PlanningDone[1] = !B.PlanningDone[1]; });
+		std::printf("the checksum notices %d kinds of change\n", 36 - Blind);
 	}
 
 	// How a battle is won besides by wiping out the other side: the time limit
@@ -455,6 +457,52 @@ int main()
 		if (Failures == Before)
 		{
 			std::printf("a battle is called on time for the healthier side, and won by holding the middle\n");
+		}
+	}
+
+	// The planning stage: the same checks as Godot's smoke_test.gd
+	// (_test_planning_stage), on the same board.
+	{
+		const int Before = Failures;
+		auto Check = [](bool bOk, const char* What) { if (!bOk) { Fail(std::string("planning: ") + What); } };
+		auto Step = [](FBattle& B, const FOrder& Order) { FTickReport Report; B.Apply(Order, Report); };
+
+		FBattle Plan;
+		Plan.Tuning.PlanningSeconds = 10.0;
+		Deal(Plan);
+		Check(Plan.IsPlanning(), "a battle with planning time starts in the planning stage");
+		FUnit& Placed = Plan.Units[0];
+		const int GaugeBefore = Placed.Tg;
+		Step(Plan, FOrder::MakeAdvance(20));
+		Check(Plan.TickCount == 0 && Placed.Tg == GaugeBefore, "no gauge fills and no time passes while planning");
+
+		const FVec2 Spot = FMap::Snap(Plan.SpawnPoints[0] + FVec2(1.0f, 1.0f));
+		Check(Plan.Validate(FOrder::MakePlace(Placed.Id, Placed.Serial, Spot)).empty(), "a unit can be placed in its own spawn area");
+		Step(Plan, FOrder::MakePlace(Placed.Id, Placed.Serial, Spot));
+		Check(Placed.Pos == Spot, "placing moves it there");
+		const FVec2 Far = FMap::Snap(Plan.SpawnPoints[1]);
+		Check(!Plan.Validate(FOrder::MakePlace(Placed.Id, Placed.Serial, Far)).empty(), "it can't be placed in the other side's area");
+		const FUnit& Enemy = Plan.Units[4];
+		Check(!Plan.Validate(FOrder::MakePlace(Enemy.Id, Enemy.Serial, Spot)).empty(), "and not on top of somebody else");
+		Check(!Plan.PlaceableNodes(Placed).empty(), "there are spots to place it on");
+		Check(!Plan.Validate(FOrder::MakeMove(Placed.Id, Placed.Serial, Spot)).empty(), "nobody walks while planning");
+
+		Step(Plan, FOrder::MakeReady(0));
+		Check(Plan.IsPlanning(), "one side being ready isn't enough");
+		Step(Plan, FOrder::MakeReady(1));
+		Check(!Plan.IsPlanning(), "both sides ready starts the battle");
+		Step(Plan, FOrder::MakeAdvance(5));
+		Check(Plan.TickCount == 5, "time runs once the planning is over");
+		Check(!Plan.Validate(FOrder::MakePlace(Placed.Id, Placed.Serial, Spot)).empty(), "and units can't be placed any more");
+
+		FBattle Waited;
+		Waited.Tuning.PlanningSeconds = 1.0;
+		Deal(Waited);
+		Step(Waited, FOrder::MakeAdvance(10));
+		Check(!Waited.IsPlanning(), "the planning ends when its time runs out");
+		if (Failures == Before)
+		{
+			std::printf("units are placed in their own spawn area before the fighting, which starts when both sides are ready\n");
 		}
 	}
 

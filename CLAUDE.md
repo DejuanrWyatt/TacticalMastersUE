@@ -63,7 +63,7 @@ be hard to kill (`Stop-Process` and `taskkill` may both refuse; WMI `Terminate` 
 6. **Any new state field must be mixed into `FBattle::Checksum()`** (`SimWorld.cpp`), or desyncs go undetected.
    The gaps F7 listed (RNG state, `KoTicks`, `bHustling`, `UnharmedTurns`) are closed, along with casting,
    channelling and toggles. `SimPlayTest` has a probe per field that changes it and insists the checksum
-   notices — 34 of them. Add one with any new field.
+   notices — 36 of them. Add one with any new field.
 7. Orders carry the unit's `Serial`, and stale orders are refused. Note that `Validate` skips the check when
    `Serial < 0`, so never send orders with `-1` from player or network paths.
 
@@ -83,7 +83,7 @@ be hard to kill (`Stop-Process` and `taskkill` may both refuse; WMI `Terminate` 
 | Wiring test: sim ↔ Unreal, in a real level | `scripts\wiring-test.bat` (runs `Tools/play_battle.py` headless) |
 | The class lab (the rules alone, for the class creator: check + playtest a class file) | `Tools\ClassLab\Build.bat` → `Binaries\ClassLab\TMClassLab.exe` |
 | Film every particle effect in the project for the class creator | `Tools\VfxCatalog.bat` (runs the game off-screen with `-tmvfxcatalog`; writes `Saved\VfxCatalog`; about 2 minutes; ends itself) |
-| Watch chosen classes fight | add `-tmroster=a,b,c,d` to a game run: both sides field those four; `-tmhold=30` / `-tmtime=180` switch on the other ways to win |
+| Watch chosen classes fight | add `-tmroster=a,b,c,d` to a game run: both sides field those four; `-tmhold=30` / `-tmtime=180` switch on the other ways to win, `-tmplan=30` planning time |
 | A whole battle in a real game world | `scriptsattle-test.bat` (no window, no rendering; ends itself) |
 
 Paths on this machine: engine `E:\UE_5.8`, Visual Studio `E:\VS2022`.
@@ -120,28 +120,24 @@ field for field (`GodotClassTable.txt`), and every one plays a battle with no re
 Particle effects are presentation only. An ability's `vfx` field names a Niagara or Cascade system under
 `/Game` (a Fab pack, say). The rules read it and ignore it, and the director plays it when the ability
 resolves. `ATMVfxStudio` films every effect for the class creator.
-Whole battles (`SimTraceTest`): 8 battles replayed from Godot's own orders
+Whole battles (`SimTraceTest`): 14 battles replayed from Godot's own orders
 (`tests/dump_battle_trace.gd` → `Tests/GodotBattleTrace.txt`, Godot 4.7.2-stable ed1daf0bf), every unit
-compared after every step — 856 orders, 1125 states, all agree. They cover passive and toggle buffs,
-auras (20 of the 81 classes have one, 11 a toggle), burn, regen, stun, channelling, the battle time
-limit and holding the middle (setup screen: Victory, Time). Units face the middle when a battle starts,
-set by `FBattle::Start` as Godot's `setup` does.
-Not yet ported (see `Docs/backlog.md`): `Randf` (easy/medium mistakes), planning time.
+compared after every step, and the port's own computer player asked for every order first: it must ask
+for exactly what Godot's did — 1667 decisions at hard, medium and easy, all agree. The battles cover
+passive and toggle buffs, auras (20 of the 81 classes have one, 11 a toggle), burn, regen, stun,
+channelling, the battle time limit, holding the middle and planning time (placing units; setup screen:
+Victory, Time, Planning). Units face the middle when a battle starts, set by `FBattle::Start` as Godot's
+`setup` does.
+
+The computer player sorts its options with a transcription of Godot's own sort (`SimSort.h`, from
+`core/templates/sort_array.h`). Godot's sort is not stable, but it is deterministic, so ties are settled
+exactly as Godot settles them. Easy and medium make Godot's random mistakes with `FSimRandom::Randf` and
+`RandiRange`, both measured against Godot (`SimRandomTest`): randf is two draws, and randi_range draws
+nothing for equal ends and rejects biased draws as PCG's bounded draw does.
+
+Not yet ported (see `Docs/backlog.md`): other maps, and saved teams.
 Kept bug-for-bug from Godot, with a comment at each: a toggle in slot 3 skips the ultimate-meter and
 cooldown gates (`AbilityBlockedReason`; reachable now that loaded classes have toggles).
-
-**One deliberate divergence**, in the AI's choice of action. Godot sorts its scored options and takes
-the first, with `sort_custom`, which is *not* a stable sort — so when two options score identically it
-may take either, and no transcription can promise to match that. The port takes the first of equals in
-build order. `SimAIActionTest` does not paper over it: where the two disagree it prices Godot's own
-choice and requires it to be worth *exactly* what the port's best is worth, so a disagreement is proven
-to be a tie rather than a worse decision. It reports how many were settled that way. This costs
-nothing for multiplayer, where both machines run this build and agree with each other; it only means a
-Godot battle and an Unreal battle can diverge on an option they both consider equally good.
-
-Easy and medium cannot yet be replayed bit-for-bit: their "settle for a worse option" roll needs
-Godot's `randf`, which is not ported. `SimRandom.h` records what was measured about it. Hard makes no
-random draw at all, which is why the parity tests use it.
 
 ## Documents
 - `Docs/backlog.md`: port slices and features with status (producer).

@@ -21,27 +21,21 @@
 //   seed 42    randi_range(1,100) 18, 29, 21, 16, 33, 57, 99, 4
 //   seed 12345 randi_range(1,100) 57, 48, 42, 21, 7, 70, 42, 89
 //
-// Randf is deliberately absent, and the rules never ask for one. The only float
-// draw in the whole game is the tie-break by which an easy or medium computer
-// player settles for a worse option, and a hard one never reaches it: GDScript
-// short-circuits `mistakes > 0.0 and rng.randf() < mistakes`, so at hard the
-// generator is untouched and the choice is wholly deterministic.
-//
-// What is known about it, measured against 4.7.2 rather than guessed, so nobody
-// has to find it out twice:
-//   - one randf() costs exactly two randi() draws (the state afterwards is the
-//     state after two, and the next randi is the third of the plain sequence);
-//   - it returns a value exactly representable as a 32-bit float;
-//   - seed 1     -> 0.32955908775329590, 0.27659484744071960
-//     seed 42    -> 0.11837019026279449, 0.65903240442276001
-//     seed 12345 -> 0.25204190611839294, 0.66667300462722778
-//     against the plain draws seed 1 -> 1811587497, 683407368, 2033395789, ...
-// No simple combination of those two draws reproduces all six values, so the
-// exponent trick needs reading out of the engine source rather than inferring.
-// Until it is, easy and medium cannot be replayed bit-for-bit -- hard can, and
-// that is what the parity tests use.
+// Randf is Godot's too, used only by an easy or medium computer player deciding
+// whether to settle for a worse option (ai_player.gd:154). Hard never draws it:
+// GDScript short-circuits `mistakes > 0.0 and rng.randf() < mistakes`.
+// RandomPCG::randf (core/math/random_pcg.h) takes one draw for an exponent --
+// how many leading zeros it has -- and a second for the digits, with the top
+// and bottom bits forced on, and scales the second by the first. Two draws per
+// call, a result exactly representable as a 32-bit float, and these values,
+// measured against Godot 4.7.2 and matched exactly:
+//   seed 1     -> 0.32955908775329590, 0.27659484744071960
+//   seed 42    -> 0.11837019026279449, 0.65903240442276001
+//   seed 12345 -> 0.25204190611839294, 0.66667300462722778
 
 #pragma once
+
+#include <cmath>
 
 #include <cstdint>
 
@@ -67,19 +61,51 @@ namespace TMSim
 		uint32_t Randi() { return Next(); }
 
 		/**
-		 * Godot's randi_range(): inclusive at both ends. Modulo, bias and all --
-		 * matching Godot matters more here than an even spread, and the rolls it
-		 * is used for are percentages out of 100.
+		 * Godot's randi_range(): inclusive at both ends, either way round
+		 * (RandomPCG::random, core/math/random_pcg.cpp). Two things about it
+		 * matter, both measured against 4.7.2:
+		 *   - equal ends return at once and draw nothing: randi_range(3, 3) on
+		 *     seed 1 leaves the next randi() at 1811587497, the first draw;
+		 *   - the draw is PCG's bounded one (pcg32_boundedrand_r), which throws
+		 *     away draws below 2^32 mod the range, so the result is unbiased. For
+		 *     a range of 100 only draws under 96 are thrown away, which is why
+		 *     a plain modulo agreed on every percentage roll ever measured. On
+		 *     0..1610612735 it shows: seed 0 -> 1327520283 (its first draw,
+		 *     881477183, thrown away), seed 1 -> 200974761, seed 3 -> 1282583244.
 		 */
 		int64_t RandiRange(int64_t From, int64_t To)
 		{
-			if (To < From)
+			if (From == To)
 			{
-				const int64_t Swap = From;
-				From = To;
-				To = Swap;
+				return From;
 			}
-			return static_cast<int64_t>(Next()) % (To - From + 1) + From;
+			const int64_t Low = From < To ? From : To;
+			const uint32_t Bound = static_cast<uint32_t>((From < To ? To - From : From - To) + 1);
+			const uint32_t Threshold = (0u - Bound) % Bound;
+			while (true)
+			{
+				const uint32_t Draw = Next();
+				if (Draw >= Threshold)
+				{
+					return Low + static_cast<int64_t>(Draw % Bound);
+				}
+			}
+		}
+
+		/** Godot's randf(): a float in [0, 1], two draws (see the note at the top). */
+		float Randf()
+		{
+			const uint32_t Exponent = Next();
+			if (Exponent == 0)
+			{
+				return 0.0f;
+			}
+			int Zeros = 0;
+			for (uint32_t Bit = 0x80000000u; Bit != 0 && (Exponent & Bit) == 0; Bit >>= 1)
+			{
+				++Zeros;
+			}
+			return std::ldexp(static_cast<float>(Next() | 0x80000001u), -32 - Zeros);
 		}
 
 		/** Saving and restoring mid-battle, for snapshots the AI thinks on. */

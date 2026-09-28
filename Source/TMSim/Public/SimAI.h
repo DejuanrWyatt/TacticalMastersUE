@@ -58,10 +58,8 @@ namespace TMSim
 		/** The unit a cast would follow, or -1 for a spot on the ground. */
 		int Follow = -1;
 		/**
-		 * How many options shared the best score. The original settles a tie with
-		 * a sort that is not stable, so a tie could fall either way there and a
-		 * transcription cannot promise to match it. In practice there is never
-		 * one, and the parity test insists on that rather than assuming it.
+		 * How many options shared the best score. Ties are settled by Godot's own
+		 * sort (SimSort.h), so this is only reported, not relied on.
 		 */
 		int Ties = 0;
 	};

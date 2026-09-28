@@ -25,6 +25,10 @@ namespace TMSim
 		Move,
 		UseAbility,
 		EndTurn,
+		/** While planning: put a unit down somewhere in its side's spawn area. */
+		Place,
+		/** While planning: a side is done placing. Carries the side, not a unit. */
+		Ready,
 	};
 
 	struct FOrder
@@ -50,6 +54,9 @@ namespace TMSim
 		FVec2 Target;
 		/** The unit a cast follows, or -1 for a spot on the ground. */
 		int Follow = -1;
+
+		/** The side a Ready speaks for. */
+		int Team = -1;
 
 		/** Advance: how many ticks. */
 		int Ticks = 0;
@@ -84,6 +91,24 @@ namespace TMSim
 			Order.Type = EOrderType::EndTurn;
 			Order.UnitId = InUnitId;
 			Order.Serial = InSerial;
+			return Order;
+		}
+
+		static FOrder MakePlace(int InUnitId, int InSerial, const FVec2& InTo)
+		{
+			FOrder Order;
+			Order.Type = EOrderType::Place;
+			Order.UnitId = InUnitId;
+			Order.Serial = InSerial;
+			Order.To = InTo;
+			return Order;
+		}
+
+		static FOrder MakeReady(int InTeam)
+		{
+			FOrder Order;
+			Order.Type = EOrderType::Ready;
+			Order.Team = InTeam;
 			return Order;
 		}
 

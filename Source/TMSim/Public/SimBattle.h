@@ -323,6 +323,16 @@ namespace TMSim
 		static constexpr int Draw = 2;
 		/** While the sides are still placing units, nothing else happens. */
 		int PlanningTicks = 0;
+		/** Which sides have said they are done placing (game_state.gd:201). */
+		bool PlanningDone[2] = { false, false };
+		/** How far from its spawn point a side may place a unit, in metres. */
+		static constexpr double PlanningRadius = 6.0;
+
+		bool IsPlanning() const { return PlanningTicks > 0; }
+		/** Whether this unit may be put down here while planning (game_state.gd:1484-1496). */
+		TMSIM_API bool CanPlace(const FUnit& Unit, const FVec2& Point) const;
+		/** Every node it may be put down on, on the one-metre lattice (game_state.gd:1499-1512). */
+		TMSIM_API std::vector<FNode> PlaceableNodes(const FUnit& Unit) const;
 		/**
 		 * Ticks each side has stood alone in the middle. Kept when a side is
 		 * pushed off: holding the middle is won by adding up, not in one go.

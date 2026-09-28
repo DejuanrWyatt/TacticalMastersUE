@@ -25,6 +25,57 @@ namespace TMSim
 		float Lerp(float A, float B, float T) { return A + (B - A) * T; }
 	}
 
+	bool FBattle::CanPlace(const FUnit& Unit, const FVec2& Point) const
+	{
+		if (!IsPlanning() || !(Point == FMap::Snap(Point)) || !InBounds(Point))
+		{
+			return false;
+		}
+		// Godot measures in float and compares against the radius as a double.
+		if (static_cast<double>(Point.DistanceTo(SpawnPoints[Unit.Team])) > PlanningRadius)
+		{
+			return false;
+		}
+		if (!Map.NodeWalkable(FMap::NodeOf(Point)))
+		{
+			return false;
+		}
+		for (const FUnit& Other : Units)
+		{
+			if (&Other != &Unit && Other.IsAlive() && Other.Pos.DistanceTo(Point) < Ground::UnitSpacing)
+			{
+				return false;
+			}
+		}
+		return true;
+	}
+
+	std::vector<FNode> FBattle::PlaceableNodes(const FUnit& Unit) const
+	{
+		std::vector<FNode> Out;
+		if (!IsPlanning())
+		{
+			return Out;
+		}
+		const int Reach = static_cast<int>(std::ceil(PlanningRadius / Ground::NavStep));
+		const FNode Middle = FMap::NodeOf(SpawnPoints[Unit.Team]);
+		for (int Dy = -Reach; Dy <= Reach; ++Dy)
+		{
+			for (int Dx = -Reach; Dx <= Reach; ++Dx)
+			{
+				FNode Node;
+				Node.X = Middle.X + Dx;
+				Node.Y = Middle.Y + Dy;
+				// GDScript's % keeps the sign, as C++'s does.
+				if (Node.X % 2 == 0 && Node.Y % 2 == 0 && CanPlace(Unit, FMap::NodePos(Node)))
+				{
+					Out.push_back(Node);
+				}
+			}
+		}
+		return Out;
+	}
+
 	bool FBattle::InBounds(const FVec2& Point) const
 	{
 		const FVec2 Size = Map.SizeMeters();
@@ -208,6 +259,8 @@ namespace TMSim
 		Mix(static_cast<uint64_t>(TickCount));
 		Mix(static_cast<uint64_t>(Winner + 1));
 		Mix(static_cast<uint64_t>(PlanningTicks));
+		Mix(static_cast<uint64_t>(PlanningDone[0] ? 1 : 0));
+		Mix(static_cast<uint64_t>(PlanningDone[1] ? 1 : 0));
 		Mix(static_cast<uint64_t>(CaptureTicks[0]));
 		Mix(static_cast<uint64_t>(CaptureTicks[1]));
 		// The dice themselves. Two machines that have drawn a different number of
@@ -340,10 +393,36 @@ namespace TMSim
 			return std::string();
 		}
 
+		// Done placing: a side, not a unit, and only while there is placing to be
+		// done (game_state.gd:1049-1053).
+		if (Order.Type == EOrderType::Ready)
+		{
+			if (Order.Team != 0 && Order.Team != 1)
+			{
+				return "Bad team.";
+			}
+			return IsPlanning() ? std::string() : "The battle has already started.";
+		}
+
 		FUnit* Unit = FindUnit(Order.UnitId);
 		if (!Unit || !Unit->IsAlive())
 		{
 			return "No such unit.";
+		}
+		// Placing happens before the battle, while nobody is ready yet, so it is
+		// checked before the turn an order was written for: there are no turns
+		// yet (game_state.gd:1058-1065).
+		if (Order.Type == EOrderType::Place)
+		{
+			if (!IsPlanning())
+			{
+				return "Units can only be placed before the battle starts.";
+			}
+			return CanPlace(*Unit, Order.To) ? std::string() : "That isn't in your spawn area.";
+		}
+		if (IsPlanning())
+		{
+			return "The sides are still placing their units.";
 		}
 		// The turn it was written for. An order held up on the network, or one
 		// replayed out of order, must not land on a later turn.
@@ -483,6 +562,29 @@ namespace TMSim
 				return true;
 			}
 			return false;
+
+		case EOrderType::Place:
+			if (FUnit* Unit = FindUnit(Order.UnitId))
+			{
+				// Put down facing the middle, as every unit opens the battle
+				// (game_state.gd:1177-1180).
+				Unit->Pos = Order.To;
+				const FVec2 Size = Map.SizeMeters();
+				Unit->Facing = (FVec2(Size.X * 0.5f, Size.Y * 0.5f) - Unit->Pos).Normalized();
+				Report.Say(EEventKind::Moved, Unit->Id);
+				return true;
+			}
+			return false;
+
+		case EOrderType::Ready:
+			// Both sides done: the fighting starts before the time is up
+			// (game_state.gd:1171-1175).
+			PlanningDone[Order.Team] = true;
+			if (PlanningDone[0] && PlanningDone[1])
+			{
+				PlanningTicks = 0;
+			}
+			return true;
 
 		default:
 			return false;
