@@ -9,6 +9,7 @@
 
 #include <cstdint>
 #include <string>
+#include <vector>
 
 // Unreal builds each module as its own library, so anything used from another
 // module has to be exported. UBT defines TMSIM_API when it compiles this; the
@@ -210,6 +211,25 @@ namespace TMSim
 		 */
 		double PlanningSeconds = 0.0;
 	};
+
+	/**
+	 * One of the rule numbers Developer Tools can change: its name in Godot,
+	 * what it is called and what it does, its range and step, and the field
+	 * it sets (game_state.gd:136-176, TUNING -- the text is Godot's own).
+	 */
+	struct FTuningKey
+	{
+		const char* Key;
+		const char* Label;
+		const char* Desc;
+		double Low;
+		double High;
+		double Step;
+		double FTuning::* Member;
+	};
+
+	/** Every rule number that can be tuned, in Godot's order. */
+	TMSIM_API const std::vector<FTuningKey>& TuningKeys();
 
 	namespace Combat
 	{

@@ -112,6 +112,46 @@ public:
 	/** Done placing: tells the rules this side is ready to fight. */
 	void ReadyToFight();
 
+	// ---------------------------------------------------------- the camera
+	// camera_rig.gd: it sits on a point of the board and looks at it from a
+	// distance, turned and tilted. Keys pan, turn and raise it; the right button
+	// drags it round, the middle one drags it along, the wheel brings it closer.
+	FVector CamTarget = FVector::ZeroVector;
+	FVector CamWantTarget = FVector::ZeroVector;
+	float CamYaw = 45.0f;
+	float CamPitch = -32.0f;
+	float CamDistance = 3000.0f;
+	float CamWantDistance = 3000.0f;
+	FVector2D LastCursor = FVector2D(-1.0, -1.0);
+	bool bRightHeld = false;
+	bool bMiddleHeld = false;
+	/** How far the right button has dragged since it went down: a short click cancels an aim. */
+	float RightDragged = 0.0f;
+	void UpdateCamera(float DeltaSeconds);
+	void ApplyCamera();
+	/** Brings the camera round to the selected unit, or the first of this side's that is ready. */
+	void CenterCamera();
+	void OnKeyUp(FKey Key);
+
+	// ---------------------------------------------- options and dev tools
+	bool bOptionsOpen = false;
+	bool bDevToolsOpen = false;
+	/** The action waiting for its new key, or -1. */
+	int32 CaptureAction = -1;
+	/** The slider being dragged, or -1. 0 is the camera speed; 100 + i is rule number i. */
+	int32 DragSlider = -1;
+	static constexpr int32 SliderCameraSpeed = 0;
+	static constexpr int32 SliderTuning = 100;
+	/** Rule numbers changed during a battle, sent as one order once the dragging stops. */
+	TMap<int32, double> TunePending;
+	float TunePendingFor = -1.0f;
+	bool SliderRange(int32 Id, double& Low, double& High, double& Step) const;
+	double SliderValue(int32 Id) const;
+	void SetSlider(int32 Id, double Value);
+	void FlushTuning();
+	/** Whether a rule number is set on the battle setup screen rather than in Developer Tools. */
+	static bool OnSetupScreen(int32 TuningIndex);
+
 	/** Clears the visible units and forgets the battle. */
 	UFUNCTION(BlueprintCallable, CallInEditor, Category = "Tactical Masters")
 	void ClearBattle();

@@ -19,6 +19,7 @@
 #include "TMBattleHud.h"
 #include "TMVfxStudio.h"
 #include "TMRobotPlayer.h"
+#include "TMSettings.h"
 #include "NiagaraFunctionLibrary.h"
 #include "NiagaraSystem.h"
 #include "Particles/ParticleSystem.h"
@@ -291,6 +292,17 @@ void ATMBattleDirector::BuildBattle()
 		Battle.Units.push_back(Unit);
 	}
 
+	// The rule numbers chosen in Developer Tools, then the setup screen's own
+	// three on top (dev_tools.gd:8: "saved and used by the next battle").
+	Battle.Tuning = TMSim::FTuning();
+	for (const TMSim::FTuningKey& Key : TMSim::TuningKeys())
+	{
+		if (const double* Saved = FTMSettings::Get().Tuning.Find(UTF8_TO_TCHAR(Key.Key)))
+		{
+			Battle.Tuning.*Key.Member = FMath::Clamp(*Saved, Key.Low, Key.High);
+		}
+	}
+
 	// How the battle can be won is a rule like any other, so it goes to the rules
 	// with the battle rather than being watched for here.
 	Battle.Tuning.CaptureSeconds = Setup.CaptureSeconds;
@@ -497,7 +509,8 @@ void ATMBattleDirector::RefreshPlates()
 		Plate->SetText(FText::FromString(Line));
 		// Blue and red, which is the only thing telling the sides apart until the
 		// classes have their own materials.
-		Plate->SetTextRenderColor(Unit.Team == 0 ? FColor(120, 180, 255) : FColor(255, 130, 120));
+		Plate->SetTextRenderColor(Unit.Team == 0 ? FColor(120, 180, 255)
+			: (FTMSettings::Get().bColorblind ? FColor(255, 185, 80) : FColor(255, 130, 120)));
 		// Fog of war: what this side cannot see, this screen does not show.
 		Plate->SetVisibility(IsSeen(Unit));
 		Plate->SetRelativeLocation(WorldFor(Unit) + FVector(0.0f, 0.0f, 150.0f));
@@ -903,6 +916,11 @@ void ATMBattleDirector::FrameTheBoard()
 	FActorSpawnParameters How;
 	How.ObjectFlags |= RF_Transient;  // a view, not part of the level
 	Watcher = World->SpawnActor<ACameraActor>(Where, FRotator(CameraPitch, 45.0f, 0.0f), How);
+	// Where the free camera starts: looking at the middle from where this puts it.
+	CamTarget = CamWantTarget = Middle;
+	CamYaw = 45.0f;
+	CamPitch = CameraPitch;
+	CamDistance = CamWantDistance = static_cast<float>((Where - Middle).Size());
 	if (!Watcher)
 	{
 		return;
@@ -1269,6 +1287,15 @@ void ATMBattleDirector::Tick(float DeltaSeconds)
 	if (GetWorld() && GetWorld()->IsGameWorld())
 	{
 		AdvanceMotion(DeltaSeconds);
+		UpdateCamera(DeltaSeconds);
+		if (TunePendingFor >= 0.0f && DragSlider < 0)
+		{
+			TunePendingFor -= DeltaSeconds;
+			if (TunePendingFor < 0.0f)
+			{
+				FlushTuning();
+			}
+		}
 	}
 	MaybeCapture();
 
@@ -1324,8 +1351,26 @@ void ATMBattleDirector::Tick(float DeltaSeconds)
 			else if (Before < 4.5f && MenuShotsAt >= 4.5f)
 			{
 				PickerSlot = -1;
+				bOptionsOpen = true;
 			}
-			else if (MenuShotsAt >= 5.0f)
+			else if (Before < 5.0f && MenuShotsAt >= 5.0f)
+			{
+				Shoot(TEXT("menu_options.png"));
+			}
+			else if (Before < 5.5f && MenuShotsAt >= 5.5f)
+			{
+				bOptionsOpen = false;
+				bDevToolsOpen = true;
+			}
+			else if (Before < 6.0f && MenuShotsAt >= 6.0f)
+			{
+				Shoot(TEXT("menu_devtools.png"));
+			}
+			else if (Before < 6.5f && MenuShotsAt >= 6.5f)
+			{
+				bDevToolsOpen = false;
+			}
+			else if (MenuShotsAt >= 7.0f)
 			{
 				MenuShotsAt = -1.0f;
 				StartMatch(false);
@@ -1565,19 +1610,25 @@ void ATMBattleDirector::SetUpPlayerInput()
 	Mode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
 	Player->SetInputMode(Mode);
 
-	// The Godot game's default keys (keybinds.gd:17-30), less the camera and the
-	// windows this port does not have yet. Bound to keys directly rather than
-	// through input assets, which would be editor work.
-	const FKey Keys[] =
+	// Every key a keyboard has, bound to keys directly rather than through input
+	// assets (which would be editor work), so any of them can be given to an
+	// action in Options. What a key does is looked up in FTMSettings each time.
+	TArray<FKey> Every;
+	EKeys::GetAllKeys(Every);
+	for (const FKey& Key : Every)
 	{
-		EKeys::LeftMouseButton, EKeys::RightMouseButton,
-		EKeys::One, EKeys::Two, EKeys::Three, EKeys::Four,
-		EKeys::SpaceBar, EKeys::LeftShift, EKeys::Enter, EKeys::Tab, EKeys::Escape,
-		EKeys::P, EKeys::R, EKeys::L, EKeys::U, EKeys::MouseScrollUp, EKeys::MouseScrollDown
-	};
-	for (const FKey& Key : Keys)
-	{
+		if (!Key.IsValid() || Key == EKeys::AnyKey || Key.IsGamepadKey() || Key.IsTouch() || Key.IsAxis1D()
+			|| Key.IsAxis2D() || Key.IsAxis3D() || (Key.IsMouseButton() && Key != EKeys::LeftMouseButton
+				&& Key != EKeys::RightMouseButton && Key != EKeys::MiddleMouseButton
+				&& Key != EKeys::MouseScrollUp && Key != EKeys::MouseScrollDown))
+		{
+			continue;
+		}
 		InputComponent->BindKey(Key, IE_Pressed, this, &ATMBattleDirector::OnKey);
+	}
+	for (const FKey& Button : { EKeys::LeftMouseButton, EKeys::RightMouseButton, EKeys::MiddleMouseButton })
+	{
+		InputComponent->BindKey(Button, IE_Released, this, &ATMBattleDirector::OnKeyUp);
 	}
 	bPlayerInput = true;
 	UE_LOG(LogTemp, Log, TEXT("taking orders from the mouse and keyboard"));
@@ -1585,48 +1636,108 @@ void ATMBattleDirector::SetUpPlayerInput()
 
 void ATMBattleDirector::OnKey(FKey Key)
 {
-	// battle.gd:699-739, _unhandled_input.
+	// battle.gd:699-739, _unhandled_input, with every key read through the
+	// player's bindings (FTMSettings) rather than fixed.
+	const FTMSettings& Keys = FTMSettings::Get();
+	auto Is = [&Keys, &Key](ETMAction Action) { return Keys.Is(Key, Action); };
 	const TMSim::FUnit* Sel = SelectedUnit();
+
+	// Options is waiting for a new key: this one is it, unless it is Esc.
+	if (CaptureAction >= 0)
+	{
+		if (Key == EKeys::Escape)
+		{
+			CaptureAction = -1;
+		}
+		else if (!Key.IsMouseButton())
+		{
+			FTMSettings::Get().Rebind(static_cast<ETMAction>(CaptureAction), Key);
+			CaptureAction = -1;
+		}
+		return;
+	}
 	if (Key == EKeys::LeftMouseButton)
 	{
 		OnClick();
 		return;
 	}
-	// The Unit Guide covers the screen: only U or Esc closes it.
+	if (Key == EKeys::RightMouseButton)
+	{
+		bRightHeld = true;
+		RightDragged = 0.0f;
+		return;
+	}
+	if (Key == EKeys::MiddleMouseButton)
+	{
+		bMiddleHeld = true;
+		return;
+	}
+	// Options and Developer Tools cover the screen: Esc closes them.
+	if (bOptionsOpen || bDevToolsOpen)
+	{
+		if (Key == EKeys::Escape || Is(ETMAction::Cancel))
+		{
+			bOptionsOpen = false;
+			bDevToolsOpen = false;
+			FlushTuning();
+			FTMSettings::Get().Save();
+		}
+		return;
+	}
+	// The wheel scrolls the log when the pointer is over it, and brings the
+	// camera closer or further anywhere else (camera_rig.gd:88-93).
+	if (Key == EKeys::MouseScrollUp || Key == EKeys::MouseScrollDown)
+	{
+		float X = 0.0f;
+		float Y = 0.0f;
+		const APlayerController* Player = GetWorld() ? GetWorld()->GetFirstPlayerController() : nullptr;
+		const ATMBattleHud* Hud = Player ? Cast<ATMBattleHud>(Player->GetHUD()) : nullptr;
+		if (Screen == EScreen::Battle && Hud && CursorPosition(X, Y) && Hud->LogArea.bIsValid && Hud->LogArea.IsInside(FVector2D(X, Y)))
+		{
+			// The newest line is never more than a few turns of the wheel away.
+			LogScroll = FMath::Clamp(LogScroll + (Key == EKeys::MouseScrollUp ? 1 : -1), 0, FMath::Max(0, Log.Num() - 1));
+		}
+		else if (!bGuideOpen && PickerSlot < 0)
+		{
+			CamWantDistance = FMath::Clamp(CamWantDistance * (Key == EKeys::MouseScrollUp ? 0.9f : 1.1f), 400.0f, 8000.0f);
+		}
+		return;
+	}
+	// The Unit Guide covers the screen: only its key or Cancel closes it.
 	if (bGuideOpen)
 	{
-		if (Key == EKeys::U || Key == EKeys::Escape)
+		if (Is(ETMAction::UnitGuide) || Is(ETMAction::Cancel))
 		{
 			ToggleGuide();
 		}
 		return;
 	}
-	// Away from a battle only the mouse and Esc mean anything: Esc steps back
-	// from the setup to the title.
+	// Away from a battle only the mouse and Cancel mean anything: Cancel steps
+	// back from the setup to the title.
 	if (Screen != EScreen::Battle)
 	{
-		if (Key == EKeys::Escape && PickerSlot >= 0)
+		if (Is(ETMAction::Cancel) && PickerSlot >= 0)
 		{
 			PickerSlot = -1;
 		}
-		else if (Key == EKeys::Escape && Screen == EScreen::Setup)
+		else if (Is(ETMAction::Cancel) && Screen == EScreen::Setup)
 		{
 			OpenTitle();
 		}
-		else if (Key == EKeys::U)
+		else if (Is(ETMAction::UnitGuide))
 		{
 			ToggleGuide();
 		}
 		return;
 	}
-	if (Key == EKeys::Enter && Battle.IsPlanning())
+	if (Is(ETMAction::EndTurn) && Battle.IsPlanning())
 	{
 		ReadyToFight();
 		return;
 	}
-	if (Key == EKeys::Escape)
+	if (Is(ETMAction::Cancel))
 	{
-		// Esc cancels an aim first; with nothing to cancel it opens the menu
+		// Cancel drops an aim first; with nothing to drop it opens the menu
 		// (battle.gd:1039-1051 pauses the game while a menu is open).
 		if (bMenuOpen)
 		{
@@ -1646,15 +1757,11 @@ void ATMBattleDirector::OnKey(FKey Key)
 	{
 		return;
 	}
-	if (Key == EKeys::RightMouseButton)
-	{
-		CancelAim();
-	}
-	else if (Key == EKeys::One) { SelectAbility(0); }
-	else if (Key == EKeys::Two) { SelectAbility(1); }
-	else if (Key == EKeys::Three) { SelectAbility(2); }
-	else if (Key == EKeys::Four) { SelectAbility(3); }
-	else if (Key == EKeys::SpaceBar)
+	if (Is(ETMAction::Ability1)) { SelectAbility(0); }
+	else if (Is(ETMAction::Ability2)) { SelectAbility(1); }
+	else if (Is(ETMAction::Ability3)) { SelectAbility(2); }
+	else if (Is(ETMAction::Ability4)) { SelectAbility(3); }
+	else if (Is(ETMAction::Move))
 	{
 		// battle.gd:966-972, _toggle_move.
 		if (!PlayerCanOrder(Sel))
@@ -1670,7 +1777,7 @@ void ATMBattleDirector::OnKey(FKey Key)
 			EnterMoveMode(false);
 		}
 	}
-	else if (Key == EKeys::LeftShift)
+	else if (Is(ETMAction::Sprint))
 	{
 		// battle.gd:977-987, _toggle_sprint: further than a walk, but it is the
 		// unit's action for the turn.
@@ -1690,14 +1797,14 @@ void ATMBattleDirector::OnKey(FKey Key)
 		}
 		EnterMoveMode(true);
 	}
-	else if (Key == EKeys::Enter)
+	else if (Is(ETMAction::EndTurn))
 	{
 		if (PlayerCanOrder(Sel))
 		{
 			OrderSelected(TMSim::FOrder::MakeEndTurn(Sel->Id, Sel->Serial));
 		}
 	}
-	else if (Key == EKeys::L)
+	else if (Is(ETMAction::Log))
 	{
 		// Shown, shown large, hidden.
 		if (!bShowLog)
@@ -1715,21 +1822,19 @@ void ATMBattleDirector::OnKey(FKey Key)
 		}
 		LogScroll = 0;
 	}
-	else if (Key == EKeys::U)
+	else if (Is(ETMAction::UnitGuide))
 	{
 		ToggleGuide();
 	}
-	else if (Key == EKeys::MouseScrollUp || Key == EKeys::MouseScrollDown)
-	{
-		// The wheel scrolls the log back through the fight; the newest line is
-		// never more than a few turns of the wheel away.
-		LogScroll = FMath::Clamp(LogScroll + (Key == EKeys::MouseScrollUp ? 1 : -1), 0, FMath::Max(0, Log.Num() - 1));
-	}
-	else if (Key == EKeys::Tab)
+	else if (Is(ETMAction::NextUnit))
 	{
 		CycleReady();
 	}
-	else if (Key == EKeys::P)
+	else if (Is(ETMAction::CenterCamera))
+	{
+		CenterCamera();
+	}
+	else if (Is(ETMAction::Pause))
 	{
 		if (Battle.Winner == -1)
 		{
@@ -1737,13 +1842,33 @@ void ATMBattleDirector::OnKey(FKey Key)
 			Tell(bPaused ? TEXT("Paused.") : TEXT("Resumed."));
 		}
 	}
-	else if (Key == EKeys::R)
+	else if (Key == EKeys::R && Battle.Winner != -1)
 	{
-		// Only once a battle is decided, so a stray key cannot throw one away.
-		if (Battle.Winner != -1)
+		// Rematch, only once a battle is decided, so a stray key cannot throw
+		// one away; while it is being fought R raises the camera.
+		StartMatch(true);
+	}
+}
+
+void ATMBattleDirector::OnKeyUp(FKey Key)
+{
+	if (Key == EKeys::RightMouseButton)
+	{
+		bRightHeld = false;
+		// A click rather than a drag: it drops an aim, as it always has.
+		if (RightDragged < 6.0f && Screen == EScreen::Battle && !bMenuOpen && !bGuideOpen && !bOptionsOpen && !bDevToolsOpen)
 		{
-			StartMatch(true);
+			CancelAim();
 		}
+	}
+	else if (Key == EKeys::MiddleMouseButton)
+	{
+		bMiddleHeld = false;
+	}
+	else if (Key == EKeys::LeftMouseButton && DragSlider >= 0)
+	{
+		DragSlider = -1;
+		FTMSettings::Get().Save();
 	}
 }
 
@@ -2600,6 +2725,80 @@ void ATMBattleDirector::PressMenuButton(const FTMHudButton& Button)
 	case ETMHudAction::PlanningReady:
 		ReadyToFight();
 		break;
+	case ETMHudAction::OpenOptions:
+		bOptionsOpen = true;
+		bDevToolsOpen = false;
+		break;
+	case ETMHudAction::OpenDevTools:
+		bDevToolsOpen = true;
+		bOptionsOpen = false;
+		break;
+	case ETMHudAction::CloseOverlay:
+		bOptionsOpen = false;
+		bDevToolsOpen = false;
+		CaptureAction = -1;
+		FlushTuning();
+		FTMSettings::Get().Save();
+		break;
+	case ETMHudAction::Slider:
+		DragSlider = Button.Value;
+		break;
+	case ETMHudAction::OptionUiScale:
+	{
+		// options_menu.gd:64, the four sizes.
+		const float Sizes[4] = { 0.9f, 1.0f, 1.15f, 1.3f };
+		int32 At = 1;
+		for (int32 i = 0; i < 4; ++i)
+		{
+			if (FMath::IsNearlyEqual(FTMSettings::Get().UiScale, Sizes[i]))
+			{
+				At = i;
+			}
+		}
+		FTMSettings::Get().UiScale = Sizes[(At + 1) % 4];
+		FTMSettings::Get().Save();
+		break;
+	}
+	case ETMHudAction::OptionFullscreen:
+		FTMSettings::Get().bFullscreen = !FTMSettings::Get().bFullscreen;
+		FTMSettings::Get().Save();
+		FTMSettings::Get().Apply();
+		break;
+	case ETMHudAction::OptionColorblind:
+		FTMSettings::Get().bColorblind = !FTMSettings::Get().bColorblind;
+		FTMSettings::Get().Save();
+		RefreshPlates();
+		break;
+	case ETMHudAction::RebindAction:
+		CaptureAction = Button.Value;
+		break;
+	case ETMHudAction::ResetOptions:
+		FTMSettings::Get().ResetOptions();
+		RefreshPlates();
+		break;
+	case ETMHudAction::DevReset:
+	{
+		const TMSim::FTuning Defaults;
+		const TMSim::FTuningKey& Key = TMSim::TuningKeys()[static_cast<size_t>(Button.Value)];
+		SetSlider(SliderTuning + Button.Value, Defaults.*Key.Member);
+		FTMSettings::Get().Tuning.Remove(UTF8_TO_TCHAR(Key.Key));
+		FTMSettings::Get().Save();
+		break;
+	}
+	case ETMHudAction::DevResetAll:
+	{
+		const TMSim::FTuning Defaults;
+		for (int32 i = 0; i < static_cast<int32>(TMSim::TuningKeys().size()); ++i)
+		{
+			if (!OnSetupScreen(i))
+			{
+				SetSlider(SliderTuning + i, Defaults.*TMSim::TuningKeys()[static_cast<size_t>(i)].Member);
+				FTMSettings::Get().Tuning.Remove(UTF8_TO_TCHAR(TMSim::TuningKeys()[static_cast<size_t>(i)].Key));
+			}
+		}
+		FTMSettings::Get().Save();
+		break;
+	}
 	case ETMHudAction::SetupStart:
 		StartMatch(true);
 		break;
@@ -2768,6 +2967,217 @@ bool ATMBattleDirector::CursorPosition(float& X, float& Y) const
 	const UWorld* World = GetWorld();
 	const APlayerController* Player = World ? World->GetFirstPlayerController() : nullptr;
 	return Player && Player->GetMousePosition(X, Y);
+}
+
+void ATMBattleDirector::UpdateCamera(float DeltaSeconds)
+{
+	const UWorld* World = GetWorld();
+	APlayerController* Player = World ? World->GetFirstPlayerController() : nullptr;
+	if (!Watcher || !Player)
+	{
+		return;
+	}
+	const FTMSettings& Settings = FTMSettings::Get();
+	float X = 0.0f;
+	float Y = 0.0f;
+	const bool bHaveCursor = CursorPosition(X, Y);
+	const FVector2D Cursor(X, Y);
+	const FVector2D Moved = bHaveCursor && LastCursor.X >= 0.0 ? Cursor - LastCursor : FVector2D::ZeroVector;
+	LastCursor = bHaveCursor ? Cursor : FVector2D(-1.0, -1.0);
+
+	// A slider being dragged in Options or Developer Tools follows the pointer.
+	if (DragSlider >= 0)
+	{
+		const ATMBattleHud* Hud = Cast<ATMBattleHud>(Player->GetHUD());
+		const FBox2D* Area = Hud ? Hud->SliderAreas.Find(DragSlider) : nullptr;
+		double Low = 0.0;
+		double High = 1.0;
+		double Step = 0.0;
+		if (Area && bHaveCursor && SliderRange(DragSlider, Low, High, Step))
+		{
+			const double Along = FMath::Clamp((Cursor.X - Area->Min.X) / FMath::Max(1.0, Area->GetSize().X), 0.0, 1.0);
+			double Value = Low + Along * (High - Low);
+			if (Step > 0.0)
+			{
+				Value = Low + FMath::RoundToDouble((Value - Low) / Step) * Step;
+			}
+			SetSlider(DragSlider, FMath::Clamp(Value, Low, High));
+		}
+		return;
+	}
+
+	// Nothing moves the camera behind a menu, or while a key is being chosen.
+	const bool bFree = bPlayerInput && !bMenuOpen && !bGuideOpen && !bOptionsOpen && !bDevToolsOpen
+		&& CaptureAction < 0 && PickerSlot < 0 && Screen == EScreen::Battle;
+	if (bFree)
+	{
+		auto Held = [&Settings, Player](ETMAction Action)
+		{
+			for (const FKey& Key : Settings.Keys(Action))
+			{
+				if (Player->IsInputKeyDown(Key))
+				{
+					return true;
+				}
+			}
+			return false;
+		};
+		const FVector Forward = FRotator(0.0f, CamYaw, 0.0f).Vector();
+		const FVector Right = FRotator(0.0f, CamYaw + 90.0f, 0.0f).Vector();
+		FVector Pan = FVector::ZeroVector;
+		if (Held(ETMAction::CamForward)) { Pan += Forward; }
+		if (Held(ETMAction::CamBack)) { Pan -= Forward; }
+		if (Held(ETMAction::CamRight)) { Pan += Right; }
+		if (Held(ETMAction::CamLeft)) { Pan -= Right; }
+		// 8 m/s at the usual distance, faster when far out (camera_rig.gd:57-70).
+		CamWantTarget += Pan.GetSafeNormal() * 800.0f * Settings.CameraSpeed * DeltaSeconds * (CamDistance / 2200.0f);
+		if (Held(ETMAction::CamUp)) { CamWantTarget.Z += 400.0f * DeltaSeconds; }
+		if (Held(ETMAction::CamDown)) { CamWantTarget.Z -= 400.0f * DeltaSeconds; }
+		const float Turn = 103.0f * Settings.CameraSpeed * DeltaSeconds;
+		if (Held(ETMAction::CamRotateLeft)) { CamYaw -= Turn; }
+		if (Held(ETMAction::CamRotateRight)) { CamYaw += Turn; }
+		// Right-drag turns and tilts; middle-drag slides (camera_rig.gd:94-101).
+		if (bRightHeld)
+		{
+			RightDragged += static_cast<float>(Moved.Size());
+			CamYaw += static_cast<float>(Moved.X) * 0.344f;
+			CamPitch = FMath::Clamp(CamPitch - static_cast<float>(Moved.Y) * 0.344f, -85.0f, -10.0f);
+		}
+		if (bMiddleHeld)
+		{
+			const float K = CamDistance * 0.0015f;
+			CamWantTarget += (-Right * static_cast<float>(Moved.X) + Forward * static_cast<float>(Moved.Y)) * K;
+		}
+		// Not so far off the board that it is lost.
+		const TMSim::FVec2 Size = Battle.Map.SizeMeters();
+		CamWantTarget.X = FMath::Clamp(CamWantTarget.X, -400.0, Size.X * TileSize + 400.0);
+		CamWantTarget.Y = FMath::Clamp(CamWantTarget.Y, -400.0, Size.Y * TileSize + 400.0);
+		CamWantTarget.Z = FMath::Clamp(CamWantTarget.Z, -200.0, 1500.0);
+	}
+	CamDistance = FMath::Lerp(CamDistance, CamWantDistance, FMath::Min(1.0f, DeltaSeconds * 10.0f));
+	CamTarget = FMath::Lerp(CamTarget, CamWantTarget, FMath::Min(1.0f, DeltaSeconds * 8.0f));
+	ApplyCamera();
+}
+
+void ATMBattleDirector::ApplyCamera()
+{
+	if (!Watcher)
+	{
+		return;
+	}
+	const FRotator Looking(CamPitch, CamYaw, 0.0f);
+	Watcher->SetActorLocationAndRotation(CamTarget - Looking.Vector() * CamDistance, Looking);
+}
+
+void ATMBattleDirector::CenterCamera()
+{
+	const TMSim::FUnit* On = SelectedUnit();
+	if (!On)
+	{
+		for (const TMSim::FUnit& Unit : Battle.Units)
+		{
+			if (Unit.IsAlive() && Unit.bReady && !ComputerPlays(Unit.Team))
+			{
+				On = &Unit;
+				break;
+			}
+		}
+	}
+	if (On)
+	{
+		CamWantTarget = GetActorTransform().TransformPosition(ShownAt(*On));
+	}
+}
+
+bool ATMBattleDirector::OnSetupScreen(int32 TuningIndex)
+{
+	const std::string Key = TMSim::TuningKeys()[static_cast<size_t>(TuningIndex)].Key;
+	return Key == "capture_seconds" || Key == "battle_seconds" || Key == "planning_seconds";
+}
+
+bool ATMBattleDirector::SliderRange(int32 Id, double& Low, double& High, double& Step) const
+{
+	if (Id == SliderCameraSpeed)
+	{
+		Low = 0.5;
+		High = 2.0;
+		Step = 0.05;
+		return true;
+	}
+	const int32 Index = Id - SliderTuning;
+	if (Index >= 0 && Index < static_cast<int32>(TMSim::TuningKeys().size()))
+	{
+		const TMSim::FTuningKey& Key = TMSim::TuningKeys()[static_cast<size_t>(Index)];
+		Low = Key.Low;
+		High = Key.High;
+		Step = Key.Step;
+		return true;
+	}
+	return false;
+}
+
+double ATMBattleDirector::SliderValue(int32 Id) const
+{
+	if (Id == SliderCameraSpeed)
+	{
+		return FTMSettings::Get().CameraSpeed;
+	}
+	const int32 Index = Id - SliderTuning;
+	if (Index < 0 || Index >= static_cast<int32>(TMSim::TuningKeys().size()))
+	{
+		return 0.0;
+	}
+	const TMSim::FTuningKey& Key = TMSim::TuningKeys()[static_cast<size_t>(Index)];
+	if (const double* Saved = FTMSettings::Get().Tuning.Find(UTF8_TO_TCHAR(Key.Key)))
+	{
+		return *Saved;
+	}
+	const TMSim::FTuning Defaults;
+	return Defaults.*Key.Member;
+}
+
+void ATMBattleDirector::SetSlider(int32 Id, double Value)
+{
+	FTMSettings& Settings = FTMSettings::Get();
+	if (Id == SliderCameraSpeed)
+	{
+		Settings.CameraSpeed = static_cast<float>(Value);
+		return;
+	}
+	const int32 Index = Id - SliderTuning;
+	if (Index < 0 || Index >= static_cast<int32>(TMSim::TuningKeys().size()))
+	{
+		return;
+	}
+	const TMSim::FTuningKey& Key = TMSim::TuningKeys()[static_cast<size_t>(Index)];
+	Settings.Tuning.Add(UTF8_TO_TCHAR(Key.Key), Value);
+	// Kept for the next battle; and, in one being fought here, sent to the
+	// rules as an order once the dragging stops (dev_tools.gd:8-10, 106-113).
+	if (Screen == EScreen::Battle && Battle.Winner == -1)
+	{
+		TunePending.Add(Index, Value);
+		TunePendingFor = 0.25f;
+	}
+}
+
+void ATMBattleDirector::FlushTuning()
+{
+	TunePendingFor = -1.0f;
+	if (TunePending.Num() == 0)
+	{
+		return;
+	}
+	std::vector<std::pair<int, double>> Values;
+	for (const TPair<int32, double>& Entry : TunePending)
+	{
+		Values.push_back({ Entry.Key, Entry.Value });
+	}
+	TunePending.Reset();
+	if (Screen == EScreen::Battle && Battle.Winner == -1)
+	{
+		const FString Refused = Submit(TMSim::FOrder::MakeTune(Values));
+		Tell(Refused.IsEmpty() ? FString(TEXT("Developer Tools: rule numbers updated.")) : Refused);
+	}
 }
 
 int32 ATMBattleDirector::PlanningTeam() const

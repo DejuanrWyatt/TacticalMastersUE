@@ -1,0 +1,165 @@
+// Options and Developer Tools, drawn over whatever screen they were opened from.
+//
+// Options (options_menu.gd): camera speed, UI scale, fullscreen, colour-blind
+// team colours, and every key, each rebindable. Developer Tools (dev_tools.gd):
+// a slider for every rule number, with Godot's own words for what it does;
+// kept for the next battle, and in a battle fought here sent to the rules as
+// an order once the dragging stops.
+
+#include "TMBattleHud.h"
+
+#include "Engine/Canvas.h"
+#include "Engine/Engine.h"
+#include "Engine/Font.h"
+
+#include "TMBattleDirector.h"
+#include "TMBattleHudStyle.h"
+#include "TMSettings.h"
+
+#include "SimAbility.h"
+
+using namespace TMHudStyle;
+
+void ATMBattleHud::Slider(float X, float Y, float W, float H, int32 Id, double Value, double Low, double High)
+{
+	const float Along = High > Low ? static_cast<float>(FMath::Clamp((Value - Low) / (High - Low), 0.0, 1.0)) : 0.0f;
+	const float TrackH = FMath::Max(4.0f, H * 0.25f);
+	const float TrackY = Y + (H - TrackH) * 0.5f;
+	DrawRect(FLinearColor(0.0f, 0.0f, 0.0f, 0.55f), X, TrackY, W, TrackH);
+	DrawRect(Gold * FLinearColor(1.0f, 1.0f, 1.0f, 0.8f), X, TrackY, W * Along, TrackH);
+	const float Knob = H * 0.7f;
+	DrawRect(TextColour, X + W * Along - Knob * 0.25f, Y + (H - Knob) * 0.5f, Knob * 0.5f, Knob);
+	// The whole height answers the pointer, not only the thin track.
+	AddButton(X, Y, W, H, ETMHudAction::Slider, Id);
+	SliderAreas.Add(Id, FBox2D(FVector2D(X, Y), FVector2D(X + W, Y + H)));
+}
+
+void ATMBattleHud::DrawOptions(ATMBattleDirector& From)
+{
+	FTMSettings& Settings = FTMSettings::Get();
+	UFont* Font = GEngine->GetMediumFont();
+	UFont* Big = GEngine->GetLargeFont();
+	DrawRect(FLinearColor(0.02f, 0.03f, 0.05f, 0.92f), 0.0f, 0.0f, Canvas->ClipX, Canvas->ClipY);
+	const float PX = 60.0f * S;
+	float Y = 40.0f * S;
+	Text(TEXT("Options"), PX, Y, Gold, Big, 1.0f * S);
+	const float BW = 200.0f * S;
+	MenuButton(Canvas->ClipX - PX - BW, Y, BW, 44.0f * S, TEXT("Close  (Esc)"), ETMHudAction::CloseOverlay, -1, true);
+	MenuButton(Canvas->ClipX - PX - BW * 2.0f - 12.0f * S, Y, BW, 44.0f * S, TEXT("Reset to defaults"), ETMHudAction::ResetOptions);
+	Y += 70.0f * S;
+
+	// Game.
+	Text(TEXT("Game"), PX, Y, Gold, Font, 0.8f * S);
+	Y += 36.0f * S;
+	const float LabelW = 300.0f * S;
+	const float RowH = 40.0f * S;
+	const float ControlW = 320.0f * S;
+	auto Label = [&](const FString& Name, float At, float LX, const FString& Tip)
+	{
+		Text(Name, LX, At + 8.0f * S, TextColour, Font, 0.62f * S);
+		if (!Tip.IsEmpty())
+		{
+			AddTip(LX, At, LabelW, RowH, Tip);
+		}
+	};
+	Label(TEXT("Camera speed"), Y, PX, TEXT("How fast the keys pan and turn the camera."));
+	Slider(PX + LabelW, Y + 6.0f * S, ControlW, RowH - 12.0f * S, ATMBattleDirector::SliderCameraSpeed, Settings.CameraSpeed, 0.5, 2.0);
+	Text(FString::Printf(TEXT("%.2f"), Settings.CameraSpeed), PX + LabelW + ControlW + 16.0f * S, Y + 8.0f * S, TextColour, Font, 0.62f * S);
+	Y += RowH + 8.0f * S;
+	Label(TEXT("UI scale"), Y, PX, TEXT("How big the menus and battle panels are drawn."));
+	MenuButton(PX + LabelW, Y, 160.0f * S, RowH, FString::Printf(TEXT("%.0f%%"), Settings.UiScale * 100.0f), ETMHudAction::OptionUiScale);
+	Y += RowH + 8.0f * S;
+	Label(TEXT("Fullscreen"), Y, PX, FString());
+	MenuButton(PX + LabelW, Y, 160.0f * S, RowH, Settings.bFullscreen ? TEXT("On") : TEXT("Off"), ETMHudAction::OptionFullscreen);
+	Y += RowH + 8.0f * S;
+	Label(TEXT("Colorblind team colors (blue / orange)"), Y, PX, TEXT("Red becomes orange, for red-green colour blindness."));
+	MenuButton(PX + LabelW, Y, 160.0f * S, RowH, Settings.bColorblind ? TEXT("On") : TEXT("Off"), ETMHudAction::OptionColorblind);
+	Y += RowH + 8.0f * S;
+	Text(TEXT("Sound volumes will be here once the game has sound."), PX, Y, Dim, Font, 0.55f * S);
+	Y += 44.0f * S;
+
+	// Controls.
+	Text(TEXT("Controls"), PX, Y, Gold, Font, 0.8f * S);
+	Y += 32.0f * S;
+	Text(TEXT("Click a key, then press the new key (Esc cancels). A key already used by another action is swapped between the two."),
+		PX, Y, Dim, Font, 0.55f * S);
+	Y += 30.0f * S;
+	const int32 Count = static_cast<int32>(ETMAction::Count);
+	const int32 PerColumn = (Count + 1) / 2;
+	const float ColumnW = (Canvas->ClipX - PX * 2.0f) * 0.5f;
+	const float KeyRowH = 34.0f * S;
+	for (int32 i = 0; i < Count; ++i)
+	{
+		const ETMAction Action = static_cast<ETMAction>(i);
+		const float CX = PX + (i / PerColumn) * ColumnW;
+		const float CY = Y + (i % PerColumn) * (KeyRowH + 4.0f * S);
+		Text(FTMSettings::Info(Action).Label, CX, CY + 6.0f * S, TextColour, Font, 0.55f * S);
+		FString Names;
+		for (const FKey& Key : Settings.Keys(Action))
+		{
+			Names += (Names.IsEmpty() ? TEXT("") : TEXT(" / ")) + Key.GetDisplayName(false).ToString();
+		}
+		MenuButton(CX + 280.0f * S, CY, 240.0f * S, KeyRowH, From.CaptureAction == i ? FString(TEXT("Press a key...")) : Names,
+			ETMHudAction::RebindAction, i, From.CaptureAction == i);
+	}
+	Y += PerColumn * (KeyRowH + 4.0f * S) + 12.0f * S;
+	Text(TEXT("Mouse (fixed): left-click select / move / target · right-click cancel · right-drag rotate and tilt camera · middle-drag pan · wheel zoom (or scroll the log)"),
+		PX, Y, Dim, Font, 0.52f * S);
+}
+
+void ATMBattleHud::DrawDevTools(ATMBattleDirector& From)
+{
+	UFont* Font = GEngine->GetMediumFont();
+	UFont* Big = GEngine->GetLargeFont();
+	DrawRect(FLinearColor(0.02f, 0.03f, 0.05f, 0.94f), 0.0f, 0.0f, Canvas->ClipX, Canvas->ClipY);
+	const float PX = 50.0f * S;
+	float Y = 36.0f * S;
+	Text(TEXT("Developer Tools"), PX, Y, Gold, Big, 1.0f * S);
+	const float BW = 200.0f * S;
+	MenuButton(Canvas->ClipX - PX - BW, Y, BW, 44.0f * S, TEXT("Close  (Esc)"), ETMHudAction::CloseOverlay, -1, true);
+	MenuButton(Canvas->ClipX - PX - BW * 2.0f - 12.0f * S, Y, BW, 44.0f * S, TEXT("Reset all"), ETMHudAction::DevResetAll);
+	Y += 60.0f * S;
+	const bool bLive = From.Screen == ATMBattleDirector::EScreen::Battle && From.Battle.Winner == -1;
+	Text(bLive
+			? TEXT("Kept for the next battle, and applied to this one at once: each change goes to the rules as a recorded order, so a replay has it too.")
+			: TEXT("Kept for the next battle. Rest the pointer on a name for what it does. Victory, the time limit and planning time are on the battle setup screen."),
+		PX, Y, Dim, Font, 0.55f * S);
+	Y += 34.0f * S;
+
+	// Every rule number but the three the setup screen owns, in two columns.
+	TArray<int32> Rows;
+	for (int32 i = 0; i < static_cast<int32>(TMSim::TuningKeys().size()); ++i)
+	{
+		if (!ATMBattleDirector::OnSetupScreen(i))
+		{
+			Rows.Add(i);
+		}
+	}
+	const int32 PerColumn = (Rows.Num() + 1) / 2;
+	const float ColumnW = (Canvas->ClipX - PX * 2.0f) * 0.5f;
+	const float RowH = FMath::Min(34.0f * S, (Canvas->ClipY - Y - 60.0f * S) / FMath::Max(1, PerColumn));
+	const TMSim::FTuning Defaults;
+	for (int32 Row = 0; Row < Rows.Num(); ++Row)
+	{
+		const int32 Index = Rows[Row];
+		const TMSim::FTuningKey& Key = TMSim::TuningKeys()[static_cast<size_t>(Index)];
+		const float CX = PX + (Row / PerColumn) * ColumnW;
+		const float CY = Y + (Row % PerColumn) * RowH;
+		const int32 Id = ATMBattleDirector::SliderTuning + Index;
+		const double Value = From.SliderValue(Id);
+		const double Default = Defaults.*Key.Member;
+		const bool bChanged = FMath::Abs(Value - Default) > 1e-9;
+		Text(UTF8_TO_TCHAR(Key.Label), CX, CY + 4.0f * S, bChanged ? Gold : TextColour, Font, 0.52f * S);
+		AddTip(CX, CY, 260.0f * S, RowH, FString::Printf(TEXT("%hs  Default %s."), Key.Desc,
+			*FString::SanitizeFloat(Default)));
+		const float SliderX = CX + 270.0f * S;
+		const float SliderW = ColumnW - 270.0f * S - 170.0f * S;
+		Slider(SliderX, CY + RowH * 0.15f, SliderW, RowH * 0.7f, Id, Value, Key.Low, Key.High);
+		const FString Shown = Key.Step >= 1.0 ? FString::Printf(TEXT("%.0f"), Value) : FString::Printf(TEXT("%.2f"), Value);
+		Text(Shown, SliderX + SliderW + 10.0f * S, CY + 4.0f * S, bChanged ? Gold : TextColour, Font, 0.52f * S);
+		MenuButton(SliderX + SliderW + 80.0f * S, CY + RowH * 0.1f, 70.0f * S, RowH * 0.8f, TEXT("Reset"), ETMHudAction::DevReset, Index);
+	}
+	Y += PerColumn * RowH + 14.0f * S;
+	Text(FString::Printf(TEXT("Classes: %d, made in the class creator (E:\\TacticsClassCreator) and read from Content/Data/Classes when the game starts."),
+		static_cast<int32>(TMSim::AllJobs().size())), PX, Y, Dim, Font, 0.52f * S);
+}

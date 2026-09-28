@@ -383,7 +383,8 @@ int main()
 		Notices("how long red has held the middle", [](FBattle& B) { B.CaptureTicks[1] += 1; });
 		Notices("whether blue is done placing", [](FBattle& B) { B.PlanningDone[0] = !B.PlanningDone[0]; });
 		Notices("whether red is done placing", [](FBattle& B) { B.PlanningDone[1] = !B.PlanningDone[1]; });
-		std::printf("the checksum notices %d kinds of change\n", 36 - Blind);
+		Notices("a rule number", [](FBattle& B) { B.Tuning.SpeedMultiplier += 0.05; });
+		std::printf("the checksum notices %d kinds of change\n", 37 - Blind);
 	}
 
 	// How a battle is won besides by wiping out the other side: the time limit
@@ -457,6 +458,45 @@ int main()
 		if (Failures == Before)
 		{
 			std::printf("a battle is called on time for the healthier side, and won by holding the middle\n");
+		}
+	}
+
+	// Developer Tools change the rule numbers by order: known keys only, and a
+	// value out of range is held to the range rather than refused, as Godot's
+	// clean_tuning does (game_state.gd:255-260).
+	{
+		const int Before = Failures;
+		FBattle Tuned;
+		Deal(Tuned);
+		int Speed = -1;
+		int KoSeconds = -1;
+		for (size_t i = 0; i < TuningKeys().size(); ++i)
+		{
+			if (std::string(TuningKeys()[i].Key) == "speed_multiplier") { Speed = static_cast<int>(i); }
+			if (std::string(TuningKeys()[i].Key) == "ko_seconds") { KoSeconds = static_cast<int>(i); }
+		}
+		if (TuningKeys().size() != 28 || Speed < 0 || KoSeconds < 0)
+		{
+			Fail("the tuning table should have Godot's 28 rule numbers");
+		}
+		const FOrder Tune = FOrder::MakeTune({ { Speed, 1.5 }, { KoSeconds, 999.0 } });
+		if (!Tuned.Validate(Tune).empty())
+		{
+			Fail("a tuning order with known keys should be accepted");
+		}
+		FTickReport Report;
+		Tuned.Apply(Tune, Report);
+		if (Tuned.Tuning.SpeedMultiplier != 1.5 || Tuned.Tuning.KoSeconds != 60.0)
+		{
+			Fail("tuning should set the number, held to its range (ko_seconds tops out at 60)");
+		}
+		if (Tuned.Validate(FOrder::MakeTune({ { 99, 1.0 } })).empty())
+		{
+			Fail("a tuning order with an unknown key should be refused");
+		}
+		if (Failures == Before)
+		{
+			std::printf("rule numbers change by order, held to their range, and unknown ones are refused\n");
 		}
 	}
 

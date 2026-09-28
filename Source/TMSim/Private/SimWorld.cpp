@@ -6,6 +6,7 @@
 #include "SimAbility.h"
 #include "SimBattle.h"
 
+#include <algorithm>
 #include <cmath>
 #include <cstring>
 #include <limits>
@@ -260,6 +261,15 @@ namespace TMSim
 		Mix(static_cast<uint64_t>(Winner + 1));
 		Mix(static_cast<uint64_t>(PlanningTicks));
 		Mix(static_cast<uint64_t>(PlanningDone[0] ? 1 : 0));
+		// The rule numbers, since Developer Tools can change them mid-battle by
+		// order: two machines on different numbers would drift apart unseen.
+		for (const FTuningKey& Key : TuningKeys())
+		{
+			uint64_t Bits = 0;
+			const double Value = Tuning.*Key.Member;
+			std::memcpy(&Bits, &Value, sizeof(Bits));
+			Mix(Bits);
+		}
 		Mix(static_cast<uint64_t>(PlanningDone[1] ? 1 : 0));
 		Mix(static_cast<uint64_t>(CaptureTicks[0]));
 		Mix(static_cast<uint64_t>(CaptureTicks[1]));
@@ -389,6 +399,26 @@ namespace TMSim
 			if (Order.Ticks < 1 || Order.Ticks > Pace::MaxAdvance)
 			{
 				return "Bad time step.";
+			}
+			return std::string();
+		}
+
+		// New rule numbers: known ones, and numbers. Out of range is not refused
+		// but held to the range when applied, as Godot's clean_tuning does
+		// (game_state.gd:255-260, 1043-1045).
+		if (Order.Type == EOrderType::Tune)
+		{
+			if (Winner != -1)
+			{
+				return "The battle is over.";
+			}
+			const int Count = static_cast<int>(TuningKeys().size());
+			for (const std::pair<int, double>& Value : Order.TuneValues)
+			{
+				if (Value.first < 0 || Value.first >= Count || !std::isfinite(Value.second))
+				{
+					return "Bad tuning values.";
+				}
 			}
 			return std::string();
 		}
@@ -575,6 +605,14 @@ namespace TMSim
 				return true;
 			}
 			return false;
+
+		case EOrderType::Tune:
+			for (const std::pair<int, double>& Value : Order.TuneValues)
+			{
+				const FTuningKey& Key = TuningKeys()[static_cast<size_t>(Value.first)];
+				Tuning.*Key.Member = std::min(std::max(Value.second, Key.Low), Key.High);
+			}
+			return true;
 
 		case EOrderType::Ready:
 			// Both sides done: the fighting starts before the time is up

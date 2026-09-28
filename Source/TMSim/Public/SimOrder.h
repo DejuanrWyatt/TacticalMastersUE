@@ -16,6 +16,9 @@
 
 #include "SimTypes.h"
 
+#include <utility>
+#include <vector>
+
 namespace TMSim
 {
 	enum class EOrderType : uint8_t
@@ -29,6 +32,12 @@ namespace TMSim
 		Place,
 		/** While planning: a side is done placing. Carries the side, not a unit. */
 		Ready,
+		/**
+		 * Developer Tools: new rule numbers, by their index in TuningKeys(). An
+		 * order like any other, so a battle whose rules were changed part way
+		 * replays with the change at the same moment (game_state.gd:1043, 1164).
+		 */
+		Tune,
 	};
 
 	struct FOrder
@@ -57,6 +66,9 @@ namespace TMSim
 
 		/** The side a Ready speaks for. */
 		int Team = -1;
+
+		/** For a Tune: which rule numbers, by index in TuningKeys(), and their new values. */
+		std::vector<std::pair<int, double>> TuneValues;
 
 		/** Advance: how many ticks. */
 		int Ticks = 0;
@@ -101,6 +113,14 @@ namespace TMSim
 			Order.UnitId = InUnitId;
 			Order.Serial = InSerial;
 			Order.To = InTo;
+			return Order;
+		}
+
+		static FOrder MakeTune(const std::vector<std::pair<int, double>>& InValues)
+		{
+			FOrder Order;
+			Order.Type = EOrderType::Tune;
+			Order.TuneValues = InValues;
 			return Order;
 		}
 

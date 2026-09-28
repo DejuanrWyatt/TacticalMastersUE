@@ -7,6 +7,7 @@
 #include "GameFramework/PlayerController.h"
 
 #include "TMBattleDirector.h"
+#include "TMSettings.h"
 #include "TMBattleHudStyle.h"
 #include "SimAbility.h"
 
@@ -14,6 +15,26 @@
 #include <cmath>
 
 using namespace TMHudStyle;
+
+void ATMBattleHud::DrawOverlays(ATMBattleDirector& From)
+{
+	if (!From.bOptionsOpen && !From.bDevToolsOpen)
+	{
+		return;
+	}
+	// Only the open one's buttons answer.
+	Buttons.Reset();
+	Tips.Reset();
+	SliderAreas.Reset();
+	if (From.bOptionsOpen)
+	{
+		DrawOptions(From);
+	}
+	else
+	{
+		DrawDevTools(From);
+	}
+}
 
 bool ATMBattleHud::FindButton(ETMHudAction Action, int32 Value, FTMHudButton& Out) const
 {
@@ -147,12 +168,14 @@ void ATMBattleHud::DrawHUD()
 	Super::DrawHUD();
 	Buttons.Reset();
 	Tips.Reset();
+	SliderAreas.Reset();
+	LogArea = FBox2D(ForceInit);
 	ATMBattleDirector* Found = FindDirector();
 	if (!Canvas || !Found || !Found->bBuilt || !GEngine)
 	{
 		return;
 	}
-	S = Canvas->ClipY / 1080.0f;
+	S = Canvas->ClipY / 1080.0f * FTMSettings::Get().UiScale;
 
 	// Away from a battle, the menu is the whole screen, over the board.
 	if (Found->Screen != ATMBattleDirector::EScreen::Battle)
@@ -178,6 +201,7 @@ void ATMBattleHud::DrawHUD()
 			Tips.Reset();
 			DrawGuide(*Found);
 		}
+		DrawOverlays(*Found);
 		DrawTooltip();
 		return;
 	}
@@ -205,6 +229,7 @@ void ATMBattleHud::DrawHUD()
 		Tips.Reset();
 		DrawBattleMenu(*Found);
 	}
+	DrawOverlays(*Found);
 	DrawTooltip();
 }
 
@@ -446,10 +471,10 @@ void ATMBattleHud::DrawActionBar(ATMBattleDirector& From)
 	};
 
 	const bool bMoving = From.AimMode == ATMBattleDirector::EAimMode::Move;
-	DrawButton(TEXT("Move"), TEXT("Space"),
+	DrawButton(TEXT("Move"), FTMSettings::Get().KeyName(ETMAction::Move),
 		bControllable && !Unit->bMoved && !Unit->IsCasting(), bMoving && !From.bSprinting,
 		TextColour, ETMHudAction::Move, -1);
-	DrawButton(TEXT("Sprint"), FString::Printf(TEXT("Shift  %.1f m"), From.Battle.MoveOf(*Unit, true)),
+	DrawButton(TEXT("Sprint"), FString::Printf(TEXT("%s  %.1f m"), *FTMSettings::Get().KeyName(ETMAction::Sprint), From.Battle.MoveOf(*Unit, true)),
 		bControllable && !Unit->bMoved && !Unit->bActed && !Unit->IsCasting(), bMoving && From.bSprinting,
 		TextColour, ETMHudAction::Sprint, -1);
 
@@ -487,7 +512,7 @@ void ATMBattleHud::DrawActionBar(ATMBattleDirector& From)
 			From.AimMode == ATMBattleDirector::EAimMode::Ability && From.AimSlot == Slot,
 			NameColour, ETMHudAction::Ability, Slot);
 	}
-	DrawButton(TEXT("End Turn"), TEXT("Enter"), bControllable, false, TextColour, ETMHudAction::EndTurn, -1);
+	DrawButton(TEXT("End Turn"), FTMSettings::Get().KeyName(ETMAction::EndTurn), bControllable, false, TextColour, ETMHudAction::EndTurn, -1);
 }
 
 void ATMBattleHud::DrawBanners(ATMBattleDirector& From)
@@ -791,13 +816,17 @@ void ATMBattleHud::DrawTitle(ATMBattleDirector& From)
 	Y += H + Gap;
 	MenuButton(X, Y, W, H, TEXT("Computer vs Computer"), ETMHudAction::TitleWatch);
 	Y += H + Gap * 3.0f;
-	MenuButton(X, Y, W, 44.0f * S, TEXT("Unit Guide  (U)"), ETMHudAction::ToggleGuide);
+	MenuButton(X, Y, W, 44.0f * S, FString::Printf(TEXT("Unit Guide  (%s)"), *FTMSettings::Get().KeyName(ETMAction::UnitGuide)), ETMHudAction::ToggleGuide);
+	Y += 44.0f * S + Gap;
+	MenuButton(X, Y, W, 44.0f * S, TEXT("Options"), ETMHudAction::OpenOptions);
+	Y += 44.0f * S + Gap;
+	MenuButton(X, Y, W, 44.0f * S, TEXT("Developer Tools"), ETMHudAction::OpenDevTools);
 	Y += 44.0f * S + Gap;
 	MenuButton(X, Y, W, 44.0f * S, TEXT("Quit"), ETMHudAction::Quit);
 	Y += 44.0f * S + 30.0f * S;
 
 	// Said rather than left out quietly: what the Godot title has that this one does not yet.
-	const FString Missing = TEXT("Online play, How to Play and Options are not ported yet.");
+	const FString Missing = TEXT("Online play and How to Play are not ported yet.");
 	const FVector2D MissingSize = TextSize(Missing, Font, 0.5f * S);
 	Text(Missing, CentreX - MissingSize.X * 0.5f, Y, Dim, Font, 0.5f * S);
 }
@@ -948,7 +977,7 @@ void ATMBattleHud::DrawBattleMenu(ATMBattleDirector& From)
 	const float H = 52.0f * S;
 	const float Gap = 10.0f * S;
 	const float PW = W + 60.0f * S;
-	const float PH = 4.0f * (H + Gap) + 100.0f * S;
+	const float PH = 6.0f * (H + Gap) + 100.0f * S;
 	const float PX = (Canvas->ClipX - PW) * 0.5f;
 	const float PY = (Canvas->ClipY - PH) * 0.5f;
 	Panel(PX, PY, PW, PH, FLinearColor(0.05f, 0.06f, 0.1f, 0.95f), Gold, 1.5f);
@@ -962,6 +991,10 @@ void ATMBattleHud::DrawBattleMenu(ATMBattleDirector& From)
 	Y += H + Gap;
 	MenuButton(X, Y, W, H, TEXT("Restart battle"), ETMHudAction::MenuRestart, -1, false,
 		FString::Printf(TEXT("same teams, same seed (%llu)"), From.BattleSeed));
+	Y += H + Gap;
+	MenuButton(X, Y, W, H, TEXT("Options"), ETMHudAction::OpenOptions);
+	Y += H + Gap;
+	MenuButton(X, Y, W, H, TEXT("Developer Tools"), ETMHudAction::OpenDevTools);
 	Y += H + Gap;
 	MenuButton(X, Y, W, H, TEXT("Change setup"), ETMHudAction::MenuSetup);
 	Y += H + Gap;

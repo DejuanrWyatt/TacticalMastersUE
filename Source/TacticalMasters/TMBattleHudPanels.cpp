@@ -609,6 +609,7 @@ void ATMBattleHud::DrawLog(ATMBattleDirector& From)
 	const int32 Count = Last - First;
 	const float H = Head + FMath::Max(1, Count) * LineH + 8.0f * S;
 	Panel(X - 6.0f * S, Y - 4.0f * S, W, H, FLinearColor(0.06f, 0.08f, 0.12f, 0.62f), FLinearColor(1, 1, 1, 0.12f), 1.0f);
+	LogArea = FBox2D(FVector2D(X - 6.0f * S, Y - 4.0f * S), FVector2D(X - 6.0f * S + W, Y - 4.0f * S + H));
 	LogBottom = Y - 4.0f * S + H;
 	FString Title = TEXT("Log");
 	if (From.LogScroll > 0)

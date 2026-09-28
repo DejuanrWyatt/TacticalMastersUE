@@ -7,6 +7,7 @@
 
 #include "SimTypes.h"
 #include "SimUnit.h"
+#include "TMSettings.h"
 
 namespace TMHudStyle
 {
@@ -18,14 +19,23 @@ namespace TMHudStyle
 	inline const FLinearColor PanelFill(0.06f, 0.08f, 0.12f, 0.78f);
 	inline const FLinearColor Shadow(0.0f, 0.0f, 0.0f, 0.8f);
 
+	// Red becomes orange with the colour-blind option on (settings.gd:16-17).
 	inline FLinearColor TeamColour(int32 Team)
 	{
-		return Team == 0 ? FLinearColor(0.47f, 0.7f, 1.0f) : FLinearColor(1.0f, 0.51f, 0.47f);
+		if (Team == 0)
+		{
+			return FLinearColor(0.47f, 0.7f, 1.0f);
+		}
+		return FTMSettings::Get().bColorblind ? FLinearColor(1.0f, 0.72f, 0.3f) : FLinearColor(1.0f, 0.51f, 0.47f);
 	}
 
 	inline FLinearColor TeamFill(int32 Team)
 	{
-		return Team == 0 ? FLinearColor(0.1f, 0.2f, 0.42f, 0.95f) : FLinearColor(0.42f, 0.12f, 0.1f, 0.95f);
+		if (Team == 0)
+		{
+			return FLinearColor(0.1f, 0.2f, 0.42f, 0.95f);
+		}
+		return FTMSettings::Get().bColorblind ? FLinearColor(0.45f, 0.26f, 0.05f, 0.95f) : FLinearColor(0.42f, 0.12f, 0.1f, 0.95f);
 	}
 
 	// The turn order timeline (hud.gd:56-74).

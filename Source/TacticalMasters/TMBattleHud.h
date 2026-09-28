@@ -78,6 +78,20 @@ enum class ETMHudAction : uint8
 	PickerChoose,
 	PickerRole,
 	PickerClose,
+
+	// Options and Developer Tools. Slider's value is the slider's id; RebindAction's
+	// the action; DevReset's the rule number's index.
+	OpenOptions,
+	OpenDevTools,
+	CloseOverlay,
+	Slider,
+	OptionUiScale,
+	OptionFullscreen,
+	OptionColorblind,
+	RebindAction,
+	ResetOptions,
+	DevReset,
+	DevResetAll,
 };
 
 /** Words shown when the pointer rests on part of the HUD: how a number is worked out. */
@@ -125,6 +139,12 @@ private:
 	void DrawField(ATMBattleDirector& Director);
 	void DrawInspectCard(ATMBattleDirector& Director);
 	void DrawGuide(ATMBattleDirector& Director);
+	void DrawOptions(ATMBattleDirector& Director);
+	/** Options or Developer Tools, if open, over everything else. */
+	void DrawOverlays(ATMBattleDirector& Director);
+	void DrawDevTools(ATMBattleDirector& Director);
+	/** A slider with its track, fill and knob, answering the pointer over all of it. */
+	void Slider(float X, float Y, float W, float H, int32 Id, double Value, double Low, double High);
 	void DrawClassPicker(ATMBattleDirector& Director);
 	void DrawTooltip();
 
@@ -170,6 +190,14 @@ private:
 	float S = 1.0f;
 
 	TArray<FTMHudButton> Buttons;
+
+public:
+	/** Where each slider was drawn this frame, for dragging it. */
+	TMap<int32, FBox2D> SliderAreas;
+	/** Where the log was drawn this frame: the wheel scrolls it there and zooms elsewhere. */
+	FBox2D LogArea = FBox2D(ForceInit);
+
+private:
 	TArray<FTMHudTip> Tips;
 
 	/** Where each turn chip is drawn, so it glides rather than jumps (hud.gd:1297-1311). */
