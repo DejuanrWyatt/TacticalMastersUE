@@ -18,6 +18,7 @@
 #include "Components/InputComponent.h"
 #include "TMBattleHud.h"
 #include "TMVfxStudio.h"
+#include "TMRobotPlayer.h"
 #include "NiagaraFunctionLibrary.h"
 #include "NiagaraSystem.h"
 #include "Particles/ParticleSystem.h"
@@ -116,7 +117,19 @@ void ATMBattleDirector::BeginPlay()
 	// turns run out and red wins, and the run still ends -- which is how pictures
 	// of the player's HUD are taken without anyone at the machine.
 	const bool bKeepBlue = FParse::Param(FCommandLine::Get(), TEXT("tmplayblue"));
-	if (bKeepBlue)
+	// -tmrobot: the robot playtester sits where a person would -- at the title
+	// screen, with the mouse and keyboard -- and plays through the controls.
+	if (FParse::Param(FCommandLine::Get(), TEXT("tmrobot")))
+	{
+		bRobotDriving = true;
+		SetUpPlayerInput();
+		Screen = EScreen::Title;
+		if (UWorld* World = GetWorld())
+		{
+			World->SpawnActor<ATMRobotPlayer>();
+		}
+	}
+	else if (bKeepBlue)
 	{
 		bComputerPlaysTeam0 = false;
 		bComputerPlaysTeam1 = true;
@@ -306,13 +319,21 @@ void ATMBattleDirector::BuildBattle()
 	ThinkRemainder = 0.0f;
 
 	USkeletalMesh* Mesh = UnitMesh.LoadSynchronous();
+	// Which body each class wears is data (TMBattleDirectorMotion.cpp); the
+	// level's mesh is what a unit wears when the map has nothing for it.
+	LoadCharacterMap();
 	for (size_t i = 0; i < Battle.Units.size(); ++i)
 	{
 		const FName Name = *FString::Printf(TEXT("Unit_%d"), Battle.Units[i].Id);
 		USkeletalMeshComponent* Visual = NewObject<USkeletalMeshComponent>(this, Name, RF_Transient);
 		Visual->SetupAttachment(RootComponent);
 		Visual->RegisterComponent();
-		if (Mesh)
+		const FTMBody* Body = BodyFor(Battle.Units[i]);
+		if (Body && Body->Mesh)
+		{
+			Visual->SetSkeletalMeshAsset(Body->Mesh);
+		}
+		else if (Mesh)
 		{
 			Visual->SetSkeletalMeshAsset(Mesh);
 		}
@@ -350,6 +371,7 @@ void ATMBattleDirector::BuildBattle()
 	BuildBoard();
 
 	bBuilt = true;
+	ResetMotion();
 	RefreshVisuals();
 
 	UE_LOG(LogTemp, Log, TEXT("Battle built with %d units"), static_cast<int32>(Battle.Units.size()));
@@ -493,15 +515,25 @@ void ATMBattleDirector::RefreshVisuals()
 		}
 		const TMSim::FUnit& Unit = Battle.Units[i];
 		const FVector Where = WorldFor(Unit);
-		UnitVisuals[i]->SetRelativeLocation(Where);
-		// A Paragon mesh does not face along its actor's +X, hence the offset.
-		const float Yaw = FMath::RadiansToDegrees(FMath::Atan2(Unit.Facing.Y, Unit.Facing.X)) + 180.0f;
-		UnitVisuals[i]->SetRelativeRotation(FRotator(0.0f, Yaw, 0.0f));
-		UnitVisuals[i]->SetVisibility(Unit.IsAlive() && IsSeen(Unit));
+		// In a game world the bodies walk, and AdvanceMotion puts them where they
+		// are part way along. In the editor nothing advances them, so they stand
+		// where the rules have them.
+		const bool bMoving = GetWorld() && GetWorld()->IsGameWorld() && Motions.IsValidIndex(i);
+		if (!bMoving)
+		{
+			UnitVisuals[i]->SetRelativeLocation(Where);
+			// A Paragon mesh does not face along its actor's +X, hence the offset.
+			const FTMBody* Body = Motions.IsValidIndex(i) ? Motions[i].Body : nullptr;
+			const float Yaw = FMath::RadiansToDegrees(FMath::Atan2(Unit.Facing.Y, Unit.Facing.X)) + (Body ? Body->Yaw : 180.0f);
+			UnitVisuals[i]->SetRelativeRotation(FRotator(0.0f, Yaw, 0.0f));
+		}
+		// A body that can fall lies where it fell while it can still be raised.
+		const bool bCanFall = Motions.IsValidIndex(i) && Motions[i].Body && Motions[i].Body->Animations;
+		UnitVisuals[i]->SetVisibility((Unit.IsAlive() || (bCanFall && Unit.IsKo())) && IsSeen(Unit));
 
 		if (ReadyLights.IsValidIndex(i) && ReadyLights[i])
 		{
-			ReadyLights[i]->SetRelativeLocation(Where + FVector(0.0f, 0.0f, 55.0f));
+			ReadyLights[i]->SetRelativeLocation((bMoving ? Motions[i].Shown : Where) + FVector(0.0f, 0.0f, 55.0f));
 			ReadyLights[i]->SetVisibility(Unit.bReady && Unit.IsAlive() && IsSeen(Unit));
 		}
 	}
@@ -652,6 +684,7 @@ void ATMBattleDirector::ShowEvents(const TMSim::FTickReport& Report)
 	{
 		return;
 	}
+	AnimateEvents(Report);
 
 	// The particle effect an ability names, if any, played as it goes off: on the
 	// user, on the spot aimed at, or once on each unit it touched. Which units
@@ -1233,6 +1266,10 @@ void ATMBattleDirector::Tick(float DeltaSeconds)
 
 	AdvanceFloaters(DeltaSeconds);
 	AdvanceVfx(DeltaSeconds);
+	if (GetWorld() && GetWorld()->IsGameWorld())
+	{
+		AdvanceMotion(DeltaSeconds);
+	}
 	MaybeCapture();
 
 	// Only while playing: in the editor the clock is stepped by hand, so a
@@ -1418,7 +1455,8 @@ void ATMBattleDirector::Tick(float DeltaSeconds)
 			UE_LOG(LogTemp, Log, TEXT("%s"), *DescribeBattle());
 			DecidedFor = 0.0f;
 		}
-		if (FApp::IsUnattended())
+		// The robot decides when its session is over, not the first result.
+		if (FApp::IsUnattended() && !bRobotDriving)
 		{
 			// A moment on the result before leaving, so a run taking pictures
 			// gets one of the end of the battle -- it used to exit in the very
@@ -1930,7 +1968,7 @@ void ATMBattleDirector::PickUnderCursor()
 	APlayerController* Player = World ? World->GetFirstPlayerController() : nullptr;
 	float MouseX = 0.0f;
 	float MouseY = 0.0f;
-	if (!Player || !Player->GetMousePosition(MouseX, MouseY))
+	if (!Player || !CursorPosition(MouseX, MouseY))
 	{
 		return;
 	}
@@ -1941,6 +1979,8 @@ void ATMBattleDirector::PickUnderCursor()
 	// the screen is what makes clicking a unit land on that unit.
 	int32 Best = -1;
 	double BestPixels = 36.0;
+	// Whether the pointer is on the nearest unit's body itself, not only near it.
+	bool bOnBody = false;
 	for (const TMSim::FUnit& Unit : Battle.Units)
 	{
 		if ((!Unit.IsAlive() && !Unit.IsKo()) || !IsSeen(Unit))
@@ -1950,14 +1990,37 @@ void ATMBattleDirector::PickUnderCursor()
 		// A fallen unit is lying down, and only its plate is shown.
 		const float Up = Unit.IsAlive() ? 90.0f : 20.0f;
 		FVector2D OnScreen;
+		const FVector Drawn = ShownAt(Unit);
 		if (Player->ProjectWorldLocationToScreen(
-			GetActorTransform().TransformPosition(WorldFor(Unit) + FVector(0.0f, 0.0f, Up)), OnScreen))
+			GetActorTransform().TransformPosition(Drawn + FVector(0.0f, 0.0f, Up)), OnScreen))
 		{
 			const double Pixels = FVector2D::Distance(OnScreen, Mouse);
 			if (Pixels < BestPixels)
 			{
 				BestPixels = Pixels;
 				Best = Unit.Id;
+				// The body as the screen shows it: feet to head, about a quarter
+				// as wide as it is tall. Godot picks a unit by a ray meeting its
+				// body (battle.gd:741-753), and this is that body, drawn flat.
+				FVector2D Feet;
+				FVector2D Head;
+				bOnBody = false;
+				if (Unit.IsAlive()
+					&& Player->ProjectWorldLocationToScreen(GetActorTransform().TransformPosition(Drawn), Feet)
+					&& Player->ProjectWorldLocationToScreen(GetActorTransform().TransformPosition(Drawn + FVector(0.0f, 0.0f, 180.0f)), Head))
+				{
+					const FVector2D Along = Head - Feet;
+					const double Length = Along.Size();
+					if (Length > 1.0)
+					{
+						const double T = FMath::Clamp(FVector2D::DotProduct(Mouse - Feet, Along) / (Length * Length), 0.0, 1.0);
+						bOnBody = FVector2D::Distance(Mouse, Feet + Along * T) <= Length * 0.25;
+					}
+				}
+				else if (!Unit.IsAlive())
+				{
+					bOnBody = Pixels <= 18.0;
+				}
 			}
 		}
 	}
@@ -1977,8 +2040,14 @@ void ATMBattleDirector::PickUnderCursor()
 		}
 	}
 
-	// Walking wants the ground under the pointer; aiming and picking want the unit.
-	if (Best >= 0 && !(AimMode == EAimMode::Move && bGround))
+	// A unit is pointed at when the pointer is on its body, as Godot's ray stops
+	// at the body (battle.gd:741-753); otherwise it is the ground there, and a
+	// unit standing on that spot (below). Nearness on screen alone is not
+	// enough: it read the ground behind a body, so a click to pick up another
+	// unit walked the selected one there, and it snapped a blast aimed between
+	// two enemies onto whichever stood nearer (both found by the robot
+	// playtester).
+	if (Best >= 0 && (!bGround || bOnBody))
 	{
 		bHaveHover = true;
 		HoverUnitId = Best;
@@ -1989,11 +2058,11 @@ void ATMBattleDirector::PickUnderCursor()
 	{
 		bHaveHover = true;
 		HoverPoint = Ground;
-		if (Best >= 0)
-		{
-			HoverUnitId = Best;
-		}
-		else if (const TMSim::FUnit* Near = Battle.UnitNear(Ground, 0.5f))
+		// On the ground, a unit is pointed at only if it stands on that spot, as
+		// in Godot (battle.gd:756-758). Merely near it on screen would make a
+		// click that places a unit, or walks one, pick up the neighbour instead
+		// (found by the robot playtester, placing units while planning).
+		if (const TMSim::FUnit* Near = Battle.UnitNear(Ground, 0.5f))
 		{
 			if (IsSeen(*Near))
 			{
@@ -2063,7 +2132,7 @@ void ATMBattleDirector::OnClick()
 	APlayerController* Player = World ? World->GetFirstPlayerController() : nullptr;
 	float MouseX = 0.0f;
 	float MouseY = 0.0f;
-	if (Player && Player->GetMousePosition(MouseX, MouseY))
+	if (Player && CursorPosition(MouseX, MouseY))
 	{
 		FTMHudButton Button;
 		const ATMBattleHud* Hud = Cast<ATMBattleHud>(Player->GetHUD());
@@ -2686,6 +2755,19 @@ FString ATMBattleDirector::HowWon() const
 		return FString::Printf(TEXT("%s has held the middle"), Side);
 	}
 	return FString();
+}
+
+bool ATMBattleDirector::CursorPosition(float& X, float& Y) const
+{
+	if (bRobotDriving)
+	{
+		X = static_cast<float>(RobotCursor.X);
+		Y = static_cast<float>(RobotCursor.Y);
+		return RobotCursor.X >= 0.0;
+	}
+	const UWorld* World = GetWorld();
+	const APlayerController* Player = World ? World->GetFirstPlayerController() : nullptr;
+	return Player && Player->GetMousePosition(X, Y);
 }
 
 int32 ATMBattleDirector::PlanningTeam() const

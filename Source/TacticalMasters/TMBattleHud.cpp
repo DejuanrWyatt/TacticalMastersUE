@@ -15,6 +15,20 @@
 
 using namespace TMHudStyle;
 
+bool ATMBattleHud::FindButton(ETMHudAction Action, int32 Value, FTMHudButton& Out) const
+{
+	// The last drawn is on top, as ButtonAt has it.
+	for (int32 i = Buttons.Num() - 1; i >= 0; --i)
+	{
+		if (Buttons[i].Action == Action && (Value == -2 || Buttons[i].Value == Value))
+		{
+			Out = Buttons[i];
+			return true;
+		}
+	}
+	return false;
+}
+
 ATMBattleDirector* ATMBattleHud::FindDirector()
 {
 	if (!Director.IsValid())
@@ -407,7 +421,7 @@ void ATMBattleHud::DrawActionBar(ATMBattleDirector& From)
 	{
 		float MX = 0.0f;
 		float MY = 0.0f;
-		if (PlayerOwner->GetMousePosition(MX, MY))
+		if (From.CursorPosition(MX, MY))
 		{
 			Mouse = FVector2D(MX, MY);
 		}
@@ -546,7 +560,7 @@ void ATMBattleHud::DrawBanners(ATMBattleDirector& From)
 	{
 		float MX = 0.0f;
 		float MY = 0.0f;
-		if (PlayerOwner->GetMousePosition(MX, MY))
+		if (From.CursorPosition(MX, MY))
 		{
 			Mouse = FVector2D(MX, MY);
 		}
@@ -717,7 +731,8 @@ FVector2D ATMBattleHud::MousePoint() const
 {
 	float MX = 0.0f;
 	float MY = 0.0f;
-	if (PlayerOwner && PlayerOwner->GetMousePosition(MX, MY))
+	const ATMBattleDirector* Board = const_cast<ATMBattleHud*>(this)->FindDirector();
+	if (Board && Board->CursorPosition(MX, MY))
 	{
 		return FVector2D(MX, MY);
 	}

@@ -22,6 +22,7 @@
 #include "TMBattleDirector.generated.h"
 
 class USkeletalMesh;
+class UAnimSequence;
 class USkeletalMeshComponent;
 class UStaticMesh;
 class UStaticMeshComponent;
@@ -92,6 +93,15 @@ public:
 	FString DescribeBattle() const;
 	/** How the battle was won, in a few words: on time, by holding the middle, or neither. */
 	FString HowWon() const;
+	/**
+	 * Where the pointer is, in screen pixels. The mouse's, unless the robot
+	 * playtester is driving (-tmrobot), when it is the robot's: everything that
+	 * reads the pointer reads it here, so the robot's clicks take exactly the
+	 * path a person's do.
+	 */
+	bool CursorPosition(float& X, float& Y) const;
+	bool bRobotDriving = false;
+	FVector2D RobotCursor = FVector2D(-1.0, -1.0);
 	/**
 	 * Which side this machine places units for while planning, or -1 when it
 	 * places for nobody, as when watching two computers (battle.gd:340-351).
@@ -421,6 +431,7 @@ private:
 
 	/** The HUD reads the selection, the aim and the log straight from here. */
 	friend class ATMBattleHud;
+	friend class ATMRobotPlayer;
 
 	/** Something the person should read: why an order was refused, mostly. */
 	void Tell(const FString& What);
@@ -570,6 +581,82 @@ private:
 
 	UPROPERTY()
 	TArray<TObjectPtr<USkeletalMeshComponent>> UnitVisuals;
+
+	// ------------------------------------------------ bodies and animation
+	// (TMBattleDirectorMotion.cpp). What each unit wears and how it moves, from
+	// Content/Data/CharacterMap/characters.json. None of it is read by the rules:
+	// a unit walks, swings and falls on screen because the rules said it moved,
+	// hit and fell, never the other way round.
+
+	/** One animation set: the clips for one skeleton. */
+	struct FTMAnimSet
+	{
+		UAnimSequence* Idle = nullptr;
+		UAnimSequence* Walk = nullptr;
+		UAnimSequence* Run = nullptr;
+		TArray<UAnimSequence*> Attack;
+		UAnimSequence* Cast = nullptr;
+		TArray<UAnimSequence*> Hit;
+		TArray<UAnimSequence*> Death;
+		UAnimSequence* Rise = nullptr;
+		/** How fast a walk and a run cover the ground, in cm/s, to match the clips. */
+		float WalkSpeed = 170.0f;
+		float RunSpeed = 380.0f;
+	};
+
+	/** A body: a mesh, which way it faces, and the set it animates with. */
+	struct FTMBody
+	{
+		USkeletalMesh* Mesh = nullptr;
+		float Yaw = 0.0f;
+		const FTMAnimSet* Animations = nullptr;
+	};
+
+	/** What one unit is doing on screen. */
+	struct FTMMotion
+	{
+		const FTMBody* Body = nullptr;
+		/** Where it is drawn, and which way it faces, in degrees. */
+		FVector Shown = FVector::ZeroVector;
+		float Yaw = 0.0f;
+		/** The rest of a walk, as points on the board; empty when standing. */
+		TArray<FVector> Path;
+		bool bRun = false;
+		/** Where the rules had it last frame, to notice it moving. */
+		TMSim::FVec2 SimPos;
+		/** The clip playing, and how long a one-off has left. */
+		UAnimSequence* Playing = nullptr;
+		float OneShotLeft = 0.0f;
+		/** An action waiting for a walk to end, and the way to face for it. */
+		UAnimSequence* Queued = nullptr;
+		float QueuedYaw = 0.0f;
+		/** Knocked out and lying down. */
+		bool bDown = false;
+	};
+
+	/** Reads the character map once per run. False, and said why, if it cannot. */
+	bool LoadCharacterMap();
+	const FTMBody* BodyFor(const TMSim::FUnit& Unit) const;
+	/** Starts every unit standing where the rules put it. */
+	void ResetMotion();
+	/** Walks, one-offs and falls, a frame at a time. Game worlds only. */
+	void AdvanceMotion(float DeltaSeconds);
+	/** What the battle's events mean for the bodies: a swing, a flinch. */
+	void AnimateEvents(const TMSim::FTickReport& Report);
+	void Animate(int32 Index, UAnimSequence* Clip, bool bLoop);
+	/** Where a unit is drawn now: part way along a walk, or where the rules have it. */
+	FVector ShownAt(const TMSim::FUnit& Unit) const;
+
+	bool bCharacterMapRead = false;
+	TMap<FString, FTMAnimSet> AnimSets;
+	TMap<FString, FTMBody> Bodies;
+	TMap<FString, FString> LookBodies;
+	TMap<FString, FString> ClassBodies;
+	FString DefaultBody;
+	/** Keeps every mesh and clip the map names loaded. */
+	UPROPERTY()
+	TArray<TObjectPtr<UObject>> CharacterAssets;
+	TArray<FTMMotion> Motions;
 
 	/** Left over from the last frame, so the clock runs at its own rate. */
 	float TickRemainder = 0.0f;

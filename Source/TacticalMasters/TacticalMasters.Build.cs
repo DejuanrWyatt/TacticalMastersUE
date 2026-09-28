@@ -16,7 +16,7 @@ public class TacticalMasters : ModuleRules
 		// class creator by ATMVfxStudio.
 		PrivateDependencyModuleNames.AddRange(new string[]
 		{
-			"Niagara", "AssetRegistry", "ImageCore"
+			"Niagara", "AssetRegistry", "ImageCore", "Json"
 		});
 	}
 }

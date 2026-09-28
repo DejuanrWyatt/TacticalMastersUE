@@ -105,6 +105,8 @@ public:
 
 	/** The button under a point on the screen, if any: so a click there is not also a click on the board. */
 	bool ButtonAt(const FVector2D& Point, FTMHudButton& Out) const;
+	/** A button on screen now, by what it does (Value -2: any value). For the robot playtester. */
+	bool FindButton(ETMHudAction Action, int32 Value, FTMHudButton& Out) const;
 
 private:
 	ATMBattleDirector* FindDirector();

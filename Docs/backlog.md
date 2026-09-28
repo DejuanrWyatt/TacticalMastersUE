@@ -67,5 +67,12 @@ Not yet broken down; run `/plan-milestone` to split it into slices.
 
 | ai-root-taunt | The computer player ignores Root and Taunt on its own units: it orders a rooted unit to walk ("It can't walk.") and a taunted one to attack someone else. The rules refuse, and the turn is lost | – | sim-engineer | Todo. The same in Godot (ai_player.gd never checks either), so fixing it is a Godot change first or a deliberate divergence. Found 2026-09-27 playtesting the Interrupter (Pin roots) and Duellist (Challenge taunts): 44 and 50 refused orders in 32 games. No built-in class roots or taunts, which is why it never showed |
 
+## Playtesting and looks
+| id | goal | depends on | owner | status |
+|----|------|-----------|-------|--------|
+| robot-playtester | A robot that plays through the real controls and reports what a person would trip over | feat-player-input | qa-engineer | Done: `-tmrobot` (`ATMRobotPlayer`), report in `Saved/Robot`. First find fixed: clicking a unit read the ground behind it, so picking up another unit walked the selected one there (`PickUnderCursor` now takes a unit only when the pointer is on its body, as Godot's ray does) |
+| unit-animation | Units walk their paths, swing, cast, flinch, fall and rise, from the battle's events; which body each class wears is data | – | unreal-engineer | Built: `TMBattleDirectorMotion.cpp`, `Content/Data/CharacterMap/characters.json` (Manny and Quinn, the mannequin's own clips). No Animation Blueprint needed |
+| character-setup | Paragon heroes (and later Tripo/Blender characters) animated and worn by classes | unit-animation | human | Todo: steps in `Docs/CharacterSetup.md` (IK Rigs, a retargeter from the mannequin, copied clips, a set and a body in the character map) |
+
 ## Later (not yet broken down)
 Ultimates · animation from events on the canonical skeleton · CharacterMap data · networking over `Submit` + checksums.

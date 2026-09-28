@@ -68,11 +68,13 @@ upgraded later without touching the rules.
    to the others by path, so moving a hero in Explorer breaks every reference
    inside it. If you want it somewhere tidier, move it *inside the editor*,
    which rewrites the references and leaves redirectors behind.
-3. Make an **IK Rig** for the hero's skeleton and one for the canonical skeleton
-   if it does not exist yet.
-4. Make an **IK Retargeter** from the hero to the canonical skeleton, and export
-   the retargeted skeletal mesh into `Retargeted/`.
-5. Point a class at it in `CharacterMap`.
+3. Copy the shared clips onto the hero's skeleton with an IK Retargeter from
+   the mannequin, and give the hero a body and an animation set in
+   `Data/CharacterMap/characters.json`. Step by step:
+   [CharacterSetup.md](CharacterSetup.md), step 1. (An earlier version of this
+   page said to retarget the hero's *mesh* onto the canonical skeleton. Unreal
+   does that only when the bones already match, and Paragon's don't.
+   Retargeting the animations is the route that works.)
 
 The first hero is the slow one. After that the retargeter is a copy-and-change.
 

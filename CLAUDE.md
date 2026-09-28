@@ -57,7 +57,8 @@ be hard to kill (`Stop-Process` and `taskkill` may both refuse; WMI `Terminate` 
    the player and replays use the same door. The AI must never get a special case inside the rules.
 5. **`FEvent`/`FTickReport` are presentation only.** Nothing in the rules may read them back. The
    director reads them twice, for two separate things: `Narrate` builds the battle log, and `ShowEvents`
-   puts up the rising numbers and flashes a struck unit's light. Losing either would not change a
+   puts up the rising numbers, flashes a struck unit's light, plays an ability's particle effect and
+   animates the bodies (`TMBattleDirectorMotion.cpp`: walks, swings, flinches, falls). Losing either would not change a
    battle by a hair. The numbers exist only in a game world, because nothing advances them in the
    editor and they would pile up in the level.
 6. **Any new state field must be mixed into `FBattle::Checksum()`** (`SimWorld.cpp`), or desyncs go undetected.
@@ -83,6 +84,7 @@ be hard to kill (`Stop-Process` and `taskkill` may both refuse; WMI `Terminate` 
 | Wiring test: sim ↔ Unreal, in a real level | `scripts\wiring-test.bat` (runs `Tools/play_battle.py` headless) |
 | The class lab (the rules alone, for the class creator: check + playtest a class file) | `Tools\ClassLab\Build.bat` → `Binaries\ClassLab\TMClassLab.exe` |
 | Film every particle effect in the project for the class creator | `Tools\VfxCatalog.bat` (runs the game off-screen with `-tmvfxcatalog`; writes `Saved\VfxCatalog`; about 2 minutes; ends itself) |
+| Robot playtester: plays three sessions through the real controls (title → setup → battle, vs computer as blue and red with planning and hold-the-middle, two players), checking every step did what it should | add `-tmrobot` to a windowed game run (not `-nullrhi`); report and a picture per problem in `Saved\Robot\` (about 10 minutes; ends itself) |
 | Watch chosen classes fight | add `-tmroster=a,b,c,d` to a game run: both sides field those four; `-tmhold=30` / `-tmtime=180` switch on the other ways to win, `-tmplan=30` planning time |
 | A whole battle in a real game world | `scriptsattle-test.bat` (no window, no rendering; ends itself) |
 

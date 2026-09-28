@@ -1,0 +1,75 @@
+{
+  "format": "tactical-masters-characters",
+  "version": 1,
+  "about": "Which body each class wears, and which animation plays for what. Read by the director when a battle is built; see Docs/CharacterSetup.md. A class is looked up by its id under classes, then by its look under looks, then default. Every body names an animation set, and every animation in a set must be authored for that body's skeleton. The mannequin set has no hit clip: the template's hit reactions are additive, made to be layered over another pose, and cannot play on their own.",
+  "default": "manny",
+  "looks": {
+    "squire": "manny",
+    "knight": "manny",
+    "monk": "manny",
+    "archer": "sparrow",
+    "black_mage": "quinn",
+    "white_mage": "quinn"
+  },
+  "classes": {},
+  "bodies": {
+    "manny": {
+      "mesh": "/Game/Characters/Mannequins/Meshes/SKM_Manny_Simple.SKM_Manny_Simple",
+      "yaw": -90,
+      "animations": "mannequin"
+    },
+    "quinn": {
+      "mesh": "/Game/Characters/Mannequins/Meshes/SKM_Quinn_Simple.SKM_Quinn_Simple",
+      "yaw": -90,
+      "animations": "mannequin"
+    },
+    "sparrow": {
+      "mesh": "/Game/ParagonSparrow/Characters/Heroes/Sparrow/Meshes/Sparrow.Sparrow",
+      "yaw": -90,
+      "animations": "sparrow"
+    }
+  },
+  "animations": {
+    "mannequin": {
+      "idle": "/Game/Characters/Mannequins/Anims/Unarmed/MM_Idle.MM_Idle",
+      "walk": "/Game/Characters/Mannequins/Anims/Unarmed/Walk/MF_Unarmed_Walk_Fwd.MF_Unarmed_Walk_Fwd",
+      "run": "/Game/Characters/Mannequins/Anims/Unarmed/Jog/MF_Unarmed_Jog_Fwd.MF_Unarmed_Jog_Fwd",
+      "attack": [
+        "/Game/Characters/Mannequins/Anims/Unarmed/Attack/MM_Attack_01.MM_Attack_01",
+        "/Game/Characters/Mannequins/Anims/Unarmed/Attack/MM_Attack_02.MM_Attack_02",
+        "/Game/Characters/Mannequins/Anims/Unarmed/Attack/MM_Attack_03.MM_Attack_03"
+      ],
+      "cast": "/Game/Characters/Mannequins/Anims/Unarmed/Attack/MM_ChargedAttack.MM_ChargedAttack",
+      "death": [
+        "/Game/Characters/Mannequins/Anims/Death/MM_Death_Front_01.MM_Death_Front_01",
+        "/Game/Characters/Mannequins/Anims/Death/MM_Death_Back_01.MM_Death_Back_01",
+        "/Game/Characters/Mannequins/Anims/Death/MM_Death_Left_01.MM_Death_Left_01"
+      ],
+      "rise": "/Game/Characters/Mannequins/Anims/Unarmed/Jump/MM_Land.MM_Land",
+      "walkSpeed": 170,
+      "runSpeed": 380
+    },
+    "sparrow": {
+      "idle": "/Game/ParagonSparrow/Characters/Heroes/Sparrow/Animations/idle.idle",
+      "walk": "/Game/ParagonSparrow/Characters/Heroes/Sparrow/Animations/Jog_Fwd.Jog_Fwd",
+      "run": "/Game/ParagonSparrow/Characters/Heroes/Sparrow/Animations/Sprint_Fwd.Sprint_Fwd",
+      "attack": [
+        "/Game/ParagonSparrow/Characters/Heroes/Sparrow/Animations/Primary_Fire_Fast.Primary_Fire_Fast",
+        "/Game/ParagonSparrow/Characters/Heroes/Sparrow/Animations/Primary_Fire_Med.Primary_Fire_Med",
+        "/Game/ParagonSparrow/Characters/Heroes/Sparrow/Animations/Primary_Fire_Slow.Primary_Fire_Slow"
+      ],
+      "cast": "/Game/ParagonSparrow/Characters/Heroes/Sparrow/Animations/Cast.Cast",
+      "hit": [
+        "/Game/ParagonSparrow/Characters/Heroes/Sparrow/Animations/Knock_Fwd.Knock_Fwd",
+        "/Game/ParagonSparrow/Characters/Heroes/Sparrow/Animations/Knock_Bwd.Knock_Bwd"
+      ],
+      "death": [
+        "/Game/ParagonSparrow/Characters/Heroes/Sparrow/Animations/Death_Fwd.Death_Fwd",
+        "/Game/ParagonSparrow/Characters/Heroes/Sparrow/Animations/Death_Bwd.Death_Bwd"
+      ],
+      "rise": "/Game/ParagonSparrow/Characters/Heroes/Sparrow/Animations/Respawn.Respawn",
+      "walkSpeed": 360,
+      "runSpeed": 600
+    }
+  }
+}
