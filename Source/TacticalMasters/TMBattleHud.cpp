@@ -303,6 +303,7 @@ void ATMBattleHud::DrawHUD()
 
 	// Under everything else, since it is drawn onto the board.
 	DrawBoardAids(*Found);
+	DrawOverheads(*Found);
 	if (FTMSettings::Get().bTurnSquares)
 	{
 		DrawTurnSquares(*Found);
@@ -529,7 +530,9 @@ void ATMBattleHud::DrawBoardAids(ATMBattleDirector& From)
 void ATMBattleHud::DrawActionBar(ATMBattleDirector& From)
 {
 	const FPanelScale Sized(*this, TEXT("action_bar"));
-	// Move, Sprint, the four abilities and End Turn (hud.gd:866-909, 1429-1474).
+	// Atlas Reactor's bar: the abilities as icons, coloured when they can be
+	// used and grey with the turns left when they cannot, between Move and
+	// Sprint and End Turn (hud.gd:866-909, 1429-1474).
 	const TMSim::FUnit* Unit = From.SelectedUnit();
 	ActionBarTop = Canvas->ClipY - 16.0f * S;
 	if (!From.bPlayerInput || !Unit || !Unit->IsAlive())
@@ -539,89 +542,48 @@ void ATMBattleHud::DrawActionBar(ATMBattleDirector& From)
 	const bool bControllable = From.PlayerCanOrder(Unit);
 
 	UFont* Font = GEngine->GetMediumFont();
-	const float BW = 150.0f * S;
-	const float BH = 58.0f * S;
-	const float Gap = 6.0f * S;
-	const int32 Count = 7;
-	const float Total = Count * BW + (Count - 1) * Gap;
-	const float CardRight = 16.0f * S + 440.0f * S + 12.0f * S;
-	float X = FMath::Max(CardRight, (Canvas->ClipX - Total) * 0.5f) + Nudge(TEXT("action_bar")).X;
-	const float Y = Canvas->ClipY - BH - 16.0f * S + Nudge(TEXT("action_bar")).Y;
-	ActionBarTop = Y;
-	Movable(TEXT("action_bar"), TEXT("Action bar"), X, Y, Total, BH);
+	const float Tile = 86.0f * S;
+	const float Small = 64.0f * S;
+	const float Gap = 10.0f * S;
+	const float Total = 3.0f * Small + 4.0f * Tile + 6.0f * Gap + 20.0f * S;
+	float X = (Canvas->ClipX - Total) * 0.5f + Nudge(TEXT("action_bar")).X;
+	const float Y = Canvas->ClipY - Tile - 22.0f * S + Nudge(TEXT("action_bar")).Y;
+	ActionBarTop = Y - 8.0f * S;
+	Movable(TEXT("action_bar"), TEXT("Action bar"), X, Y, Total, Tile);
 
-	FVector2D Mouse(-1.0f, -1.0f);
-	if (PlayerOwner)
-	{
-		float MX = 0.0f;
-		float MY = 0.0f;
-		if (From.CursorPosition(MX, MY))
-		{
-			Mouse = FVector2D(MX, MY);
-		}
-	}
+	// The long dark strip everything sits on.
+	Slant(X - 26.0f * S, Y - 10.0f * S, Total + 40.0f * S, Tile + 20.0f * S, FLinearColor(0.02f, 0.03f, 0.05f, 0.72f), 18.0f * S);
 
-	auto DrawButton = [&](const FString& Name, const FString& Details, bool bEnabled, bool bPressed,
-		const FLinearColor& NameColour, ETMHudAction Action, int32 Value)
+	const FVector2D Mouse = MousePoint();
+	// Move, Sprint and End Turn: smaller tiles, a word and a key.
+	auto WordTile = [&](const FString& Word, const FString& Under, bool bEnabled, bool bPressed, ETMHudAction Action)
 	{
-		const bool bOver = FBox2D(FVector2D(X, Y), FVector2D(X + BW, Y + BH)).IsInside(Mouse);
-		FLinearColor Fill = bEnabled ? FLinearColor(0.12f, 0.15f, 0.22f, 0.92f) : FLinearColor(0.08f, 0.09f, 0.12f, 0.8f);
-		if (bEnabled && bOver)
-		{
-			Fill = FLinearColor(0.18f, 0.23f, 0.33f, 0.95f);
-		}
-		const FLinearColor Edge = bPressed ? Gold : FLinearColor(0.4f, 0.45f, 0.55f, bEnabled ? 0.8f : 0.35f);
-		Panel(X, Y, BW, BH, Fill, Edge, bPressed ? 3.0f : 1.0f);
-		const FLinearColor Colour = bEnabled ? NameColour : Dim;
-		Text(Name, X + 8.0f * S, Y + 5.0f * S, Colour, Font, 0.62f * S);
-		Text(Details, X + 8.0f * S, Y + 33.0f * S, bEnabled ? Dim : FLinearColor(1, 1, 1, 0.3f), Font, 0.5f * S);
-		AddButton(X, Y, BW, BH, Action, Value);
-		X += BW + Gap;
+		const float TY = Y + Tile - Small;
+		const bool bOver = FBox2D(FVector2D(X, TY), FVector2D(X + Small, TY + Small)).IsInside(Mouse);
+		DrawRect(FLinearColor(0.0f, 0.0f, 0.0f, 0.75f), X - 3.0f * S, TY - 3.0f * S, Small + 6.0f * S, Small + 6.0f * S);
+		DrawRect(bPressed ? Gold : FLinearColor(0.55f, 0.62f, 0.75f, bEnabled ? 0.8f : 0.3f), X - 2.0f * S, TY - 2.0f * S, Small + 4.0f * S, Small + 4.0f * S);
+		DrawRect(bEnabled && bOver ? FLinearColor(0.16f, 0.2f, 0.3f, 1.0f) : FLinearColor(0.06f, 0.07f, 0.1f, 1.0f), X, TY, Small, Small);
+		const FVector2D WordSize = TextSize(Word, Font, 0.42f * S);
+		Text(Word, X + (Small - WordSize.X) * 0.5f, TY + Small * 0.22f, bEnabled ? TextColour : Dim, Font, 0.42f * S);
+		const FVector2D UnderSize = TextSize(Under, Font, 0.32f * S);
+		Text(Under, X + (Small - UnderSize.X) * 0.5f, TY + Small * 0.6f, Dim, Font, 0.32f * S);
+		AddButton(X, TY, Small, Small, Action, -1);
+		X += Small + Gap;
 	};
 
 	const bool bMoving = From.AimMode == ATMBattleDirector::EAimMode::Move;
-	DrawButton(TEXT("Move"), FTMSettings::Get().KeyName(ETMAction::Move),
-		bControllable && !Unit->bMoved && !Unit->IsCasting(), bMoving && !From.bSprinting,
-		TextColour, ETMHudAction::Move, -1);
-	DrawButton(TEXT("Sprint"), FString::Printf(TEXT("%s  %.1f m"), *FTMSettings::Get().KeyName(ETMAction::Sprint), From.Battle.MoveOf(*Unit, true)),
-		bControllable && !Unit->bMoved && !Unit->bActed && !Unit->IsCasting(), bMoving && From.bSprinting,
-		TextColour, ETMHudAction::Sprint, -1);
-
+	WordTile(TEXT("MOVE"), FTMSettings::Get().KeyName(ETMAction::Move),
+		bControllable && !Unit->bMoved && !Unit->IsCasting(), bMoving && !From.bSprinting, ETMHudAction::Move);
+	WordTile(TEXT("SPRINT"), FString::Printf(TEXT("%s  %.1fm"), *FTMSettings::Get().KeyName(ETMAction::Sprint), From.Battle.MoveOf(*Unit, true)),
+		bControllable && !Unit->bMoved && !Unit->bActed && !Unit->IsCasting(), bMoving && From.bSprinting, ETMHudAction::Sprint);
+	X += 10.0f * S;
 	for (int32 Slot = 0; Slot < 4; ++Slot)
 	{
-		const TMSim::FAbility* Ability = TMSim::JobAbility(Unit->Job, Slot);
-		if (!Ability)
-		{
-			X += BW + Gap;
-			continue;
-		}
-		// What the second line says, in Godot's order of importance (hud.gd:1439-1452).
-		FString Details = FString::Printf(TEXT("%d"), Slot + 1);
-		if (Ability->Kind == "passive" || Ability->Kind == "aura")
-		{
-			Details = FString(UTF8_TO_TCHAR(Ability->Kind.c_str())).ToUpper();
-		}
-		if (Slot == 3 && Unit->Ult < TMSim::Pace::UltMax)
-		{
-			Details += FString::Printf(TEXT("  ULT %d%%"), Unit->Ult);
-		}
-		else if (Unit->Cooldowns[Slot] > 0)
-		{
-			Details += FString::Printf(TEXT("  wait %d"), Unit->Cooldowns[Slot]);
-		}
-		else if (Ability->Cast > 0.0f)
-		{
-			Details += FString::Printf(TEXT("  %.1fs"), From.Battle.CastTicks(*Ability) / Tps);
-		}
-		const bool bBlocked = !From.Battle.AbilityBlockedReason(*Unit, Slot).empty();
-		// A ready ultimate stands out in gold.
-		const FLinearColor NameColour = Slot == 3 && Unit->Ult >= TMSim::Pace::UltMax ? Gold : TextColour;
-		DrawButton(UTF8_TO_TCHAR(Ability->Name.c_str()), Details,
-			bControllable && !Unit->bActed && !bBlocked,
-			From.AimMode == ATMBattleDirector::EAimMode::Ability && From.AimSlot == Slot,
-			NameColour, ETMHudAction::Ability, Slot);
+		AbilityTile(From, *Unit, Slot, X, Y, Tile, true);
+		X += Tile + Gap;
 	}
-	DrawButton(TEXT("End Turn"), FTMSettings::Get().KeyName(ETMAction::EndTurn), bControllable, false, TextColour, ETMHudAction::EndTurn, -1);
+	X += 10.0f * S;
+	WordTile(TEXT("END"), FTMSettings::Get().KeyName(ETMAction::EndTurn), bControllable, false, ETMHudAction::EndTurn);
 }
 
 void ATMBattleHud::DrawBanners(ATMBattleDirector& From)

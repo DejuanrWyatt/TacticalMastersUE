@@ -853,6 +853,52 @@ private:
 	TArray<TObjectPtr<UObject>> CharacterAssets;
 	TArray<FTMMotion> Motions;
 
+	// ------------------------------------------------ how units look to the player
+	// (TMBattleDirectorLooks.cpp): allies blue and enemies red, a ring under each
+	// unit that fills with its Turn Gauge, an outline, and a live portrait for
+	// the HUD's unit panels.
+
+public:
+	/**
+	 * The side the player is on: one person's side against the computer; with
+	 * two people at one screen, the side whose unit is being ordered; blue
+	 * while nobody is.
+	 */
+	int32 FriendTeam() const;
+	bool IsFriend(const TMSim::FUnit& Unit) const { return Unit.Team == FriendTeam(); }
+	/**
+	 * A picture of a unit's head and shoulders, filmed this frame, for the HUD.
+	 * Side 0 is the ally panel's camera and 1 the enemy's, so both can show at once.
+	 */
+	class UTextureRenderTarget2D* PortraitOf(int32 Side, const TMSim::FUnit& Unit);
+
+private:
+	void BuildTurnRings();
+	void AdvanceTurnRings();
+	void ClearLooks();
+	/** Stencil values for the outline: 1 for an ally, 2 for an enemy. */
+	void ApplyOutlines();
+	/** The team outline, if its material is in the project (Docs/TeamOutline.md). */
+	void AddOutlineToCamera();
+
+	UPROPERTY()
+	TArray<TObjectPtr<UStaticMeshComponent>> TurnRings;
+	UPROPERTY()
+	TArray<TObjectPtr<class UTextureRenderTarget2D>> TurnRingTargets;
+	UPROPERTY()
+	TArray<TObjectPtr<class UMaterialInstanceDynamic>> TurnRingPaint;
+	/** How full each ring was last drawn, so it is redrawn only when that changes. */
+	TArray<float> TurnRingDrawn;
+	UPROPERTY()
+	TObjectPtr<class USceneCaptureComponent2D> PortraitCamera0 = nullptr;
+	UPROPERTY()
+	TObjectPtr<class USceneCaptureComponent2D> PortraitCamera1 = nullptr;
+	UPROPERTY()
+	TObjectPtr<class UTextureRenderTarget2D> PortraitFilm0 = nullptr;
+	UPROPERTY()
+	TObjectPtr<class UTextureRenderTarget2D> PortraitFilm1 = nullptr;
+	bool bOutlineAdded = false;
+
 	/** Left over from the last frame, so the clock runs at its own rate. */
 	float TickRemainder = 0.0f;
 

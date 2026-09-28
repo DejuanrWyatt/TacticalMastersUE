@@ -207,6 +207,7 @@ void ATMBattleDirector::ClearBattle()
 	}
 	StatusLights.Reset();
 	ClearBlows();
+	ClearLooks();
 	for (TObjectPtr<UTextRenderComponent>& Plate : Plates)
 	{
 		if (Plate) { Plate->DestroyComponent(); }
@@ -414,6 +415,7 @@ void ATMBattleDirector::BuildBattle()
 	}
 
 	BuildBoard();
+	BuildTurnRings();
 
 	bBuilt = true;
 	ResetMotion();
@@ -501,10 +503,19 @@ void ATMBattleDirector::RefreshPlates()
 	// Who each one is and how it is doing, over its head. Every unit wears the
 	// same borrowed mesh, so without this the two sides are indistinguishable and
 	// a match is unreadable however good the lighting gets.
+	// While playing, the HUD draws each unit's name, health and statuses over
+	// its head (ATMBattleHud::DrawOverheads); these plates are for the editor,
+	// where there is no HUD.
+	const bool bHudShows = GetWorld() && GetWorld()->IsGameWorld();
 	for (int32 i = 0; i < Plates.Num() && i < static_cast<int32>(Battle.Units.size()); ++i)
 	{
 		if (!Plates[i])
 		{
+			continue;
+		}
+		if (bHudShows)
+		{
+			Plates[i]->SetVisibility(false);
 			continue;
 		}
 		const TMSim::FUnit& Unit = Battle.Units[i];
@@ -553,6 +564,7 @@ void ATMBattleDirector::RefreshPlates()
 void ATMBattleDirector::RefreshVisuals()
 {
 	RefreshPlates();
+	ApplyOutlines();
 	for (int32 i = 0; i < UnitVisuals.Num() && i < static_cast<int32>(Battle.Units.size()); ++i)
 	{
 		if (!UnitVisuals[i])
@@ -838,6 +850,7 @@ void ATMBattleDirector::FrameTheBoard()
 		// Cut rather than glide: there is nothing to glide from on the first frame.
 		Player->SetViewTarget(Watcher);
 	}
+	AddOutlineToCamera();
 	UE_LOG(LogTemp, Log, TEXT("camera framing a %.0f by %.0f m board"), Size.X, Size.Y);
 }
 
@@ -1209,6 +1222,7 @@ void ATMBattleDirector::Tick(float DeltaSeconds)
 	if (GetWorld() && GetWorld()->IsGameWorld())
 	{
 		AdvanceMotion(DeltaSeconds);
+		AdvanceTurnRings();
 		UpdateCamera(DeltaSeconds);
 		if (TunePendingFor >= 0.0f && DragSlider < 0)
 		{

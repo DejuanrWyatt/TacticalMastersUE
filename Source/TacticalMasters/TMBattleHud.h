@@ -26,6 +26,7 @@ namespace TMSim
 {
 	struct FUnit;
 	struct FVec2;
+	struct FAbility;
 }
 
 /** Something on the HUD that does something when clicked. */
@@ -172,8 +173,27 @@ private:
 
 	/** Who is casting what at this unit, as a line per caster (hud.gd:1123-1150). Returns the height used. */
 	float DrawIncoming(ATMBattleDirector& Director, const TMSim::FUnit& Unit, float X, float Y, float W);
-	/** A unit's gauges and numbers, as the selected-unit card and the inspect card both show them. Returns the height used. */
-	float DrawUnitBody(ATMBattleDirector& Director, const TMSim::FUnit& Unit, float X, float Y, float W);
+	/**
+	 * A unit's panel, Atlas Reactor's way: its portrait, health, statuses, Turn
+	 * Gauge and ultimate meter, bottom left for an ally and bottom right for an
+	 * enemy, which also shows its abilities.
+	 */
+	void DrawUnitPanel(ATMBattleDirector& Director, const TMSim::FUnit& Unit, bool bRight);
+	/** Each unit's name, health and statuses over its head. */
+	void DrawOverheads(ATMBattleDirector& Director);
+	/** A row of status chips. Returns the width used. Right to left from X when bLeftward. */
+	float StatusChips(const TMSim::FUnit& Unit, float X, float Y, float Size, bool bLeftward, bool bTips);
+	/** An ability's icon tile: coloured when it can be used, grey with the turns left when it cannot. */
+	void AbilityTile(ATMBattleDirector& Director, const TMSim::FUnit& Unit, int32 Slot, float X, float Y, float Size, bool bButton);
+	/** A slanted bar, the shape Atlas Reactor's are. */
+	void Slant(float X, float Y, float W, float H, const FLinearColor& Colour, float Skew);
+	void Bar(float X, float Y, float W, float H, float Fraction, const FLinearColor& Fill, const FLinearColor& Back, float Skew = 0.0f);
+	void Picture(class UTexture* Texture, float X, float Y, float W, float H, const FLinearColor& Tint = FLinearColor::White);
+
+	/** One of the Godot game's icons (Content/Data/Icons), loaded once; the grey copy for what cannot be used. */
+	class UTexture2D* Icon(const FString& Name, bool bGrey);
+	class UTexture2D* AbilityIcon(const TMSim::FAbility& Ability, bool bGrey);
+	class UTexture2D* ClassIcon(const TMSim::FUnit& Unit);
 
 	// How numbers are worked out, in words (game_state.gd:952-1016).
 	FString ExplainTurn(ATMBattleDirector& Director, const TMSim::FUnit& Unit) const;
@@ -207,6 +227,11 @@ private:
 	static FString JobName(const TMSim::FUnit& Unit);
 
 	TWeakObjectPtr<ATMBattleDirector> Director;
+
+	UPROPERTY()
+	TMap<FString, TObjectPtr<class UTexture2D>> Icons;
+	/** Names with no picture, asked for once. */
+	TSet<FString> NoIcon;
 
 	/** Pixels per design pixel: the layout is drawn for 1080 lines and scaled. */
 	float S = 1.0f;

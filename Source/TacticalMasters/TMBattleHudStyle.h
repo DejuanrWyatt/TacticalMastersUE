@@ -9,6 +9,8 @@
 #include "SimUnit.h"
 #include "TMSettings.h"
 
+#include <string>
+
 namespace TMHudStyle
 {
 	inline const FLinearColor TextColour(0.92f, 0.94f, 1.0f);
@@ -36,6 +38,69 @@ namespace TMHudStyle
 			return FLinearColor(0.1f, 0.2f, 0.42f, 0.95f);
 		}
 		return FTMSettings::Get().bColorblind ? FLinearColor(0.45f, 0.26f, 0.05f, 0.95f) : FLinearColor(0.42f, 0.12f, 0.1f, 0.95f);
+	}
+
+	// Allies blue and enemies red, from where the player stands rather than by
+	// side, as Atlas Reactor does it. Red becomes orange with the colour-blind
+	// option on, as TeamColour's does.
+	inline FLinearColor SideColour(bool bFriend)
+	{
+		if (bFriend)
+		{
+			return FLinearColor(0.2f, 0.55f, 1.0f);
+		}
+		return FTMSettings::Get().bColorblind ? FLinearColor(1.0f, 0.6f, 0.1f) : FLinearColor(1.0f, 0.18f, 0.15f);
+	}
+
+	inline FLinearColor SideDark(bool bFriend)
+	{
+		return SideColour(bFriend) * FLinearColor(0.25f, 0.25f, 0.25f, 1.0f);
+	}
+
+	/** A status's colour and what it does, as the Godot game shows them (jobs.gd:90-134). */
+	struct FStatusLook
+	{
+		const char* Id;
+		FLinearColor Colour;
+		const TCHAR* Desc;
+	};
+
+	inline const FStatusLook& StatusLook(const std::string& Id)
+	{
+		static const FStatusLook Looks[] =
+		{
+			{ "burn", FLinearColor(1.0f, 0.5f, 0.2f), TEXT("Loses 10% of max HP at the start of each of its turns.") },
+			{ "bleed", FLinearColor(0.8f, 0.1f, 0.2f), TEXT("Loses 6% of max HP at the start of each of its turns.") },
+			{ "regen", FLinearColor(0.45f, 1.0f, 0.55f), TEXT("Recovers 10% of max HP at the start of each of its turns.") },
+			{ "slow", FLinearColor(0.5f, 0.75f, 1.0f), TEXT("Turn Gauge fills at half speed.") },
+			{ "stun", FLinearColor(1.0f, 0.9f, 0.3f), TEXT("A unit caught in its own turn loses it, and is left partway to its next one instead of starting the gauge over.") },
+			{ "shield", FLinearColor(0.6f, 0.85f, 1.0f), TEXT("Soaks up damage until it is used up (or its turns run out).") },
+			{ "barrier", FLinearColor(0.75f, 0.9f, 1.0f), TEXT("Soaks up damage the way a Shield does, and the two stack.") },
+			{ "root", FLinearColor(0.7f, 0.55f, 0.3f), TEXT("Can't walk, but can still use abilities.") },
+			{ "crippled", FLinearColor(0.6f, 0.5f, 0.35f), TEXT("Walks only half as far.") },
+			{ "stride", FLinearColor(0.5f, 0.95f, 0.8f), TEXT("Walks half again as far.") },
+			{ "silence", FLinearColor(0.8f, 0.5f, 0.9f), TEXT("Can't use abilities, but can still walk and make a plain attack.") },
+			{ "blind", FLinearColor(0.45f, 0.4f, 0.5f), TEXT("Its attacks are 25% more likely to be evaded.") },
+			{ "shred", FLinearColor(0.9f, 0.45f, 0.3f), TEXT("AttDef and MagDef cut to 60%, so everything hits it harder.") },
+			{ "sleep", FLinearColor(0.55f, 0.65f, 1.0f), TEXT("Loses its turns, but any damage wakes it at once.") },
+			{ "freeze", FLinearColor(0.6f, 0.9f, 1.0f), TEXT("Locked in place and can do nothing, but AttDef and MagDef are tripled while it lasts.") },
+			{ "knockdown", FLinearColor(0.8f, 0.7f, 0.45f), TEXT("Getting up takes something: it may walk or use an ability on its turn, not both.") },
+			{ "doom", FLinearColor(0.7f, 0.2f, 0.45f), TEXT("When its count runs out the unit falls, however much health it has left.") },
+			{ "taunt", FLinearColor(1.0f, 0.6f, 0.35f), TEXT("Must attack whoever taunted it while that unit is in reach.") },
+			{ "fly", FLinearColor(0.75f, 0.85f, 1.0f), TEXT("Climbs any height, and melee abilities can't reach it.") },
+			{ "immunity", FLinearColor(1.0f, 0.95f, 0.6f), TEXT("Clears every harmful status on it, and turns away new ones while it lasts.") },
+			{ "invuln", FLinearColor(1.0f, 1.0f, 0.85f), TEXT("Takes no damage at all while it lasts.") },
+			{ "relentless", FLinearColor(1.0f, 0.75f, 0.3f), TEXT("Takes another turn the moment this one ends, then wears off.") },
+		};
+		for (const FStatusLook& Look : Looks)
+		{
+			if (Id == Look.Id)
+			{
+				return Look;
+			}
+		}
+		static const FStatusLook Unknown = { "", FLinearColor(0.8f, 0.8f, 0.85f), TEXT("") };
+		return Unknown;
 	}
 
 	// The turn order timeline (hud.gd:56-74).
