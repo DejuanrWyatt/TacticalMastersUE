@@ -83,6 +83,24 @@ Everything is built from the engine's basic shapes and material, so a theme
 needs no editor work. Real meshes from Fab (the Paragon Agora and Monolith
 environment, say) can replace the shapes later without changing the files.
 
+## Making maps: the map maker
+
+The class creator (`E:\TacticsClassCreator`) has a map maker: **Map maker** in
+its sidebar. Paint heights, rock, water, embers and springs on a grid (the other
+half paints itself), put blue's four spawns, and pick the theme. It shows:
+
+- **The rules' verdict** as you paint: the same checks the game makes.
+- **The numbers:** size, walking distance between the sides, standing room,
+  high ground, rock, water, embers and springs.
+- **How it looks**, in its theme, from the corner the camera starts at.
+- **Play it:** the class lab (`TMClassLab map <file> [games]`) fights 8 to 64
+  computer-vs-computer battles on the game's rules and reports the win rate by
+  side, how long a battle takes, when the first blow lands and any refused
+  order. The grid then shows where units walked and where they fell, so ground
+  nobody uses, or one spot everyone dies on, shows up at once.
+- **Install** checks it again, plays two battles, and writes it here; the game
+  offers it on the setup screen when it next starts.
+
 ## Choosing them
 
 The setup screen has **Map** and **Theme**; Theme cycles through "the map's

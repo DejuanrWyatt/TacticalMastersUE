@@ -32,6 +32,7 @@
 #include "SimBattle.h"
 #include "SimClassFile.h"
 
+#include <algorithm>
 #include <chrono>
 #include <cstdio>
 #include <fstream>
@@ -397,10 +398,150 @@ namespace
 		std::printf("PLAYTEST %s\n", Out.c_str());
 		return 0;
 	}
+
+	/**
+	 * Is a map legal, and how does it play? Read with the game's own checks
+	 * (TMSim::ReadMapFile), then fought on: the Godot starting four a side,
+	 * computer against computer at hard, the seeds counting up. It says how
+	 * often each side won -- a fair map is near half and half -- how long a
+	 * battle takes and when the first blow lands, where units fell, and how
+	 * often each tile was stood on, so ground nobody uses shows up.
+	 */
+	int MapCheck(const char* Path, int Games)
+	{
+		FMapDef Def;
+		const std::string Text = ReadAll(Path);
+		const std::string Problems = Text.empty() ? std::string("could not read ") + Path : ReadMapFile(Text, Def);
+		if (!Problems.empty())
+		{
+			std::printf("MAPCHECK {\"ok\":false,\"errors\":%s}\n", ErrorList(Problems).c_str());
+			return 1;
+		}
+		FMap Map;
+		Map.BuildMirrored(Def.Top);
+		const FVec2 Size = Map.SizeMeters();
+		const char* const Roster[4] = { "knight", "archer", "black_mage", "white_mage" };
+		int Wins[2] = { 0, 0 };
+		int Undecided = 0;
+		int Illegal = 0;
+		double Seconds = 0.0;
+		double FirstBlow = 0.0;
+		int Blows = 0;
+		std::vector<int> Trodden(static_cast<size_t>(Map.TilesX) * Map.TilesY, 0);
+		std::vector<int> Falls(Trodden.size(), 0);
+		auto TileAt = [&Map](const FVec2& Point)
+		{
+			const FNode Node = FMap::NodeOf(Point);
+			const int X = std::min(Map.TilesX - 1, std::max(0, Node.X / Ground::NodesPerTile));
+			const int Y = std::min(Map.TilesY - 1, std::max(0, Node.Y / Ground::NodesPerTile));
+			return static_cast<size_t>(Y * Map.TilesX + X);
+		};
+		for (int Game = 0; Game < Games; ++Game)
+		{
+			FBattle Battle;
+			Battle.Map = Map;
+			for (int Index = 0; Index < 8; ++Index)
+			{
+				FUnit Unit;
+				Unit.Id = Index;
+				Unit.Team = Index < 4 ? 0 : 1;
+				Unit.Job = Roster[Index % 4];
+				Unit.Stats = &FindJob(Unit.Job)->Stats;
+				const FVec2 Spot = Def.Spawns[Index % 4];
+				Unit.Pos = Index < 4 ? Spot : FVec2(Size.X - Spot.X, Size.Y - Spot.Y);
+				Battle.Units.push_back(Unit);
+			}
+			Battle.SpawnPoints[0] = Def.Spawns[0];
+			Battle.SpawnPoints[1] = FVec2(Size.X - Def.Spawns[0].X, Size.Y - Def.Spawns[0].Y);
+			Battle.Start(1000 + Game);
+			FAIPlayer Computer("hard");
+			Computer.Rng.Seed(2000 + Game);
+			int Hit = -1;
+			while (Battle.Winner == -1 && Battle.TickCount < 6000)
+			{
+				const FUnit* Ready = NextReady(Battle);
+				FOrder Order = Ready ? Computer.NextCommand(Battle, *Ready) : FOrder::MakeAdvance(1);
+				if (!Battle.Validate(Order).empty())
+				{
+					++Illegal;
+					if (!Ready)
+					{
+						break;
+					}
+					Order = FOrder::MakeEndTurn(Ready->Id, Ready->Serial);
+				}
+				FTickReport Report;
+				Battle.Apply(Order, Report);
+				for (const FEvent& Event : Report.Events)
+				{
+					if (Hit < 0 && Event.Kind == EEventKind::Hit && Event.By >= 0)
+					{
+						Hit = Battle.TickCount;
+					}
+					if (Event.Kind == EEventKind::Knocked)
+					{
+						if (const FUnit* Fallen = Battle.FindUnit(Event.Unit))
+						{
+							++Falls[TileAt(Fallen->Pos)];
+						}
+					}
+				}
+				// Where everyone stands, once a second of battle.
+				if (Battle.TickCount % Pace::TicksPerSecond == 0 && !Ready)
+				{
+					for (const FUnit& Unit : Battle.Units)
+					{
+						if (Unit.IsAlive())
+						{
+							++Trodden[TileAt(Unit.Pos)];
+						}
+					}
+				}
+			}
+			if (Battle.Winner == 0 || Battle.Winner == 1)
+			{
+				++Wins[Battle.Winner];
+			}
+			else
+			{
+				++Undecided;
+			}
+			Seconds += Battle.TickCount / static_cast<double>(Pace::TicksPerSecond);
+			if (Hit >= 0)
+			{
+				FirstBlow += Hit / static_cast<double>(Pace::TicksPerSecond);
+				++Blows;
+			}
+		}
+		auto List = [](const std::vector<int>& Values)
+		{
+			std::string Out = "[";
+			for (size_t i = 0; i < Values.size(); ++i)
+			{
+				Out += (i ? "," : "") + std::to_string(Values[i]);
+			}
+			return Out + "]";
+		};
+		std::printf("MAPCHECK {\"ok\":true,\"errors\":[],\"id\":%s,\"name\":%s,\"tiles\":[%d,%d],\"games\":%d,\"blue\":%d,\"red\":%d,"
+			"\"undecided\":%d,\"illegal\":%d,\"seconds\":%s,\"firstBlow\":%s,\"trodden\":%s,\"falls\":%s}\n",
+			Quote(Def.Id).c_str(), Quote(Def.Name).c_str(), Map.TilesX, Map.TilesY, Games, Wins[0], Wins[1], Undecided, Illegal,
+			Number(Seconds / Games).c_str(), Number(Blows ? FirstBlow / Blows : -1.0).c_str(), List(Trodden).c_str(), List(Falls).c_str());
+		return Illegal == 0 ? 0 : 1;
+	}
 }
 
 int main(int ArgCount, char** Args)
 {
+	if (ArgCount >= 3 && std::string(Args[1]) == "map")
+	{
+		const int Games = ArgCount >= 4 ? std::atoi(Args[3]) : 8;
+		if (Games < 1 || Games > 64)
+		{
+			std::fprintf(stderr, "games must be 1 to 64\n");
+			return 2;
+		}
+		return MapCheck(Args[2], Games);
+	}
 	if (ArgCount >= 3 && std::string(Args[1]) == "check")
 	{
 		const bool bBattle = ArgCount >= 4 && std::string(Args[3]) == "--battle";
@@ -429,6 +570,6 @@ int main(int ArgCount, char** Args)
 		}
 		return Playtest(Args[2], Games, Skill);
 	}
-	std::fprintf(stderr, "usage:\n  TMClassLab check <class file> [--battle]\n  TMClassLab playtest <class file> [games] [--skill easy|medium|hard]\n");
+	std::fprintf(stderr, "usage:\n  TMClassLab check <class file> [--battle]\n  TMClassLab playtest <class file> [games] [--skill easy|medium|hard]\n  TMClassLab map <map file> [games]\n");
 	return 2;
 }
