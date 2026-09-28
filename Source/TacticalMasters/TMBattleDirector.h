@@ -647,9 +647,24 @@ private:
 	// a unit walks, swings and falls on screen because the rules said it moved,
 	// hit and fell, never the other way round.
 
+	/**
+	 * The clips for one motion (TMSim::AnimMotions): what plays when it goes
+	 * off -- one per slot, round -- and, for an ability with a cast time, what
+	 * plays as it starts charging, what loops while it charges, and what plays
+	 * when a charged one goes off.
+	 */
+	struct FTMMotionClips
+	{
+		TArray<UAnimSequence*> Release;
+		UAnimSequence* Intro = nullptr;
+		UAnimSequence* Windup = nullptr;
+		UAnimSequence* CastRelease = nullptr;
+	};
+
 	/** One animation set: the clips for one skeleton. */
 	struct FTMAnimSet
 	{
+		TMap<FString, FTMMotionClips> Motions;
 		UAnimSequence* Idle = nullptr;
 		UAnimSequence* Walk = nullptr;
 		UAnimSequence* Run = nullptr;
@@ -691,7 +706,14 @@ private:
 		float QueuedYaw = 0.0f;
 		/** Knocked out and lying down. */
 		bool bDown = false;
+		/** Its ability was charged before it went off, so the charged release plays. */
+		bool bWasCasting = false;
 	};
+
+	/** A motion's clips in this set, or the nearest motion it has (heavy to melee, area to bolt...). */
+	static const FTMMotionClips* FindMotion(const FTMAnimSet& Set, const FString& Motion);
+	/** What a unit shows standing: its wind-up while it charges, its channel while it channels, or idle. */
+	UAnimSequence* StandingClip(int32 Index) const;
 
 	/** Reads the character map once per run. False, and said why, if it cannot. */
 	bool LoadCharacterMap();

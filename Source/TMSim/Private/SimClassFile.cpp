@@ -1,7 +1,9 @@
 #include "SimClassFile.h"
 
 #include "SimJson.h"
+#include "SimAbility.h"
 
+#include <algorithm>
 #include <cmath>
 
 namespace TMSim
@@ -28,7 +30,7 @@ namespace TMSim
 
 		const char* const ClassKeys[] = { "format", "version", "id", "name", "color", "look", "icon", "roles", "stats", "abilities", "creator" };
 		const char* const AbilityKeys[] = { "id", "name", "desc", "kind", "effect", "scale", "target", "shape", "power", "min_range",
-			"max_range", "aoe", "angle", "channel", "cooldown", "cast", "tg", "status", "buffs", "fx", "vfx" };
+			"max_range", "aoe", "angle", "channel", "cooldown", "cast", "tg", "status", "buffs", "fx", "vfx", "anim" };
 		const char* const VfxKeys[] = { "system", "at", "scale" };
 		const char* const VfxPlaces[] = { "user", "point", "targets" };
 		const char* const Looks[] = { "squire", "knight", "archer", "monk", "black_mage", "white_mage" };
@@ -159,6 +161,11 @@ namespace TMSim
 			Out.Name = StringOf(Json, "name", Where, Problems, true);
 			Out.Desc = StringOf(Json, "desc", Where, Problems, false);
 			Out.Fx = StringOf(Json, "fx", Where, Problems, false);
+			Out.Anim = StringOf(Json, "anim", Where, Problems, false);
+			if (!Out.Anim.empty() && std::find(AnimMotions().begin(), AnimMotions().end(), Out.Anim) == AnimMotions().end())
+			{
+				Problems.Say(Where, "unknown anim \"" + Out.Anim + "\"");
+			}
 			if (!ValidId(Out.Id, 96) && !Out.Id.empty())
 			{
 				Problems.Say(Where, "the id should be lowercase letters, digits and _");

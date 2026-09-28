@@ -32,6 +32,7 @@
 #include "SimJson.h"
 
 #include <algorithm>
+#include <map>
 #include <chrono>
 #include <cstdio>
 #include <filesystem>
@@ -384,6 +385,7 @@ int main(int ArgCount, char** Args)
 			{ "an effect with an unknown key", Mutated(Fresh, "\"kind\": ", "\"vfx\": {\"system\": \"/Game/A/B.B\", \"colour\": \"red\"}, \"kind\": ") },
 			{ "an effect played nowhere", Mutated(Fresh, "\"kind\": ", "\"vfx\": {\"system\": \"/Game/A/B.B\", \"at\": \"sky\"}, \"kind\": ") },
 			{ "an effect far too big", Mutated(Fresh, "\"kind\": ", "\"vfx\": {\"system\": \"/Game/A/B.B\", \"scale\": 50}, \"kind\": ") },
+			{ "a motion no body knows", Mutated(Fresh, "\"kind\": ", "\"anim\": \"backflip\", \"kind\": ") },
 		};
 		int Refused = 0;
 		for (const FProbe& Probe : Probes)
@@ -420,6 +422,36 @@ int main(int ArgCount, char** Args)
 		{
 			std::printf("read an ability's particle effect as written\n");
 		}
+
+		// A motion named in the file is the one played; every other ability of
+		// every class gets one worked out from what it is.
+		FJobDef AnimJob;
+		std::vector<FAbility> AnimAbilities;
+		const std::string AnimProblems = ReadClassFile(Mutated(Fresh, "\"kind\": ", "\"anim\": \"heavy\", \"kind\": "), AnimJob, AnimAbilities);
+		if (!AnimProblems.empty() || AnimAbilities.empty() || MotionOf(AnimAbilities[0], 0) != "heavy")
+		{
+			Fail("a class file naming a motion was not read as written: " + AnimProblems);
+		}
+		std::map<std::string, int> Motions;
+		for (const FJobDef* Job : AllJobs())
+		{
+			for (int Slot = 0; Slot < 4; ++Slot)
+			{
+				const FAbility* Ability = JobAbility(Job->Id, Slot);
+				const std::string Motion = Ability ? MotionOf(*Ability, Slot) : std::string("?");
+				if (std::find(AnimMotions().begin(), AnimMotions().end(), Motion) == AnimMotions().end())
+				{
+					Fail(Job->Id + " slot " + std::to_string(Slot) + " has no motion");
+				}
+				++Motions[Motion];
+			}
+		}
+		std::printf("every ability of every class has a motion:");
+		for (const auto& Each : Motions)
+		{
+			std::printf(" %s %d", Each.first.c_str(), Each.second);
+		}
+		std::printf("\n");
 	}
 
 	// -------------------------------------------------------------- MATCH

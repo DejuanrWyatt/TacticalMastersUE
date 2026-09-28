@@ -85,6 +85,13 @@ namespace TMSim
 		 */
 		std::string VfxSystem;
 		std::string VfxAt;
+		/**
+		 * How the user's body moves when it is used -- a motion such as "melee" or
+		 * "bolt" (AnimMotions()), which each body's animation set turns into a
+		 * clip. Empty means the motion worked out from what the ability is
+		 * (MotionOf). Never read by the rules.
+		 */
+		std::string Anim;
 		float VfxScale = 1.0f;
 
 		bool HasStatus() const { return !StatusId.empty(); }
@@ -122,6 +129,18 @@ namespace TMSim
 	/** Null if nothing is registered under that id. */
 	TMSIM_API const FJobDef* FindJob(const std::string& JobId);
 	TMSIM_API const FAbility* FindAbility(const std::string& AbilityId);
+
+	/** Every motion an ability can name, for a class file's "anim" and the creator's list. */
+	TMSIM_API const std::vector<std::string>& AnimMotions();
+	/**
+	 * The motion an ability plays: the one its class file names, or else one
+	 * worked out from what it is -- a weapon at arm's length swings, a weapon at
+	 * range shoots, a spell at one target is a bolt, a spell over an area is
+	 * cast wide, healing and raising and blessing each have their own, a
+	 * channelled spell channels, a charge dashes. The ultimate (slot 3) of a
+	 * weapon user swings heavy. Presentation only: the rules never ask.
+	 */
+	TMSIM_API std::string MotionOf(const FAbility& Ability, int Slot);
 
 	/** The ability in one of a class's four slots, or null. */
 	TMSIM_API const FAbility* JobAbility(const std::string& JobId, int Slot);

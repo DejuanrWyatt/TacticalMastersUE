@@ -129,6 +129,44 @@ retargeter above) and Lyra's set. Each role has a key:
 Several clips in a list are spread across slots or hits so it doesn't look
 repetitive. A different skeleton gets its own set, and its bodies name that set.
 
+### Motions: a different move for each kind of ability
+
+Every ability has a **motion**: `melee`, `heavy`, `shoot`, `bolt`, `area`,
+`heal`, `buff`, `revive`, `channel`, `dash` or `none`. A class file can name one
+with `"anim"`. If it doesn't, the game works one out: a weapon at arm's length
+is `melee`, and `heavy` if it's the ultimate or hits an area. A weapon at range
+is `shoot`. A spell at one target is `bolt`, and over an area it's `area`.
+Healing, raising and blessing each have their own motion, a channelled spell
+is `channel` and a charge is `dash`. Toggles, passives and auras are `none`.
+
+An animation set maps motions to clips under `"motions"`:
+
+```json
+"motions": {
+  "shoot": {
+    "release": ["/Game/.../Primary_Fire_Fast.Primary_Fire_Fast"],
+    "intro": "/Game/.../RMB_Drawback.RMB_Drawback",
+    "windup": "/Game/.../RMB_Loop.RMB_Loop",
+    "castRelease": "/Game/.../RMB_Fire.RMB_Fire"
+  }
+}
+```
+
+| key | when it plays |
+|---|---|
+| `release` | the ability goes off (a list is spread across slots) |
+| `intro` | an ability with a cast time starts charging |
+| `windup` | loops for as long as it charges, or while a channel goes on |
+| `castRelease` | a *charged* ability goes off (instead of `release`) |
+
+A set doesn't need every motion. A missing one falls back to a close relative:
+`heavy` to `melee`, `dash` to `heavy` or `melee`, `shoot` and `area` to `bolt`,
+`heal`, `buff` and `revive` to each other and then `bolt`, and `channel` to
+`area` or `bolt`. If none of those has clips either, a weapon motion uses the
+set's `attack` clips and anything else uses `cast`. A cast that fizzles stops,
+and the set's first `hit` clip plays. Additive clips are refused here too; the
+log says which.
+
 ## Step 4 (optional): an Animation Blueprint
 
 Only if you want blending: a swing that starts mid-walk, aim offsets, or

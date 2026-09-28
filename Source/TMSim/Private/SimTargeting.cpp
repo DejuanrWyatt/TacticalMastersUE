@@ -19,6 +19,68 @@
 
 namespace TMSim
 {
+	const std::vector<std::string>& AnimMotions()
+	{
+		static const std::vector<std::string> Motions =
+		{
+			"melee", "heavy", "shoot", "bolt", "area", "heal", "buff", "revive", "channel", "dash", "none"
+		};
+		return Motions;
+	}
+
+	std::string MotionOf(const FAbility& Ability, int Slot)
+	{
+		if (!Ability.Anim.empty())
+		{
+			return Ability.Anim;
+		}
+		// A switch flipped, or something always on, is no motion at all.
+		if (Ability.Kind == "toggle" || Ability.Kind == "passive" || Ability.Kind == "aura")
+		{
+			return "none";
+		}
+		if (Ability.Kind == "channeled")
+		{
+			return "channel";
+		}
+		const std::string Shape = ShapeOf(Ability);
+		switch (Ability.Effect)
+		{
+		case EEffect::Revive:
+			return "revive";
+		case EEffect::Heal:
+			return "heal";
+		case EEffect::Support:
+			// On itself, or all around it: a blessing. On others: the healer's
+			// gesture for a friend, the caster's bolt for a foe.
+			if (Shape == "self" || Ability.MaxRange == 0.0f)
+			{
+				return "buff";
+			}
+			return Ability.Target == ETargetSide::Enemy ? "bolt" : "heal";
+		case EEffect::Damage:
+		default:
+			if (Shape == "vector")
+			{
+				return "dash";
+			}
+			if (Ability.Scale == EScale::Att)
+			{
+				// Arm's length is two metres or less, as a melee reach is.
+				if (Ability.MaxRange <= 2.0f)
+				{
+					return Slot == 3 || Ability.Aoe > 0.0f ? "heavy" : "melee";
+				}
+				return "shoot";
+			}
+			if (Ability.Aoe > 0.0f || Shape == "circle" || Shape == "cone" || Shape == "line" || Shape == "global")
+			{
+				return "area";
+			}
+			return "bolt";
+		}
+	}
+
 	std::string ShapeOf(const FAbility& Ability)
 	{
 		// Written down wins; otherwise it follows from the ranges, which is how

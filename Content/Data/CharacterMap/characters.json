@@ -1,7 +1,7 @@
 {
   "format": "tactical-masters-characters",
   "version": 1,
-  "about": "Which body each class wears, and which animation plays for what. Read by the director when a battle is built; see Docs/CharacterSetup.md. A class is looked up by its id under classes, then by its look under looks, then default. Every body names an animation set, and every animation in a set must be authored for that body's skeleton. The mannequin set has no hit clip: the template's hit reactions are additive, made to be layered over another pose, and cannot play on their own.",
+  "about": "Which body each class wears, and which animation plays for what. Read by the director when a battle is built; see Docs/CharacterSetup.md. A class is looked up by its id under classes, then by its look under looks, then default. Every body names an animation set, and every animation in a set must be authored for that body's skeleton. The mannequin set has no hit clip: the template's hit reactions are additive, made to be layered over another pose, and cannot play on their own. Each set may map motions (melee, heavy, shoot, bolt, area, heal, buff, revive, channel, dash) to clips: 'release' when it goes off (one per slot, round), and for a cast 'intro' and a looping 'windup' while it charges, then 'castRelease'. A motion a set lacks falls back to a near one (heavy to melee, area to bolt, heal and buff to each other) and at last to the set's attack or cast.",
   "default": "manny",
   "looks": {
     "squire": "manny",
@@ -47,7 +47,31 @@
       ],
       "rise": "/Game/Characters/Mannequins/Anims/Unarmed/Jump/MM_Land.MM_Land",
       "walkSpeed": 170,
-      "runSpeed": 380
+      "runSpeed": 380,
+      "motions": {
+        "melee": {
+          "release": [
+            "/Game/Characters/Mannequins/Anims/Unarmed/Attack/MM_Attack_01.MM_Attack_01",
+            "/Game/Characters/Mannequins/Anims/Unarmed/Attack/MM_Attack_02.MM_Attack_02",
+            "/Game/Characters/Mannequins/Anims/Unarmed/Attack/MM_Attack_03.MM_Attack_03"
+          ]
+        },
+        "heavy": {
+          "release": [
+            "/Game/Characters/Mannequins/Anims/Unarmed/Attack/MM_ChargedAttack.MM_ChargedAttack"
+          ]
+        },
+        "dash": {
+          "release": [
+            "/Game/Characters/Mannequins/Anims/Unarmed/Jump/MM_Dash.MM_Dash"
+          ]
+        },
+        "bolt": {
+          "release": [
+            "/Game/Characters/Mannequins/Anims/Unarmed/Attack/MM_ChargedAttack.MM_ChargedAttack"
+          ]
+        }
+      }
     },
     "sparrow": {
       "idle": "/Game/ParagonSparrow/Characters/Heroes/Sparrow/Animations/idle.idle",
@@ -69,7 +93,50 @@
       ],
       "rise": "/Game/ParagonSparrow/Characters/Heroes/Sparrow/Animations/Respawn.Respawn",
       "walkSpeed": 360,
-      "runSpeed": 600
+      "runSpeed": 600,
+      "motions": {
+        "shoot": {
+          "release": [
+            "/Game/ParagonSparrow/Characters/Heroes/Sparrow/Animations/Primary_Fire_Fast.Primary_Fire_Fast",
+            "/Game/ParagonSparrow/Characters/Heroes/Sparrow/Animations/Primary_Fire_Med.Primary_Fire_Med",
+            "/Game/ParagonSparrow/Characters/Heroes/Sparrow/Animations/Primary_Fire_Slow.Primary_Fire_Slow"
+          ],
+          "intro": "/Game/ParagonSparrow/Characters/Heroes/Sparrow/Animations/RMB_Drawback.RMB_Drawback",
+          "windup": "/Game/ParagonSparrow/Characters/Heroes/Sparrow/Animations/RMB_Loop.RMB_Loop",
+          "castRelease": "/Game/ParagonSparrow/Characters/Heroes/Sparrow/Animations/RMB_Fire.RMB_Fire"
+        },
+        "melee": {
+          "release": [
+            "/Game/ParagonSparrow/Characters/Heroes/Sparrow/Animations/Primary_Fire_Fast.Primary_Fire_Fast"
+          ]
+        },
+        "heavy": {
+          "release": [
+            "/Game/ParagonSparrow/Characters/Heroes/Sparrow/Animations/R_Ability_Fast_Fire.R_Ability_Fast_Fire"
+          ]
+        },
+        "area": {
+          "release": [
+            "/Game/ParagonSparrow/Characters/Heroes/Sparrow/Animations/R_Ability_Med_Fire.R_Ability_Med_Fire"
+          ]
+        },
+        "bolt": {
+          "release": [
+            "/Game/ParagonSparrow/Characters/Heroes/Sparrow/Animations/Q_Ability.Q_Ability"
+          ]
+        },
+        "heal": {
+          "release": [
+            "/Game/ParagonSparrow/Characters/Heroes/Sparrow/Animations/Cast.Cast"
+          ]
+        },
+        "channel": {
+          "windup": "/Game/ParagonSparrow/Characters/Heroes/Sparrow/Animations/RMB_Loop.RMB_Loop",
+          "release": [
+            "/Game/ParagonSparrow/Characters/Heroes/Sparrow/Animations/RMB_Fire.RMB_Fire"
+          ]
+        }
+      }
     }
   }
 }

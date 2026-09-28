@@ -120,6 +120,38 @@ bool ATMBattleDirector::LoadCharacterMap()
 			Out.Cast = One(TEXT("cast"));
 			Out.Rise = One(TEXT("rise"));
 			Many(TEXT("attack"), Out.Attack);
+			const TSharedPtr<FJsonObject>* MotionList = nullptr;
+			if (Set->TryGetObjectField(TEXT("motions"), MotionList))
+			{
+				for (const TPair<FString, TSharedPtr<FJsonValue>>& Motion : (*MotionList)->Values)
+				{
+					const TSharedPtr<FJsonObject> Clips = Motion.Value->AsObject();
+					if (!Clips.IsValid())
+					{
+						continue;
+					}
+					FTMMotionClips& Into = Out.Motions.Add(Motion.Key);
+					auto Clip = [&](const TCHAR* Key) { FString Path; Clips->TryGetStringField(Key, Path); return LoadNamed<UAnimSequence>(Path, CharacterAssets); };
+					Into.Intro = Clip(TEXT("intro"));
+					Into.Windup = Clip(TEXT("windup"));
+					Into.CastRelease = Clip(TEXT("castRelease"));
+					const TArray<TSharedPtr<FJsonValue>>* Releases = nullptr;
+					if (Clips->TryGetArrayField(TEXT("release"), Releases))
+					{
+						for (const TSharedPtr<FJsonValue>& Item : *Releases)
+						{
+							if (UAnimSequence* Loaded = LoadNamed<UAnimSequence>(Item->AsString(), CharacterAssets))
+							{
+								Into.Release.Add(Loaded);
+							}
+						}
+					}
+					else if (UAnimSequence* Single = Clip(TEXT("release")))
+					{
+						Into.Release.Add(Single);
+					}
+				}
+			}
 			Many(TEXT("hit"), Out.Hit);
 			Many(TEXT("death"), Out.Death);
 			double Speed = 0.0;
@@ -261,6 +293,63 @@ void ATMBattleDirector::Animate(int32 Index, UAnimSequence* Clip, bool bLoop)
 	Motion.OneShotLeft = bLoop ? 0.0f : Clip->GetPlayLength();
 }
 
+const ATMBattleDirector::FTMMotionClips* ATMBattleDirector::FindMotion(const FTMAnimSet& Set, const FString& Motion)
+{
+	// The nearest motion a set has, so a body with a few clips still moves
+	// sensibly for all of them.
+	static const TMap<FString, TArray<FString>> Nearest =
+	{
+		{ TEXT("heavy"), { TEXT("melee") } },
+		{ TEXT("dash"), { TEXT("heavy"), TEXT("melee") } },
+		{ TEXT("shoot"), { TEXT("bolt") } },
+		{ TEXT("area"), { TEXT("bolt") } },
+		{ TEXT("heal"), { TEXT("buff"), TEXT("bolt") } },
+		{ TEXT("buff"), { TEXT("heal"), TEXT("bolt") } },
+		{ TEXT("revive"), { TEXT("heal"), TEXT("buff"), TEXT("bolt") } },
+		{ TEXT("channel"), { TEXT("area"), TEXT("bolt") } },
+	};
+	if (const FTMMotionClips* Found = Set.Motions.Find(Motion))
+	{
+		return Found;
+	}
+	if (const TArray<FString>* Next = Nearest.Find(Motion))
+	{
+		for (const FString& Other : *Next)
+		{
+			if (const FTMMotionClips* Found = Set.Motions.Find(Other))
+			{
+				return Found;
+			}
+		}
+	}
+	return nullptr;
+}
+
+UAnimSequence* ATMBattleDirector::StandingClip(int32 Index) const
+{
+	const FTMMotion& Motion = Motions[Index];
+	const FTMAnimSet* Set = Motion.Body ? Motion.Body->Animations : nullptr;
+	if (!Set)
+	{
+		return nullptr;
+	}
+	const TMSim::FUnit& Unit = Battle.Units[Index];
+	// Charging a cast, or between the turns of a channel: its loop, if it has one.
+	int32 Slot = Unit.IsCasting() ? Unit.Casting.Slot : (Unit.IsChanneling() ? Unit.Channeling.Slot : -1);
+	if (Slot >= 0)
+	{
+		if (const TMSim::FAbility* Ability = TMSim::JobAbility(Unit.Job, Slot))
+		{
+			const FTMMotionClips* Clips = FindMotion(*Set, UTF8_TO_TCHAR(TMSim::MotionOf(*Ability, Slot).c_str()));
+			if (Clips && Clips->Windup)
+			{
+				return Clips->Windup;
+			}
+		}
+	}
+	return Set->Idle;
+}
+
 void ATMBattleDirector::AnimateEvents(const TMSim::FTickReport& Report)
 {
 	if (Motions.Num() != static_cast<int32>(Battle.Units.size()))
@@ -288,18 +377,66 @@ void ATMBattleDirector::AnimateEvents(const TMSim::FTickReport& Report)
 		FTMMotion& Motion = Motions[i];
 		const FTMAnimSet& Set = *Motion.Body->Animations;
 		const TMSim::FUnit& Unit = Battle.Units[i];
+		if (Event.Kind == TMSim::EEventKind::CastStarted)
+		{
+			// Starting to charge: the motion's intro, then its wind-up loops for
+			// as long as the cast lasts (StandingClip).
+			const TMSim::FAbility* Ability = TMSim::FindAbility(Event.Id);
+			const FTMMotionClips* Clips = Ability ? FindMotion(Set, UTF8_TO_TCHAR(TMSim::MotionOf(*Ability, Event.Slot).c_str())) : nullptr;
+			Motion.bWasCasting = true;
+			const TMSim::FVec2 Toward = Event.Where - Unit.Pos;
+			if (Toward.Length() > 0.05f)
+			{
+				Motion.Yaw = YawOf(Toward);
+			}
+			if (Clips && Clips->Intro && Motion.Path.Num() == 0)
+			{
+				Animate(i, Clips->Intro, false);
+			}
+			continue;
+		}
+		if (Event.Kind == TMSim::EEventKind::CastFizzled)
+		{
+			// Lost to a stun or a knock: whatever it was charging stops.
+			Motion.bWasCasting = false;
+			Motion.OneShotLeft = 0.0f;
+			if (Set.Hit.Num() > 0 && Unit.IsAlive())
+			{
+				Animate(i, Set.Hit[0], false);
+			}
+			continue;
+		}
 		if (Event.Kind == TMSim::EEventKind::Resolved)
 		{
-			// A weapon ability swings; anything else -- spells, healing, songs --
-			// is the charged, two-handed motion. A switch flipped is no motion.
+			// Its motion (TMSim::MotionOf): the class file's, or one worked out
+			// from the ability. A switch flipped, or an aura, is no motion.
 			const TMSim::FAbility* Ability = TMSim::FindAbility(Event.Id);
-			if (!Ability || Ability->Kind == "toggle")
+			const FString Named = Ability ? FString(UTF8_TO_TCHAR(TMSim::MotionOf(*Ability, Event.Slot).c_str())) : FString(TEXT("none"));
+			const bool bCharged = Motion.bWasCasting;
+			Motion.bWasCasting = false;
+			if (Named == TEXT("none"))
 			{
 				continue;
 			}
-			UAnimSequence* Clip = Ability->Effect == TMSim::EEffect::Damage && Ability->Scale == TMSim::EScale::Att && Set.Attack.Num() > 0
-				? Set.Attack[FMath::Max(0, Event.Slot) % Set.Attack.Num()]
-				: Set.Cast;
+			UAnimSequence* Clip = nullptr;
+			if (const FTMMotionClips* Clips = FindMotion(Set, Named))
+			{
+				if (bCharged && Clips->CastRelease)
+				{
+					Clip = Clips->CastRelease;
+				}
+				else if (Clips->Release.Num() > 0)
+				{
+					Clip = Clips->Release[FMath::Max(0, Event.Slot) % Clips->Release.Num()];
+				}
+			}
+			if (!Clip)
+			{
+				// No clip for it or anything near it: a weapon swings, anything
+				// else makes the set's cast motion.
+				const bool bWeapon = Named == TEXT("melee") || Named == TEXT("heavy") || Named == TEXT("dash") || Named == TEXT("shoot");
+				Clip = bWeapon && Set.Attack.Num() > 0 ? Set.Attack[FMath::Max(0, Event.Slot) % Set.Attack.Num()] : Set.Cast;
+			}
 			const TMSim::FVec2 Toward = Event.Where - Unit.Pos;
 			const float Yaw = Toward.Length() > 0.05f ? YawOf(Toward) : YawOf(Unit.Facing);
 			if (Motion.Path.Num() > 0)
@@ -435,12 +572,12 @@ void ATMBattleDirector::AdvanceMotion(float DeltaSeconds)
 			Motion.OneShotLeft -= DeltaSeconds;
 			if (Motion.OneShotLeft <= 0.0f && !Motion.bDown && Set)
 			{
-				Animate(i, Motion.Path.Num() > 0 ? (Motion.bRun && Set->Run ? Set->Run : Set->Walk) : Set->Idle, true);
+				Animate(i, Motion.Path.Num() > 0 ? (Motion.bRun && Set->Run ? Set->Run : Set->Walk) : StandingClip(i), true);
 			}
 		}
 		else if (Motion.Path.Num() == 0 && !Motion.bDown && Set)
 		{
-			Animate(i, Set->Idle, true);
+			Animate(i, StandingClip(i), true);
 		}
 
 		// The body and everything that stands with it.
