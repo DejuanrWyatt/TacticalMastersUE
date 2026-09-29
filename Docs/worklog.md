@@ -22,6 +22,14 @@ How to write here:
 - State: packaging from a clean worktree of `a75a859`, **without watchtowers**, at
   `E:\UnrealProjects\TM_Release` (its `Content` is a junction to this folder's). Log: `E:\Builds\package.log`.
   Started 2026-09-29; the cook takes an hour or more and uses ~10 GB.
+- 2026-09-29: the cook ran the PC out of memory again at 82% (9059/11110; "paging file too small").
+  The human is enlarging the page file (32 GB on E:) and restarting the PC. **To resume** (keeps the
+  82% already cooked), from any session, with the PC otherwise quiet:
+  `E:\UE_5.8\Engine\Build\BatchFiles\RunUAT.bat BuildCookRun -project=E:\UnrealProjects\TM_Release\TacticalMasters.uproject -noP4 -platform=Win64 -clientconfig=Development -build -cook -cookincremental -stage -pak -iostore -prereqs -archive -archivedirectory=E:\Builds\TacticalMasters -utf8output -unattended > E:\Builds\package.log 2>&1`
+  Then: run `E:\Builds\TacticalMasters\Windows\TacticalMasters.exe` once to check it opens and plays,
+  and copy the online guide (`HOW TO PLAY ONLINE.txt`, drafted by this session; rewrite it if lost:
+  host = Play Online -> Host Game, TCP port 7777, UPnP or forward by hand; join = Host address -> Join Game)
+  into `E:\Builds\TacticalMasters\Windows`.
 - Please don't: delete or move `E:\UnrealProjects\TM_Release`, or change Content assets, while it cooks.
   A second heavy build at the same time may run the PC out of memory again.
 
