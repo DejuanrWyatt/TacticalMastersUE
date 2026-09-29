@@ -85,7 +85,7 @@
       "tg": 20,
       "fx": "haste",
       "vfx": {
-        "system": "/Game/FreeParticle_SoftTofu/Niagara/NS_Sparkling_Heart.NS_Sparkling_Heart",
+        "system": "/Game/ParagonKhaimera/FX/ParticleSystems/Abilities/WarriorSustain/FX/P_Passive_Activate.P_Passive_Activate",
         "at": "targets",
         "scale": 1
       }

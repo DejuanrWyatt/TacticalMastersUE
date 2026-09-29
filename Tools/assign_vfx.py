@@ -21,6 +21,8 @@ Plain Python, no editor:
     python Tools/assign_vfx.py --write      write the class files
     python Tools/assign_vfx.py --list FILE  also write the chosen effects, one a line,
                                             for Tools\\VfxCatalog.bat to film just those
+    python Tools/assign_vfx.py --only heal,revive --avoid --write
+                                            only abilities with those motions
 """
 
 import glob
@@ -28,6 +30,7 @@ import json
 import os
 import re
 import sys
+import zlib
 
 ROOT = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 CONTENT = os.path.join(ROOT, "Content")
@@ -51,7 +54,30 @@ FALLBACK = {
     "shot": ("/Game/ParagonMinions/FX/Particles/Minions/Shared/P_Minion_Melee_Impact.P_Minion_Melee_Impact", "targets"),
     "area": ("/Game/ParagonMinions/FX/Particles/Buffs/Buff_Red/FX/P_Buff_Red_BigSmash_Impact.P_Buff_Red_BigSmash_Impact", "point"),
 }
-REVIVE = ("/Game/ParticleSystemVFXVol1/Systems/NS_SparkleBurst.NS_SparkleBurst", "targets")
+# A heal with nothing fitting from its hero: one of the brightest green and
+# teal effects in the installed packs (picked from the effects catalogue,
+# 2026-09-29), by its damage type, else spread over them by the ability's id,
+# so the 48 heals don't all look alike. Paragon's own heal effects (Narbash's
+# regen, Zinx's heal shot) film nearly invisible away from their hero.
+HEALS = {
+    "burst": "/Game/ParagonKhaimera/FX/ParticleSystems/Abilities/WarriorSustain/FX/P_Passive_Activate.P_Passive_Activate",
+    "twinkle": "/Game/FreeParticle_SoftTofu/Niagara/NS_Sparkling_Animate_2.NS_Sparkling_Animate_2",
+    "motes": "/Game/ParagonSevarog/FX/Particles/Abilities/SoulStackPassive/FX/P_SoulStageEmbersBurst.P_SoulStageEmbersBurst",
+    "teal": "/Game/FreeParticle_SoftTofu/Niagara/NS_Sparkling_Glow.NS_Sparkling_Glow",
+}
+HEAL_BY_ELEMENT = {"holy": "twinkle", "light": "twinkle", "nature": "motes", "earth": "motes", "water": "teal", "ice": "teal"}
+# A revive: a golden sunburst.
+REVIVE = ("/Game/ParagonSunWukong/FX/Particles/Wukong/Skins/Future/FX/P_Wukong_Future_Toggle_StaffSwirls.P_Wukong_Future_Toggle_StaffSwirls", "targets")
+# General effects an earlier run gave out that a later one may replace
+# without --replace: they were placeholders, not choices.
+SUPERSEDED = {"/Game/FreeParticle_SoftTofu/Niagara/NS_Sparkling_Heart.NS_Sparkling_Heart",
+              "/Game/ParticleSystemVFXVol1/Systems/NS_SparkleBurst.NS_SparkleBurst"}
+
+
+def heal_effect(data, slot, ability):
+    element = element_of(data, slot, ability) or ""
+    kind = HEAL_BY_ELEMENT.get(element) or sorted(HEALS)[zlib.crc32(ability.get("id", "").encode()) % len(HEALS)]
+    return HEALS[kind]
 # A damaging ability with nothing fitting from its hero: the general pack's
 # effect for its damage type, so a fire bolt burns and a frost blow freezes.
 BY_ELEMENT = {
@@ -219,6 +245,8 @@ def main(args):
     write = "--write" in args
     replace = "--replace" in args
     listing = args[args.index("--list") + 1] if "--list" in args else None
+    # --only heal,revive: touch only abilities with those motions.
+    only = set(args[args.index("--only") + 1].split(",")) if "--only" in args else None
     the_map = json.load(open(MAP_FILE, encoding="utf-8"))
     bodies = the_map.get("bodies", {})
     chosen_all = set()
@@ -254,18 +282,21 @@ def main(args):
         used = set()
         said = []
         for slot, ability in enumerate(data.get("abilities", [])):
-            if ability.get("vfx") and not replace and ability["vfx"].get("system") not in avoid:
+            motion = motion_of(ability, slot)
+            superseded = ability.get("vfx", {}).get("system") in SUPERSEDED and motion in ("heal", "revive")
+            if ability.get("vfx") and not replace and ability["vfx"].get("system") not in avoid and not superseded:
                 used.add(ability["vfx"].get("system", ""))
                 continue
-            motion = motion_of(ability, slot)
             want = MOTION_WANTS.get(motion)
-            if not want:
+            if not want or (only and motion not in only):
                 continue
             best = max(((score(w, want, slot, s, wearing_skin), p) for p, w, s in effects if p not in used),
                        default=(0, None))
             at = "point" if motion == "area" else ("user" if motion == "channel" or (motion == "buff" and shape_of(ability) == "self") else "targets")
             if best[0] < 3:
                 general = REVIVE if motion == "revive" else FALLBACK[want]
+                if motion == "heal":
+                    general = (heal_effect(data, slot, ability), general[1])
                 element = element_of(data, slot, ability) if want in ("strike", "shot", "area") else None
                 if element == "fire" and want in ("strike", "shot"):
                     element = "fire_hit"

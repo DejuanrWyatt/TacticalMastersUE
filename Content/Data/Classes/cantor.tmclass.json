@@ -61,7 +61,7 @@
       "tg": 25,
       "fx": "haste",
       "vfx": {
-        "system": "/Game/FreeParticle_SoftTofu/Niagara/NS_Sparkling_Heart.NS_Sparkling_Heart",
+        "system": "/Game/FreeParticle_SoftTofu/Niagara/NS_Sparkling_Glow.NS_Sparkling_Glow",
         "at": "targets",
         "scale": 1
       }
@@ -116,7 +116,7 @@
       },
       "fx": "sanctuary",
       "vfx": {
-        "system": "/Game/FreeParticle_SoftTofu/Niagara/NS_Sparkling_Heart.NS_Sparkling_Heart",
+        "system": "/Game/FreeParticle_SoftTofu/Niagara/NS_Sparkling_Animate_2.NS_Sparkling_Animate_2",
         "at": "targets",
         "scale": 1
       }

@@ -60,7 +60,7 @@
       "cast": 1,
       "fx": "cure",
       "vfx": {
-        "system": "/Game/FreeParticle_SoftTofu/Niagara/NS_Sparkling_Heart.NS_Sparkling_Heart",
+        "system": "/Game/FreeParticle_SoftTofu/Niagara/NS_Sparkling_Animate_2.NS_Sparkling_Animate_2",
         "at": "targets",
         "scale": 1
       }
@@ -82,7 +82,7 @@
       "cast": 2,
       "fx": "raise",
       "vfx": {
-        "system": "/Game/ParticleSystemVFXVol1/Systems/NS_SparkleBurst.NS_SparkleBurst",
+        "system": "/Game/ParagonSunWukong/FX/Particles/Wukong/Skins/Future/FX/P_Wukong_Future_Toggle_StaffSwirls.P_Wukong_Future_Toggle_StaffSwirls",
         "at": "targets",
         "scale": 1
       }
@@ -108,7 +108,7 @@
       },
       "fx": "sanctuary",
       "vfx": {
-        "system": "/Game/FreeParticle_SoftTofu/Niagara/NS_Sparkling_Heart.NS_Sparkling_Heart",
+        "system": "/Game/FreeParticle_SoftTofu/Niagara/NS_Sparkling_Animate_2.NS_Sparkling_Animate_2",
         "at": "targets",
         "scale": 1
       }

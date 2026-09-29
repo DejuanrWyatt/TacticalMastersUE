@@ -67,7 +67,7 @@
       },
       "fx": "haste",
       "vfx": {
-        "system": "/Game/FreeParticle_SoftTofu/Niagara/NS_Sparkling_Heart.NS_Sparkling_Heart",
+        "system": "/Game/FreeParticle_SoftTofu/Niagara/NS_Sparkling_Glow.NS_Sparkling_Glow",
         "at": "targets",
         "scale": 1
       }
@@ -93,7 +93,7 @@
       },
       "fx": "focus",
       "vfx": {
-        "system": "/Game/FreeParticle_SoftTofu/Niagara/NS_Sparkling_Heart.NS_Sparkling_Heart",
+        "system": "/Game/ParagonKhaimera/FX/ParticleSystems/Abilities/WarriorSustain/FX/P_Passive_Activate.P_Passive_Activate",
         "at": "targets",
         "scale": 1
       }

@@ -61,7 +61,7 @@
       "tg": 25,
       "fx": "haste",
       "vfx": {
-        "system": "/Game/FreeParticle_SoftTofu/Niagara/NS_Sparkling_Heart.NS_Sparkling_Heart",
+        "system": "/Game/ParagonSevarog/FX/Particles/Abilities/SoulStackPassive/FX/P_SoulStageEmbersBurst.P_SoulStageEmbersBurst",
         "at": "targets",
         "scale": 1
       }
@@ -111,7 +111,7 @@
       },
       "fx": "sanctuary",
       "vfx": {
-        "system": "/Game/FreeParticle_SoftTofu/Niagara/NS_Sparkling_Heart.NS_Sparkling_Heart",
+        "system": "/Game/FreeParticle_SoftTofu/Niagara/NS_Sparkling_Animate_2.NS_Sparkling_Animate_2",
         "at": "targets",
         "scale": 1
       }
