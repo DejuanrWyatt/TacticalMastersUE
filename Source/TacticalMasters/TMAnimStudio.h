@@ -57,6 +57,8 @@ private:
 		float Yaw = 0.0f;
 		UAnimSequence* Clip = nullptr;
 		float Scale = 1.0f;
+		/** Whether its cloth is simulated, as the game draws it (FTMAnimSet::bCloth). */
+		bool bCloth = true;
 	};
 
 	struct FFilmed

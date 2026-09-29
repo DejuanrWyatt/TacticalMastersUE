@@ -16,7 +16,7 @@ public class TacticalMasters : ModuleRules
 		// class creator by ATMVfxStudio.
 		PrivateDependencyModuleNames.AddRange(new string[]
 		{
-			"Niagara", "AssetRegistry", "ImageCore", "Json", "RenderCore"
+			"Niagara", "AssetRegistry", "ImageCore", "Json", "RenderCore", "RHI"
 		});
 
 		// Online play (Docs/tech/feat-online.md): one TCP connection between two

@@ -186,7 +186,7 @@ void ATMAnimStudio::Begin(const ATMBattleDirector* InDirector)
 		}
 		for (UAnimSequence* Clip : Clips)
 		{
-			Jobs.Add({ Name, Body.Mesh, Body.Yaw, Clip, Body.Scale });
+			Jobs.Add({ Name, Body.Mesh, Body.Yaw, Clip, Body.Scale, Set->bCloth });
 		}
 	}
 	bDone = false;
@@ -271,6 +271,9 @@ void ATMAnimStudio::Tick(float DeltaSeconds)
 		}
 		Actor->PlayAnimation(Job.Clip, false);
 		Actor->SetPlayRate(0.0f);
+		// Cloth as the game draws it; -tmnocloth films every body with none, to
+		// see which heroes' cloth flies apart (Terra's did: "cloth": false).
+		Actor->bDisableClothSimulation = !Job.bCloth || FParse::Param(FCommandLine::Get(), TEXT("tmnocloth"));
 		const float Length = Job.Clip->GetPlayLength();
 		FrameCount = FMath::Clamp(FMath::CeilToInt(Length * FramesPerSecond) + 1, 2, MaxFrames);
 		Strip.SetNumZeroed(FrameSize * FrameSize * FrameCount);

@@ -323,6 +323,7 @@ void ATMBattleHud::DrawHUD()
 			DrawGuide(*Found);
 		}
 		DrawOverlays(*Found);
+		DrawLoading(*Found);
 		DrawTooltip();
 		return;
 	}
@@ -364,7 +365,26 @@ void ATMBattleHud::DrawHUD()
 		DrawLayoutEditing(*Found);
 	}
 	DrawOverlays(*Found);
+	DrawLoading(*Found);
 	DrawTooltip();
+}
+
+void ATMBattleHud::DrawLoading(ATMBattleDirector& From)
+{
+	FString What;
+	float Fraction = 0.0f;
+	if (!From.LoadingProgress(What, Fraction))
+	{
+		return;
+	}
+	// High in the middle, under the turn cards and clear of the action bar,
+	// over everything but the tooltip; nothing to press.
+	const float W = 520.0f * S;
+	const float H = 26.0f * S;
+	const float X = (Canvas->ClipX - W) * 0.5f;
+	const float Y = 135.0f * S;
+	Panel(X - 10.0f * S, Y - 10.0f * S, W + 20.0f * S, H + 20.0f * S, PanelFill, Gold, 1.0f);
+	Gauge(X, Y, W, H, Fraction, FLinearColor(Gold.R, Gold.G, Gold.B, 0.85f), What);
 }
 
 void ATMBattleHud::DrawBoardAids(ATMBattleDirector& From)

@@ -80,6 +80,9 @@ public:
 	float SfxVolume = 0.8f;
 	float VoiceVolume = 0.8f;
 
+	/** How big the damage and healing numbers rising off units are, times the director's FloaterSize (Options). */
+	float DamageTextScale = 1.75f;
+
 	/**
 	 * Where each panel has been moved to in Edit layout, as how far it is
 	 * nudged from where it normally sits, in 1080p pixels -- so it still

@@ -449,17 +449,19 @@ void ATMBattleDirector::BuildBattle()
 	{
 		return MakeUniqueObjectName(this, Class, *FString::Printf(TEXT("%s_%d"), Kind, Id));
 	};
+	const bool bReadLater = GetWorld() && GetWorld()->IsGameWorld() && !FApp::IsUnattended();
 	for (size_t i = 0; i < Battle.Units.size(); ++i)
 	{
 		USkeletalMeshComponent* Visual = NewObject<USkeletalMeshComponent>(
 			this, Fresh(USkeletalMeshComponent::StaticClass(), TEXT("Unit"), Battle.Units[i].Id), RF_Transient);
 		Visual->SetupAttachment(RootComponent);
 		Visual->RegisterComponent();
+		// A hero not read yet is read in the background (LoadBodiesInBackground,
+		// below) and the unit wears the level's mesh until it is in.
 		const FTMBody* Body = BodyFor(Battle.Units[i]);
-		if (Body && MeshOf(*Body))
+		if (Body && (IsBodyLoaded(*Body) || !bReadLater) && MeshOf(*Body))
 		{
-			Visual->SetSkeletalMeshAsset(Body->Mesh);
-			Visual->SetRelativeScale3D(FVector(Body->Scale));
+			WearBody(Visual, *Body);
 		}
 		else if (Mesh)
 		{
@@ -513,6 +515,7 @@ void ATMBattleDirector::BuildBattle()
 	bBuilt = true;
 	ResetMotion();
 	RefreshVisuals();
+	LoadBodiesInBackground();
 
 	UE_LOG(LogTemp, Log, TEXT("Battle built with %d units"), static_cast<int32>(Battle.Units.size()));
 }
@@ -1496,6 +1499,14 @@ void ATMBattleDirector::Tick(float DeltaSeconds)
 		return;
 	}
 	if (!OnlineStopped.IsEmpty())
+	{
+		TickRemainder = 0.0f;
+		return;
+	}
+	// Heroes still loading: the battle waits for them, as for a pause. Online
+	// the host's clock can't wait on this machine; the units there stand in the
+	// plain mesh for a moment instead.
+	if (BodyLoad.IsValid() && !bOnline)
 	{
 		TickRemainder = 0.0f;
 		return;
@@ -2815,45 +2826,32 @@ void ATMBattleDirector::OpenSetup()
 	bMenuOpen = false;
 	bPaused = false;
 	BuildBattle();
+	// Random's next teams, their heroes loading while this screen is read.
+	for (int32 Team = 0; Team < 2; ++Team)
+	{
+		if (NextRandom[Team].empty())
+		{
+			RollNextRandomTeam(Team);
+		}
+	}
 }
 
 void ATMBattleDirector::RandomTeam(int32 Team)
 {
-	// class_list.gd:62-77, sensible_team: a class for each wanted role, preferring
-	// one not already picked so the team is not four of a kind. The dice here are
-	// the menu's own, nothing to do with a battle.
-	static FRandomStream Pick(static_cast<int32>(FDateTime::UtcNow().GetTicks() & 0x7FFFFFFF));
-	const char* Wanted[4] = { "tank", "damage", "damage", "support" };
-	std::vector<std::string> Chosen;
-	for (const char* WantedRole : Wanted)
+	// The team rolled ahead (RollNextRandomTeam), whose heroes have been
+	// loading in the background since, then the next one rolled and loading.
+	if (NextRandom[Team].size() != 4)
 	{
-		std::vector<std::string> Fresh;
-		std::vector<std::string> Any;
-		for (const TMSim::FJobDef* Job : TMSim::AllJobs())
-		{
-			if (!TMSim::JobHasRole(Job->Id, WantedRole))
-			{
-				continue;
-			}
-			Any.push_back(Job->Id);
-			if (std::find(Chosen.begin(), Chosen.end(), Job->Id) == Chosen.end())
-			{
-				Fresh.push_back(Job->Id);
-			}
-		}
-		const std::vector<std::string>& From = !Fresh.empty() ? Fresh : Any;
-		if (From.empty())
-		{
-			Chosen.push_back(TMSim::AllJobs().front()->Id);
-			continue;
-		}
-		Chosen.push_back(From[Pick.RandRange(0, static_cast<int32>(From.size()) - 1)]);
+		RollNextRandomTeam(Team);
 	}
 	for (int32 Slot = 0; Slot < 4; ++Slot)
 	{
-		Setup.Rosters[Team][Slot] = Chosen[Slot];
+		Setup.Rosters[Team][Slot] = NextRandom[Team][Slot];
 	}
+	// Built before the next is rolled: rolling lets go of this team's early
+	// load, and by then the battle holds its heroes itself.
 	BuildBattle();
+	RollNextRandomTeam(Team);
 }
 
 void ATMBattleDirector::PressMenuButton(const FTMHudButton& Button)
@@ -2979,7 +2977,9 @@ void ATMBattleDirector::PressMenuButton(const FTMHudButton& Button)
 			At = Maps[i].Id == Setup.MapId ? i : At;
 		}
 		Setup.MapId = Maps[(At + 1) % Maps.size()].Id;
-		bBuilt = false;
+		// Rebuilt now: nothing in a running game rebuilds a battle marked unbuilt,
+		// and the board and every menu stopped drawing until one was.
+		BuildBattle();
 		break;
 	}
 	case ETMHudAction::SetupTheme:
@@ -2988,7 +2988,7 @@ void ATMBattleDirector::PressMenuButton(const FTMHudButton& Button)
 		LoadThemes();
 		int32 At = ThemeIds.IndexOfByKey(Setup.ThemeId);
 		Setup.ThemeId = At + 1 < ThemeIds.Num() ? ThemeIds[At + 1] : FString();
-		bBuilt = false;
+		BuildBattle();
 		break;
 	}
 	case ETMHudAction::SetupPlanning:
@@ -3544,6 +3544,13 @@ bool ATMBattleDirector::SliderRange(int32 Id, double& Low, double& High, double&
 		Step = 0.05;
 		return true;
 	}
+	if (Id == SliderDamageText)
+	{
+		Low = 0.75;
+		High = 3.0;
+		Step = 0.05;
+		return true;
+	}
 	if (Id == SliderOverhead || Id == SliderStatusIcons)
 	{
 		Low = 0.6;
@@ -3585,6 +3592,10 @@ double ATMBattleDirector::SliderValue(int32 Id) const
 	{
 		return FTMSettings::Get().VoiceVolume;
 	}
+	if (Id == SliderDamageText)
+	{
+		return FTMSettings::Get().DamageTextScale;
+	}
 	const int32 Index = Id - SliderTuning;
 	if (Index < 0 || Index >= static_cast<int32>(TMSim::TuningKeys().size()))
 	{
@@ -3625,6 +3636,11 @@ void ATMBattleDirector::SetSlider(int32 Id, double Value)
 	if (Id == SliderVoiceVolume)
 	{
 		Settings.VoiceVolume = static_cast<float>(Value);
+		return;
+	}
+	if (Id == SliderDamageText)
+	{
+		Settings.DamageTextScale = static_cast<float>(Value);
 		return;
 	}
 	const int32 Index = Id - SliderTuning;

@@ -1047,7 +1047,9 @@
         "/Game/ParagonSparrow/Characters/Heroes/Sparrow/Animations/Emote_Bow_M1.Emote_Bow_M1",
         "/Game/ParagonSparrow/Characters/Heroes/Sparrow/Animations/Emote_Handstand_T3.Emote_Handstand_T3",
         "/Game/ParagonSparrow/Characters/Heroes/Sparrow/Animations/Emote_BowBalance_T1.Emote_BowBalance_T1"
-      ]
+      ],
+      "evadeLeft": "/Game/ParagonSparrow/Characters/Heroes/Sparrow/Animations/Jog_Left_Start.Jog_Left_Start",
+      "evadeRight": "/Game/ParagonSparrow/Characters/Heroes/Sparrow/Animations/Jog_Right_Start.Jog_Right_Start"
     },
     "countess": {
       "idle": "/Game/ParagonCountess/Characters/Heroes/Countess/Animations/Idle_Straight.Idle_Straight",
@@ -1149,7 +1151,9 @@
       "hit": [
         "/Game/ParagonCountess/Characters/Heroes/Countess/Animations/Knock_Fwd.Knock_Fwd",
         "/Game/ParagonCountess/Characters/Heroes/Countess/Animations/Knock_Bwd.Knock_Bwd"
-      ]
+      ],
+      "evadeLeft": "/Game/ParagonCountess/Characters/Heroes/Countess/Animations/Jog_Left_Start.Jog_Left_Start",
+      "evadeRight": "/Game/ParagonCountess/Characters/Heroes/Countess/Animations/Jog_Right_Start.Jog_Right_Start"
     },
     "dekker": {
       "idle": "/Game/ParagonDekker/Characters/Heroes/Dekker/Animations/Idle.Idle",
@@ -1227,7 +1231,9 @@
       "hit": [
         "/Game/ParagonDekker/Characters/Heroes/Dekker/Animations/KnockBack_Front.KnockBack_Front",
         "/Game/ParagonDekker/Characters/Heroes/Dekker/Animations/KnockBack_Back.KnockBack_Back"
-      ]
+      ],
+      "evadeLeft": "/Game/ParagonDekker/Characters/Heroes/Dekker/Animations/Jog_Left_Start.Jog_Left_Start",
+      "evadeRight": "/Game/ParagonDekker/Characters/Heroes/Dekker/Animations/Jog_Right_Start.Jog_Right_Start"
     },
     "fengmao": {
       "idle": "/Game/ParagonFengMao/Characters/Heroes/FengMao/Animations/Idle.Idle",
@@ -1330,7 +1336,9 @@
       "hit": [
         "/Game/ParagonFengMao/Characters/Heroes/FengMao/Animations/Knock_Fwd.Knock_Fwd",
         "/Game/ParagonFengMao/Characters/Heroes/FengMao/Animations/Knock_Bwd.Knock_Bwd"
-      ]
+      ],
+      "evadeLeft": "/Game/ParagonFengMao/Characters/Heroes/FengMao/Animations/Jog_Left_Start.Jog_Left_Start",
+      "evadeRight": "/Game/ParagonFengMao/Characters/Heroes/FengMao/Animations/Jog_Right_Start.Jog_Right_Start"
     },
     "grim": {
       "idle": "/Game/ParagonGRIMexe/Characters/Heroes/GRIM/Animations/Idle.Idle",
@@ -1399,7 +1407,9 @@
       "hit": [
         "/Game/ParagonGRIMexe/Characters/Heroes/GRIM/Animations/Knock_Fwd.Knock_Fwd",
         "/Game/ParagonGRIMexe/Characters/Heroes/GRIM/Animations/Knock_Bwd.Knock_Bwd"
-      ]
+      ],
+      "evadeLeft": "/Game/ParagonGRIMexe/Characters/Heroes/GRIM/Animations/Jog_Left_Start.Jog_Left_Start",
+      "evadeRight": "/Game/ParagonGRIMexe/Characters/Heroes/GRIM/Animations/Jog_Right_Start.Jog_Right_Start"
     },
     "gadget": {
       "idle": "/Game/ParagonGadget/Characters/Heroes/Gadget/Animations/Idle.Idle",
@@ -1486,7 +1496,9 @@
       "hit": [
         "/Game/ParagonGadget/Characters/Heroes/Gadget/Animations/KnockBack.KnockBack",
         "/Game/ParagonGadget/Characters/Heroes/Gadget/Animations/Knock_Back.Knock_Back"
-      ]
+      ],
+      "evadeLeft": "/Game/ParagonGadget/Characters/Heroes/Gadget/Animations/Jog_Lft_Start.Jog_Lft_Start",
+      "evadeRight": "/Game/ParagonGadget/Characters/Heroes/Gadget/Animations/Jog_Rt_Start.Jog_Rt_Start"
     },
     "murdock": {
       "idle": "/Game/ParagonMurdock/Characters/Heroes/Murdock/Animations/Idle.Idle",
@@ -1591,7 +1603,9 @@
       "hit": [
         "/Game/ParagonMurdock/Characters/Heroes/Murdock/Animations/Knockback_Fwd.Knockback_Fwd",
         "/Game/ParagonMurdock/Characters/Heroes/Murdock/Animations/Knockback_Bwd.Knockback_Bwd"
-      ]
+      ],
+      "evadeLeft": "/Game/ParagonMurdock/Characters/Heroes/Murdock/Animations/Jog_Left_Start.Jog_Left_Start",
+      "evadeRight": "/Game/ParagonMurdock/Characters/Heroes/Murdock/Animations/Jog_Right_Start.Jog_Right_Start"
     },
     "muriel": {
       "idle": "/Game/ParagonMuriel/Characters/Heroes/Muriel/Animations/Idle.Idle",
@@ -1716,7 +1730,9 @@
       "hit": [
         "/Game/ParagonMuriel/Characters/Heroes/Muriel/Animations/Knock_Back_Fwd.Knock_Back_Fwd",
         "/Game/ParagonMuriel/Characters/Heroes/Muriel/Animations/Knock_Back_Bwd.Knock_Back_Bwd"
-      ]
+      ],
+      "evadeLeft": "/Game/ParagonMuriel/Characters/Heroes/Muriel/Animations/Jog_Left_Start.Jog_Left_Start",
+      "evadeRight": "/Game/ParagonMuriel/Characters/Heroes/Muriel/Animations/Jog_Right_Start.Jog_Right_Start"
     },
     "serath": {
       "idle": "/Game/ParagonSerath/Characters/Heroes/Serath/Animations/Idle.Idle",
@@ -1842,7 +1858,9 @@
       "hit": [
         "/Game/ParagonSerath/Characters/Heroes/Serath/Animations/Knockback_Fwd.Knockback_Fwd",
         "/Game/ParagonSerath/Characters/Heroes/Serath/Animations/Knockback_Bwd.Knockback_Bwd"
-      ]
+      ],
+      "evadeLeft": "/Game/ParagonSerath/Characters/Heroes/Serath/Animations/Jog_Left_Start.Jog_Left_Start",
+      "evadeRight": "/Game/ParagonSerath/Characters/Heroes/Serath/Animations/Jog_Right_Start.Jog_Right_Start"
     },
     "sevarog": {
       "idle": "/Game/ParagonSevarog/Characters/Heroes/Sevarog/Animations/Idle.Idle",
@@ -1948,7 +1966,9 @@
       "hit": [
         "/Game/ParagonSevarog/Characters/Heroes/Sevarog/Animations/Knock_back.Knock_back",
         "/Game/ParagonSevarog/Characters/Heroes/Sevarog/Animations/Knock_back_bwd.Knock_back_bwd"
-      ]
+      ],
+      "evadeLeft": "/Game/ParagonSevarog/Characters/Heroes/Sevarog/Animations/Jog_Left.Jog_Left",
+      "evadeRight": "/Game/ParagonSevarog/Characters/Heroes/Sevarog/Animations/Jog_Right.Jog_Right"
     },
     "shinbi": {
       "idle": "/Game/ParagonShinbi/Characters/Heroes/Shinbi/Shinbi_Wolf/Animations/Idle.Idle",
@@ -2047,7 +2067,9 @@
       "hit": [
         "/Game/ParagonShinbi/Characters/Heroes/Shinbi/Animations/Knockback_Front.Knockback_Front",
         "/Game/ParagonShinbi/Characters/Heroes/Shinbi/Animations/Knockback_Rear.Knockback_Rear"
-      ]
+      ],
+      "evadeLeft": "/Game/ParagonShinbi/Characters/Heroes/Shinbi/Animations/Jog_Left_Start.Jog_Left_Start",
+      "evadeRight": "/Game/ParagonShinbi/Characters/Heroes/Shinbi/Animations/Jog_Right_Start.Jog_Right_Start"
     },
     "howitzer": {
       "idle": "/Game/ParagonHowitzer/Characters/Heroes/Howitzer/Animations/Idle.Idle",
@@ -2111,7 +2133,9 @@
       "hit": [
         "/Game/ParagonHowitzer/Characters/Heroes/Howitzer/Animations/KnockBack_Bwd.KnockBack_Bwd",
         "/Game/ParagonHowitzer/Characters/Heroes/Howitzer/Animations/Knock_Back.Knock_Back"
-      ]
+      ],
+      "evadeLeft": "/Game/ParagonHowitzer/Characters/Heroes/Howitzer/Animations/Run_Lft.Run_Lft",
+      "evadeRight": "/Game/ParagonHowitzer/Characters/Heroes/Howitzer/Animations/Run_Rt.Run_Rt"
     },
     "aurora": {
       "idle": "/Game/ParagonAurora/Characters/Heroes/Aurora/Animations/Idle.Idle",
@@ -2215,7 +2239,9 @@
       "hit": [
         "/Game/ParagonAurora/Characters/Heroes/Aurora/Animations/Knockback_Fwd.Knockback_Fwd",
         "/Game/ParagonAurora/Characters/Heroes/Aurora/Animations/Knockback_Bwd.Knockback_Bwd"
-      ]
+      ],
+      "evadeLeft": "/Game/ParagonAurora/Characters/Heroes/Aurora/Animations/Jog_Left_Start.Jog_Left_Start",
+      "evadeRight": "/Game/ParagonAurora/Characters/Heroes/Aurora/Animations/Jog_Right_Start.Jog_Right_Start"
     },
     "boris": {
       "idle": "/Game/ParagonBoris/Characters/Heroes/Boris/Animations/Idle.Idle",
@@ -2234,7 +2260,9 @@
         }
       },
       "walkSpeed": 360,
-      "runSpeed": 600
+      "runSpeed": 600,
+      "evadeLeft": "/Game/ParagonBoris/Characters/Heroes/Boris/Animations/Jog_Left_Start.Jog_Left_Start",
+      "evadeRight": "/Game/ParagonBoris/Characters/Heroes/Boris/Animations/Jog_Right_Start.Jog_Right_Start"
     },
     "crunch": {
       "idle": "/Game/ParagonCrunch/Characters/Heroes/Crunch/Animations/Idle_Combat.Idle_Combat",
@@ -2329,7 +2357,9 @@
       "hit": [
         "/Game/ParagonCrunch/Characters/Heroes/Crunch/Animations/Knockback_Front.Knockback_Front",
         "/Game/ParagonCrunch/Characters/Heroes/Crunch/Animations/Knockback_Back.Knockback_Back"
-      ]
+      ],
+      "evadeLeft": "/Game/ParagonCrunch/Characters/Heroes/Crunch/Animations/Jog_Left_Start.Jog_Left_Start",
+      "evadeRight": "/Game/ParagonCrunch/Characters/Heroes/Crunch/Animations/Jog_Right_Start.Jog_Right_Start"
     },
     "drongo": {
       "idle": "/Game/ParagonDrongo/Characters/Heroes/Drongo/Animations/Idle_Combat.Idle_Combat",
@@ -2424,7 +2454,9 @@
       "death": [
         "/Game/ParagonDrongo/Characters/Heroes/Drongo/Animations/Death.Death"
       ],
-      "stunned": "/Game/ParagonDrongo/Characters/Heroes/Drongo/Animations/Stun_Idle.Stun_Idle"
+      "stunned": "/Game/ParagonDrongo/Characters/Heroes/Drongo/Animations/Stun_Idle.Stun_Idle",
+      "evadeLeft": "/Game/ParagonDrongo/Characters/Heroes/Drongo/Animations/Jog_Left_Start.Jog_Left_Start",
+      "evadeRight": "/Game/ParagonDrongo/Characters/Heroes/Drongo/Animations/Jog_Right_Start.Jog_Right_Start"
     },
     "fey": {
       "idle": "/Game/ParagonFey/Characters/Heroes/Fey/Animations/Idle.Idle",
@@ -2544,7 +2576,9 @@
       "hit": [
         "/Game/ParagonFey/Characters/Heroes/Fey/Animations/Knockback_Fwd.Knockback_Fwd",
         "/Game/ParagonFey/Characters/Heroes/Fey/Animations/KnockBack_Bwd.KnockBack_Bwd"
-      ]
+      ],
+      "evadeLeft": "/Game/ParagonFey/Characters/Heroes/Fey/Animations/Jog_Lft_Start.Jog_Lft_Start",
+      "evadeRight": "/Game/ParagonFey/Characters/Heroes/Fey/Animations/Jog_Rt_Start.Jog_Rt_Start"
     },
     "greystone": {
       "idle": "/Game/ParagonGreystone/Characters/Heroes/Greystone/Animations/Idle.Idle",
@@ -2643,7 +2677,9 @@
         "/Game/ParagonGreystone/Characters/Heroes/Greystone/Animations/Death.Death"
       ],
       "stunned": "/Game/ParagonGreystone/Characters/Heroes/Greystone/Animations/Stun_Idle.Stun_Idle",
-      "block": "/Game/ParagonGreystone/Characters/Heroes/Greystone/Animations/Deflect_InPlace.Deflect_InPlace"
+      "block": "/Game/ParagonGreystone/Characters/Heroes/Greystone/Animations/Deflect_InPlace.Deflect_InPlace",
+      "evadeLeft": "/Game/ParagonGreystone/Characters/Heroes/Greystone/Animations/Jog_Left_Start.Jog_Left_Start",
+      "evadeRight": "/Game/ParagonGreystone/Characters/Heroes/Greystone/Animations/Jog_Right_Start.Jog_Right_Start"
     },
     "grux": {
       "idle": "/Game/ParagonGrux/Characters/Heroes/Grux/Animations/Idle.Idle",
@@ -2742,7 +2778,9 @@
         "/Game/ParagonGrux/Characters/Heroes/Grux/Animations/Knock_Back.Knock_Back",
         "/Game/ParagonGrux/Characters/Heroes/Grux/Animations/Knock_Back_Bwd.Knock_Back_Bwd"
       ],
-      "stunned": "/Game/ParagonGrux/Characters/Heroes/Grux/Animations/Stun_Idle.Stun_Idle"
+      "stunned": "/Game/ParagonGrux/Characters/Heroes/Grux/Animations/Stun_Idle.Stun_Idle",
+      "evadeLeft": "/Game/ParagonGrux/Characters/Heroes/Grux/Animations/Run_Lft_Start.Run_Lft_Start",
+      "evadeRight": "/Game/ParagonGrux/Characters/Heroes/Grux/Animations/Run_Rt_Start.Run_Rt_Start"
     },
     "kwang": {
       "idle": "/Game/ParagonKwang/Characters/Heroes/Kwang/Animations/Idle.Idle",
@@ -2842,7 +2880,9 @@
       "hit": [
         "/Game/ParagonKwang/Characters/Heroes/Kwang/Animations/Knockback_Fwd.Knockback_Fwd",
         "/Game/ParagonKwang/Characters/Heroes/Kwang/Animations/Knockback_Bwd.Knockback_Bwd"
-      ]
+      ],
+      "evadeLeft": "/Game/ParagonKwang/Characters/Heroes/Kwang/Animations/Jog_Left_Start.Jog_Left_Start",
+      "evadeRight": "/Game/ParagonKwang/Characters/Heroes/Kwang/Animations/Jog_Right_Start.Jog_Right_Start"
     },
     "belica": {
       "idle": "/Game/ParagonLtBelica/Characters/Heroes/Belica/Animations/Idle_Relaxed.Idle_Relaxed",
@@ -2897,7 +2937,9 @@
         }
       },
       "walkSpeed": 360,
-      "runSpeed": 600
+      "runSpeed": 600,
+      "evadeLeft": "/Game/ParagonLtBelica/Characters/Heroes/Belica/Animations/Jog_Left_Start.Jog_Left_Start",
+      "evadeRight": "/Game/ParagonLtBelica/Characters/Heroes/Belica/Animations/Jog_Right_Start.Jog_Right_Start"
     },
     "morigesh": {
       "idle": "/Game/ParagonMorigesh/Characters/Heroes/Morigesh/Animations/Idle.Idle",
@@ -3000,7 +3042,9 @@
       "hit": [
         "/Game/ParagonMorigesh/Characters/Heroes/Morigesh/Animations/Knock_Back.Knock_Back",
         "/Game/ParagonMorigesh/Characters/Heroes/Morigesh/Animations/Knock_Back_Bwd.Knock_Back_Bwd"
-      ]
+      ],
+      "evadeLeft": "/Game/ParagonMorigesh/Characters/Heroes/Morigesh/Animations/Jog_Left_Start.Jog_Left_Start",
+      "evadeRight": "/Game/ParagonMorigesh/Characters/Heroes/Morigesh/Animations/Jog_Right_Start.Jog_Right_Start"
     },
     "narbash": {
       "idle": "/Game/ParagonNarbash/Characters/Heroes/Narbash/Animations/Idle_combat.Idle_combat",
@@ -3123,7 +3167,9 @@
       "hit": [
         "/Game/ParagonNarbash/Characters/Heroes/Narbash/Animations/Knockback.Knockback",
         "/Game/ParagonNarbash/Characters/Heroes/Narbash/Animations/Knockback_Bwd.Knockback_Bwd"
-      ]
+      ],
+      "evadeLeft": "/Game/ParagonNarbash/Characters/Heroes/Narbash/Animations/Jog_Left_Start.Jog_Left_Start",
+      "evadeRight": "/Game/ParagonNarbash/Characters/Heroes/Narbash/Animations/Jog_Right_Start.Jog_Right_Start"
     },
     "phase": {
       "idle": "/Game/ParagonPhase/Characters/Heroes/Phase/Animations/Idle.Idle",
@@ -3246,7 +3292,9 @@
       "hit": [
         "/Game/ParagonPhase/Characters/Heroes/Phase/Animations/KnockBack.KnockBack",
         "/Game/ParagonPhase/Characters/Heroes/Phase/Animations/KnockBack_BWD.KnockBack_BWD"
-      ]
+      ],
+      "evadeLeft": "/Game/ParagonPhase/Characters/Heroes/Phase/Animations/Jog_Left_Start.Jog_Left_Start",
+      "evadeRight": "/Game/ParagonPhase/Characters/Heroes/Phase/Animations/Jog_Right_Start.Jog_Right_Start"
     },
     "rampage": {
       "idle": "/Game/ParagonRampage/Characters/Heroes/Rampage/Animations/Idle.Idle",
@@ -3348,7 +3396,9 @@
         "/Game/ParagonRampage/Characters/Heroes/Rampage/Animations/KnockBack.KnockBack",
         "/Game/ParagonRampage/Characters/Heroes/Rampage/Animations/KnockBack_Bwd.KnockBack_Bwd"
       ],
-      "stunned": "/Game/ParagonRampage/Characters/Heroes/Rampage/Animations/Stun_Idle.Stun_Idle"
+      "stunned": "/Game/ParagonRampage/Characters/Heroes/Rampage/Animations/Stun_Idle.Stun_Idle",
+      "evadeLeft": "/Game/ParagonRampage/Characters/Heroes/Rampage/Animations/Jog_Left_Start.Jog_Left_Start",
+      "evadeRight": "/Game/ParagonRampage/Characters/Heroes/Rampage/Animations/Jog_Right_Start.Jog_Right_Start"
     },
     "revenant": {
       "idle": "/Game/ParagonRevenant/Characters/Heroes/Revenant/Animations/Idle.Idle",
@@ -3459,7 +3509,9 @@
         "/Game/ParagonRevenant/Characters/Heroes/Revenant/Animations/Knockback_Fwd.Knockback_Fwd",
         "/Game/ParagonRevenant/Characters/Heroes/Revenant/Animations/Knockback_Bwd.Knockback_Bwd"
       ],
-      "stunned": "/Game/ParagonRevenant/Characters/Heroes/Revenant/Animations/Stun_Idle.Stun_Idle"
+      "stunned": "/Game/ParagonRevenant/Characters/Heroes/Revenant/Animations/Stun_Idle.Stun_Idle",
+      "evadeLeft": "/Game/ParagonRevenant/Characters/Heroes/Revenant/Animations/Jog_Left_Start.Jog_Left_Start",
+      "evadeRight": "/Game/ParagonRevenant/Characters/Heroes/Revenant/Animations/Jog_Right_Start.Jog_Right_Start"
     },
     "riktor": {
       "idle": "/Game/ParagonRiktor/Characters/Heroes/Riktor/Animations/Idle.Idle",
@@ -3485,7 +3537,9 @@
         }
       },
       "walkSpeed": 360,
-      "runSpeed": 600
+      "runSpeed": 600,
+      "evadeLeft": "/Game/ParagonRiktor/Characters/Heroes/Riktor/Animations/Jog_Left_Start.Jog_Left_Start",
+      "evadeRight": "/Game/ParagonRiktor/Characters/Heroes/Riktor/Animations/Jog_Right_Start.Jog_Right_Start"
     },
     "steel": {
       "walk": "/Game/ParagonSteel/Characters/Heroes/Steel/Animations/Steel_Jog_Fwd_Combat.Steel_Jog_Fwd_Combat",
@@ -3583,7 +3637,9 @@
         "/Game/ParagonSteel/Characters/Heroes/Steel/Animations/Steel_KnockBack.Steel_KnockBack",
         "/Game/ParagonSteel/Characters/Heroes/Steel/Animations/Steel_KnockBack_Bwd.Steel_KnockBack_Bwd"
       ],
-      "block": "/Game/ParagonSteel/Characters/Heroes/Steel/Animations/Steel_Ability_Block_Idle.Steel_Ability_Block_Idle"
+      "block": "/Game/ParagonSteel/Characters/Heroes/Steel/Animations/Steel_Ability_Block_Idle.Steel_Ability_Block_Idle",
+      "evadeLeft": "/Game/ParagonSteel/Characters/Heroes/Steel/Animations/Steel_Jog_Left_Combat.Steel_Jog_Left_Combat",
+      "evadeRight": "/Game/ParagonSteel/Characters/Heroes/Steel/Animations/Steel_Jog_Right_Combat.Steel_Jog_Right_Combat"
     },
     "terra": {
       "idle": "/Game/ParagonTerra/Characters/Heroes/Terra/Animations/Idle.Idle",
@@ -3675,7 +3731,10 @@
         "/Game/ParagonTerra/Characters/Heroes/Terra/Animations/Knockback_front.Knockback_front",
         "/Game/ParagonTerra/Characters/Heroes/Terra/Animations/Knockback_back.Knockback_back"
       ],
-      "stunned": "/Game/ParagonTerra/Characters/Heroes/Terra/Animations/Stun_Idle.Stun_Idle"
+      "stunned": "/Game/ParagonTerra/Characters/Heroes/Terra/Animations/Stun_Idle.Stun_Idle",
+      "evadeLeft": "/Game/ParagonTerra/Characters/Heroes/Terra/Animations/Jog_Left_Start.Jog_Left_Start",
+      "evadeRight": "/Game/ParagonTerra/Characters/Heroes/Terra/Animations/Jog_Right_Start.Jog_Right_Start",
+      "cloth": false
     },
     "twinblast": {
       "idle": "/Game/ParagonTwinblast/Characters/Heroes/TwinBlast/Animations/Idle.Idle",
@@ -3716,7 +3775,9 @@
         }
       },
       "walkSpeed": 360,
-      "runSpeed": 600
+      "runSpeed": 600,
+      "evadeLeft": "/Game/ParagonTwinblast/Characters/Heroes/TwinBlast/Animations/Evade_Left.Evade_Left",
+      "evadeRight": "/Game/ParagonTwinblast/Characters/Heroes/TwinBlast/Animations/Evade_Right.Evade_Right"
     },
     "wraith": {
       "idle": "/Game/ParagonWraith/Characters/Heroes/Wraith/Animations/Locomotion_Combat/Idle_Combat.Idle_Combat",
@@ -3758,7 +3819,9 @@
         }
       },
       "walkSpeed": 360,
-      "runSpeed": 600
+      "runSpeed": 600,
+      "evadeLeft": "/Game/ParagonWraith/Characters/Heroes/Wraith/Animations/Jog_Left_Start.Jog_Left_Start",
+      "evadeRight": "/Game/ParagonWraith/Characters/Heroes/Wraith/Animations/Jog_Right_Start.Jog_Right_Start"
     },
     "yin": {
       "idle": "/Game/ParagonYin/Characters/Heroes/Yin/Animations/Idle_Combat.Idle_Combat",
@@ -3864,7 +3927,9 @@
         "/Game/ParagonYin/Characters/Heroes/Yin/Animations/Knockback_Fwd.Knockback_Fwd",
         "/Game/ParagonYin/Characters/Heroes/Yin/Animations/Knockback_Bwd.Knockback_Bwd"
       ],
-      "stunned": "/Game/ParagonYin/Characters/Heroes/Yin/Animations/Stun_Idle.Stun_Idle"
+      "stunned": "/Game/ParagonYin/Characters/Heroes/Yin/Animations/Stun_Idle.Stun_Idle",
+      "evadeLeft": "/Game/ParagonYin/Characters/Heroes/Yin/Animations/Jog_Left_Start.Jog_Left_Start",
+      "evadeRight": "/Game/ParagonYin/Characters/Heroes/Yin/Animations/Jog_Right_Start.Jog_Right_Start"
     },
     "zinx": {
       "idle": "/Game/ParagonZinx/Characters/Heroes/Zinx/Animations/Idle.Idle",
@@ -3905,7 +3970,9 @@
         }
       },
       "walkSpeed": 360,
-      "runSpeed": 600
+      "runSpeed": 600,
+      "evadeLeft": "/Game/ParagonZinx/Characters/Heroes/Zinx/Animations/Jog_Left_Start.Jog_Left_Start",
+      "evadeRight": "/Game/ParagonZinx/Characters/Heroes/Zinx/Animations/Jog_Right_Start.Jog_Right_Start"
     },
     "iggyscorch": {
       "idle": "/Game/ParagonIggyScorch/Characters/Heroes/IggyScorch/Animations/Idle_Pose.Idle_Pose",
@@ -4012,7 +4079,9 @@
         "/Game/ParagonIggyScorch/Characters/Heroes/IggyScorch/Animations/IggyScorch_KnockBack.IggyScorch_KnockBack",
         "/Game/ParagonIggyScorch/Characters/Heroes/IggyScorch/Animations/IggyScorch_KnockBack_Bwd.IggyScorch_KnockBack_Bwd"
       ],
-      "stunned": "/Game/ParagonIggyScorch/Characters/Heroes/IggyScorch/Animations/IggyScorch_Stun_Loop.IggyScorch_Stun_Loop"
+      "stunned": "/Game/ParagonIggyScorch/Characters/Heroes/IggyScorch/Animations/IggyScorch_Stun_Loop.IggyScorch_Stun_Loop",
+      "evadeLeft": "/Game/ParagonIggyScorch/Characters/Heroes/IggyScorch/Animations/Jog_Left.Jog_Left",
+      "evadeRight": "/Game/ParagonIggyScorch/Characters/Heroes/IggyScorch/Animations/Jog_Right.Jog_Right"
     },
     "kallari": {
       "idle": "/Game/ParagonKallari/Characters/Heroes/Kallari/Animations/Idle.Idle",
@@ -4118,7 +4187,9 @@
       ],
       "stunned": "/Game/ParagonKallari/Characters/Heroes/Kallari/Animations/Stun_Idle.Stun_Idle",
       "block": "/Game/ParagonKallari/Characters/Heroes/Kallari/Animations/Ability_Block.Ability_Block",
-      "evade": "/Game/ParagonKallari/Characters/Heroes/Kallari/Animations/Evade_Bwd_Mid.Evade_Bwd_Mid"
+      "evade": "/Game/ParagonKallari/Characters/Heroes/Kallari/Animations/Evade_Bwd_Mid.Evade_Bwd_Mid",
+      "evadeLeft": "/Game/ParagonKallari/Characters/Heroes/Kallari/Animations/Jog_Left_Start.Jog_Left_Start",
+      "evadeRight": "/Game/ParagonKallari/Characters/Heroes/Kallari/Animations/Jog_Right_Start.Jog_Right_Start"
     },
     "khaimera": {
       "idle": "/Game/ParagonKhaimera/Characters/Heroes/Khaimera/Animations/Idle_NonAdditive.Idle_NonAdditive",
@@ -4215,7 +4286,9 @@
       "hit": [
         "/Game/ParagonKhaimera/Characters/Heroes/Khaimera/Animations/Knockback_Front.Knockback_Front",
         "/Game/ParagonKhaimera/Characters/Heroes/Khaimera/Animations/Knockback_Back.Knockback_Back"
-      ]
+      ],
+      "evadeLeft": "/Game/ParagonKhaimera/Characters/Heroes/Khaimera/Animations/Jog_Left_Start.Jog_Left_Start",
+      "evadeRight": "/Game/ParagonKhaimera/Characters/Heroes/Khaimera/Animations/Jog_Right_Start.Jog_Right_Start"
     },
     "wukong": {
       "idle": "/Game/ParagonSunWukong/Characters/Heroes/Wukong/Animations/Idle.Idle",
@@ -4312,7 +4385,9 @@
       "hit": [
         "/Game/ParagonSunWukong/Characters/Heroes/Wukong/Animations/Knockback.Knockback",
         "/Game/ParagonSunWukong/Characters/Heroes/Wukong/Animations/Knockfwd.Knockfwd"
-      ]
+      ],
+      "evadeLeft": "/Game/ParagonSunWukong/Characters/Heroes/Wukong/Animations/Jog_Left_Start.Jog_Left_Start",
+      "evadeRight": "/Game/ParagonSunWukong/Characters/Heroes/Wukong/Animations/Jog_Right_Start.Jog_Right_Start"
     },
     "gideon": {
       "idle": "/Game/ParagonGideon/Characters/Heroes/Gideon/Animations/Idle.Idle",
@@ -4418,7 +4493,9 @@
         }
       },
       "walkSpeed": 360,
-      "runSpeed": 600
+      "runSpeed": 600,
+      "evadeLeft": "/Game/ParagonGideon/Characters/Heroes/Gideon/Animations/Jog_Left_Start.Jog_Left_Start",
+      "evadeRight": "/Game/ParagonGideon/Characters/Heroes/Gideon/Animations/Jog_Right_Start.Jog_Right_Start"
     }
   },
   "heroPlan": {

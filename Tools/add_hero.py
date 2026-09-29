@@ -160,6 +160,12 @@ def every(clips, pattern, limit=4):
     return [clips[n] for n in sorted(clips) if re.fullmatch(pattern, n, re.IGNORECASE)][:limit]
 
 
+LEFT_DODGES = [r"Evade_Left", r"Dive_Left_Start", r"Jog_Left_Start", r"Jog_Lft_Start", r"Run_Lft_Start",
+               r"Jog_Left", r"Jog_Lft", r"Run_Lft", r"Steel_Jog_Left_Combat"]
+RIGHT_DODGES = [r"Evade_Right", r"Dive_Right_Start", r"Jog_Right_Start", r"Jog_Rt_Start", r"Run_Rt_Start",
+                r"Jog_Right", r"Jog_Rt", r"Run_Rt", r"Steel_Jog_Right_Combat"]
+
+
 def build_set(clips):
     """What each role plays, guessed from Paragon's names for things."""
     s = {}
@@ -184,6 +190,12 @@ def build_set(clips):
     put("hitBack", first(clips, r"HitReact_Back", r"Hit_Back.*"))
     put("hitLeft", first(clips, r"HitReact_Left", r"Hit_Left.*"))
     put("hitRight", first(clips, r"HitReact_Right", r"Hit_Right.*"))
+    # Getting out of a blow's way, to the side it steps to: a hero's own evade
+    # or dive if it has one, else the push-off of a jog to that side, which
+    # reads as a quick sidestep (TMBattleDirectorBlows.cpp, Evaded).
+    # A hero with neither steps with a stride of its sideways jog.
+    put("evadeLeft", first(clips, *LEFT_DODGES))
+    put("evadeRight", first(clips, *RIGHT_DODGES))
     # An emote's own clip, not the intro, loop and outro it is sometimes cut into.
     put("victory", every(clips, r"Emote_(?!.*_(Intro|Loop|Outro)$).*", 3) or None)
 
@@ -250,6 +262,11 @@ def corrected(anim_set, body, clips):
                 anim_set.setdefault("motions", {})[motion + "_ult"] = {"release": [found]}
     for role, value in fixes.items():
         if role in ("ult", "ult_support"):
+            continue
+        if role == "cloth":
+            # "cloth": false -- a hero whose cloth simulation flies apart when
+            # the game switches clips (Terra's shield panels): drawn as skinned.
+            anim_set["cloth"] = bool(value)
             continue
         if role == "motions":
             motions = anim_set.setdefault("motions", {})

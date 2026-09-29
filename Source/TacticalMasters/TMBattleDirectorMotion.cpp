@@ -161,14 +161,22 @@ bool ATMBattleDirector::LoadCharacterMap()
 
 USkeletalMesh* ATMBattleDirector::MeshOf(const FTMBody& Body)
 {
+	if (Body.Mesh && Body.Animations)
+	{
+		return Body.Mesh;
+	}
+	const double Began = FPlatformTime::Seconds();
 	if (!Body.Mesh)
 	{
 		Body.Mesh = LoadNamed<USkeletalMesh>(Body.MeshPath, CharacterAssets);
 	}
+	const double MeshDone = FPlatformTime::Seconds();
 	if (Body.Mesh && !Body.Animations)
 	{
 		Body.Animations = SetOf(Body.SetName);
 	}
+	UE_LOG(LogTemp, Log, TEXT("body %s: mesh %.0f ms, clips %.0f ms"), *Body.SetName,
+		(MeshDone - Began) * 1000.0, (FPlatformTime::Seconds() - MeshDone) * 1000.0);
 	return Body.Mesh;
 }
 
@@ -210,6 +218,7 @@ void ATMBattleDirector::BuildAnimSet(const FJsonObject& Set, FTMAnimSet& Out)
 	Out.Run = One(TEXT("run"));
 	Out.Cast = One(TEXT("cast"));
 	Out.Rise = One(TEXT("rise"));
+	Set.TryGetBoolField(TEXT("cloth"), Out.bCloth);
 	Many(TEXT("attack"), Out.Attack);
 	const TSharedPtr<FJsonObject>* MotionList = nullptr;
 	if (Set.TryGetObjectField(TEXT("motions"), MotionList))
@@ -291,9 +300,14 @@ void ATMBattleDirector::BuildAnimSet(const FJsonObject& Set, FTMAnimSet& Out)
 
 const ATMBattleDirector::FTMBody* ATMBattleDirector::BodyFor(const TMSim::FUnit& Unit) const
 {
+	return BodyForJob(Unit.Job);
+}
+
+const ATMBattleDirector::FTMBody* ATMBattleDirector::BodyForJob(const std::string& JobId) const
+{
 	// The class's own, then its look's, then the default. A built-in class has
 	// no look written down, but each built-in's id is itself a look.
-	const FString Id = UTF8_TO_TCHAR(Unit.Job.c_str());
+	const FString Id = UTF8_TO_TCHAR(JobId.c_str());
 	if (const FString* Named = ClassBodies.Find(Id))
 	{
 		if (const FTMBody* Body = Bodies.Find(*Named))
@@ -302,7 +316,7 @@ const ATMBattleDirector::FTMBody* ATMBattleDirector::BodyFor(const TMSim::FUnit&
 		}
 	}
 	FString Look = Id;
-	if (const TMSim::FJobDef* Job = TMSim::FindJob(Unit.Job))
+	if (const TMSim::FJobDef* Job = TMSim::FindJob(JobId))
 	{
 		if (!Job->Look.empty())
 		{
@@ -357,7 +371,7 @@ FVector ATMBattleDirector::ShownAt(const TMSim::FUnit& Unit) const
 	return WorldFor(Unit);
 }
 
-void ATMBattleDirector::Animate(int32 Index, UAnimSequence* Clip, bool bLoop)
+void ATMBattleDirector::Animate(int32 Index, UAnimSequence* Clip, bool bLoop, float MaxSeconds)
 {
 	if (!Clip || !UnitVisuals.IsValidIndex(Index) || !UnitVisuals[Index] || !Motions.IsValidIndex(Index))
 	{
@@ -372,6 +386,10 @@ void ATMBattleDirector::Animate(int32 Index, UAnimSequence* Clip, bool bLoop)
 	UnitVisuals[Index]->PlayAnimation(Clip, bLoop);
 	Motion.Playing = Clip;
 	Motion.OneShotLeft = bLoop ? 0.0f : Clip->GetPlayLength();
+	if (!bLoop && MaxSeconds > 0.0f)
+	{
+		Motion.OneShotLeft = FMath::Min(Motion.OneShotLeft, MaxSeconds);
+	}
 }
 
 const ATMBattleDirector::FTMMotionClips* ATMBattleDirector::FindMotion(const FTMAnimSet& Set, const FString& Motion)

@@ -186,6 +186,8 @@ private:
 	void Slider(float X, float Y, float W, float H, int32 Id, double Value, double Low, double High);
 	void DrawClassPicker(ATMBattleDirector& Director);
 	void DrawTooltip();
+	/** A bar while heroes, shaders or graphics pipelines are still loading. */
+	void DrawLoading(ATMBattleDirector& Director);
 
 	/** Who is casting what at this unit, as a line per caster (hud.gd:1123-1150). Returns the height used. */
 	float DrawIncoming(ATMBattleDirector& Director, const TMSim::FUnit& Unit, float X, float Y, float W);
@@ -288,6 +290,8 @@ public:
 	TArray<FTMMovable> Movables;
 	/** Where each turn square was drawn this frame, by unit id, for reordering. */
 	TMap<int32, FBox2D> SquareAreas;
+	/** When each unit's turn came, in real seconds, for the flash its card gives (DrawTurnSquares). */
+	TMap<int32, float> ReadySince;
 	/** Screen pixels to a 1080p pixel's worth, as this frame was drawn -- before any panel's own size. */
 	float Scale() const { return BaseS; }
 

@@ -11,6 +11,7 @@
 // seen, never what happened: the health bars and the log already have it.
 
 #include "TMBattleDirector.h"
+#include "TMSettings.h"
 
 #include "Animation/AnimSequence.h"
 #include "Components/PointLightComponent.h"
@@ -158,7 +159,7 @@ const TArray<FString>& ATMBattleDirector::ExtraKeys()
 	static const TArray<FString> Keys =
 	{
 		TEXT("hitFront"), TEXT("hitBack"), TEXT("hitLeft"), TEXT("hitRight"), TEXT("hitHeavy"),
-		TEXT("evade"), TEXT("block"),
+		TEXT("evade"), TEXT("evadeLeft"), TEXT("evadeRight"), TEXT("block"),
 		TEXT("deathFront"), TEXT("deathBack"), TEXT("deathLeft"), TEXT("deathRight"),
 		TEXT("stunned"), TEXT("sleep"),
 		TEXT("ready"), TEXT("victory"), TEXT("defeat"),
@@ -608,7 +609,9 @@ void ATMBattleDirector::AddFloater(int32 UnitId, const FString& What, const FCol
 			++Stacked;
 		}
 	}
-	const FVector Where = ShownAt(*Unit) + FVector(0.0f, 0.0f, 190.0f + Stacked * 26.0f);
+	// As big as the player set it in Options, and stacked that far apart.
+	const float Size = FloaterSize * FTMSettings::Get().DamageTextScale;
+	const FVector Where = ShownAt(*Unit) + FVector(0.0f, 0.0f, 190.0f + Stacked * Size);
 
 	UTextRenderComponent* Text = NewObject<UTextRenderComponent>(this, NAME_None, RF_Transient);
 	Text->SetMobility(EComponentMobility::Movable);
@@ -616,7 +619,7 @@ void ATMBattleDirector::AddFloater(int32 UnitId, const FString& What, const FCol
 	Text->RegisterComponent();
 	Text->SetText(FText::FromString(What));
 	Text->SetTextRenderColor(Tint);
-	Text->SetWorldSize(FloaterSize);
+	Text->SetWorldSize(Size);
 	Text->SetHorizontalAlignment(EHTA_Center);
 	Text->SetRelativeLocation(Where);
 	// Facing the camera is a per-frame job; billboarded in AdvanceFloaters.
@@ -713,15 +716,21 @@ void ATMBattleDirector::React(const TMSim::FEvent& Event, int32 CasterId)
 		break;
 	case TMSim::EEventKind::Evaded:
 	{
-		// Out of the way: a step to the side, whichever side it is.
+		// Out of the way: a step to the side, whichever side it is, with the
+		// hero's own dodge to that side -- its evade or dive, or the push-off of
+		// a sideways jog, cut before it settles into running.
 		const FVector Across = FVector(-Away.Y, Away.X, 0.0f) * ((Unit.Id % 2) ? 1.0f : -1.0f);
 		Jolt(i, Across, 45.0f);
-		if (bFree)
+		if (bFree && Set)
 		{
-			if (UAnimSequence* Dodge = Set->Extra(TEXT("evade"), Unit.Id))
+			const float Yaw = FMath::DegreesToRadians(Motion.Yaw);
+			const FVector Right(-FMath::Sin(Yaw), FMath::Cos(Yaw), 0.0f);
+			UAnimSequence* Dodge = Set->Extra(FVector::DotProduct(Across, Right) > 0.0f ? TEXT("evadeRight") : TEXT("evadeLeft"), Unit.Id);
+			if (!Dodge)
 			{
-				Animate(i, Dodge, false);
+				Dodge = Set->Extra(TEXT("evade"), Unit.Id);
 			}
+			Animate(i, Dodge, false, 0.6f);
 		}
 		break;
 	}

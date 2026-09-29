@@ -94,6 +94,10 @@ void ATMBattleHud::DrawOptions(ATMBattleDirector& From)
 	Label(TEXT("Voices volume"), Y, PX, TEXT("How loud the heroes are: their efforts, cries and cheers."));
 	Slider(PX + LabelW, Y + 6.0f * S, ControlW, RowH - 12.0f * S, ATMBattleDirector::SliderVoiceVolume, Settings.VoiceVolume, 0.0, 1.0);
 	Text(FString::Printf(TEXT("%.0f%%"), Settings.VoiceVolume * 100.0f), PX + LabelW + ControlW + 16.0f * S, Y + 8.0f * S, TextColour, Font, 0.62f * S);
+	Y += RowH + 8.0f * S;
+	Label(TEXT("Damage number size"), Y, PX, TEXT("How big the damage and healing numbers rising off units are."));
+	Slider(PX + LabelW, Y + 6.0f * S, ControlW, RowH - 12.0f * S, ATMBattleDirector::SliderDamageText, Settings.DamageTextScale, 0.75, 3.0);
+	Text(FString::Printf(TEXT("%.2fx"), Settings.DamageTextScale), PX + LabelW + ControlW + 16.0f * S, Y + 8.0f * S, TextColour, Font, 0.62f * S);
 	Y += RowH + 16.0f * S;
 
 	// Controls.

@@ -850,7 +850,8 @@
         ]
       }
     },
-    "ult": "R_ending"
+    "ult": "R_ending",
+    "cloth": false
   },
   "kwang": {
     "idle": "Idle",

@@ -148,6 +148,7 @@ public:
 	static constexpr int32 SliderStatusIcons = 2;
 	static constexpr int32 SliderSfxVolume = 3;
 	static constexpr int32 SliderVoiceVolume = 4;
+	static constexpr int32 SliderDamageText = 5;
 	static constexpr int32 SliderTuning = 100;
 	/** Rule numbers changed during a battle, sent as one order once the dragging stops. */
 	TMap<int32, double> TunePending;
@@ -768,6 +769,12 @@ private:
 		TArray<UAnimSequence*> Hit;
 		TArray<UAnimSequence*> Death;
 		UAnimSequence* Rise = nullptr;
+		/**
+		 * Whether the hero's cloth is simulated ("cloth" in the map, true unless
+		 * said). Terra's flies apart -- her shield panels thrown out as long
+		 * slabs -- when the game switches clips, so hers is drawn skinned.
+		 */
+		bool bCloth = true;
 		/** How fast a walk and a run cover the ground, in cm/s, to match the clips. */
 		float WalkSpeed = 170.0f;
 		float RunSpeed = 380.0f;
@@ -808,6 +815,33 @@ private:
 	USkeletalMesh* MeshOf(const FTMBody& Body);
 	/** An animation set by name, its clips loaded the first time it is asked for. */
 	const FTMAnimSet* SetOf(const FString& Name);
+	/** Puts a unit's mesh into the body: its mesh, its size, and whether its cloth moves. */
+	void WearBody(class USkeletalMeshComponent* Visual, const FTMBody& Body) const;
+	/** Whether the body's mesh and clips are already in memory, so wearing it costs nothing. */
+	bool IsBodyLoaded(const FTMBody& Body) const;
+
+	// ------------------------------------------------ loading in the background
+	// (TMBattleDirectorLoading.cpp). A hero's mesh, textures and clips take
+	// seconds to read; read on the game thread they froze the screen, one hero
+	// after another. They are read by Unreal's loader in the background instead,
+	// all at once, with a bar saying how far along it is.
+	/** Starts the bodies the battle's units wear loading; true if any had to be. */
+	bool LoadBodiesInBackground();
+	/** What wearing these bodies would still have to read from disk. */
+	void UnreadPaths(const TArray<const FTMBody*>& Wanted, TArray<struct FSoftObjectPath>& Paths) const;
+	/** Once they are in: every unit put into its own body. */
+	void DressUnits();
+	/** A random team rolled ahead of the click, its heroes loaded while the setup screen is read. */
+	void RollNextRandomTeam(int32 Team);
+	/** What is still loading, for the HUD: a line to say and how far along. False when nothing is. */
+	bool LoadingProgress(FString& What, float& Fraction) const;
+	/** The bodies for the battle, while they load; the next random teams' heroes, likewise. */
+	TSharedPtr<struct FStreamableHandle> BodyLoad;
+	TSharedPtr<struct FStreamableHandle> AheadLoad[2];
+	std::vector<std::string> NextRandom[2];
+	/** The most shaders seen waiting at once, so the bar can say how far along they are. */
+	mutable int32 ShaderJobsPeak = 0;
+	mutable int32 PipelinesPeak = 0;
 
 	/** What one unit is doing on screen. */
 	struct FTMMotion
@@ -947,13 +981,15 @@ private:
 	/** Reads the character map once per run. False, and said why, if it cannot. */
 	bool LoadCharacterMap();
 	const FTMBody* BodyFor(const TMSim::FUnit& Unit) const;
+	const FTMBody* BodyForJob(const std::string& JobId) const;
 	/** Starts every unit standing where the rules put it. */
 	void ResetMotion();
 	/** Walks, one-offs and falls, a frame at a time. Game worlds only. */
 	void AdvanceMotion(float DeltaSeconds);
 	/** What the battle's events mean for the bodies: a swing, a flinch. */
 	void AnimateEvents(const TMSim::FTickReport& Report);
-	void Animate(int32 Index, UAnimSequence* Clip, bool bLoop);
+	/** Plays a clip on a unit; a one-off can be cut short after MaxSeconds (0: all of it). */
+	void Animate(int32 Index, UAnimSequence* Clip, bool bLoop, float MaxSeconds = 0.0f);
 	/** Where a unit is drawn now: part way along a walk, or where the rules have it. */
 	FVector ShownAt(const TMSim::FUnit& Unit) const;
 

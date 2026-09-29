@@ -729,13 +729,15 @@ void ATMBattleHud::DrawTurnOrder(ATMBattleDirector& From)
 void ATMBattleHud::DrawTurnSquares(ATMBattleDirector& From)
 {
 	// hud.gd:318-470. A square per unit, one row per side, each row movable on
-	// its own and its squares reorderable (Edit layout). Waiting, a square is
-	// grey and a red meter fills from the bottom as its gauge fills; on its
-	// turn it goes gold, its border pulses, and the meter drains as its
-	// countdown runs out. The badge is the seconds to either, or to a cast.
+	// its own and its squares reorderable (Edit layout). Waiting, a card is
+	// greyed and its gauge fills it from the bottom; when its turn comes it
+	// flashes yellow, then stays gold with a pulsing border while the fill
+	// drains from the top as its countdown runs out. The badge is the seconds
+	// to either, or to a cast.
 	const TMSim::FBattle& Battle = From.Battle;
 	UFont* Font = GEngine->GetMediumFont();
-	const float Pulse = 0.55f + 0.45f * FMath::Sin((GetWorld() ? GetWorld()->GetRealTimeSeconds() : 0.0f) * 1000.0f / 180.0f);
+	const float Now = GetWorld() ? GetWorld()->GetRealTimeSeconds() : 0.0f;
+	const float Pulse = 0.55f + 0.45f * FMath::Sin(Now * 1000.0f / 180.0f);
 	for (int32 Team = 0; Team < 2; ++Team)
 	{
 		const FPanelScale Sized(*this, Team == 0 ? TEXT("turn_cards_blue") : TEXT("turn_cards_red"));
@@ -837,21 +839,52 @@ void ATMBattleHud::DrawTurnSquares(ATMBattleDirector& From)
 			{
 				if (UTexture* Face0 = From.CardPortrait(*Unit))
 				{
+					// Greyed while it waits; full colour on its turn.
 					Picture(Face0, X + FrameWidth, RowY + FrameWidth, SW - 2.0f * FrameWidth, SW - 2.0f * FrameWidth,
-						FLinearColor(1, 1, 1, Unit->bReady ? 1.0f : 0.85f));
+						Unit->bReady ? FLinearColor::White : FLinearColor(0.42f, 0.44f, 0.47f, 1.0f));
+				}
+				if (!Unit->bReady)
+				{
+					DrawRect(FLinearColor(0.3f, 0.31f, 0.33f, 0.3f), X + FrameWidth, RowY + FrameWidth, SW - 2.0f * FrameWidth, SW - 2.0f * FrameWidth);
+				}
+				// The gauge, up the card: filling from the bottom while it waits,
+				// draining from the top through its turn.
+				const float Inner = SW - 2.0f * FrameWidth;
+				const float Tall = Inner * FMath::Clamp(Level, 0.0f, 1.0f);
+				DrawRect(Meter, X + FrameWidth, RowY + FrameWidth + Inner - Tall, Inner, Tall);
+				if (Tall > 1.0f && Tall < Inner)
+				{
+					// Its edge, so the level reads at a glance.
+					DrawRect((Unit->bReady ? Gold : FLinearColor(1.0f, 0.45f, 0.35f)) * FLinearColor(1, 1, 1, 0.9f),
+						X + FrameWidth, RowY + FrameWidth + Inner - Tall - 1.0f * S, Inner, 2.0f * S);
 				}
 				const float Crest = 18.0f * S;
 				DrawRect(FLinearColor(0.0f, 0.0f, 0.0f, 0.6f), X + FrameWidth, RowY + FrameWidth, Crest, Crest);
 				Picture(ClassIcon(*Unit), X + FrameWidth, RowY + FrameWidth, Crest, Crest);
 			}
-			// Health in its side's colour, then the gauge (gold, draining, on its turn).
+			// The moment its turn comes, the whole card flashes yellow and fades
+			// to its gold; it keeps a soft yellow beat for as long as it can act.
+			if (Unit->bReady)
+			{
+				const float* Since = ReadySince.Find(Unit->Id);
+				if (!Since)
+				{
+					Since = &ReadySince.Add(Unit->Id, Now);
+				}
+				const float Flash = FMath::Clamp(1.0f - (Now - *Since) / 0.7f, 0.0f, 1.0f);
+				const float Glow = FMath::Max(0.75f * Flash, 0.12f * Pulse) * Alpha;
+				DrawRect(FLinearColor(1.0f, 0.9f, 0.25f, Glow), X, RowY, SW, SW);
+			}
+			else
+			{
+				ReadySince.Remove(Unit->Id);
+			}
+			// Health in its side's colour, under the card.
 			const float BarY = RowY + SW + 2.0f * S;
 			const float HpPart = bFogged ? 0.0f : static_cast<float>(Unit->Hp) / FMath::Max(1, Unit->MaxHp());
 			DrawRect(FLinearColor(0.03f, 0.04f, 0.06f, 0.95f * Alpha), X, BarY, SW, 5.0f * S);
 			DrawRect(SideColour(bFriend) * FLinearColor(1, 1, 1, Alpha), X, BarY, SW * HpPart, 5.0f * S);
-			const float GaugeY = BarY + 6.0f * S;
-			DrawRect(FLinearColor(0.03f, 0.04f, 0.06f, 0.95f * Alpha), X, GaugeY, SW, 4.0f * S);
-			DrawRect((Unit->bReady ? Gold : FLinearColor(0.55f, 0.75f, 0.95f)) * FLinearColor(1, 1, 1, Alpha), X, GaugeY, SW * Level, 4.0f * S);
+			const float GaugeY = BarY + 1.0f * S;
 			const float BadgeScale = 0.4f * S;
 			const FVector2D BadgeSize = TextSize(Badge, Font, BadgeScale);
 			Text(Badge, X + (SW - BadgeSize.X) * 0.5f, GaugeY + 5.0f * S, BadgeColour * FLinearColor(1, 1, 1, Alpha), Font, BadgeScale);
@@ -966,8 +999,8 @@ UTexture2D* ATMBattleHud::Icon(const FString& Name, bool bGrey)
 	{
 		return nullptr;
 	}
-	// Pictures made from the Godot game's own icons (Tools/import_icons.py),
-	// read at run time: nothing here is an asset made in the editor.
+	// Pictures drawn by the class creator (its Icons tab), read at run time:
+	// nothing here is an asset made in the editor.
 	FImage Image;
 	const FString File = FPaths::ProjectContentDir() / TEXT("Data/Icons") / (Name + TEXT(".png"));
 	if (!FPaths::FileExists(File) || !FImageUtils::LoadImage(*File, Image))
@@ -1324,6 +1357,25 @@ void ATMBattleHud::DrawOverheads(ATMBattleDirector& From)
 		const FString Hp = FString::FromInt(Unit.Hp);
 		Text(Hp, X + 10.0f * S * O, Y + (H - TextSize(Hp, Font, 0.34f * S * O).Y) * 0.5f, FLinearColor::White, Font, 0.34f * S * O);
 		Y += H + 3.0f * S;
+
+		// Its turn gauge, as its turn card shows it: filling toward its turn,
+		// then gold and draining while it can act.
+		const float Thin = 4.0f * S * O;
+		float Gauge = static_cast<float>(Unit.Tg) / TMSim::Pace::TgMax;
+		FLinearColor GaugeColour(0.55f, 0.75f, 0.95f);
+		if (Unit.bReady)
+		{
+			Gauge = static_cast<float>(Unit.Clock) / FMath::Max(1, From.Battle.ClockTicks(Unit));
+			GaugeColour = Gold;
+		}
+		Bar(X, Y, W, Thin, FMath::Clamp(Gauge, 0.0f, 1.0f), GaugeColour, FLinearColor(0.05f, 0.05f, 0.08f, 0.85f), 2.0f * S);
+		Y += Thin + 2.0f * S;
+		// The ultimate meter, pulsing once it is full.
+		const bool bUltReady = Unit.Ult >= TMSim::Pace::UltMax;
+		const float Beat = bUltReady ? 0.7f + 0.3f * FMath::Sin((GetWorld() ? GetWorld()->GetRealTimeSeconds() : 0.0f) * 6.0f) : 1.0f;
+		const FLinearColor UltColour = bUltReady ? FLinearColor(1.0f, 0.62f, 0.2f, Beat) : FLinearColor(0.78f, 0.5f, 1.0f, 0.9f);
+		Bar(X, Y, W, Thin, static_cast<float>(Unit.Ult) / TMSim::Pace::UltMax, UltColour, FLinearColor(0.05f, 0.05f, 0.08f, 0.85f), 2.0f * S);
+		Y += Thin + 3.0f * S;
 
 		// A spell on its way out: how long it has left.
 		if (Unit.IsCasting())
