@@ -2796,6 +2796,8 @@ void ATMBattleDirector::StartMatch(bool bNewSeed)
 		BattleSeed, *Who(0), *Who(1));
 	Log.Add(Opening);
 	UE_LOG(LogTemp, Log, TEXT("%s"), *Opening);
+	// A war horn as the battle begins.
+	PlayEventSound(TEXT("battleStart"), nullptr, 0.7f);
 }
 
 void ATMBattleDirector::OpenTitle()

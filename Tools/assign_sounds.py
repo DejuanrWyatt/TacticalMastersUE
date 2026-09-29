@@ -41,7 +41,7 @@ MOTIONS = {
 ELEMENTS = {"fire", "ice", "water", "earth", "nature", "holy", "shadow", "lightning", "wind"}
 SPELLS = {"bolt", "area", "channel"}
 EVENTS = {"cast": "charge", "knockout": "knock_out", "ready": "ready", "turnLost": "turn_lost",
-          "victory": "victory", "defeat": "defeat", "step": "step", "click": "click", "select": "select",
+          "victory": "victory", "defeat": "defeat", "step": "step", "click": "click", "select": "select", "battleStart": "horn",
           "step_meadow": "step_meadow", "step_winter": "step_winter", "step_volcanic": "step_volcanic",
           "step_ruined_keep": "step_ruined_keep"}
 # A hero's voice lines by role, from its cues' names (Greystone_Effort_Pain...),
@@ -68,13 +68,16 @@ VOICE_ROLES = {
 #   Free_Sounds_Pack      50 Free Game Sounds Pack
 #   SmallSoundKit         Small Sound Kit
 #   Essential_Foosteps_SK Essential Footsteps SFX
+#   RealisticSwordSoundEffects  Free Realistic Sword Sound Effects Pack
+#   VikingWarHorns        Viking War Horn
 MAGIC = "FreeModularMagicSFX/**/"
 SFX_PACKS = {
     # Weapons.
-    "swing": ["General_Whoosh_SK/**/Swooshes_Swish_Sword_Swing_Heavy_*", "General_Whoosh_SK/**/GW_Whoosh_Combo_Light_*",
+    "swing": ["RealisticSwordSoundEffects/**/Swoosh_*", "General_Whoosh_SK/**/Swooshes_Swish_Sword_Swing_Heavy_*",
               "General_Whoosh_SK/**/GW_Whoosh_Combo_Medium_*"],
     "swing_heavy": ["General_Whoosh_SK/**/GW_Whoosh_Combo_Heavy_*", MAGIC + "SW_MagicWeapon_Swing_*"],
-    "hit_metal": ["Free_Sounds_Pack/**/Shield_Metal_Impact_*", "Free_Sounds_Pack/**/Stab_*", MAGIC + "SW_MagicImpact_Metallic_*"],
+    # Steel on steel: the sword pack's blade strikes, and a blow taken on a shield.
+    "hit_metal": ["RealisticSwordSoundEffects/**/Sword_Attack_*", "Free_Sounds_Pack/**/Shield_Metal_Impact_*"],
     "hit_heavy": ["Free_Sounds_Pack/**/Punch_*", "Free_Sounds_Pack/**/Rock_Impact_*", "Free_Sounds_Pack/**/Hit_Generic_*"],
     "shoot": [MAGIC + "SW_MagicCast_Arrow_*", MAGIC + "SW_MagicCast_HeavyArrowShoot_*"],
     "hit_arrow": ["Free_Sounds_Pack/**/Hit_Generic_*", "Free_Sounds_Pack/**/Stab_*"],
@@ -115,6 +118,8 @@ SFX_PACKS = {
     "defeat": [MAGIC + "SW_MagicFade_FadeOut1_*"],
     "click": ["Free_Sounds_Pack/**/Interface_1-*"],
     "select": ["Free_Sounds_Pack/**/Magical_Interface_8-*"],
+    # A war horn as a battle begins.
+    "horn": ["VikingWarHorns/**/SW_Intro_*"],
     # Footsteps, by the battlefield's look (step_<theme id>), else "step".
     "step": ["Essential_Foosteps_SK/**/Footstep_Dirt_Boots_Walk_[0-9]"],
     "step_meadow": ["Essential_Foosteps_SK/**/Footstep_FootstepLeaves_Boots_Walk_[0-9]"],

@@ -4,15 +4,16 @@
   "about": "What a battle sounds like; written by Tools/assign_sounds.py and read by the director, never the rules.",
   "sfx": {
     "swing": [
+      "/Game/RealisticSwordSoundEffects/Wavs/Sword_Swoosh/Swoosh_1.Swoosh_1",
+      "/Game/RealisticSwordSoundEffects/Wavs/Sword_Swoosh/Swoosh_2.Swoosh_2",
+      "/Game/RealisticSwordSoundEffects/Wavs/Sword_Swoosh/Swoosh_3.Swoosh_3",
+      "/Game/RealisticSwordSoundEffects/Wavs/Sword_Swoosh/Swoosh_4.Swoosh_4",
+      "/Game/RealisticSwordSoundEffects/Wavs/Sword_Swoosh/Swoosh_5.Swoosh_5",
+      "/Game/RealisticSwordSoundEffects/Wavs/Sword_Swoosh/Swoosh_6.Swoosh_6",
       "/Game/General_Whoosh_SK/WAV/New_Update/Swooshes_Swish_Sword_Swing_Heavy_1.Swooshes_Swish_Sword_Swing_Heavy_1",
       "/Game/General_Whoosh_SK/WAV/New_Update/Swooshes_Swish_Sword_Swing_Heavy_2.Swooshes_Swish_Sword_Swing_Heavy_2",
       "/Game/General_Whoosh_SK/WAV/New_Update/Swooshes_Swish_Sword_Swing_Heavy_3.Swooshes_Swish_Sword_Swing_Heavy_3",
       "/Game/General_Whoosh_SK/WAV/New_Update/Swooshes_Swish_Sword_Swing_Heavy_4.Swooshes_Swish_Sword_Swing_Heavy_4",
-      "/Game/General_Whoosh_SK/WAV/Layered/GW_Whoosh_Combo_Light_1.GW_Whoosh_Combo_Light_1",
-      "/Game/General_Whoosh_SK/WAV/Layered/GW_Whoosh_Combo_Light_2.GW_Whoosh_Combo_Light_2",
-      "/Game/General_Whoosh_SK/WAV/Layered/GW_Whoosh_Combo_Light_3.GW_Whoosh_Combo_Light_3",
-      "/Game/General_Whoosh_SK/WAV/Layered/GW_Whoosh_Combo_Light_4.GW_Whoosh_Combo_Light_4",
-      "/Game/General_Whoosh_SK/WAV/Layered/GW_Whoosh_Combo_Light_5.GW_Whoosh_Combo_Light_5",
       "/Game/General_Whoosh_SK/WAV/Layered/GW_Whoosh_Combo_Medium_1.GW_Whoosh_Combo_Medium_1",
       "/Game/General_Whoosh_SK/WAV/Layered/GW_Whoosh_Combo_Medium_2.GW_Whoosh_Combo_Medium_2",
       "/Game/General_Whoosh_SK/WAV/Layered/GW_Whoosh_Combo_Medium_3.GW_Whoosh_Combo_Medium_3"
@@ -27,16 +28,22 @@
       "/Game/FreeModularMagicSFX/D1_Spell/Mono/SW_MagicWeapon_Swing_4.SW_MagicWeapon_Swing_4"
     ],
     "hit_metal": [
-      "/Game/Free_Sounds_Pack/wav/Shield_Metal_Impact_1-3.Shield_Metal_Impact_1-3",
-      "/Game/Free_Sounds_Pack/wav/Stab_4-1.Stab_4-1",
-      "/Game/FreeModularMagicSFX/E_Impact/Mono/SW_MagicImpact_Metallic_1.SW_MagicImpact_Metallic_1",
-      "/Game/FreeModularMagicSFX/E_Impact/Mono/SW_MagicImpact_Metallic_2.SW_MagicImpact_Metallic_2",
-      "/Game/FreeModularMagicSFX/E_Impact/Mono/SW_MagicImpact_Metallic_3.SW_MagicImpact_Metallic_3",
-      "/Game/FreeModularMagicSFX/E_Impact/Mono/SW_MagicImpact_Metallic_4.SW_MagicImpact_Metallic_4",
-      "/Game/FreeModularMagicSFX/E_Impact/Mono/SW_MagicImpact_Metallic_5.SW_MagicImpact_Metallic_5",
-      "/Game/FreeModularMagicSFX/E_Impact/Mono/SW_MagicImpact_Metallic_6.SW_MagicImpact_Metallic_6",
-      "/Game/FreeModularMagicSFX/E_Impact/Mono/SW_MagicImpact_Metallic_7.SW_MagicImpact_Metallic_7",
-      "/Game/FreeModularMagicSFX/E_Impact/Mono/SW_MagicImpact_Metallic_8.SW_MagicImpact_Metallic_8"
+      "/Game/RealisticSwordSoundEffects/Wavs/Sword_Attack/Sword_Attack_1.Sword_Attack_1",
+      "/Game/RealisticSwordSoundEffects/Wavs/Sword_Attack/Sword_Attack_10.Sword_Attack_10",
+      "/Game/RealisticSwordSoundEffects/Wavs/Sword_Attack/Sword_Attack_11.Sword_Attack_11",
+      "/Game/RealisticSwordSoundEffects/Wavs/Sword_Attack/Sword_Attack_12.Sword_Attack_12",
+      "/Game/RealisticSwordSoundEffects/Wavs/Sword_Attack/Sword_Attack_13.Sword_Attack_13",
+      "/Game/RealisticSwordSoundEffects/Wavs/Sword_Attack/Sword_Attack_2.Sword_Attack_2",
+      "/Game/RealisticSwordSoundEffects/Wavs/Sword_Attack/Sword_Attack_3.Sword_Attack_3",
+      "/Game/RealisticSwordSoundEffects/Wavs/Sword_Attack/Sword_Attack_4.Sword_Attack_4",
+      "/Game/RealisticSwordSoundEffects/Wavs/Sword_Attack/Sword_Attack_5.Sword_Attack_5",
+      "/Game/RealisticSwordSoundEffects/Wavs/Sword_Attack/Sword_Attack_6.Sword_Attack_6",
+      "/Game/RealisticSwordSoundEffects/Wavs/Sword_Attack/Sword_Attack_7.Sword_Attack_7",
+      "/Game/RealisticSwordSoundEffects/Wavs/Sword_Attack/Sword_Attack_8.Sword_Attack_8",
+      "/Game/RealisticSwordSoundEffects/Wavs/Sword_Attack/Sword_Attack_9.Sword_Attack_9",
+      "/Game/RealisticSwordSoundEffects/Wavs/Sword_Attack/Sword_Attack_Short_1.Sword_Attack_Short_1",
+      "/Game/RealisticSwordSoundEffects/Wavs/Sword_Attack/Sword_Attack_Short_2.Sword_Attack_Short_2",
+      "/Game/Free_Sounds_Pack/wav/Shield_Metal_Impact_1-3.Shield_Metal_Impact_1-3"
     ],
     "hit_heavy": [
       "/Game/Free_Sounds_Pack/wav/Punch_2-1.Punch_2-1",
@@ -294,6 +301,14 @@
     ],
     "select": [
       "/Game/Free_Sounds_Pack/wav/Magical_Interface_8-1.Magical_Interface_8-1"
+    ],
+    "horn": [
+      "/Game/VikingWarHorns/VWH/SW_Intro_1.SW_Intro_1",
+      "/Game/VikingWarHorns/VWH/SW_Intro_2.SW_Intro_2",
+      "/Game/VikingWarHorns/VWH/SW_Intro_3.SW_Intro_3",
+      "/Game/VikingWarHorns/VWH/SW_Intro_4.SW_Intro_4",
+      "/Game/VikingWarHorns/VWH/SW_Intro_5.SW_Intro_5",
+      "/Game/VikingWarHorns/VWH/SW_Intro_6.SW_Intro_6"
     ],
     "step": [
       "/Game/Essential_Foosteps_SK/WAV/Dirt/Footstep_Dirt_Boots_Walk_1.Footstep_Dirt_Boots_Walk_1",
@@ -736,6 +751,7 @@
     "step": "step",
     "click": "click",
     "select": "select",
+    "battleStart": "horn",
     "step_meadow": "step_meadow",
     "step_winter": "step_winter",
     "step_volcanic": "step_volcanic",
