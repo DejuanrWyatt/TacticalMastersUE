@@ -2,18 +2,361 @@
   "format": "tactical-masters-sounds",
   "version": 1,
   "about": "What a battle sounds like; written by Tools/assign_sounds.py and read by the director, never the rules.",
-  "sfx": {},
+  "sfx": {
+    "swing": [
+      "/Game/General_Whoosh_SK/WAV/New_Update/Swooshes_Swish_Sword_Swing_Heavy_1.Swooshes_Swish_Sword_Swing_Heavy_1",
+      "/Game/General_Whoosh_SK/WAV/New_Update/Swooshes_Swish_Sword_Swing_Heavy_2.Swooshes_Swish_Sword_Swing_Heavy_2",
+      "/Game/General_Whoosh_SK/WAV/New_Update/Swooshes_Swish_Sword_Swing_Heavy_3.Swooshes_Swish_Sword_Swing_Heavy_3",
+      "/Game/General_Whoosh_SK/WAV/New_Update/Swooshes_Swish_Sword_Swing_Heavy_4.Swooshes_Swish_Sword_Swing_Heavy_4",
+      "/Game/General_Whoosh_SK/WAV/Layered/GW_Whoosh_Combo_Light_1.GW_Whoosh_Combo_Light_1",
+      "/Game/General_Whoosh_SK/WAV/Layered/GW_Whoosh_Combo_Light_2.GW_Whoosh_Combo_Light_2",
+      "/Game/General_Whoosh_SK/WAV/Layered/GW_Whoosh_Combo_Light_3.GW_Whoosh_Combo_Light_3",
+      "/Game/General_Whoosh_SK/WAV/Layered/GW_Whoosh_Combo_Light_4.GW_Whoosh_Combo_Light_4",
+      "/Game/General_Whoosh_SK/WAV/Layered/GW_Whoosh_Combo_Light_5.GW_Whoosh_Combo_Light_5",
+      "/Game/General_Whoosh_SK/WAV/Layered/GW_Whoosh_Combo_Medium_1.GW_Whoosh_Combo_Medium_1",
+      "/Game/General_Whoosh_SK/WAV/Layered/GW_Whoosh_Combo_Medium_2.GW_Whoosh_Combo_Medium_2",
+      "/Game/General_Whoosh_SK/WAV/Layered/GW_Whoosh_Combo_Medium_3.GW_Whoosh_Combo_Medium_3"
+    ],
+    "swing_heavy": [
+      "/Game/General_Whoosh_SK/WAV/Layered/GW_Whoosh_Combo_Heavy_1.GW_Whoosh_Combo_Heavy_1",
+      "/Game/General_Whoosh_SK/WAV/Layered/GW_Whoosh_Combo_Heavy_2.GW_Whoosh_Combo_Heavy_2",
+      "/Game/General_Whoosh_SK/WAV/Layered/GW_Whoosh_Combo_Heavy_3.GW_Whoosh_Combo_Heavy_3",
+      "/Game/FreeModularMagicSFX/D1_Spell/Mono/SW_MagicWeapon_Swing_1.SW_MagicWeapon_Swing_1",
+      "/Game/FreeModularMagicSFX/D1_Spell/Mono/SW_MagicWeapon_Swing_2.SW_MagicWeapon_Swing_2",
+      "/Game/FreeModularMagicSFX/D1_Spell/Mono/SW_MagicWeapon_Swing_3.SW_MagicWeapon_Swing_3",
+      "/Game/FreeModularMagicSFX/D1_Spell/Mono/SW_MagicWeapon_Swing_4.SW_MagicWeapon_Swing_4"
+    ],
+    "hit_metal": [
+      "/Game/Free_Sounds_Pack/wav/Shield_Metal_Impact_1-3.Shield_Metal_Impact_1-3",
+      "/Game/Free_Sounds_Pack/wav/Stab_4-1.Stab_4-1",
+      "/Game/FreeModularMagicSFX/E_Impact/Mono/SW_MagicImpact_Metallic_1.SW_MagicImpact_Metallic_1",
+      "/Game/FreeModularMagicSFX/E_Impact/Mono/SW_MagicImpact_Metallic_2.SW_MagicImpact_Metallic_2",
+      "/Game/FreeModularMagicSFX/E_Impact/Mono/SW_MagicImpact_Metallic_3.SW_MagicImpact_Metallic_3",
+      "/Game/FreeModularMagicSFX/E_Impact/Mono/SW_MagicImpact_Metallic_4.SW_MagicImpact_Metallic_4",
+      "/Game/FreeModularMagicSFX/E_Impact/Mono/SW_MagicImpact_Metallic_5.SW_MagicImpact_Metallic_5",
+      "/Game/FreeModularMagicSFX/E_Impact/Mono/SW_MagicImpact_Metallic_6.SW_MagicImpact_Metallic_6",
+      "/Game/FreeModularMagicSFX/E_Impact/Mono/SW_MagicImpact_Metallic_7.SW_MagicImpact_Metallic_7",
+      "/Game/FreeModularMagicSFX/E_Impact/Mono/SW_MagicImpact_Metallic_8.SW_MagicImpact_Metallic_8"
+    ],
+    "hit_heavy": [
+      "/Game/Free_Sounds_Pack/wav/Punch_2-1.Punch_2-1",
+      "/Game/Free_Sounds_Pack/wav/Rock_Impact_11.Rock_Impact_11",
+      "/Game/Free_Sounds_Pack/wav/Rock_Impact_37.Rock_Impact_37",
+      "/Game/Free_Sounds_Pack/wav/Hit_Generic_2-1.Hit_Generic_2-1",
+      "/Game/Free_Sounds_Pack/wav/Hit_Generic_5-1.Hit_Generic_5-1"
+    ],
+    "shoot": [
+      "/Game/FreeModularMagicSFX/C_Cast/Mono/SW_MagicCast_Arrow_1.SW_MagicCast_Arrow_1",
+      "/Game/FreeModularMagicSFX/C_Cast/Mono/SW_MagicCast_Arrow_2.SW_MagicCast_Arrow_2",
+      "/Game/FreeModularMagicSFX/C_Cast/Mono/SW_MagicCast_Arrow_3.SW_MagicCast_Arrow_3",
+      "/Game/FreeModularMagicSFX/C_Cast/Mono/SW_MagicCast_Arrow_4.SW_MagicCast_Arrow_4",
+      "/Game/FreeModularMagicSFX/C_Cast/Mono/SW_MagicCast_HeavyArrowShoot_1.SW_MagicCast_HeavyArrowShoot_1",
+      "/Game/FreeModularMagicSFX/C_Cast/Mono/SW_MagicCast_HeavyArrowShoot_2.SW_MagicCast_HeavyArrowShoot_2",
+      "/Game/FreeModularMagicSFX/C_Cast/Mono/SW_MagicCast_HeavyArrowShoot_3.SW_MagicCast_HeavyArrowShoot_3",
+      "/Game/FreeModularMagicSFX/C_Cast/Mono/SW_MagicCast_HeavyArrowShoot_4.SW_MagicCast_HeavyArrowShoot_4"
+    ],
+    "hit_arrow": [
+      "/Game/Free_Sounds_Pack/wav/Hit_Generic_2-1.Hit_Generic_2-1",
+      "/Game/Free_Sounds_Pack/wav/Hit_Generic_5-1.Hit_Generic_5-1",
+      "/Game/Free_Sounds_Pack/wav/Stab_4-1.Stab_4-1"
+    ],
+    "cast_bolt": [
+      "/Game/FreeModularMagicSFX/C_Cast/Mono/SW_MagicCast_Projectile1_1.SW_MagicCast_Projectile1_1",
+      "/Game/FreeModularMagicSFX/C_Cast/Mono/SW_MagicCast_Projectile1_2.SW_MagicCast_Projectile1_2",
+      "/Game/FreeModularMagicSFX/C_Cast/Mono/SW_MagicCast_Projectile1_3.SW_MagicCast_Projectile1_3",
+      "/Game/FreeModularMagicSFX/C_Cast/Mono/SW_MagicCast_Projectile2_1.SW_MagicCast_Projectile2_1",
+      "/Game/FreeModularMagicSFX/C_Cast/Mono/SW_MagicCast_Projectile2_2.SW_MagicCast_Projectile2_2",
+      "/Game/FreeModularMagicSFX/C_Cast/Mono/SW_MagicCast_Projectile2_3.SW_MagicCast_Projectile2_3",
+      "/Game/FreeModularMagicSFX/C_Cast/Mono/SW_MagicCast_Generic1_1.SW_MagicCast_Generic1_1",
+      "/Game/FreeModularMagicSFX/C_Cast/Mono/SW_MagicCast_Generic1_2.SW_MagicCast_Generic1_2",
+      "/Game/FreeModularMagicSFX/C_Cast/Mono/SW_MagicCast_Generic1_3.SW_MagicCast_Generic1_3",
+      "/Game/FreeModularMagicSFX/C_Cast/Mono/SW_MagicCast_Generic1_4.SW_MagicCast_Generic1_4"
+    ],
+    "magic": [
+      "/Game/FreeModularMagicSFX/E_Impact/Mono/SW_MagicImpact_Crystal_1.SW_MagicImpact_Crystal_1",
+      "/Game/FreeModularMagicSFX/E_Impact/Mono/SW_MagicImpact_Crystal_2.SW_MagicImpact_Crystal_2",
+      "/Game/FreeModularMagicSFX/E_Impact/Mono/SW_MagicImpact_Crystal_3.SW_MagicImpact_Crystal_3",
+      "/Game/FreeModularMagicSFX/E_Impact/Mono/SW_MagicImpact_Crystal_4.SW_MagicImpact_Crystal_4",
+      "/Game/FreeModularMagicSFX/E_Impact/Mono/SW_MagicImpact_Barrier_1.SW_MagicImpact_Barrier_1",
+      "/Game/FreeModularMagicSFX/E_Impact/Mono/SW_MagicImpact_Barrier_2.SW_MagicImpact_Barrier_2",
+      "/Game/FreeModularMagicSFX/E_Impact/Mono/SW_MagicImpact_Barrier_3.SW_MagicImpact_Barrier_3"
+    ],
+    "cast_area": [
+      "/Game/FreeModularMagicSFX/C_Cast/Mono/SW_MagicCast_Multi1_1.SW_MagicCast_Multi1_1",
+      "/Game/FreeModularMagicSFX/C_Cast/Mono/SW_MagicCast_Multi1_2.SW_MagicCast_Multi1_2",
+      "/Game/FreeModularMagicSFX/C_Cast/Mono/SW_MagicCast_Multi1_3.SW_MagicCast_Multi1_3",
+      "/Game/FreeModularMagicSFX/C_Cast/Mono/SW_MagicCast_Multi2_1.SW_MagicCast_Multi2_1",
+      "/Game/FreeModularMagicSFX/C_Cast/Mono/SW_MagicCast_Multi2_2.SW_MagicCast_Multi2_2",
+      "/Game/FreeModularMagicSFX/C_Cast/Mono/SW_MagicCast_Multi2_3.SW_MagicCast_Multi2_3",
+      "/Game/FreeModularMagicSFX/C_Cast/Mono/SW_MagicCast_StaffStrikeGround_1.SW_MagicCast_StaffStrikeGround_1",
+      "/Game/FreeModularMagicSFX/C_Cast/Mono/SW_MagicCast_StaffStrikeGround_2.SW_MagicCast_StaffStrikeGround_2",
+      "/Game/FreeModularMagicSFX/C_Cast/Mono/SW_MagicCast_StaffStrikeGround_3.SW_MagicCast_StaffStrikeGround_3"
+    ],
+    "boom": [
+      "/Game/Free_Sounds_Pack/wav/Explosion_Medium_2-1.Explosion_Medium_2-1",
+      "/Game/Free_Sounds_Pack/wav/Explosion_Large_1-1.Explosion_Large_1-1",
+      "/Game/FreeModularMagicSFX/D1_Spell/Mono/SW_MagicSpell_RockExplosion1_1.SW_MagicSpell_RockExplosion1_1",
+      "/Game/FreeModularMagicSFX/D1_Spell/Mono/SW_MagicSpell_RockExplosion1_2.SW_MagicSpell_RockExplosion1_2",
+      "/Game/FreeModularMagicSFX/D1_Spell/Mono/SW_MagicSpell_RockExplosion1_3.SW_MagicSpell_RockExplosion1_3"
+    ],
+    "charge": [
+      "/Game/FreeModularMagicSFX/A_Chant/Mono/SW_MagicChant_Charge1_1.SW_MagicChant_Charge1_1",
+      "/Game/FreeModularMagicSFX/A_Chant/Mono/SW_MagicChant_Charge1_2.SW_MagicChant_Charge1_2",
+      "/Game/FreeModularMagicSFX/A_Chant/Mono/SW_MagicChant_Charge1_3.SW_MagicChant_Charge1_3",
+      "/Game/FreeModularMagicSFX/A_Chant/Mono/SW_MagicChant_Charge2_1.SW_MagicChant_Charge2_1",
+      "/Game/FreeModularMagicSFX/A_Chant/Mono/SW_MagicChant_Charge2_2.SW_MagicChant_Charge2_2",
+      "/Game/FreeModularMagicSFX/A_Chant/Mono/SW_MagicChant_Charge2_3.SW_MagicChant_Charge2_3",
+      "/Game/FreeModularMagicSFX/B_Transition/Mono/SW_MagicRiser_Charge1_1.SW_MagicRiser_Charge1_1",
+      "/Game/FreeModularMagicSFX/B_Transition/Mono/SW_MagicRiser_Charge1_2.SW_MagicRiser_Charge1_2",
+      "/Game/FreeModularMagicSFX/B_Transition/Mono/SW_MagicRiser_Charge1_3.SW_MagicRiser_Charge1_3"
+    ],
+    "beam": [
+      "/Game/FreeModularMagicSFX/D2_Beam/Mono/SW_MagicBeam_Light1_1.SW_MagicBeam_Light1_1",
+      "/Game/FreeModularMagicSFX/D2_Beam/Mono/SW_MagicBeam_Light1_2.SW_MagicBeam_Light1_2",
+      "/Game/FreeModularMagicSFX/D2_Beam/Mono/SW_MagicBeam_Light1_3.SW_MagicBeam_Light1_3",
+      "/Game/FreeModularMagicSFX/D2_Beam/Mono/SW_MagicBeam_Light3_1.SW_MagicBeam_Light3_1",
+      "/Game/FreeModularMagicSFX/D2_Beam/Mono/SW_MagicBeam_Light3_2.SW_MagicBeam_Light3_2",
+      "/Game/FreeModularMagicSFX/D2_Beam/Mono/SW_MagicBeam_Light3_3.SW_MagicBeam_Light3_3"
+    ],
+    "heal": [
+      "/Game/FreeModularMagicSFX/C_Cast/Mono/SW_MagicCast_Healing_1.SW_MagicCast_Healing_1",
+      "/Game/FreeModularMagicSFX/C_Cast/Mono/SW_MagicCast_Healing_2.SW_MagicCast_Healing_2",
+      "/Game/FreeModularMagicSFX/C_Cast/Mono/SW_MagicCast_Healing_3.SW_MagicCast_Healing_3",
+      "/Game/FreeModularMagicSFX/C_Cast/Mono/SW_MagicCast_Healing_4.SW_MagicCast_Healing_4"
+    ],
+    "buff": [
+      "/Game/FreeModularMagicSFX/C_Cast/Mono/SW_MagicCast_Buff1_1.SW_MagicCast_Buff1_1",
+      "/Game/FreeModularMagicSFX/C_Cast/Mono/SW_MagicCast_Buff1_2.SW_MagicCast_Buff1_2",
+      "/Game/FreeModularMagicSFX/C_Cast/Mono/SW_MagicCast_Buff1_3.SW_MagicCast_Buff1_3",
+      "/Game/FreeModularMagicSFX/C_Cast/Mono/SW_MagicCast_Buff1_4.SW_MagicCast_Buff1_4",
+      "/Game/FreeModularMagicSFX/C_Cast/Mono/SW_MagicCast_Buff2_1.SW_MagicCast_Buff2_1",
+      "/Game/FreeModularMagicSFX/C_Cast/Mono/SW_MagicCast_Buff2_2.SW_MagicCast_Buff2_2",
+      "/Game/FreeModularMagicSFX/C_Cast/Mono/SW_MagicCast_Buff2_3.SW_MagicCast_Buff2_3",
+      "/Game/FreeModularMagicSFX/C_Cast/Mono/SW_MagicCast_Buff3_1.SW_MagicCast_Buff3_1",
+      "/Game/FreeModularMagicSFX/C_Cast/Mono/SW_MagicCast_Buff3_2.SW_MagicCast_Buff3_2",
+      "/Game/FreeModularMagicSFX/C_Cast/Mono/SW_MagicCast_Buff3_3.SW_MagicCast_Buff3_3"
+    ],
+    "revive": [
+      "/Game/FreeModularMagicSFX/B_Transition/Mono/SW_MagicFade_Appear1_1.SW_MagicFade_Appear1_1",
+      "/Game/FreeModularMagicSFX/B_Transition/Mono/SW_MagicFade_Appear1_2.SW_MagicFade_Appear1_2",
+      "/Game/FreeModularMagicSFX/B_Transition/Mono/SW_MagicFade_Appear1_3.SW_MagicFade_Appear1_3",
+      "/Game/FreeModularMagicSFX/B_Transition/Mono/SW_MagicRiser_FullyCharge1_1.SW_MagicRiser_FullyCharge1_1",
+      "/Game/FreeModularMagicSFX/B_Transition/Mono/SW_MagicRiser_FullyCharge1_2.SW_MagicRiser_FullyCharge1_2",
+      "/Game/FreeModularMagicSFX/B_Transition/Mono/SW_MagicRiser_FullyCharge1_3.SW_MagicRiser_FullyCharge1_3"
+    ],
+    "cast_fire": [
+      "/Game/FreeModularMagicSFX/C_Cast/Mono/SW_MagicCast_FireBall1_1.SW_MagicCast_FireBall1_1",
+      "/Game/FreeModularMagicSFX/C_Cast/Mono/SW_MagicCast_FireBall1_2.SW_MagicCast_FireBall1_2",
+      "/Game/FreeModularMagicSFX/C_Cast/Mono/SW_MagicCast_FireBall1_3.SW_MagicCast_FireBall1_3",
+      "/Game/FreeModularMagicSFX/C_Cast/Mono/SW_MagicCast_FireBall2_1.SW_MagicCast_FireBall2_1",
+      "/Game/FreeModularMagicSFX/C_Cast/Mono/SW_MagicCast_FireBall2_2.SW_MagicCast_FireBall2_2",
+      "/Game/FreeModularMagicSFX/C_Cast/Mono/SW_MagicCast_FireBall2_3.SW_MagicCast_FireBall2_3"
+    ],
+    "land_fire": [
+      "/Game/FreeModularMagicSFX/E_Impact/Mono/SW_MagicImpact_Fire_1.SW_MagicImpact_Fire_1",
+      "/Game/FreeModularMagicSFX/E_Impact/Mono/SW_MagicImpact_Fire_2.SW_MagicImpact_Fire_2",
+      "/Game/FreeModularMagicSFX/E_Impact/Mono/SW_MagicImpact_Fire_3.SW_MagicImpact_Fire_3",
+      "/Game/FreeModularMagicSFX/E_Impact/Mono/SW_MagicImpact_Fire_4.SW_MagicImpact_Fire_4",
+      "/Game/FreeModularMagicSFX/E_Impact/Mono/SW_MagicImpact_Fire_5.SW_MagicImpact_Fire_5",
+      "/Game/SmallSoundKit/SSKWav/MagicWav/Mgc_Fire_Impact_01.Mgc_Fire_Impact_01"
+    ],
+    "cast_ice": [
+      "/Game/FreeModularMagicSFX/C_Cast/Mono/SW_MagicCast_IceCrystal1_1.SW_MagicCast_IceCrystal1_1",
+      "/Game/FreeModularMagicSFX/C_Cast/Mono/SW_MagicCast_IceCrystal1_2.SW_MagicCast_IceCrystal1_2",
+      "/Game/FreeModularMagicSFX/C_Cast/Mono/SW_MagicCast_IceCrystal1_3.SW_MagicCast_IceCrystal1_3",
+      "/Game/FreeModularMagicSFX/C_Cast/Mono/SW_MagicCast_IceCrystal2_1.SW_MagicCast_IceCrystal2_1",
+      "/Game/FreeModularMagicSFX/C_Cast/Mono/SW_MagicCast_IceCrystal2_2.SW_MagicCast_IceCrystal2_2",
+      "/Game/FreeModularMagicSFX/C_Cast/Mono/SW_MagicCast_IceCrystal2_3.SW_MagicCast_IceCrystal2_3"
+    ],
+    "land_ice": [
+      "/Game/FreeModularMagicSFX/E_Impact/Mono/SW_MagicImpact_Crystal_1.SW_MagicImpact_Crystal_1",
+      "/Game/FreeModularMagicSFX/E_Impact/Mono/SW_MagicImpact_Crystal_2.SW_MagicImpact_Crystal_2",
+      "/Game/FreeModularMagicSFX/E_Impact/Mono/SW_MagicImpact_Crystal_3.SW_MagicImpact_Crystal_3",
+      "/Game/FreeModularMagicSFX/E_Impact/Mono/SW_MagicImpact_Crystal_4.SW_MagicImpact_Crystal_4",
+      "/Game/SmallSoundKit/SSKWav/MagicWav/Mgc_Ice_Arrow_Hit_01.Mgc_Ice_Arrow_Hit_01",
+      "/Game/SmallSoundKit/SSKWav/MagicWav/Mgc_Glacier_Impact_01.Mgc_Glacier_Impact_01"
+    ],
+    "cast_water": [
+      "/Game/FreeModularMagicSFX/C_Cast/Mono/SW_MagicCast_Liquid_Water_1.SW_MagicCast_Liquid_Water_1",
+      "/Game/FreeModularMagicSFX/C_Cast/Mono/SW_MagicCast_Liquid_Water_2.SW_MagicCast_Liquid_Water_2",
+      "/Game/FreeModularMagicSFX/C_Cast/Mono/SW_MagicCast_Liquid_Water_3.SW_MagicCast_Liquid_Water_3",
+      "/Game/FreeModularMagicSFX/C_Cast/Mono/SW_MagicCast_Liquid_Water_4.SW_MagicCast_Liquid_Water_4",
+      "/Game/FreeModularMagicSFX/C_Cast/Mono/SW_MagicCast_Liquid_Water_5.SW_MagicCast_Liquid_Water_5"
+    ],
+    "land_water": [
+      "/Game/FreeModularMagicSFX/E_Impact/Mono/SW_MagicImpact_Water_1.SW_MagicImpact_Water_1",
+      "/Game/FreeModularMagicSFX/E_Impact/Mono/SW_MagicImpact_Water_2.SW_MagicImpact_Water_2",
+      "/Game/FreeModularMagicSFX/E_Impact/Mono/SW_MagicImpact_Water_3.SW_MagicImpact_Water_3",
+      "/Game/FreeModularMagicSFX/E_Impact/Mono/SW_MagicImpact_Water_4.SW_MagicImpact_Water_4",
+      "/Game/FreeModularMagicSFX/E_Impact/Mono/SW_MagicImpact_Water_5.SW_MagicImpact_Water_5",
+      "/Game/SmallSoundKit/SSKWav/MagicWav/Mgc_Water_Impact_01.Mgc_Water_Impact_01"
+    ],
+    "cast_lightning": [
+      "/Game/FreeModularMagicSFX/C_Cast/Mono/SW_MagicCast_Lightning1_1.SW_MagicCast_Lightning1_1",
+      "/Game/FreeModularMagicSFX/C_Cast/Mono/SW_MagicCast_Lightning1_2.SW_MagicCast_Lightning1_2",
+      "/Game/FreeModularMagicSFX/C_Cast/Mono/SW_MagicCast_Lightning1_3.SW_MagicCast_Lightning1_3",
+      "/Game/FreeModularMagicSFX/C_Cast/Mono/SW_MagicCast_Lightning1_4.SW_MagicCast_Lightning1_4",
+      "/Game/FreeModularMagicSFX/C_Cast/Mono/SW_MagicCast_Lightning1_5.SW_MagicCast_Lightning1_5",
+      "/Game/FreeModularMagicSFX/C_Cast/Mono/SW_MagicCast_Lightning1_6.SW_MagicCast_Lightning1_6",
+      "/Game/FreeModularMagicSFX/C_Cast/Mono/SW_MagicCast_Lightning1_7.SW_MagicCast_Lightning1_7",
+      "/Game/FreeModularMagicSFX/C_Cast/Mono/SW_MagicCast_ThrowLightningSpear_1.SW_MagicCast_ThrowLightningSpear_1",
+      "/Game/FreeModularMagicSFX/C_Cast/Mono/SW_MagicCast_ThrowLightningSpear_2.SW_MagicCast_ThrowLightningSpear_2",
+      "/Game/FreeModularMagicSFX/C_Cast/Mono/SW_MagicCast_ThrowLightningSpear_3.SW_MagicCast_ThrowLightningSpear_3"
+    ],
+    "land_lightning": [
+      "/Game/FreeModularMagicSFX/E_Impact/Mono/SW_MagicImpact_LightningStrike_1.SW_MagicImpact_LightningStrike_1",
+      "/Game/FreeModularMagicSFX/E_Impact/Mono/SW_MagicImpact_LightningStrike_2.SW_MagicImpact_LightningStrike_2",
+      "/Game/FreeModularMagicSFX/E_Impact/Mono/SW_MagicImpact_LightningStrike_3.SW_MagicImpact_LightningStrike_3",
+      "/Game/FreeModularMagicSFX/E_Impact/Mono/SW_MagicImpact_LightningStrike_4.SW_MagicImpact_LightningStrike_4",
+      "/Game/SmallSoundKit/SSKWav/MagicWav/Mgc_Electric_Impact_01.Mgc_Electric_Impact_01"
+    ],
+    "cast_earth": [
+      "/Game/FreeModularMagicSFX/C_Cast/Mono/SW_MagicCast_GroundStrike_1.SW_MagicCast_GroundStrike_1",
+      "/Game/FreeModularMagicSFX/C_Cast/Mono/SW_MagicCast_GroundStrike_2.SW_MagicCast_GroundStrike_2",
+      "/Game/FreeModularMagicSFX/C_Cast/Mono/SW_MagicCast_GroundStrike_3.SW_MagicCast_GroundStrike_3"
+    ],
+    "land_earth": [
+      "/Game/FreeModularMagicSFX/D1_Spell/Mono/SW_MagicSpell_RockExplosion1_1.SW_MagicSpell_RockExplosion1_1",
+      "/Game/FreeModularMagicSFX/D1_Spell/Mono/SW_MagicSpell_RockExplosion1_2.SW_MagicSpell_RockExplosion1_2",
+      "/Game/FreeModularMagicSFX/D1_Spell/Mono/SW_MagicSpell_RockExplosion1_3.SW_MagicSpell_RockExplosion1_3",
+      "/Game/Free_Sounds_Pack/wav/Rock_Impact_11.Rock_Impact_11",
+      "/Game/Free_Sounds_Pack/wav/Rock_Impact_37.Rock_Impact_37"
+    ],
+    "cast_wind": [
+      "/Game/FreeModularMagicSFX/A_Chant/Mono/SW_MagicChant_WindCharge_1.SW_MagicChant_WindCharge_1",
+      "/Game/FreeModularMagicSFX/A_Chant/Mono/SW_MagicChant_WindCharge_2.SW_MagicChant_WindCharge_2",
+      "/Game/FreeModularMagicSFX/A_Chant/Mono/SW_MagicChant_WindCharge_3.SW_MagicChant_WindCharge_3"
+    ],
+    "land_wind": [
+      "/Game/FreeModularMagicSFX/D1_Spell/Mono/SW_MagicSpell_FreezingWind_1.SW_MagicSpell_FreezingWind_1",
+      "/Game/FreeModularMagicSFX/D1_Spell/Mono/SW_MagicSpell_FreezingWind_2.SW_MagicSpell_FreezingWind_2",
+      "/Game/FreeModularMagicSFX/D1_Spell/Mono/SW_MagicSpell_FreezingWind_3.SW_MagicSpell_FreezingWind_3",
+      "/Game/FreeModularMagicSFX/D1_Spell/Mono/SW_MagicSpell_FreezingWind_4.SW_MagicSpell_FreezingWind_4"
+    ],
+    "cast_nature": [
+      "/Game/FreeModularMagicSFX/C_Cast/Mono/SW_MagicCast_ThrowToxin_1.SW_MagicCast_ThrowToxin_1",
+      "/Game/FreeModularMagicSFX/C_Cast/Mono/SW_MagicCast_ThrowToxin_2.SW_MagicCast_ThrowToxin_2",
+      "/Game/FreeModularMagicSFX/C_Cast/Mono/SW_MagicCast_ThrowToxin_3.SW_MagicCast_ThrowToxin_3",
+      "/Game/FreeModularMagicSFX/C_Cast/Mono/SW_MagicCast_ThrowToxin_4.SW_MagicCast_ThrowToxin_4"
+    ],
+    "land_nature": [
+      "/Game/FreeModularMagicSFX/C_Cast/Mono/SW_MagicCast_Liquid_Gore_1.SW_MagicCast_Liquid_Gore_1",
+      "/Game/FreeModularMagicSFX/C_Cast/Mono/SW_MagicCast_Liquid_Gore_2.SW_MagicCast_Liquid_Gore_2",
+      "/Game/FreeModularMagicSFX/C_Cast/Mono/SW_MagicCast_Liquid_Gore_3.SW_MagicCast_Liquid_Gore_3",
+      "/Game/FreeModularMagicSFX/C_Cast/Mono/SW_MagicCast_Liquid_Gore_4.SW_MagicCast_Liquid_Gore_4",
+      "/Game/FreeModularMagicSFX/C_Cast/Mono/SW_MagicCast_Liquid_Gore_5.SW_MagicCast_Liquid_Gore_5",
+      "/Game/FreeModularMagicSFX/C_Cast/Mono/SW_MagicCast_Liquid_Gore_6.SW_MagicCast_Liquid_Gore_6"
+    ],
+    "cast_shadow": [
+      "/Game/FreeModularMagicSFX/B_Transition/Mono/SW_MagicFade_Shoot1_1.SW_MagicFade_Shoot1_1",
+      "/Game/FreeModularMagicSFX/B_Transition/Mono/SW_MagicFade_Shoot1_2.SW_MagicFade_Shoot1_2",
+      "/Game/FreeModularMagicSFX/B_Transition/Mono/SW_MagicFade_Shoot1_3.SW_MagicFade_Shoot1_3",
+      "/Game/FreeModularMagicSFX/B_Transition/Mono/SW_MagicFade_Shoot2_1.SW_MagicFade_Shoot2_1",
+      "/Game/FreeModularMagicSFX/B_Transition/Mono/SW_MagicFade_Shoot2_2.SW_MagicFade_Shoot2_2",
+      "/Game/FreeModularMagicSFX/B_Transition/Mono/SW_MagicFade_Shoot2_3.SW_MagicFade_Shoot2_3"
+    ],
+    "land_shadow": [
+      "/Game/FreeModularMagicSFX/B_Transition/Mono/SW_MagicFade_Bass1_1.SW_MagicFade_Bass1_1",
+      "/Game/FreeModularMagicSFX/B_Transition/Mono/SW_MagicFade_Bass1_2.SW_MagicFade_Bass1_2",
+      "/Game/FreeModularMagicSFX/B_Transition/Mono/SW_MagicFade_Bass1_3.SW_MagicFade_Bass1_3"
+    ],
+    "cast_holy": [
+      "/Game/FreeModularMagicSFX/D2_Beam/Mono/SW_MagicBeam_Light2_1.SW_MagicBeam_Light2_1",
+      "/Game/FreeModularMagicSFX/D2_Beam/Mono/SW_MagicBeam_Light2_2.SW_MagicBeam_Light2_2",
+      "/Game/FreeModularMagicSFX/D2_Beam/Mono/SW_MagicBeam_Light2_3.SW_MagicBeam_Light2_3"
+    ],
+    "land_holy": [
+      "/Game/FreeModularMagicSFX/B_Transition/Mono/SW_MagicFade_LightingAppear_1.SW_MagicFade_LightingAppear_1",
+      "/Game/FreeModularMagicSFX/B_Transition/Mono/SW_MagicFade_LightingAppear_2.SW_MagicFade_LightingAppear_2",
+      "/Game/FreeModularMagicSFX/B_Transition/Mono/SW_MagicFade_LightingAppear_3.SW_MagicFade_LightingAppear_3",
+      "/Game/FreeModularMagicSFX/B_Transition/Mono/SW_MagicFade_LightingAppear_4.SW_MagicFade_LightingAppear_4"
+    ],
+    "knock_out": [
+      "/Game/Free_Sounds_Pack/wav/Hit_Generic_5-1.Hit_Generic_5-1",
+      "/Game/Free_Sounds_Pack/wav/Rock_Large_Debris_1-3.Rock_Large_Debris_1-3"
+    ],
+    "ready": [
+      "/Game/Free_Sounds_Pack/wav/Magical_Interface_5-1.Magical_Interface_5-1"
+    ],
+    "turn_lost": [
+      "/Game/Free_Sounds_Pack/wav/Interface_3-3.Interface_3-3"
+    ],
+    "victory": [
+      "/Game/Free_Sounds_Pack/wav/Special_Collectible_26-1.Special_Collectible_26-1"
+    ],
+    "defeat": [
+      "/Game/FreeModularMagicSFX/B_Transition/Mono/SW_MagicFade_FadeOut1_1.SW_MagicFade_FadeOut1_1",
+      "/Game/FreeModularMagicSFX/B_Transition/Mono/SW_MagicFade_FadeOut1_2.SW_MagicFade_FadeOut1_2",
+      "/Game/FreeModularMagicSFX/B_Transition/Mono/SW_MagicFade_FadeOut1_3.SW_MagicFade_FadeOut1_3"
+    ],
+    "click": [
+      "/Game/Free_Sounds_Pack/wav/Interface_1-1.Interface_1-1"
+    ],
+    "select": [
+      "/Game/Free_Sounds_Pack/wav/Magical_Interface_8-1.Magical_Interface_8-1"
+    ],
+    "step": [
+      "/Game/Essential_Foosteps_SK/WAV/Dirt/Footstep_Dirt_Boots_Walk_1.Footstep_Dirt_Boots_Walk_1",
+      "/Game/Essential_Foosteps_SK/WAV/Dirt/Footstep_Dirt_Boots_Walk_2.Footstep_Dirt_Boots_Walk_2",
+      "/Game/Essential_Foosteps_SK/WAV/Dirt/Footstep_Dirt_Boots_Walk_3.Footstep_Dirt_Boots_Walk_3",
+      "/Game/Essential_Foosteps_SK/WAV/Dirt/Footstep_Dirt_Boots_Walk_4.Footstep_Dirt_Boots_Walk_4",
+      "/Game/Essential_Foosteps_SK/WAV/Dirt/Footstep_Dirt_Boots_Walk_5.Footstep_Dirt_Boots_Walk_5",
+      "/Game/Essential_Foosteps_SK/WAV/Dirt/Footstep_Dirt_Boots_Walk_6.Footstep_Dirt_Boots_Walk_6",
+      "/Game/Essential_Foosteps_SK/WAV/Dirt/Footstep_Dirt_Boots_Walk_7.Footstep_Dirt_Boots_Walk_7",
+      "/Game/Essential_Foosteps_SK/WAV/Dirt/Footstep_Dirt_Boots_Walk_8.Footstep_Dirt_Boots_Walk_8"
+    ],
+    "step_meadow": [
+      "/Game/Essential_Foosteps_SK/WAV/Leaves/Footstep_FootstepLeaves_Boots_Walk_1.Footstep_FootstepLeaves_Boots_Walk_1",
+      "/Game/Essential_Foosteps_SK/WAV/Leaves/Footstep_FootstepLeaves_Boots_Walk_2.Footstep_FootstepLeaves_Boots_Walk_2",
+      "/Game/Essential_Foosteps_SK/WAV/Leaves/Footstep_FootstepLeaves_Boots_Walk_3.Footstep_FootstepLeaves_Boots_Walk_3",
+      "/Game/Essential_Foosteps_SK/WAV/Leaves/Footstep_FootstepLeaves_Boots_Walk_4.Footstep_FootstepLeaves_Boots_Walk_4",
+      "/Game/Essential_Foosteps_SK/WAV/Leaves/Footstep_FootstepLeaves_Boots_Walk_5.Footstep_FootstepLeaves_Boots_Walk_5",
+      "/Game/Essential_Foosteps_SK/WAV/Leaves/Footstep_FootstepLeaves_Boots_Walk_6.Footstep_FootstepLeaves_Boots_Walk_6",
+      "/Game/Essential_Foosteps_SK/WAV/Leaves/Footstep_FootstepLeaves_Boots_Walk_7.Footstep_FootstepLeaves_Boots_Walk_7",
+      "/Game/Essential_Foosteps_SK/WAV/Leaves/Footstep_FootstepLeaves_Boots_Walk_8.Footstep_FootstepLeaves_Boots_Walk_8"
+    ],
+    "step_winter": [
+      "/Game/Essential_Foosteps_SK/WAV/Snow/Footstep_Snow_Walk_1.Footstep_Snow_Walk_1",
+      "/Game/Essential_Foosteps_SK/WAV/Snow/Footstep_Snow_Walk_2.Footstep_Snow_Walk_2",
+      "/Game/Essential_Foosteps_SK/WAV/Snow/Footstep_Snow_Walk_3.Footstep_Snow_Walk_3",
+      "/Game/Essential_Foosteps_SK/WAV/Snow/Footstep_Snow_Walk_4.Footstep_Snow_Walk_4",
+      "/Game/Essential_Foosteps_SK/WAV/Snow/Footstep_Snow_Walk_5.Footstep_Snow_Walk_5",
+      "/Game/Essential_Foosteps_SK/WAV/Snow/Footstep_Snow_Walk_6.Footstep_Snow_Walk_6",
+      "/Game/Essential_Foosteps_SK/WAV/Snow/Footstep_Snow_Walk_7.Footstep_Snow_Walk_7",
+      "/Game/Essential_Foosteps_SK/WAV/Snow/Footstep_Snow_Walk_8.Footstep_Snow_Walk_8"
+    ],
+    "step_volcanic": [
+      "/Game/Essential_Foosteps_SK/WAV/Gravel/Footstep_Gravel_Boots_Walk_1.Footstep_Gravel_Boots_Walk_1",
+      "/Game/Essential_Foosteps_SK/WAV/Gravel/Footstep_Gravel_Boots_Walk_2.Footstep_Gravel_Boots_Walk_2",
+      "/Game/Essential_Foosteps_SK/WAV/Gravel/Footstep_Gravel_Boots_Walk_3.Footstep_Gravel_Boots_Walk_3",
+      "/Game/Essential_Foosteps_SK/WAV/Gravel/Footstep_Gravel_Boots_Walk_4.Footstep_Gravel_Boots_Walk_4",
+      "/Game/Essential_Foosteps_SK/WAV/Gravel/Footstep_Gravel_Boots_Walk_5.Footstep_Gravel_Boots_Walk_5",
+      "/Game/Essential_Foosteps_SK/WAV/Gravel/Footstep_Gravel_Boots_Walk_6.Footstep_Gravel_Boots_Walk_6",
+      "/Game/Essential_Foosteps_SK/WAV/Gravel/Footstep_Gravel_Boots_Walk_7.Footstep_Gravel_Boots_Walk_7",
+      "/Game/Essential_Foosteps_SK/WAV/Gravel/Footstep_Gravel_Boots_Walk_8.Footstep_Gravel_Boots_Walk_8"
+    ],
+    "step_ruined_keep": [
+      "/Game/Essential_Foosteps_SK/WAV/Concrete/Footstep_Concrete_Boots_Walk_1.Footstep_Concrete_Boots_Walk_1",
+      "/Game/Essential_Foosteps_SK/WAV/Concrete/Footstep_Concrete_Boots_Walk_2.Footstep_Concrete_Boots_Walk_2",
+      "/Game/Essential_Foosteps_SK/WAV/Concrete/Footstep_Concrete_Boots_Walk_3.Footstep_Concrete_Boots_Walk_3",
+      "/Game/Essential_Foosteps_SK/WAV/Concrete/Footstep_Concrete_Boots_Walk_4.Footstep_Concrete_Boots_Walk_4",
+      "/Game/Essential_Foosteps_SK/WAV/Concrete/Footstep_Concrete_Boots_Walk_5.Footstep_Concrete_Boots_Walk_5",
+      "/Game/Essential_Foosteps_SK/WAV/Concrete/Footstep_Concrete_Boots_Walk_6.Footstep_Concrete_Boots_Walk_6",
+      "/Game/Essential_Foosteps_SK/WAV/Concrete/Footstep_Concrete_Boots_Walk_7.Footstep_Concrete_Boots_Walk_7",
+      "/Game/Essential_Foosteps_SK/WAV/Concrete/Footstep_Concrete_Boots_Walk_8.Footstep_Concrete_Boots_Walk_8"
+    ]
+  },
   "motions": {
     "melee": [
       "swing",
       "hit_metal"
     ],
     "heavy": [
-      "swing",
+      "swing_heavy",
       "hit_heavy"
     ],
     "dash": [
-      "swing",
+      "swing_heavy",
       "hit_heavy"
     ],
     "shoot": [
@@ -21,15 +364,15 @@
       "hit_arrow"
     ],
     "bolt": [
-      "",
+      "cast_bolt",
       "magic"
     ],
     "area": [
-      "",
+      "cast_area",
       "boom"
     ],
     "channel": [
-      "charge",
+      "beam",
       "magic"
     ],
     "heal": [
@@ -46,249 +389,341 @@
     ]
   },
   "abilities": {
-    "aeromancer_cyclone": [
-      "",
-      "magic"
-    ],
     "aeromancer_hurricane": [
-      "charge",
-      "ice"
+      "beam",
+      "land_ice"
     ],
     "arc_warlock_thunder_doom": [
-      "",
-      "magic"
+      "cast_holy",
+      "land_holy"
+    ],
+    "ash_witch_flame_doom": [
+      "cast_fire",
+      "land_fire"
     ],
     "bard_lullaby": [
-      "",
-      "ice"
+      "cast_ice",
+      "land_ice"
+    ],
+    "blazeblade_flame_edge": [
+      "cast_holy",
+      "land_holy"
+    ],
+    "blazeblade_flame_lance": [
+      "cast_fire",
+      "land_fire"
+    ],
+    "blazeblade_flame_maelstrom": [
+      "cast_fire",
+      "land_fire"
+    ],
+    "chrono_sage_tick_bolt": [
+      "cast_lightning",
+      "land_lightning"
+    ],
+    "crusader_holy_edge": [
+      "cast_holy",
+      "land_holy"
     ],
     "crusader_holy_lance": [
-      "",
-      "magic"
+      "cast_holy",
+      "land_holy"
     ],
     "crusader_holy_maelstrom": [
-      "",
-      "magic"
+      "cast_holy",
+      "land_holy"
     ],
     "cryomancer_frost_bolt": [
-      "",
-      "ice"
+      "cast_ice",
+      "land_ice"
     ],
     "cryomancer_hailstorm": [
-      "",
-      "ice"
+      "cast_ice",
+      "land_ice"
     ],
     "cryomancer_absolute_zero": [
-      "charge",
-      "ice"
+      "beam",
+      "land_ice"
     ],
-    "druid_bramble_burst": [
-      "",
-      "magic"
+    "dawn_aegis_radiant_lance": [
+      "cast_holy",
+      "land_holy"
     ],
     "dust_hexer_stone_doom": [
-      "",
-      "hit_stone"
+      "cast_earth",
+      "land_earth"
+    ],
+    "earthshaker_stone_edge": [
+      "cast_holy",
+      "land_holy"
     ],
     "earthshaker_stone_lance": [
-      "",
-      "hit_stone"
+      "cast_earth",
+      "land_earth"
     ],
     "earthshaker_stone_maelstrom": [
-      "",
-      "hit_stone"
+      "cast_earth",
+      "land_earth"
     ],
     "exorcist_holy_doom": [
-      "",
-      "magic"
+      "cast_holy",
+      "land_holy"
     ],
     "flame_sorcerer_bolt": [
-      "",
-      "boom"
+      "cast_fire",
+      "land_fire"
+    ],
+    "flame_sorcerer_burst": [
+      "cast_fire",
+      "land_fire"
     ],
     "flame_sorcerer_cataclysm": [
-      "charge",
-      "boom"
+      "beam",
+      "land_fire"
     ],
     "frost_hexer_hex": [
-      "",
-      "ice"
+      "cast_ice",
+      "land_ice"
     ],
     "frost_hexer_curse": [
-      "",
-      "ice"
+      "cast_ice",
+      "land_ice"
     ],
     "frost_hexer_slumber": [
-      "",
-      "ice"
+      "cast_ice",
+      "land_ice"
     ],
     "frost_hexer_doom": [
-      "",
-      "ice"
+      "cast_ice",
+      "land_ice"
     ],
     "frost_witch_frost_doom": [
-      "",
-      "ice"
+      "cast_ice",
+      "land_ice"
+    ],
+    "frostblade_frost_edge": [
+      "cast_holy",
+      "land_holy"
     ],
     "frostblade_frost_lance": [
-      "",
-      "ice"
+      "cast_ice",
+      "land_ice"
     ],
     "frostblade_frost_maelstrom": [
-      "",
-      "ice"
+      "cast_ice",
+      "land_ice"
+    ],
+    "gale_minstrel_chord": [
+      "cast_wind",
+      "land_wind"
     ],
     "geomancer_quake": [
-      "",
-      "hit_stone"
+      "cast_earth",
+      "land_earth"
     ],
     "geomancer_tectonic_rift": [
-      "",
-      "hit_stone"
+      "cast_earth",
+      "land_earth"
     ],
     "golem_master_summon_golem": [
-      "",
-      "hit_stone"
+      "cast_earth",
+      "land_earth"
     ],
     "golem_master_golem_ascendant": [
-      "",
-      "hit_stone"
+      "cast_earth",
+      "land_earth"
     ],
-    "hexblade_shadow_lance": [
-      "",
-      "magic"
+    "grave_warden_grave_bolt": [
+      "cast_shadow",
+      "land_shadow"
+    ],
+    "grave_warden_rend_soul": [
+      "cast_shadow",
+      "land_shadow"
+    ],
+    "grave_warden_death_knell": [
+      "cast_shadow",
+      "land_shadow"
+    ],
+    "hexblade_shadow_edge": [
+      "cast_holy",
+      "land_holy"
+    ],
+    "hexblade_shadow_maelstrom": [
+      "cast_fire",
+      "land_fire"
     ],
     "leviathan_caller_summon_leviathan": [
-      "",
-      "ice"
+      "cast_ice",
+      "land_ice"
     ],
     "leviathan_caller_leviathan_ascendant": [
-      "",
-      "ice"
+      "cast_ice",
+      "land_ice"
     ],
-    "lich_caller_summon_lich": [
-      "",
-      "magic"
+    "lich_caller_lich_ascendant": [
+      "cast_fire",
+      "land_fire"
+    ],
+    "lumimancer_holy_bolt": [
+      "cast_holy",
+      "land_holy"
     ],
     "lumimancer_radiance": [
-      "",
-      "magic"
+      "cast_holy",
+      "land_holy"
+    ],
+    "lumimancer_divine_wrath": [
+      "beam",
+      "land_holy"
     ],
     "mirage_dancer_sirocco": [
-      "",
-      "hit_stone"
-    ],
-    "necromancer_umbral_burst": [
-      "",
-      "magic"
+      "cast_earth",
+      "land_earth"
     ],
     "necromancer_eclipse": [
-      "charge",
-      "boom"
+      "beam",
+      "land_fire"
+    ],
+    "null_monk_hush": [
+      "cast_holy",
+      "land_holy"
     ],
     "null_monk_void_mantra": [
-      "",
-      "magic"
+      "cast_holy",
+      "land_holy"
     ],
     "oracle_divination": [
-      "",
-      "ice"
+      "cast_ice",
+      "land_ice"
     ],
     "paladin_judgment": [
-      "",
-      "magic"
+      "cast_holy",
+      "land_holy"
     ],
     "rime_warden_frost_shard": [
-      "",
-      "ice"
+      "cast_ice",
+      "land_ice"
     ],
     "rime_warden_rime_snare": [
-      "",
-      "ice"
+      "cast_ice",
+      "land_ice"
     ],
     "rime_warden_glacial_prison": [
-      "",
-      "ice"
+      "cast_ice",
+      "land_ice"
     ],
     "rime_warden_absolute_zero": [
-      "",
-      "ice"
-    ],
-    "roc_caller_summon_roc": [
-      "",
-      "magic"
+      "cast_ice",
+      "land_ice"
     ],
     "roc_caller_roc_ascendant": [
-      "",
-      "ice"
+      "cast_ice",
+      "land_ice"
+    ],
+    "salamander_caller_summon_salamander": [
+      "cast_fire",
+      "land_fire"
+    ],
+    "salamander_caller_salamander_ascendant": [
+      "cast_fire",
+      "land_fire"
     ],
     "sea_witch_tide_doom": [
-      "",
-      "ice"
+      "cast_ice",
+      "land_ice"
     ],
     "seraph_caller_summon_seraph": [
-      "",
-      "magic"
+      "cast_holy",
+      "land_holy"
     ],
     "seraph_caller_seraph_ascendant": [
-      "",
-      "magic"
+      "cast_holy",
+      "land_holy"
+    ],
+    "shadow_assassin_veil": [
+      "cast_shadow",
+      "land_shadow"
+    ],
+    "snare_hunter_tranquilizer_volley": [
+      "cast_nature",
+      "land_nature"
+    ],
+    "stormcaller_thunder_bolt": [
+      "cast_holy",
+      "land_holy"
     ],
     "stormcaller_chain_lightning": [
-      "",
-      "magic"
+      "cast_holy",
+      "land_holy"
+    ],
+    "stormcaller_tempest": [
+      "beam",
+      "land_holy"
+    ],
+    "summoner_ifrit": [
+      "cast_fire",
+      "land_fire"
+    ],
+    "summoner_bahamut": [
+      "cast_fire",
+      "land_fire"
     ],
     "tempest_hexer_gale_doom": [
-      "",
-      "ice"
+      "cast_ice",
+      "land_ice"
     ],
     "thorn_summoner_summon": [
-      "",
-      "magic"
+      "cast_nature",
+      "land_nature"
     ],
     "thorn_summoner_ascendant": [
-      "",
-      "magic"
+      "cast_nature",
+      "land_nature"
+    ],
+    "thunder_spellblade_edge": [
+      "cast_lightning",
+      "land_lightning"
     ],
     "thunder_spellblade_lance": [
-      "",
-      "magic"
+      "cast_lightning",
+      "land_lightning"
     ],
     "thunder_spellblade_maelstrom": [
-      "",
-      "magic"
+      "cast_lightning",
+      "land_lightning"
     ],
     "thunderbird_caller_summon_thunderbird": [
-      "",
-      "magic"
+      "cast_holy",
+      "land_holy"
     ],
     "thunderbird_caller_thunderbird_ascendant": [
-      "",
-      "magic"
+      "cast_holy",
+      "land_holy"
     ],
-    "treant_caller_summon_treant": [
-      "",
-      "magic"
+    "time_mage_time_stop": [
+      "cast_fire",
+      "land_fire"
     ],
-    "treant_caller_treant_ascendant": [
-      "",
-      "magic"
+    "warlock_shadow_doom": [
+      "cast_fire",
+      "land_fire"
     ],
-    "windblade_gale_lance": [
-      "",
-      "magic"
+    "windblade_gale_edge": [
+      "cast_holy",
+      "land_holy"
     ],
     "windblade_gale_maelstrom": [
-      "",
-      "ice"
+      "cast_ice",
+      "land_ice"
     ],
     "yeti_caller_summon_yeti": [
-      "",
-      "ice"
+      "cast_ice",
+      "land_ice"
     ],
     "yeti_caller_yeti_ascendant": [
-      "",
-      "ice"
+      "cast_ice",
+      "land_ice"
     ]
   },
   "events": {
@@ -300,7 +735,11 @@
     "defeat": "defeat",
     "step": "step",
     "click": "click",
-    "select": "select"
+    "select": "select",
+    "step_meadow": "step_meadow",
+    "step_winter": "step_winter",
+    "step_volcanic": "step_volcanic",
+    "step_ruined_keep": "step_ruined_keep"
   },
   "voices": {
     "aurora": {

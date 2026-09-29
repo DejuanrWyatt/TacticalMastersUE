@@ -1,6 +1,6 @@
 // What a battle sounds like (Content/Data/Sounds/sounds.json, written by
-// Tools/assign_sounds.py): a sound as an ability goes off and one where it
-// lands, as the Godot game plays them (scripts/battle/fx.gd:23-33); the
+// Tools/assign_sounds.py from the Fab sound packs): a sound as an ability goes
+// off and one where it lands, by what it is and its damage type; the
 // hero's own voice as it strikes, is hurt, falls and wins; footsteps, a chime
 // when one of this side's units is ready, a buzz when a turn is lost, and the
 // clicks of the menus (audio.gd:126-128).
@@ -259,7 +259,10 @@ void ATMBattleDirector::SoundStep(int32 Index, float DeltaSeconds)
 		Motion.StepClock = 0.0f;
 		if (IsSeen(Battle.Units[Index]))
 		{
-			PlayEventSound(TEXT("step"), &Motion.Shown, 0.35f);
+			// The battlefield's own ground if it has one (step_winter: snow), else plain earth.
+			LoadSounds();
+			const FString Ground = TEXT("step_") + ActiveTheme().Id;
+			PlayEventSound(EventSounds.Contains(Ground) ? *Ground : TEXT("step"), &Motion.Shown, 0.35f);
 		}
 	}
 }
