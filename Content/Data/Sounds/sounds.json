@@ -1,0 +1,566 @@
+{
+  "format": "tactical-masters-sounds",
+  "version": 1,
+  "about": "What a battle sounds like; written by Tools/assign_sounds.py and read by the director, never the rules.",
+  "sfx": {
+    "boom": [
+      "/Game/Audio/SFX/boom.boom"
+    ],
+    "buff": [
+      "/Game/Audio/SFX/buff.buff"
+    ],
+    "charge": [
+      "/Game/Audio/SFX/charge.charge"
+    ],
+    "click": [
+      "/Game/Audio/SFX/click.click"
+    ],
+    "defeat": [
+      "/Game/Audio/SFX/defeat.defeat"
+    ],
+    "heal": [
+      "/Game/Audio/SFX/heal.heal"
+    ],
+    "hit_arrow": [
+      "/Game/Audio/SFX/hit_arrow.hit_arrow"
+    ],
+    "hit_heavy": [
+      "/Game/Audio/SFX/hit_heavy.hit_heavy"
+    ],
+    "hit_metal": [
+      "/Game/Audio/SFX/hit_metal_1.hit_metal_1",
+      "/Game/Audio/SFX/hit_metal_2.hit_metal_2",
+      "/Game/Audio/SFX/hit_metal_3.hit_metal_3"
+    ],
+    "hit_punch": [
+      "/Game/Audio/SFX/hit_punch_1.hit_punch_1",
+      "/Game/Audio/SFX/hit_punch_2.hit_punch_2"
+    ],
+    "hit_stone": [
+      "/Game/Audio/SFX/hit_stone.hit_stone"
+    ],
+    "ice": [
+      "/Game/Audio/SFX/ice.ice"
+    ],
+    "knock_out": [
+      "/Game/Audio/SFX/knock_out.knock_out"
+    ],
+    "magic": [
+      "/Game/Audio/SFX/magic_1.magic_1",
+      "/Game/Audio/SFX/magic_2.magic_2"
+    ],
+    "ready": [
+      "/Game/Audio/SFX/ready.ready"
+    ],
+    "revive": [
+      "/Game/Audio/SFX/revive.revive"
+    ],
+    "select": [
+      "/Game/Audio/SFX/select.select"
+    ],
+    "shoot": [
+      "/Game/Audio/SFX/shoot.shoot"
+    ],
+    "step": [
+      "/Game/Audio/SFX/step_1.step_1",
+      "/Game/Audio/SFX/step_2.step_2",
+      "/Game/Audio/SFX/step_3.step_3"
+    ],
+    "swing": [
+      "/Game/Audio/SFX/swing_1.swing_1",
+      "/Game/Audio/SFX/swing_2.swing_2"
+    ],
+    "turn_lost": [
+      "/Game/Audio/SFX/turn_lost.turn_lost"
+    ],
+    "victory": [
+      "/Game/Audio/SFX/victory.victory"
+    ]
+  },
+  "motions": {
+    "melee": [
+      "swing",
+      "hit_metal"
+    ],
+    "heavy": [
+      "swing",
+      "hit_heavy"
+    ],
+    "dash": [
+      "swing",
+      "hit_heavy"
+    ],
+    "shoot": [
+      "shoot",
+      "hit_arrow"
+    ],
+    "bolt": [
+      "",
+      "magic"
+    ],
+    "area": [
+      "",
+      "boom"
+    ],
+    "channel": [
+      "charge",
+      "magic"
+    ],
+    "heal": [
+      "",
+      "heal"
+    ],
+    "buff": [
+      "",
+      "buff"
+    ],
+    "revive": [
+      "",
+      "revive"
+    ]
+  },
+  "abilities": {
+    "aeromancer_cyclone": [
+      "",
+      "magic"
+    ],
+    "aeromancer_hurricane": [
+      "charge",
+      "ice"
+    ],
+    "arc_warlock_thunder_doom": [
+      "",
+      "magic"
+    ],
+    "bard_lullaby": [
+      "",
+      "ice"
+    ],
+    "crusader_holy_lance": [
+      "",
+      "magic"
+    ],
+    "crusader_holy_maelstrom": [
+      "",
+      "magic"
+    ],
+    "cryomancer_frost_bolt": [
+      "",
+      "ice"
+    ],
+    "cryomancer_hailstorm": [
+      "",
+      "ice"
+    ],
+    "cryomancer_absolute_zero": [
+      "charge",
+      "ice"
+    ],
+    "druid_bramble_burst": [
+      "",
+      "magic"
+    ],
+    "dust_hexer_stone_doom": [
+      "",
+      "hit_stone"
+    ],
+    "earthshaker_stone_lance": [
+      "",
+      "hit_stone"
+    ],
+    "earthshaker_stone_maelstrom": [
+      "",
+      "hit_stone"
+    ],
+    "exorcist_holy_doom": [
+      "",
+      "magic"
+    ],
+    "flame_sorcerer_bolt": [
+      "",
+      "boom"
+    ],
+    "flame_sorcerer_cataclysm": [
+      "charge",
+      "boom"
+    ],
+    "frost_hexer_hex": [
+      "",
+      "ice"
+    ],
+    "frost_hexer_curse": [
+      "",
+      "ice"
+    ],
+    "frost_hexer_slumber": [
+      "",
+      "ice"
+    ],
+    "frost_hexer_doom": [
+      "",
+      "ice"
+    ],
+    "frost_witch_frost_doom": [
+      "",
+      "ice"
+    ],
+    "frostblade_frost_lance": [
+      "",
+      "ice"
+    ],
+    "frostblade_frost_maelstrom": [
+      "",
+      "ice"
+    ],
+    "geomancer_quake": [
+      "",
+      "hit_stone"
+    ],
+    "geomancer_tectonic_rift": [
+      "",
+      "hit_stone"
+    ],
+    "golem_master_summon_golem": [
+      "",
+      "hit_stone"
+    ],
+    "golem_master_golem_ascendant": [
+      "",
+      "hit_stone"
+    ],
+    "hexblade_shadow_lance": [
+      "",
+      "magic"
+    ],
+    "leviathan_caller_summon_leviathan": [
+      "",
+      "ice"
+    ],
+    "leviathan_caller_leviathan_ascendant": [
+      "",
+      "ice"
+    ],
+    "lich_caller_summon_lich": [
+      "",
+      "magic"
+    ],
+    "lumimancer_radiance": [
+      "",
+      "magic"
+    ],
+    "mirage_dancer_sirocco": [
+      "",
+      "hit_stone"
+    ],
+    "necromancer_umbral_burst": [
+      "",
+      "magic"
+    ],
+    "necromancer_eclipse": [
+      "charge",
+      "boom"
+    ],
+    "null_monk_void_mantra": [
+      "",
+      "magic"
+    ],
+    "oracle_divination": [
+      "",
+      "ice"
+    ],
+    "paladin_judgment": [
+      "",
+      "magic"
+    ],
+    "rime_warden_frost_shard": [
+      "",
+      "ice"
+    ],
+    "rime_warden_rime_snare": [
+      "",
+      "ice"
+    ],
+    "rime_warden_glacial_prison": [
+      "",
+      "ice"
+    ],
+    "rime_warden_absolute_zero": [
+      "",
+      "ice"
+    ],
+    "roc_caller_summon_roc": [
+      "",
+      "magic"
+    ],
+    "roc_caller_roc_ascendant": [
+      "",
+      "ice"
+    ],
+    "sea_witch_tide_doom": [
+      "",
+      "ice"
+    ],
+    "seraph_caller_summon_seraph": [
+      "",
+      "magic"
+    ],
+    "seraph_caller_seraph_ascendant": [
+      "",
+      "magic"
+    ],
+    "stormcaller_chain_lightning": [
+      "",
+      "magic"
+    ],
+    "tempest_hexer_gale_doom": [
+      "",
+      "ice"
+    ],
+    "thorn_summoner_summon": [
+      "",
+      "magic"
+    ],
+    "thorn_summoner_ascendant": [
+      "",
+      "magic"
+    ],
+    "thunder_spellblade_lance": [
+      "",
+      "magic"
+    ],
+    "thunder_spellblade_maelstrom": [
+      "",
+      "magic"
+    ],
+    "thunderbird_caller_summon_thunderbird": [
+      "",
+      "magic"
+    ],
+    "thunderbird_caller_thunderbird_ascendant": [
+      "",
+      "magic"
+    ],
+    "treant_caller_summon_treant": [
+      "",
+      "magic"
+    ],
+    "treant_caller_treant_ascendant": [
+      "",
+      "magic"
+    ],
+    "windblade_gale_lance": [
+      "",
+      "magic"
+    ],
+    "windblade_gale_maelstrom": [
+      "",
+      "ice"
+    ],
+    "yeti_caller_summon_yeti": [
+      "",
+      "ice"
+    ],
+    "yeti_caller_yeti_ascendant": [
+      "",
+      "ice"
+    ]
+  },
+  "events": {
+    "cast": "charge",
+    "knockout": "knock_out",
+    "ready": "ready",
+    "turnLost": "turn_lost",
+    "victory": "victory",
+    "defeat": "defeat",
+    "step": "step",
+    "click": "click",
+    "select": "select"
+  },
+  "voices": {
+    "aurora": {
+      "primary": "/Game/ParagonAurora/Audio/Cues/Aurora_Effort_Ability_Primary.Aurora_Effort_Ability_Primary",
+      "q": "/Game/ParagonAurora/Audio/Cues/Aurora_Effort_Ability_Q.Aurora_Effort_Ability_Q",
+      "e": "/Game/ParagonAurora/Audio/Cues/Aurora_Effort_Ability_RMB.Aurora_Effort_Ability_RMB",
+      "ultimate": "/Game/ParagonAurora/Audio/Cues/Aurora_Ability_Ultimate_Self.Aurora_Ability_Ultimate_Self",
+      "pain": "/Game/ParagonAurora/Audio/Cues/Aurora_Effort_Pain.Aurora_Effort_Pain",
+      "painHeavy": "/Game/ParagonAurora/Audio/Cues/Aurora_Effort_PainHeavy.Aurora_Effort_PainHeavy",
+      "death": "/Game/ParagonAurora/Audio/Cues/Aurora_Effort_Death.Aurora_Effort_Death",
+      "cheer": "/Game/ParagonAurora/Audio/Cues/Aurora_Effort_Cheer.Aurora_Effort_Cheer"
+    },
+    "belica": {
+      "primary": "/Game/ParagonLtBelica/Audio/Cues/LtBelica_Effort_Attack.LtBelica_Effort_Attack",
+      "q": "/Game/ParagonLtBelica/Audio/Cues/LtBelica_Effort_Ability_Q.LtBelica_Effort_Ability_Q",
+      "e": "/Game/ParagonLtBelica/Audio/Cues/LtBelica_Effort_Ability_RMB.LtBelica_Effort_Ability_RMB",
+      "ultimate": "/Game/ParagonLtBelica/Audio/Cues/LtBelica_Ability_Ultimate_Self.LtBelica_Ability_Ultimate_Self",
+      "pain": "/Game/ParagonLtBelica/Audio/Cues/LtBelica_Effort_Pain.LtBelica_Effort_Pain",
+      "painHeavy": "/Game/ParagonLtBelica/Audio/Cues/LtBelica_Effort_PainHeavy.LtBelica_Effort_PainHeavy",
+      "death": "/Game/ParagonLtBelica/Audio/Cues/LtBelica_Effort_Death.LtBelica_Effort_Death",
+      "cheer": "/Game/ParagonLtBelica/Audio/Cues/LtBelica_Effort_Cheer.LtBelica_Effort_Cheer"
+    },
+    "boris": {
+      "primary": "/Game/ParagonBoris/Audio/Cues/Boris_Effort_Ability_Primary.Boris_Effort_Ability_Primary",
+      "q": "/Game/ParagonBoris/Audio/Cues/Boris_Effort_Ability_Q.Boris_Effort_Ability_Q",
+      "e": "/Game/ParagonBoris/Audio/Cues/Boris_Effort_Ability_RMB.Boris_Effort_Ability_RMB",
+      "ultimate": "/Game/ParagonBoris/Audio/Cues/Boris_Ability_Ultimate_Self.Boris_Ability_Ultimate_Self",
+      "pain": "/Game/ParagonBoris/Audio/Cues/Boris_Effort_Pain.Boris_Effort_Pain",
+      "painHeavy": "/Game/ParagonBoris/Audio/Cues/Boris_Effort_PainHeavy.Boris_Effort_PainHeavy",
+      "death": "/Game/ParagonBoris/Audio/Cues/Boris_Effort_Death.Boris_Effort_Death",
+      "cheer": "/Game/ParagonBoris/Audio/Cues/Boris_Effort_Cheer.Boris_Effort_Cheer"
+    },
+    "drongo": {
+      "primary": "/Game/ParagonDrongo/Audio/Cues/Drongo_Effort_Attack.Drongo_Effort_Attack",
+      "q": "/Game/ParagonDrongo/Audio/Cues/Drongo_Effort_Attack.Drongo_Effort_Attack",
+      "ultimate": "/Game/ParagonDrongo/Audio/Cues/Drongo_Ability_Ultimate_Self.Drongo_Ability_Ultimate_Self",
+      "pain": "/Game/ParagonDrongo/Audio/Cues/Drongo_Effort_Pain.Drongo_Effort_Pain",
+      "painHeavy": "/Game/ParagonDrongo/Audio/Cues/Drongo_Effort_PainHeavy.Drongo_Effort_PainHeavy",
+      "death": "/Game/ParagonDrongo/Audio/Cues/Drongo_Effort_Death.Drongo_Effort_Death",
+      "cheer": "/Game/ParagonDrongo/Audio/Cues/Drongo_Effort_Cheer.Drongo_Effort_Cheer"
+    },
+    "fey": {
+      "primary": "/Game/ParagonFey/Audio/Cues/TheFey_Effort_Attack.TheFey_Effort_Attack",
+      "q": "/Game/ParagonFey/Audio/Cues/TheFey_Effort_Ability_Q.TheFey_Effort_Ability_Q",
+      "e": "/Game/ParagonFey/Audio/Cues/TheFey_Effort_Ability_RMB.TheFey_Effort_Ability_RMB",
+      "ultimate": "/Game/ParagonFey/Audio/Cues/TheFey_Ability_Ultimate_Self.TheFey_Ability_Ultimate_Self",
+      "pain": "/Game/ParagonFey/Audio/Cues/TheFey_Effort_Pain.TheFey_Effort_Pain",
+      "painHeavy": "/Game/ParagonFey/Audio/Cues/TheFey_Effort_PainHeavy.TheFey_Effort_PainHeavy",
+      "death": "/Game/ParagonFey/Audio/Cues/TheFey_Effort_Death.TheFey_Effort_Death",
+      "cheer": "/Game/ParagonFey/Audio/Cues/TheFey_Effort_Cheer.TheFey_Effort_Cheer"
+    },
+    "gideon": {
+      "primary": "/Game/ParagonGideon/Audio/Cues/Gideon_Effort_Attack.Gideon_Effort_Attack",
+      "q": "/Game/ParagonGideon/Audio/Cues/Gideon_Effort_Ability_E.Gideon_Effort_Ability_E",
+      "e": "/Game/ParagonGideon/Audio/Cues/Gideon_Effort_Ability_E.Gideon_Effort_Ability_E",
+      "ultimate": "/Game/ParagonGideon/Audio/Cues/Gideon_Ability_Ultimate_Self.Gideon_Ability_Ultimate_Self",
+      "pain": "/Game/ParagonGideon/Audio/Cues/Gideon_Effort_Pain.Gideon_Effort_Pain",
+      "painHeavy": "/Game/ParagonGideon/Audio/Cues/Gideon_Effort_PainHeavy.Gideon_Effort_PainHeavy",
+      "death": "/Game/ParagonGideon/Audio/Cues/Gideon_Effort_Death.Gideon_Effort_Death",
+      "cheer": "/Game/ParagonGideon/Audio/Cues/Gideon_Effort_Cheer.Gideon_Effort_Cheer"
+    },
+    "greystone": {
+      "primary": "/Game/ParagonGreystone/Audio/Cues/Greystone_Effort_Ability_Primary.Greystone_Effort_Ability_Primary",
+      "q": "/Game/ParagonGreystone/Audio/Cues/Greystone_Effort_Ability_Q.Greystone_Effort_Ability_Q",
+      "e": "/Game/ParagonGreystone/Audio/Cues/Greystone_Effort_Ability_RMB.Greystone_Effort_Ability_RMB",
+      "ultimate": "/Game/ParagonGreystone/Audio/Cues/Greystone_Ability_Ultimate_Self.Greystone_Ability_Ultimate_Self",
+      "pain": "/Game/ParagonGreystone/Audio/Cues/Greystone_Effort_Pain.Greystone_Effort_Pain",
+      "painHeavy": "/Game/ParagonGreystone/Audio/Cues/Greystone_Effort_PainHeavy.Greystone_Effort_PainHeavy",
+      "death": "/Game/ParagonGreystone/Audio/Cues/Greystone_Effort_Death.Greystone_Effort_Death",
+      "cheer": "/Game/ParagonGreystone/Audio/Cues/Greystone_Effort_Cheer.Greystone_Effort_Cheer"
+    },
+    "iggyscorch": {
+      "primary": "/Game/ParagonIggyScorch/Audio/Cues/IggyScorch_Effort_Attack.IggyScorch_Effort_Attack",
+      "q": "/Game/ParagonIggyScorch/Audio/Cues/IggyScorch_Effort_Attack.IggyScorch_Effort_Attack",
+      "ultimate": "/Game/ParagonIggyScorch/Audio/Cues/IggyScorch_Ability_Ultimate_Self.IggyScorch_Ability_Ultimate_Self",
+      "pain": "/Game/ParagonIggyScorch/Audio/Cues/IggyScorch_Effort_Pain.IggyScorch_Effort_Pain",
+      "painHeavy": "/Game/ParagonIggyScorch/Audio/Cues/IggyScorch_Effort_PainHeavy.IggyScorch_Effort_PainHeavy",
+      "death": "/Game/ParagonIggyScorch/Audio/Cues/IggyScorch_Effort_Death.IggyScorch_Effort_Death",
+      "cheer": "/Game/ParagonIggyScorch/Audio/Cues/IggyScorch_Effort_Cheer.IggyScorch_Effort_Cheer"
+    },
+    "kallari": {
+      "primary": "/Game/ParagonKallari/Audio/Cues/Kallari_Effort_Attack.Kallari_Effort_Attack",
+      "q": "/Game/ParagonKallari/Audio/Cues/Kallari_Effort_Attack.Kallari_Effort_Attack",
+      "ultimate": "/Game/ParagonKallari/Audio/Cues/Kallari_Ability_Ultimate_Self.Kallari_Ability_Ultimate_Self",
+      "pain": "/Game/ParagonKallari/Audio/Cues/Kallari_Effort_Pain.Kallari_Effort_Pain",
+      "painHeavy": "/Game/ParagonKallari/Audio/Cues/Kallari_Effort_PainHeavy.Kallari_Effort_PainHeavy",
+      "death": "/Game/ParagonKallari/Audio/Cues/Kallari_Effort_Death.Kallari_Effort_Death",
+      "cheer": "/Game/ParagonKallari/Audio/Cues/Kallari_Effort_Cheer.Kallari_Effort_Cheer"
+    },
+    "morigesh": {
+      "primary": "/Game/ParagonMorigesh/Audio/Cues/Morigesh_Effort_Ability_Primary.Morigesh_Effort_Ability_Primary",
+      "q": "/Game/ParagonMorigesh/Audio/Cues/Morigesh_Effort_Ability_Q.Morigesh_Effort_Ability_Q",
+      "e": "/Game/ParagonMorigesh/Audio/Cues/Morigesh_Effort_Ability_RMB.Morigesh_Effort_Ability_RMB",
+      "ultimate": "/Game/ParagonMorigesh/Audio/Cues/Morigesh_Ability_Ultimate_Self.Morigesh_Ability_Ultimate_Self",
+      "pain": "/Game/ParagonMorigesh/Audio/Cues/Morigesh_Effort_Pain.Morigesh_Effort_Pain",
+      "painHeavy": "/Game/ParagonMorigesh/Audio/Cues/Morigesh_Effort_PainHeavy.Morigesh_Effort_PainHeavy",
+      "death": "/Game/ParagonMorigesh/Audio/Cues/Morigesh_Effort_Death.Morigesh_Effort_Death",
+      "cheer": "/Game/ParagonMorigesh/Audio/Cues/Morigesh_Effort_Cheer.Morigesh_Effort_Cheer"
+    },
+    "narbash": {
+      "primary": "/Game/ParagonNarbash/Audio/Cues/Narbash_Effort_Attack.Narbash_Effort_Attack",
+      "q": "/Game/ParagonNarbash/Audio/Cues/Narbash_Effort_Ability_Q.Narbash_Effort_Ability_Q",
+      "e": "/Game/ParagonNarbash/Audio/Cues/Narbash_Effort_Ability_RMB.Narbash_Effort_Ability_RMB",
+      "ultimate": "/Game/ParagonNarbash/Audio/Cues/Narbash_Ability_Ultimate_Self.Narbash_Ability_Ultimate_Self",
+      "pain": "/Game/ParagonNarbash/Audio/Cues/Narbash_Effort_Pain.Narbash_Effort_Pain",
+      "painHeavy": "/Game/ParagonNarbash/Audio/Cues/Narbash_Effort_PainHeavy.Narbash_Effort_PainHeavy",
+      "death": "/Game/ParagonNarbash/Audio/Cues/Narbash_Effort_Death.Narbash_Effort_Death",
+      "cheer": "/Game/ParagonNarbash/Audio/Cues/Narbash_Effort_Cheer.Narbash_Effort_Cheer"
+    },
+    "revenant": {
+      "primary": "/Game/ParagonRevenant/Audio/Cues/Revenant_Effort_Ability_Primary.Revenant_Effort_Ability_Primary",
+      "q": "/Game/ParagonRevenant/Audio/Cues/Revenant_Effort_Ability_Q.Revenant_Effort_Ability_Q",
+      "e": "/Game/ParagonRevenant/Audio/Cues/Revenant_Effort_Ability_RMB.Revenant_Effort_Ability_RMB",
+      "ultimate": "/Game/ParagonRevenant/Audio/Cues/Revenant_Ability_Ultimate_Self.Revenant_Ability_Ultimate_Self",
+      "pain": "/Game/ParagonRevenant/Audio/Cues/Revenant_Effort_Pain.Revenant_Effort_Pain",
+      "painHeavy": "/Game/ParagonRevenant/Audio/Cues/Revenant_Effort_PainHeavy.Revenant_Effort_PainHeavy",
+      "death": "/Game/ParagonRevenant/Audio/Cues/Revenant_Effort_Death.Revenant_Effort_Death",
+      "cheer": "/Game/ParagonRevenant/Audio/Cues/Revenant_Effort_Cheer.Revenant_Effort_Cheer"
+    },
+    "sparrow": {
+      "primary": "/Game/ParagonSparrow/Audio/Cues/Sparrow_Effort_Attack.Sparrow_Effort_Attack",
+      "q": "/Game/ParagonSparrow/Audio/Cues/Sparrow_Effort_Attack.Sparrow_Effort_Attack",
+      "ultimate": "/Game/ParagonSparrow/Audio/Cues/Sparrow_Ability_Ultimate_Self.Sparrow_Ability_Ultimate_Self",
+      "pain": "/Game/ParagonSparrow/Audio/Cues/Sparrow_Effort_Pain.Sparrow_Effort_Pain",
+      "painHeavy": "/Game/ParagonSparrow/Audio/Cues/Sparrow_Effort_PainHeavy.Sparrow_Effort_PainHeavy",
+      "death": "/Game/ParagonSparrow/Audio/Cues/Sparrow_Effort_Death.Sparrow_Effort_Death",
+      "cheer": "/Game/ParagonSparrow/Audio/Cues/Sparrow_Effort_Cheer.Sparrow_Effort_Cheer"
+    },
+    "steel": {
+      "primary": "/Game/ParagonSteel/Audio/Cues/Steel_Effort_Attack.Steel_Effort_Attack",
+      "q": "/Game/ParagonSteel/Audio/Cues/Steel_Effort_Attack.Steel_Effort_Attack",
+      "ultimate": "/Game/ParagonSteel/Audio/Cues/Steel_Ability_Ultimate_Self.Steel_Ability_Ultimate_Self",
+      "pain": "/Game/ParagonSteel/Audio/Cues/Steel_Effort_Pain.Steel_Effort_Pain",
+      "painHeavy": "/Game/ParagonSteel/Audio/Cues/Steel_Effort_PainHeavy.Steel_Effort_PainHeavy",
+      "death": "/Game/ParagonSteel/Audio/Cues/Steel_Effort_Death.Steel_Effort_Death",
+      "cheer": "/Game/ParagonSteel/Audio/Cues/Steel_Effort_Cheer.Steel_Effort_Cheer"
+    },
+    "terra": {
+      "primary": "/Game/ParagonTerra/Audio/Cues/Terra_Effort_Ability_Primary.Terra_Effort_Ability_Primary",
+      "q": "/Game/ParagonTerra/Audio/Cues/Terra_Effort_Ability_Q.Terra_Effort_Ability_Q",
+      "e": "/Game/ParagonTerra/Audio/Cues/Terra_Effort_Ability_RMB.Terra_Effort_Ability_RMB",
+      "ultimate": "/Game/ParagonTerra/Audio/Cues/Terra_Ability_Ultimate_Self.Terra_Ability_Ultimate_Self",
+      "pain": "/Game/ParagonTerra/Audio/Cues/Terra_Effort_Pain.Terra_Effort_Pain",
+      "painHeavy": "/Game/ParagonTerra/Audio/Cues/Terra_Effort_PainHeavy.Terra_Effort_PainHeavy",
+      "death": "/Game/ParagonTerra/Audio/Cues/Terra_Effort_Death.Terra_Effort_Death",
+      "cheer": "/Game/ParagonTerra/Audio/Cues/Terra_Effort_Cheer.Terra_Effort_Cheer"
+    },
+    "wraith": {
+      "primary": "/Game/ParagonWraith/Audio/Cues/Wraith_Effort_Ability_Primary.Wraith_Effort_Ability_Primary",
+      "q": "/Game/ParagonWraith/Audio/Cues/Wraith_Effort_Ability_Q.Wraith_Effort_Ability_Q",
+      "e": "/Game/ParagonWraith/Audio/Cues/Wraith_Effort_Ability_RMB.Wraith_Effort_Ability_RMB",
+      "ultimate": "/Game/ParagonWraith/Audio/Cues/Wraith_Ability_Ultimate_Self.Wraith_Ability_Ultimate_Self",
+      "pain": "/Game/ParagonWraith/Audio/Cues/Wraith_Effort_Pain.Wraith_Effort_Pain",
+      "painHeavy": "/Game/ParagonWraith/Audio/Cues/Wraith_Effort_PainHeavy.Wraith_Effort_PainHeavy",
+      "death": "/Game/ParagonWraith/Audio/Cues/Wraith_Effort_Death.Wraith_Effort_Death",
+      "cheer": "/Game/ParagonWraith/Audio/Cues/Wraith_Effort_Cheer.Wraith_Effort_Cheer"
+    },
+    "wukong": {
+      "primary": "/Game/ParagonSunWukong/Audio/Cues/Wukong_Effort_Ability_Primary.Wukong_Effort_Ability_Primary",
+      "q": "/Game/ParagonSunWukong/Audio/Cues/Wukong_Effort_Ability_Q.Wukong_Effort_Ability_Q",
+      "e": "/Game/ParagonSunWukong/Audio/Cues/Wukong_Effort_Ability_RMB.Wukong_Effort_Ability_RMB",
+      "ultimate": "/Game/ParagonSunWukong/Audio/Cues/Wukong_Ability_Ultimate_Self.Wukong_Ability_Ultimate_Self",
+      "pain": "/Game/ParagonSunWukong/Audio/Cues/Wukong_Effort_Pain.Wukong_Effort_Pain",
+      "painHeavy": "/Game/ParagonSunWukong/Audio/Cues/Wukong_Effort_PainHeavy.Wukong_Effort_PainHeavy",
+      "death": "/Game/ParagonSunWukong/Audio/Cues/Wukong_Effort_Death.Wukong_Effort_Death",
+      "cheer": "/Game/ParagonSunWukong/Audio/Cues/Wukong_Effort_Cheer.Wukong_Effort_Cheer"
+    },
+    "yin": {
+      "primary": "/Game/ParagonYin/Audio/Cues/Yin_Effort_Ability_Primary.Yin_Effort_Ability_Primary",
+      "q": "/Game/ParagonYin/Audio/Cues/Yin_Effort_Ability_Q.Yin_Effort_Ability_Q",
+      "e": "/Game/ParagonYin/Audio/Cues/Yin_Effort_Ability_RMB.Yin_Effort_Ability_RMB",
+      "ultimate": "/Game/ParagonYin/Audio/Cues/Yin_Ability_Ultimate_Self.Yin_Ability_Ultimate_Self",
+      "pain": "/Game/ParagonYin/Audio/Cues/Yin_Effort_Pain.Yin_Effort_Pain",
+      "painHeavy": "/Game/ParagonYin/Audio/Cues/Yin_Effort_PainHeavy.Yin_Effort_PainHeavy",
+      "death": "/Game/ParagonYin/Audio/Cues/Yin_Effort_Death.Yin_Effort_Death",
+      "cheer": "/Game/ParagonYin/Audio/Cues/Yin_Effort_Cheer.Yin_Effort_Cheer"
+    },
+    "zinx": {
+      "primary": "/Game/ParagonZinx/Audio/Cues/Zinx_Effort_Ability_Primary.Zinx_Effort_Ability_Primary",
+      "q": "/Game/ParagonZinx/Audio/Cues/Zinx_Effort_Ability_Q.Zinx_Effort_Ability_Q",
+      "e": "/Game/ParagonZinx/Audio/Cues/Zinx_Effort_Ability_RMB.Zinx_Effort_Ability_RMB",
+      "ultimate": "/Game/ParagonZinx/Audio/Cues/Zinx_Ability_Ultimate_Self.Zinx_Ability_Ultimate_Self",
+      "pain": "/Game/ParagonZinx/Audio/Cues/Zinx_Effort_Pain.Zinx_Effort_Pain",
+      "painHeavy": "/Game/ParagonZinx/Audio/Cues/Zinx_Effort_PainHeavy.Zinx_Effort_PainHeavy",
+      "death": "/Game/ParagonZinx/Audio/Cues/Zinx_Effort_Death.Zinx_Effort_Death",
+      "cheer": "/Game/ParagonZinx/Audio/Cues/Zinx_Effort_Cheer.Zinx_Effort_Cheer"
+    }
+  }
+}

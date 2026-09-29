@@ -197,6 +197,7 @@ void ATMBattleDirector::GatherBlows(const TMSim::FTickReport& Report)
 			Blow.Ability = TMSim::FindAbility(Event.Id);
 			Blow.Aim = Event.Where;
 			Blow.Motion = Blow.Ability ? FString(UTF8_TO_TCHAR(TMSim::MotionOf(*Blow.Ability, Event.Slot).c_str())) : FString(TEXT("none"));
+			Blow.Slot = Event.Slot;
 			Open = Blows.Num() - 1;
 			// An effect on the user plays as it goes off; the rest wait to land.
 			const TMSim::FUnit* User = Battle.FindUnit(Event.Unit);
@@ -281,6 +282,12 @@ void ATMBattleDirector::AdvanceBlows(float DeltaSeconds)
 			}
 		}
 		bool bLanded = Blow.Age > 10.0f;
+		if (Blow.bStarted && !Blow.bSounded)
+		{
+			// The swing begins (after any walk there): heard now, landing later.
+			Blow.bSounded = true;
+			SoundBlowStarts(Blow, Blow.Slot);
+		}
 		if (Blow.bStarted && !bLanded)
 		{
 			Blow.Since += DeltaSeconds;
@@ -433,6 +440,7 @@ void ATMBattleDirector::LaunchShots(FTMBlow& Blow)
 
 void ATMBattleDirector::LandBlow(FTMBlow& Blow)
 {
+	SoundBlowLands(Blow);
 	for (FTMShot& Shot : Blow.Shots)
 	{
 		if (Shot.Mesh.IsValid())
@@ -680,6 +688,11 @@ void ATMBattleDirector::React(const TMSim::FEvent& Event, int32 CasterId)
 			const bool bHeavy = Motion.bCritPending;
 			Motion.bCritPending = false;
 			Jolt(i, Away, bHeavy ? 32.0f : 14.0f);
+			// A grunt, not every time: a critical nearly always, a scratch now and then.
+			if (Unit.IsAlive())
+			{
+				PlayVoice(i, bHeavy ? TEXT("painHeavy") : TEXT("pain"), bHeavy ? 0.9f : 0.3f);
+			}
 			if (bFree || (bHeavy && Set && Unit.IsAlive() && Motion.Path.Num() == 0 && !Motion.bDown))
 			{
 				UAnimSequence* Clip = bHeavy ? Set->Extra(TEXT("hitHeavy"), Event.Amount) : nullptr;
@@ -847,6 +860,18 @@ void ATMBattleDirector::UltimateBeat(const TMSim::FEvent& Event)
 void ATMBattleDirector::Celebrate()
 {
 	bCelebrated = true;
+	// Won or lost, from this side's seat (hud.gd's jingles); two people at one
+	// screen, or nobody playing, hear the win.
+	const int32 Mine = ViewerTeam();
+	PlayEventSound(Mine >= 0 && Battle.Winner != Mine ? TEXT("defeat") : TEXT("victory"), nullptr, 0.8f);
+	for (int32 i = 0; i < Motions.Num() && i < static_cast<int32>(Battle.Units.size()); ++i)
+	{
+		if (Battle.Units[i].IsAlive() && Battle.Units[i].Team == Battle.Winner)
+		{
+			PlayVoice(i, TEXT("cheer"), 1.0f);
+			break;
+		}
+	}
 	for (int32 i = 0; i < Motions.Num() && i < static_cast<int32>(Battle.Units.size()); ++i)
 	{
 		const TMSim::FUnit& Unit = Battle.Units[i];

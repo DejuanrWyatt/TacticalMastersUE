@@ -22,6 +22,7 @@
 #include "Engine/SkeletalMesh.h"
 #include "Misc/FileHelper.h"
 #include "Misc/PackageName.h"
+#include "Misc/ScopeExit.h"
 #include "Misc/Paths.h"
 #include "Serialization/JsonReader.h"
 #include "Serialization/JsonSerializer.h"
@@ -483,6 +484,11 @@ void ATMBattleDirector::AnimateEvents(const TMSim::FTickReport& Report)
 		const TMSim::FUnit& Unit = Battle.Units[i];
 		if (Event.Kind == TMSim::EEventKind::CastStarted)
 		{
+			if (IsSeen(Unit))
+			{
+				const FVector Where = WorldFor(Unit) + FVector(0.0f, 0.0f, 100.0f);
+				PlayEventSound(TEXT("cast"), &Where, 0.6f);
+			}
 			// Starting to charge: the motion's intro, then its wind-up loops for
 			// as long as the cast lasts (StandingClip).
 			const TMSim::FAbility* Ability = TMSim::FindAbility(Event.Id);
@@ -565,6 +571,11 @@ void ATMBattleDirector::AnimateEvents(const TMSim::FTickReport& Report)
 		else if (Event.Kind == TMSim::EEventKind::BecameReady && Unit.IsAlive()
 			&& Motion.Path.Num() == 0 && Motion.OneShotLeft <= 0.0f && !Unit.IsCasting())
 		{
+			// A chime when one of this side's units is ready (battle.gd:1052-1063).
+			if (bPlayerInput && PlayerCanOrder(&Unit))
+			{
+				PlayEventSound(TEXT("ready"), nullptr, 0.6f);
+			}
 			// Its turn: a small gesture, if the set has one.
 			if (UAnimSequence* Ready = Set.Extra(TEXT("ready"), Unit.Id))
 			{
@@ -626,6 +637,17 @@ void ATMBattleDirector::AdvanceMotion(float DeltaSeconds)
 		}
 		else if (!Unit.IsAlive())
 		{
+			const bool bWasDown = Motion.bDown;
+			ON_SCOPE_EXIT
+			{
+				// Falls: a thud and a cry (battle.gd:456), once, as it goes down.
+				if (!bWasDown && Motion.bDown && IsSeen(Unit))
+				{
+					const FVector Where = WorldFor(Unit) + FVector(0.0f, 0.0f, 50.0f);
+					PlayEventSound(TEXT("knockout"), &Where);
+					PlayVoice(i, TEXT("death"), 1.0f);
+				}
+			};
 			if (!Motion.bDown && Unit.IsKo() && Set && (Motion.DeathClip || Set->Death.Num() > 0))
 			{
 				Motion.bDown = true;
@@ -643,6 +665,7 @@ void ATMBattleDirector::AdvanceMotion(float DeltaSeconds)
 
 		if (Motion.Path.Num() > 0 && !Motion.bDown)
 		{
+			SoundStep(i, DeltaSeconds);
 			const float Speed = Set ? (Motion.bRun ? Set->RunSpeed : Set->WalkSpeed) : 400.0f;
 			float Step = Speed * DeltaSeconds;
 			while (Step > 0.0f && Motion.Path.Num() > 0)

@@ -76,6 +76,10 @@ public:
 	float OverheadScale = 1.35f;
 	float StatusIconScale = 1.5f;
 
+	/** How loud the battle's sound effects and the heroes' voices are, 0 to 1 (Options). */
+	float SfxVolume = 0.8f;
+	float VoiceVolume = 0.8f;
+
 	/**
 	 * Where each panel has been moved to in Edit layout, as how far it is
 	 * nudged from where it normally sits, in 1080p pixels -- so it still

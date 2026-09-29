@@ -1039,6 +1039,14 @@ void ATMBattleDirector::Narrate(const TMSim::FTickReport& Report)
 			break;
 		case TMSim::EEventKind::TimedOut:
 			Line = FString::Printf(TEXT("%s ran out of time"), *NameOf(Event.Unit));
+			// A buzz when one of this side's turns is lost (battle.gd:1060-1063).
+			if (const TMSim::FUnit* Lost = Battle.FindUnit(Event.Unit))
+			{
+				if (bPlayerInput && !ComputerPlays(Lost->Team) && (!bOnline || Lost->Team == LocalTeam))
+				{
+					PlayEventSound(TEXT("turnLost"), nullptr, 0.6f);
+				}
+			}
 			break;
 		case TMSim::EEventKind::CastStarted:
 			Line = FString::Printf(TEXT("%s begins casting %hs (%.1fs)"), *NameOf(Event.Unit),
@@ -2648,6 +2656,8 @@ void ATMBattleDirector::ShowHud()
 
 void ATMBattleDirector::PressHudButton(const FTMHudButton& Button)
 {
+	// Every button clicks (audio.gd:126-128).
+	PlayEventSound(TEXT("click"), nullptr, 0.5f);
 	// The HUD's buttons do what their keys do (hud.gd's action bar calls the same
 	// functions the key bindings do).
 	const TMSim::FUnit* Unit = SelectedUnit();
@@ -3525,6 +3535,13 @@ bool ATMBattleDirector::SliderRange(int32 Id, double& Low, double& High, double&
 		Step = 0.05;
 		return true;
 	}
+	if (Id == SliderSfxVolume || Id == SliderVoiceVolume)
+	{
+		Low = 0.0;
+		High = 1.0;
+		Step = 0.05;
+		return true;
+	}
 	if (Id == SliderOverhead || Id == SliderStatusIcons)
 	{
 		Low = 0.6;
@@ -3558,6 +3575,14 @@ double ATMBattleDirector::SliderValue(int32 Id) const
 	{
 		return FTMSettings::Get().StatusIconScale;
 	}
+	if (Id == SliderSfxVolume)
+	{
+		return FTMSettings::Get().SfxVolume;
+	}
+	if (Id == SliderVoiceVolume)
+	{
+		return FTMSettings::Get().VoiceVolume;
+	}
 	const int32 Index = Id - SliderTuning;
 	if (Index < 0 || Index >= static_cast<int32>(TMSim::TuningKeys().size()))
 	{
@@ -3588,6 +3613,16 @@ void ATMBattleDirector::SetSlider(int32 Id, double Value)
 	if (Id == SliderStatusIcons)
 	{
 		Settings.StatusIconScale = static_cast<float>(Value);
+		return;
+	}
+	if (Id == SliderSfxVolume)
+	{
+		Settings.SfxVolume = static_cast<float>(Value);
+		return;
+	}
+	if (Id == SliderVoiceVolume)
+	{
+		Settings.VoiceVolume = static_cast<float>(Value);
 		return;
 	}
 	const int32 Index = Id - SliderTuning;

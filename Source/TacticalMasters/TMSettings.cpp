@@ -136,6 +136,8 @@ void FTMSettings::ResetOptions()
 	UiScale = 1.0f;
 	OverheadScale = 1.35f;
 	StatusIconScale = 1.5f;
+	SfxVolume = 0.8f;
+	VoiceVolume = 0.8f;
 	bFullscreen = false;
 	bColorblind = false;
 	bTurnSquares = true;
@@ -174,6 +176,8 @@ void FTMSettings::Load()
 	if (Root->TryGetNumberField(TEXT("ui_scale"), Number)) { UiScale = FMath::Clamp(static_cast<float>(Number), 0.9f, 1.3f); }
 	if (Root->TryGetNumberField(TEXT("overhead_scale"), Number)) { OverheadScale = FMath::Clamp(static_cast<float>(Number), 0.6f, 2.5f); }
 	if (Root->TryGetNumberField(TEXT("status_icon_scale"), Number)) { StatusIconScale = FMath::Clamp(static_cast<float>(Number), 0.6f, 3.0f); }
+	if (Root->TryGetNumberField(TEXT("sfx_volume"), Number)) { SfxVolume = FMath::Clamp(static_cast<float>(Number), 0.0f, 1.0f); }
+	if (Root->TryGetNumberField(TEXT("voice_volume"), Number)) { VoiceVolume = FMath::Clamp(static_cast<float>(Number), 0.0f, 1.0f); }
 	Root->TryGetBoolField(TEXT("fullscreen"), bFullscreen);
 	Root->TryGetBoolField(TEXT("colorblind"), bColorblind);
 	Root->TryGetBoolField(TEXT("turn_squares"), bTurnSquares);
@@ -251,6 +255,8 @@ void FTMSettings::Save() const
 	Root->SetNumberField(TEXT("ui_scale"), UiScale);
 	Root->SetNumberField(TEXT("overhead_scale"), OverheadScale);
 	Root->SetNumberField(TEXT("status_icon_scale"), StatusIconScale);
+	Root->SetNumberField(TEXT("sfx_volume"), SfxVolume);
+	Root->SetNumberField(TEXT("voice_volume"), VoiceVolume);
 	Root->SetBoolField(TEXT("fullscreen"), bFullscreen);
 	Root->SetBoolField(TEXT("colorblind"), bColorblind);
 	Root->SetBoolField(TEXT("turn_squares"), bTurnSquares);

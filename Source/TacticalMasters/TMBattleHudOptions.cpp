@@ -87,8 +87,14 @@ void ATMBattleHud::DrawOptions(ATMBattleDirector& From)
 		TEXT("A square per unit, filling as its turn comes, instead of chips sliding along two bars. Move and reorder them in Edit layout."));
 	MenuButton(PX + LabelW, Y, 160.0f * S, RowH, Settings.bTurnSquares ? TEXT("On") : TEXT("Off"), ETMHudAction::OptionTurnSquares);
 	Y += RowH + 8.0f * S;
-	Text(TEXT("Sound volumes will be here once the game has sound."), PX, Y, Dim, Font, 0.55f * S);
-	Y += 44.0f * S;
+	Label(TEXT("Sound effects volume"), Y, PX, TEXT("How loud swings, spells, hits, footsteps and the menus are."));
+	Slider(PX + LabelW, Y + 6.0f * S, ControlW, RowH - 12.0f * S, ATMBattleDirector::SliderSfxVolume, Settings.SfxVolume, 0.0, 1.0);
+	Text(FString::Printf(TEXT("%.0f%%"), Settings.SfxVolume * 100.0f), PX + LabelW + ControlW + 16.0f * S, Y + 8.0f * S, TextColour, Font, 0.62f * S);
+	Y += RowH + 8.0f * S;
+	Label(TEXT("Voices volume"), Y, PX, TEXT("How loud the heroes are: their efforts, cries and cheers."));
+	Slider(PX + LabelW, Y + 6.0f * S, ControlW, RowH - 12.0f * S, ATMBattleDirector::SliderVoiceVolume, Settings.VoiceVolume, 0.0, 1.0);
+	Text(FString::Printf(TEXT("%.0f%%"), Settings.VoiceVolume * 100.0f), PX + LabelW + ControlW + 16.0f * S, Y + 8.0f * S, TextColour, Font, 0.62f * S);
+	Y += RowH + 16.0f * S;
 
 	// Controls.
 	Text(TEXT("Controls"), PX, Y, Gold, Font, 0.8f * S);

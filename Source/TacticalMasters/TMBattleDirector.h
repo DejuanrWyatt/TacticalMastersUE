@@ -24,6 +24,7 @@
 #include "TMBattleDirector.generated.h"
 
 class USkeletalMesh;
+class USoundBase;
 class UAnimSequence;
 class USkeletalMeshComponent;
 class UStaticMesh;
@@ -145,6 +146,8 @@ public:
 	static constexpr int32 SliderCameraSpeed = 0;
 	static constexpr int32 SliderOverhead = 1;
 	static constexpr int32 SliderStatusIcons = 2;
+	static constexpr int32 SliderSfxVolume = 3;
+	static constexpr int32 SliderVoiceVolume = 4;
 	static constexpr int32 SliderTuning = 100;
 	/** Rule numbers changed during a battle, sent as one order once the dragging stops. */
 	TMap<int32, double> TunePending;
@@ -831,6 +834,8 @@ private:
 		 * fall (Muriel flies, and never needed one): it topples instead.
 		 */
 		float Tipped = 0.0f;
+		/** Seconds since its last footstep (SoundStep). */
+		float StepClock = 0.0f;
 		/** Its ability was charged before it went off, so the charged release plays. */
 		bool bWasCasting = false;
 		/** The release it last began, or will begin when its walk ends. */
@@ -892,6 +897,9 @@ private:
 		TArray<FTMShot> Shots;
 		/** Units whose fall or rise waits for this. */
 		TArray<int32> Held;
+		/** Its slot, and whether its launch has been heard (SoundBlowStarts). */
+		int32 Slot = 0;
+		bool bSounded = false;
 	};
 	TArray<FTMBlow> Blows;
 
@@ -980,6 +988,30 @@ private:
 	void SendChat();
 	void TypedDone(bool bSubmit);
 	void EndPlay(const EEndPlayReason::Type Reason) override;
+
+	// Sound (TMBattleDirectorSound.cpp; Content/Data/Sounds/sounds.json).
+	bool bSoundsRead = false;
+	TMap<FString, TArray<FString>> SoundTakes;
+	TMap<FString, TPair<FString, FString>> MotionSounds;
+	TMap<FString, TPair<FString, FString>> AbilitySounds;
+	TMap<FString, FString> EventSounds;
+	/** Each hero's voice lines by role, by animation set. */
+	TMap<FString, TMap<FString, FString>> Voices;
+	UPROPERTY()
+	TMap<FString, TObjectPtr<USoundBase>> LoadedSounds;
+	void LoadSounds();
+	USoundBase* SoundAt(const FString& Path);
+	bool CanSound() const;
+	/** A named sound: at a place on the board, or everywhere if At is null. */
+	void PlaySound(const FString& Name, const FVector* At, float Volume = 1.0f);
+	void PlayEventSound(const TCHAR* Event, const FVector* At, float Volume = 1.0f);
+	/** One of a unit's hero's voice lines, this often (0 to 1). */
+	void PlayVoice(int32 Index, const TCHAR* Line, float Chance);
+	/** An ability's sounds: as it goes off, and where it lands. */
+	TPair<FString, FString> SoundsOf(const TMSim::FAbility* Ability, const FString& Motion);
+	void SoundBlowStarts(const FTMBlow& Blow, int32 Slot);
+	void SoundBlowLands(const FTMBlow& Blow);
+	void SoundStep(int32 Index, float DeltaSeconds);
 
 	bool bCharacterMapRead = false;
 	/**
