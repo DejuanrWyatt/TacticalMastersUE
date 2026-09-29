@@ -839,6 +839,11 @@ void ATMBattleDirector::FrameTheBoard()
 	if (UCameraComponent* Lens = Watcher->GetCameraComponent())
 	{
 		Lens->SetFieldOfView(CameraFov);
+		// A camera actor holds 16:9 by default, putting black bars round any
+		// window of another shape. The HUD is drawn inside the bars but the
+		// pointer is measured from the window's corner, so every button would
+		// answer somewhere off to one side of where it is drawn. Fill the window.
+		Lens->SetConstraintAspectRatio(false);
 	}
 	if (APlayerController* Player = World->GetFirstPlayerController())
 	{
@@ -2236,9 +2241,17 @@ void ATMBattleDirector::OnClick()
 		const ATMBattleHud* Hud = Cast<ATMBattleHud>(Player->GetHUD());
 		if (Hud && Hud->ButtonAt(FVector2D(MouseX, MouseY), Button))
 		{
+			UE_LOG(LogTemp, Log, TEXT("CLICK %.0f,%.0f on action %d value %d"), MouseX, MouseY, static_cast<int32>(Button.Action), Button.Value);
 			PressHudButton(Button);
 			return;
 		}
+		// A click that found no button, and what was nearest: menus that seem not
+		// to answer are found this way.
+		UE_LOG(LogTemp, Log, TEXT("CLICK %.0f,%.0f on no button: %s"), MouseX, MouseY, Hud ? *Hud->DescribeMiss(FVector2D(MouseX, MouseY)) : TEXT("no HUD"));
+	}
+	else
+	{
+		UE_LOG(LogTemp, Log, TEXT("CLICK with no pointer position"));
 	}
 	// Behind a menu or the guide, or while the screen is being arranged, the
 	// board takes no clicks.

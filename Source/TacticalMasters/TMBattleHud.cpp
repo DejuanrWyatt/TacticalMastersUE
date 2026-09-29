@@ -225,6 +225,28 @@ bool ATMBattleHud::ButtonAt(const FVector2D& Point, FTMHudButton& Out) const
 	return false;
 }
 
+FString ATMBattleHud::DescribeMiss(const FVector2D& Point) const
+{
+	float Best = TNumericLimits<float>::Max();
+	const FTMHudButton* Near = nullptr;
+	for (const FTMHudButton& Button : Buttons)
+	{
+		const float Away = FMath::Sqrt(Button.Area.ComputeSquaredDistanceToPoint(Point));
+		if (Away < Best)
+		{
+			Best = Away;
+			Near = &Button;
+		}
+	}
+	const FString Size = Canvas ? FString::Printf(TEXT("canvas %.0fx%.0f"), Canvas->ClipX, Canvas->ClipY) : FString(TEXT("no canvas"));
+	if (!Near)
+	{
+		return FString::Printf(TEXT("no buttons, %s"), *Size);
+	}
+	return FString::Printf(TEXT("%d buttons; nearest action %d value %d at %.0f,%.0f-%.0f,%.0f, %.0f px away; %s"), Buttons.Num(),
+		static_cast<int32>(Near->Action), Near->Value, Near->Area.Min.X, Near->Area.Min.Y, Near->Area.Max.X, Near->Area.Max.Y, Best, *Size);
+}
+
 bool ATMBattleHud::ToScreen(ATMBattleDirector& From, const TMSim::FVec2& Point, float Lift, FVector2D& Out) const
 {
 	return PlayerOwner && PlayerOwner->ProjectWorldLocationToScreen(From.BoardPoint(Point, Lift), Out);
