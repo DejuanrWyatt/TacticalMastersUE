@@ -1066,6 +1066,135 @@ void ATMBattleHud::Slant(float X, float Y, float W, float H, const FLinearColor&
 	Canvas->DrawItem(Two);
 }
 
+void ATMBattleHud::ShapeBadge(const std::string& Shape, float X, float Y, float Size, const FLinearColor& Colour)
+{
+	if (!Canvas)
+	{
+		return;
+	}
+	DrawRect(FLinearColor(0.0f, 0.0f, 0.0f, 0.75f), X, Y, Size, Size);
+	const FVector2D C(X + Size * 0.5f, Y + Size * 0.5f);
+	const float R = Size * 0.36f;
+	const float Thick = FMath::Max(1.0f, Size / 14.0f);
+	auto Tri = [&](const FVector2D& A, const FVector2D& B, const FVector2D& E, const FLinearColor& Tint)
+	{
+		FCanvasTriangleItem Item(A, B, E, GWhiteTexture);
+		Item.SetColor(Tint);
+		Item.BlendMode = SE_BLEND_Translucent;
+		Canvas->DrawItem(Item);
+	};
+	auto At = [&](float Degrees, float Radius, const FVector2D& Centre, float Squash = 1.0f)
+	{
+		const float Rad = FMath::DegreesToRadians(Degrees);
+		return Centre + FVector2D(FMath::Cos(Rad) * Radius, FMath::Sin(Rad) * Radius * Squash);
+	};
+	auto Ring = [&](const FVector2D& Centre, float Radius, float Squash = 1.0f)
+	{
+		for (int32 i = 0; i < 20; ++i)
+		{
+			const FVector2D A = At(i * 18.0f, Radius, Centre, Squash);
+			const FVector2D B = At((i + 1) * 18.0f, Radius, Centre, Squash);
+			DrawLine(A.X, A.Y, B.X, B.Y, Colour, Thick);
+		}
+	};
+	auto Disc = [&](const FVector2D& Centre, float Radius, const FLinearColor& Tint)
+	{
+		for (int32 i = 0; i < 20; ++i)
+		{
+			Tri(Centre, At(i * 18.0f, Radius, Centre), At((i + 1) * 18.0f, Radius, Centre), Tint);
+		}
+	};
+	auto Arrow = [&](const FVector2D& From, const FVector2D& To)
+	{
+		// A shaft and a filled head.
+		const FVector2D Along = (To - From).GetSafeNormal();
+		const FVector2D Across(-Along.Y, Along.X);
+		const float Head = Size * 0.2f;
+		const FVector2D Base = To - Along * Head;
+		DrawLine(From.X, From.Y, Base.X, Base.Y, Colour, Thick * 2.0f);
+		Tri(To, Base + Across * Head * 0.7f, Base - Across * Head * 0.7f, Colour);
+	};
+	const FLinearColor Soft = Colour * FLinearColor(1, 1, 1, 0.4f);
+
+	if (Shape == "circle")
+	{
+		// An area: a filled disc with its rim.
+		Disc(C, R, Soft);
+		Ring(C, R);
+	}
+	else if (Shape == "cone")
+	{
+		// A wedge fanning out from the user at the bottom.
+		const FVector2D Apex(C.X, Y + Size * 0.86f);
+		const float Reach = Size * 0.7f;
+		for (int32 i = 0; i < 6; ++i)
+		{
+			Tri(Apex, At(-120.0f + i * 10.0f, Reach, Apex), At(-120.0f + (i + 1) * 10.0f, Reach, Apex), Soft);
+		}
+		const FVector2D Left = At(-120.0f, Reach, Apex);
+		const FVector2D Right = At(-60.0f, Reach, Apex);
+		DrawLine(Apex.X, Apex.Y, Left.X, Left.Y, Colour, Thick);
+		DrawLine(Apex.X, Apex.Y, Right.X, Right.Y, Colour, Thick);
+		for (int32 i = 0; i < 6; ++i)
+		{
+			const FVector2D A = At(-120.0f + i * 10.0f, Reach, Apex);
+			const FVector2D B = At(-120.0f + (i + 1) * 10.0f, Reach, Apex);
+			DrawLine(A.X, A.Y, B.X, B.Y, Colour, Thick);
+		}
+	}
+	else if (Shape == "line")
+	{
+		// A straight band out from the user.
+		DrawRect(Soft, C.X - Size * 0.12f, Y + Size * 0.22f, Size * 0.24f, Size * 0.66f);
+		Arrow(FVector2D(C.X, Y + Size * 0.88f), FVector2D(C.X, Y + Size * 0.1f));
+	}
+	else if (Shape == "vector")
+	{
+		// Picked at a spot, then swept in a direction.
+		Disc(FVector2D(X + Size * 0.24f, Y + Size * 0.72f), Size * 0.1f, Colour);
+		Arrow(FVector2D(X + Size * 0.24f, Y + Size * 0.72f), FVector2D(X + Size * 0.86f, Y + Size * 0.18f));
+	}
+	else if (Shape == "self")
+	{
+		// Around the user: a figure standing in a ring.
+		Ring(FVector2D(C.X, Y + Size * 0.76f), R, 0.35f);
+		Disc(FVector2D(C.X, Y + Size * 0.24f), Size * 0.1f, Colour);
+		Tri(FVector2D(C.X, Y + Size * 0.36f), FVector2D(C.X - Size * 0.15f, Y + Size * 0.76f), FVector2D(C.X + Size * 0.15f, Y + Size * 0.76f), Colour);
+	}
+	else if (Shape == "global")
+	{
+		// Everywhere: a globe.
+		Ring(C, R);
+		DrawLine(C.X - R, C.Y, C.X + R, C.Y, Colour, Thick);
+		for (int32 i = 0; i < 20; ++i)
+		{
+			const float A0 = FMath::DegreesToRadians(i * 18.0f);
+			const float A1 = FMath::DegreesToRadians((i + 1) * 18.0f);
+			DrawLine(C.X + FMath::Cos(A0) * R * 0.45f, C.Y + FMath::Sin(A0) * R, C.X + FMath::Cos(A1) * R * 0.45f, C.Y + FMath::Sin(A1) * R, Colour, Thick);
+		}
+	}
+	else if (Shape == "point")
+	{
+		// A spot on the ground: a cross on a flat ring.
+		Ring(FVector2D(C.X, C.Y + Size * 0.12f), R, 0.45f);
+		const float K = Size * 0.16f;
+		DrawLine(C.X - K, C.Y + Size * 0.12f - K * 0.6f, C.X + K, C.Y + Size * 0.12f + K * 0.6f, Colour, Thick * 1.5f);
+		DrawLine(C.X - K, C.Y + Size * 0.12f + K * 0.6f, C.X + K, C.Y + Size * 0.12f - K * 0.6f, Colour, Thick * 1.5f);
+	}
+	else
+	{
+		// One unit: a crosshair.
+		Ring(C, R * 0.8f);
+		const float In = R * 0.35f;
+		const float Out = R * 1.15f;
+		DrawLine(C.X, C.Y - Out, C.X, C.Y - In, Colour, Thick);
+		DrawLine(C.X, C.Y + In, C.X, C.Y + Out, Colour, Thick);
+		DrawLine(C.X - Out, C.Y, C.X - In, C.Y, Colour, Thick);
+		DrawLine(C.X + In, C.Y, C.X + Out, C.Y, Colour, Thick);
+		Disc(C, Size * 0.06f, Colour);
+	}
+}
+
 void ATMBattleHud::Bar(float X, float Y, float W, float H, float Fraction, const FLinearColor& Fill, const FLinearColor& Back, float Skew)
 {
 	Slant(X, Y, W, H, Back, Skew);
@@ -1290,6 +1419,12 @@ void ATMBattleHud::AbilityTile(ATMBattleDirector& From, const TMSim::FUnit& Unit
 		}
 		Fitted(Effect, Y + Size - Band, EffectColour * FLinearColor(1, 1, 1, Fade));
 		Top = Y + Band;
+		if (!bPassive)
+		{
+			// Its shape, so a cone reads as a cone before it is aimed.
+			const float Badge = Size * 0.26f;
+			ShapeBadge(TMSim::ShapeOf(*Ability), X + Size - Badge, Top, Badge, FLinearColor(1, 1, 1, bColour ? 0.95f : 0.55f));
+		}
 	}
 	else if (bPassive)
 	{
@@ -1302,8 +1437,9 @@ void ATMBattleHud::AbilityTile(ATMBattleDirector& From, const TMSim::FUnit& Unit
 		// A cast time, in the corner.
 		const FString Cast = FString::Printf(TEXT("%.1fs"), From.Battle.CastTicks(*Ability) / Tps);
 		const FVector2D CastSize = TextSize(Cast, Font, Size / 300.0f);
-		DrawRect(CastColour * FLinearColor(0.4f, 0.4f, 0.4f, 0.9f), X + Size - CastSize.X - 6.0f * S, Top, CastSize.X + 6.0f * S, CastSize.Y);
-		Text(Cast, X + Size - CastSize.X - 3.0f * S, Top, FLinearColor::White, Font, Size / 300.0f);
+		const float CastX = bButton ? X : X + Size - CastSize.X - 6.0f * S;
+		DrawRect(CastColour * FLinearColor(0.4f, 0.4f, 0.4f, 0.9f), CastX, Top, CastSize.X + 6.0f * S, CastSize.Y);
+		Text(Cast, CastX + 3.0f * S, Top, FLinearColor::White, Font, Size / 300.0f);
 	}
 	if (bButton)
 	{
@@ -1316,7 +1452,9 @@ void ATMBattleHud::AbilityTile(ATMBattleDirector& From, const TMSim::FUnit& Unit
 	}
 	FString ClassName;
 	AbilityClassColour(*Ability, &ClassName);
-	AddTip(X, Y, Size, Size, FString::Printf(TEXT("%hs  -  %s\n\n"), Ability->Name.c_str(), *ClassName) + ExplainAbility(From, Unit, Slot));
+	FString ShapeName = UTF8_TO_TCHAR(TMSim::ShapeOf(*Ability).c_str());
+	ShapeName = bPassive ? FString() : TEXT("  -  ") + ShapeName.Left(1).ToUpper() + ShapeName.Mid(1);
+	AddTip(X, Y, Size, Size, FString::Printf(TEXT("%hs  -  %s%s\n\n"), Ability->Name.c_str(), *ClassName, *ShapeName) + ExplainAbility(From, Unit, Slot));
 }
 
 void ATMBattleHud::DrawUnitPanel(ATMBattleDirector& From, const TMSim::FUnit& Unit, bool bRight)

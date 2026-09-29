@@ -16,6 +16,7 @@
 #include "GameFramework/HUD.h"
 
 #include "TMSettings.h"
+#include <string>
 
 #include "TMBattleHud.generated.h"
 
@@ -189,6 +190,8 @@ private:
 	void AbilityTile(ATMBattleDirector& Director, const TMSim::FUnit& Unit, int32 Slot, float X, float Y, float Size, bool bButton);
 	/** A slanted bar, the shape Atlas Reactor's are. */
 	void Slant(float X, float Y, float W, float H, const FLinearColor& Colour, float Skew);
+	/** A small picture of an ability's shape (TMSim::ShapeOf) in a Size-wide badge: a crosshair, a disc, a cone... */
+	void ShapeBadge(const std::string& Shape, float X, float Y, float Size, const FLinearColor& Colour);
 	void Bar(float X, float Y, float W, float H, float Fraction, const FLinearColor& Fill, const FLinearColor& Back, float Skew = 0.0f);
 	void Picture(class UTexture* Texture, float X, float Y, float W, float H, const FLinearColor& Tint = FLinearColor::White);
 
