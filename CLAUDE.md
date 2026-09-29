@@ -192,10 +192,6 @@ Agents write step-by-step instructions instead of attempting these:
 - Editing `.uasset`/`.umap` files. Agents may change levels only through editor Python in `Tools/`.
 - Packaging settings, and anything touching `D:\ProgramsByMe\TacticalMasters` other than reading.
 
-## Team
-Agents live in `.claude/agents/`. The main session orchestrates with `/plan-milestone`, `/port <slice>`,
-`/feature <id>` and `/playtest` (see `.claude/commands/`). Subagents cannot call each other, so every
-hand-off goes through the main session.
 ## Working alongside other sessions
 Several Claude sessions may work in this folder at once, and they often can't message each other.
 **`Docs/worklog.md` is how they stay aware of each other.** Every session:
@@ -209,3 +205,7 @@ Several Claude sessions may work in this folder at once, and they often can't me
 Before a build others will use (packaging, online tests), check the log for half-done work in the tree.
 If another session is reachable (`ListAgents`), tell it directly as well.
 
+## Team
+Agents live in `.claude/agents/`. The main session orchestrates with `/plan-milestone`, `/port <slice>`,
+`/feature <id>` and `/playtest` (see `.claude/commands/`). Subagents cannot call each other, so every
+hand-off goes through the main session.
