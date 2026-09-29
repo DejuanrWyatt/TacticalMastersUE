@@ -3,9 +3,10 @@ Writes Content/Data/Sounds/sounds.json: what every ability, body and moment of a
 battle sounds like. Read by the director (TMBattleDirectorSound.cpp); never by
 the rules -- a battle is the same heard or silent.
 
-  sfx        the sound effects under /Game/Audio/SFX (Tools/import_sounds.py),
-             by name; numbered files are takes of one sound (hit_metal_1, _2...),
-             one picked at random each time, as the Godot game does
+  sfx        the sound effects, by name; each name lists takes of one sound,
+             one picked at random each time. Filled from the sound packs in
+             SFX_PACKS below -- none yet: the Godot game's sounds were removed
+             (2026-09-29), and the game's own come from Fab
   motions    each motion's sound as it goes off and where it lands -- the Godot
              game's table (scripts/battle/fx.gd:23-33) by motion
   abilities  a class file ability's own, where its damage type says more than
@@ -57,12 +58,19 @@ VOICE_ROLES = {
 }
 
 
+# Where each named sound comes from: a sound pack installed from Fab, by the
+# names of its files. Empty until one is installed, and the battle's effects
+# are silent (the heroes' voices still speak).
+SFX_PACKS = {}
+
+
 def sfx():
     out = {}
-    for path in sorted(glob.glob(os.path.join(CONTENT, "Audio", "SFX", "*.uasset"))):
-        name = os.path.splitext(os.path.basename(path))[0]
-        base = re.sub(r"_\d+$", "", name)
-        out.setdefault(base, []).append("/Game/Audio/SFX/%s.%s" % (name, name))
+    for name, patterns in SFX_PACKS.items():
+        for pattern in patterns:
+            for path in sorted(glob.glob(os.path.join(CONTENT, pattern + ".uasset"))):
+                rel = os.path.relpath(path, CONTENT).replace("\\", "/")[:-len(".uasset")]
+                out.setdefault(name, []).append("/Game/%s.%s" % (rel, os.path.basename(rel)))
     return out
 
 
@@ -107,7 +115,7 @@ def main():
     effects = sfx()
     missing = sorted(({n for pair in MOTIONS.values() for n in pair if n} | set(EVENTS.values())) - set(effects))
     if missing:
-        print("not imported yet (Tools/import_sounds.py): " + ", ".join(missing))
+        print("no sound yet for: " + ", ".join(missing))
     sounds = {
         "format": "tactical-masters-sounds",
         "version": 1,
