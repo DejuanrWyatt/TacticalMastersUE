@@ -65,7 +65,7 @@
       },
       "fx": "shield_bash",
       "vfx": {
-        "system": "/Game/ParagonTerra/FX/Particles/Terra/Abilities/DoubleSweep/FX/P_Terra_DoubleSweep_Impact.P_Terra_DoubleSweep_Impact",
+        "system": "/Game/ParagonTerra/FX/Particles/Terra/Abilities/DoubleSweep/FX/P_Terra_DoubleSweep_DustImpact.P_Terra_DoubleSweep_DustImpact",
         "at": "targets",
         "scale": 1
       }
@@ -115,7 +115,7 @@
       },
       "fx": "holy_blade",
       "vfx": {
-        "system": "/Game/ParagonTerra/FX/Particles/Terra/Abilities/DoubleSweep/FX/P_Terra_DoubleSweep_DustImpact.P_Terra_DoubleSweep_DustImpact",
+        "system": "/Game/ParagonTerra/FX/Particles/Terra/Abilities/Shield/FX/P_Terra_ShieldBlockHit.P_Terra_ShieldBlockHit",
         "at": "targets",
         "scale": 1
       }

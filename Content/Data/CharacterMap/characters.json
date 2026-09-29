@@ -247,7 +247,7 @@
       "animations": "gadget"
     },
     "gideon": {
-      "mesh": "/Game/ParagonGideon/Characters/Heroes/Gideon/Skins/Mephisto/Meshes/Gideon_Mephisto.Gideon_Mephisto",
+      "mesh": "/Game/ParagonGideon/Characters/Heroes/Gideon/Meshes/Gideon.Gideon",
       "yaw": -90,
       "animations": "gideon"
     },
@@ -1487,77 +1487,6 @@
         "/Game/ParagonGadget/Characters/Heroes/Gadget/Animations/KnockBack.KnockBack",
         "/Game/ParagonGadget/Characters/Heroes/Gadget/Animations/Knock_Back.Knock_Back"
       ]
-    },
-    "gideon": {
-      "idle": "/Game/ParagonGideon/Characters/Heroes/Gideon/Animations/Idle.Idle",
-      "walk": "/Game/ParagonGideon/Characters/Heroes/Gideon/Animations/Jog_Fwd.Jog_Fwd",
-      "run": "/Game/ParagonGideon/Characters/Heroes/Gideon/Animations/Run_Fwd.Run_Fwd",
-      "attack": [
-        "/Game/ParagonGideon/Characters/Heroes/Gideon/Animations/Primary_Attack_A_Medium.Primary_Attack_A_Medium",
-        "/Game/ParagonGideon/Characters/Heroes/Gideon/Animations/Primary_Attack_B_Medium.Primary_Attack_B_Medium",
-        "/Game/ParagonGideon/Characters/Heroes/Gideon/Animations/Primary_Attack_C_Medium.Primary_Attack_C_Medium"
-      ],
-      "cast": "/Game/ParagonGideon/Characters/Heroes/Gideon/Animations/Cast.Cast",
-      "death": [
-        "/Game/ParagonGideon/Characters/Heroes/Gideon/Animations/Death_Back.Death_Back",
-        "/Game/ParagonGideon/Characters/Heroes/Gideon/Animations/Death_Fwd.Death_Fwd"
-      ],
-      "rise": "/Game/ParagonGideon/Characters/Heroes/Gideon/Animations/Respawn.Respawn",
-      "deathFront": "/Game/ParagonGideon/Characters/Heroes/Gideon/Animations/Death_Back.Death_Back",
-      "deathBack": "/Game/ParagonGideon/Characters/Heroes/Gideon/Animations/Death_Fwd.Death_Fwd",
-      "stunned": "/Game/ParagonGideon/Characters/Heroes/Gideon/Animations/Stun_Loop.Stun_Loop",
-      "victory": [
-        "/Game/ParagonGideon/Characters/Heroes/Gideon/Animations/Emote_Bravo.Emote_Bravo",
-        "/Game/ParagonGideon/Characters/Heroes/Gideon/Animations/Emote_Taunt_PraiseMe_T1.Emote_Taunt_PraiseMe_T1",
-        "/Game/ParagonGideon/Characters/Heroes/Gideon/Animations/Emote_Master_Levitate_T3.Emote_Master_Levitate_T3"
-      ],
-      "motions": {
-        "melee": {
-          "release": [
-            "/Game/ParagonGideon/Characters/Heroes/Gideon/Animations/Primary_Attack_A_Medium.Primary_Attack_A_Medium",
-            "/Game/ParagonGideon/Characters/Heroes/Gideon/Animations/Primary_Attack_B_Medium.Primary_Attack_B_Medium",
-            "/Game/ParagonGideon/Characters/Heroes/Gideon/Animations/Primary_Attack_C_Medium.Primary_Attack_C_Medium"
-          ]
-        },
-        "heal": {
-          "release": [
-            "/Game/ParagonGideon/Characters/Heroes/Gideon/Animations/Cast.Cast"
-          ]
-        },
-        "bolt": {
-          "release": [
-            "/Game/ParagonGideon/Characters/Heroes/Gideon/Animations/Primary_Attack_A_Medium.Primary_Attack_A_Medium",
-            "/Game/ParagonGideon/Characters/Heroes/Gideon/Animations/Primary_Attack_B_Medium.Primary_Attack_B_Medium",
-            "/Game/ParagonGideon/Characters/Heroes/Gideon/Animations/Primary_Attack_C_Medium.Primary_Attack_C_Medium"
-          ]
-        },
-        "area": {
-          "intro": "/Game/ParagonGideon/Characters/Heroes/Gideon/Animations/Cosmic_Rift_Intro.Cosmic_Rift_Intro",
-          "windup": "/Game/ParagonGideon/Characters/Heroes/Gideon/Animations/Cosmic_Rift_Targeting.Cosmic_Rift_Targeting",
-          "castRelease": "/Game/ParagonGideon/Characters/Heroes/Gideon/Animations/CosmicRift_Execute.CosmicRift_Execute",
-          "release": [
-            "/Game/ParagonGideon/Characters/Heroes/Gideon/Animations/CosmicRift.CosmicRift"
-          ]
-        },
-        "heavy": {
-          "release": [
-            "/Game/ParagonGideon/Characters/Heroes/Gideon/Animations/portal_blast_medium.portal_blast_medium"
-          ]
-        },
-        "channel": {
-          "intro": "/Game/ParagonGideon/Characters/Heroes/Gideon/Animations/Blackhole_Start.Blackhole_Start",
-          "release": [
-            "/Game/ParagonGideon/Characters/Heroes/Gideon/Animations/BlackHole_Loop.BlackHole_Loop"
-          ]
-        },
-        "buff": {
-          "release": [
-            "/Game/ParagonGideon/Characters/Heroes/Gideon/Animations/Cast.Cast"
-          ]
-        }
-      },
-      "walkSpeed": 360,
-      "runSpeed": 600
     },
     "murdock": {
       "idle": "/Game/ParagonMurdock/Characters/Heroes/Murdock/Animations/Idle.Idle",
@@ -4384,6 +4313,112 @@
         "/Game/ParagonSunWukong/Characters/Heroes/Wukong/Animations/Knockback.Knockback",
         "/Game/ParagonSunWukong/Characters/Heroes/Wukong/Animations/Knockfwd.Knockfwd"
       ]
+    },
+    "gideon": {
+      "idle": "/Game/ParagonGideon/Characters/Heroes/Gideon/Animations/Idle.Idle",
+      "walk": "/Game/ParagonGideon/Characters/Heroes/Gideon/Animations/Jog_Fwd.Jog_Fwd",
+      "run": "/Game/ParagonGideon/Characters/Heroes/Gideon/Animations/Run_Fwd.Run_Fwd",
+      "attack": [
+        "/Game/ParagonGideon/Characters/Heroes/Gideon/Animations/Primary_Attack_A_Medium.Primary_Attack_A_Medium",
+        "/Game/ParagonGideon/Characters/Heroes/Gideon/Animations/Primary_Attack_B_Medium.Primary_Attack_B_Medium",
+        "/Game/ParagonGideon/Characters/Heroes/Gideon/Animations/Primary_Attack_C_Medium.Primary_Attack_C_Medium"
+      ],
+      "cast": "/Game/ParagonGideon/Characters/Heroes/Gideon/Animations/Cast.Cast",
+      "death": [
+        "/Game/ParagonGideon/Characters/Heroes/Gideon/Animations/Death_Back.Death_Back",
+        "/Game/ParagonGideon/Characters/Heroes/Gideon/Animations/Death_Fwd.Death_Fwd"
+      ],
+      "rise": "/Game/ParagonGideon/Characters/Heroes/Gideon/Animations/Respawn.Respawn",
+      "deathFront": "/Game/ParagonGideon/Characters/Heroes/Gideon/Animations/Death_Back.Death_Back",
+      "deathBack": "/Game/ParagonGideon/Characters/Heroes/Gideon/Animations/Death_Fwd.Death_Fwd",
+      "stunned": "/Game/ParagonGideon/Characters/Heroes/Gideon/Animations/Stun_Loop.Stun_Loop",
+      "victory": [
+        "/Game/ParagonGideon/Characters/Heroes/Gideon/Animations/Emote_Bravo.Emote_Bravo",
+        "/Game/ParagonGideon/Characters/Heroes/Gideon/Animations/Emote_Taunt_PraiseMe_T1.Emote_Taunt_PraiseMe_T1",
+        "/Game/ParagonGideon/Characters/Heroes/Gideon/Animations/Emote_Master_Levitate_T3.Emote_Master_Levitate_T3"
+      ],
+      "motions": {
+        "melee": {
+          "release": [
+            "/Game/ParagonGideon/Characters/Heroes/Gideon/Animations/Primary_Attack_A_Medium.Primary_Attack_A_Medium",
+            "/Game/ParagonGideon/Characters/Heroes/Gideon/Animations/Primary_Attack_B_Medium.Primary_Attack_B_Medium",
+            "/Game/ParagonGideon/Characters/Heroes/Gideon/Animations/Primary_Attack_C_Medium.Primary_Attack_C_Medium"
+          ]
+        },
+        "heal": {
+          "release": [
+            "/Game/ParagonGideon/Characters/Heroes/Gideon/Animations/Cast.Cast"
+          ]
+        },
+        "melee_ult": {
+          "release": [
+            "/Game/ParagonGideon/Characters/Heroes/Gideon/Animations/Blackhole_Start.Blackhole_Start"
+          ]
+        },
+        "heavy_ult": {
+          "release": [
+            "/Game/ParagonGideon/Characters/Heroes/Gideon/Animations/Blackhole_Start.Blackhole_Start"
+          ]
+        },
+        "dash_ult": {
+          "release": [
+            "/Game/ParagonGideon/Characters/Heroes/Gideon/Animations/Blackhole_Start.Blackhole_Start"
+          ]
+        },
+        "area_ult": {
+          "release": [
+            "/Game/ParagonGideon/Characters/Heroes/Gideon/Animations/Blackhole_Start.Blackhole_Start"
+          ]
+        },
+        "bolt_ult": {
+          "release": [
+            "/Game/ParagonGideon/Characters/Heroes/Gideon/Animations/Blackhole_Start.Blackhole_Start"
+          ]
+        },
+        "shoot_ult": {
+          "release": [
+            "/Game/ParagonGideon/Characters/Heroes/Gideon/Animations/Blackhole_Start.Blackhole_Start"
+          ]
+        },
+        "channel_ult": {
+          "release": [
+            "/Game/ParagonGideon/Characters/Heroes/Gideon/Animations/Blackhole_Start.Blackhole_Start"
+          ]
+        },
+        "bolt": {
+          "release": [
+            "/Game/ParagonGideon/Characters/Heroes/Gideon/Animations/Primary_Attack_A_Medium.Primary_Attack_A_Medium",
+            "/Game/ParagonGideon/Characters/Heroes/Gideon/Animations/Primary_Attack_B_Medium.Primary_Attack_B_Medium",
+            "/Game/ParagonGideon/Characters/Heroes/Gideon/Animations/Primary_Attack_C_Medium.Primary_Attack_C_Medium"
+          ]
+        },
+        "area": {
+          "intro": "/Game/ParagonGideon/Characters/Heroes/Gideon/Animations/Cosmic_Rift_Intro.Cosmic_Rift_Intro",
+          "windup": "/Game/ParagonGideon/Characters/Heroes/Gideon/Animations/Cosmic_Rift_Targeting.Cosmic_Rift_Targeting",
+          "castRelease": "/Game/ParagonGideon/Characters/Heroes/Gideon/Animations/CosmicRift_Execute.CosmicRift_Execute",
+          "release": [
+            "/Game/ParagonGideon/Characters/Heroes/Gideon/Animations/CosmicRift.CosmicRift"
+          ]
+        },
+        "heavy": {
+          "release": [
+            "/Game/ParagonGideon/Characters/Heroes/Gideon/Animations/portal_blast_medium.portal_blast_medium"
+          ]
+        },
+        "channel": {
+          "intro": "/Game/ParagonGideon/Characters/Heroes/Gideon/Animations/Blackhole_Start.Blackhole_Start",
+          "release": [
+            "/Game/ParagonGideon/Characters/Heroes/Gideon/Animations/BlackHole_Loop.BlackHole_Loop"
+          ]
+        },
+        "buff": {
+          "release": [
+            "/Game/ParagonGideon/Characters/Heroes/Gideon/Animations/Cast.Cast"
+          ]
+        }
+      },
+      "walkSpeed": 360,
+      "runSpeed": 600
     }
   },
   "heroPlan": {

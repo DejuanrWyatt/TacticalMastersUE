@@ -38,7 +38,7 @@
       "cast": 0,
       "fx": "punch",
       "vfx": {
-        "system": "/Game/ParagonRampage/FX/Particles/Abilities/Primary/FX/P_Rampage_Melee_Impact.P_Rampage_Melee_Impact",
+        "system": "/Game/ParagonRampage/FX/Particles/Abilities/Primary/FX/P_Rampage_Enraged_Impact.P_Rampage_Enraged_Impact",
         "at": "targets",
         "scale": 1
       }

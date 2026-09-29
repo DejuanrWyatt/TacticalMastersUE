@@ -38,7 +38,7 @@
       "cast": 0,
       "fx": "punch",
       "vfx": {
-        "system": "/Game/ParagonSunWukong/FX/Particles/Wukong/Abilities/Primary/FX/P_Wukong_Impact_Empowered.P_Wukong_Impact_Empowered",
+        "system": "/Game/ParagonMinions/FX/Particles/Minions/Shared/P_Minion_Melee_Impact.P_Minion_Melee_Impact",
         "at": "targets",
         "scale": 1
       }

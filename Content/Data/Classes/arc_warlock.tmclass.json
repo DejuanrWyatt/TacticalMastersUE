@@ -38,7 +38,7 @@
       "cast": 0,
       "fx": "pin_shot",
       "vfx": {
-        "system": "/Game/ParticleSystemVFXVol1/Systems/NS_EnergyVortex.NS_EnergyVortex",
+        "system": "/Game/ParagonGideon/FX/Particles/Gideon/Abilities/Primary/FX/P_Gideon_Primary_HitCharacter.P_Gideon_Primary_HitCharacter",
         "at": "targets",
         "scale": 1
       }
@@ -67,7 +67,7 @@
       ],
       "fx": "pin_shot",
       "vfx": {
-        "system": "/Game/ParticleSystemVFXVol1/Systems/NS_EnergyVortex.NS_EnergyVortex",
+        "system": "/Game/ParagonGideon/FX/Particles/Gideon/Abilities/Burden/FX/P_Gideon_Burden_HitCharacter.P_Gideon_Burden_HitCharacter",
         "at": "targets",
         "scale": 1
       }
@@ -93,7 +93,7 @@
       },
       "fx": "haste",
       "vfx": {
-        "system": "/Game/ParticleSystemVFXVol1/Systems/NS_EnergyVortex.NS_EnergyVortex",
+        "system": "/Game/ParagonGideon/FX/Particles/Gideon/Abilities/Meteor/FX/P_Gideon_MeteorBigImpact.P_Gideon_MeteorBigImpact",
         "at": "targets",
         "scale": 1
       }
@@ -119,7 +119,7 @@
       },
       "fx": "holy_blade",
       "vfx": {
-        "system": "/Game/ParticleSystemVFXVol1/Systems/NS_SparkleBurst.NS_SparkleBurst",
+        "system": "/Game/ParagonGideon/FX/Particles/Gideon/Abilities/ProjectileMeteor/FX/P_Gideon_RMB_Proj.P_Gideon_RMB_Proj",
         "at": "point",
         "scale": 1
       }

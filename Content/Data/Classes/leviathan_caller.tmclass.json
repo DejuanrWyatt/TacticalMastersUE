@@ -39,7 +39,7 @@
       "cast": 0,
       "fx": "attack",
       "vfx": {
-        "system": "/Game/ParagonMinions/FX/Particles/Minions/Shared/P_Minion_Melee_Impact.P_Minion_Melee_Impact",
+        "system": "/Game/ParagonGideon/FX/Particles/Gideon/Abilities/Primary/FX/P_Gideon_Primary_HitCharacter.P_Gideon_Primary_HitCharacter",
         "at": "targets",
         "scale": 1
       }
@@ -65,7 +65,7 @@
       },
       "fx": "blizzard",
       "vfx": {
-        "system": "/Game/TorchFire/FX/NS_TorchFire_Ice.NS_TorchFire_Ice",
+        "system": "/Game/ParagonGideon/FX/Particles/Gideon/Abilities/ProjectileMeteor/FX/P_Gideon_RMB_Proj.P_Gideon_RMB_Proj",
         "at": "point",
         "scale": 1
       }
@@ -120,7 +120,7 @@
       },
       "fx": "blizzard",
       "vfx": {
-        "system": "/Game/TorchFire/FX/NS_TorchFire_Ice.NS_TorchFire_Ice",
+        "system": "/Game/ParagonGideon/FX/Particles/Gideon/Abilities/ProjectileMeteor/FX/P_Gideon_RMB_HitWorld.P_Gideon_RMB_HitWorld",
         "at": "point",
         "scale": 1
       }

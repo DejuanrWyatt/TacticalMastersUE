@@ -41,6 +41,22 @@ for ($i = 0; $i -lt $Sets.Count; $i += $PerRun) {
 	Remove-Item "$Out\catalog-$($Batch[0]).json"
 }
 
+# Which body each class wears, as the game reads it. A class in a skin points at
+# its hero: only the hero is filmed, and a skin plays the hero's clips.
+$Filmed_Bodies = @($Bodies | ForEach-Object { $_.name })
+$Classes = [ordered]@{}
+foreach ($Entry in $Catalog.classes.PSObject.Properties) {
+	$Body = $Entry.Value
+	if ($Filmed_Bodies -notcontains $Body -and $Map.bodies.$Body) { $Body = $Map.bodies.$Body.animations }
+	$Classes[$Entry.Name] = $Body
+}
+$Looks = [ordered]@{}
+foreach ($Entry in $Catalog.looks.PSObject.Properties) {
+	$Body = $Entry.Value
+	if ($Filmed_Bodies -notcontains $Body -and $Map.bodies.$Body) { $Body = $Map.bodies.$Body.animations }
+	$Looks[$Entry.Name] = $Body
+}
+
 $Merged = [ordered]@{
 	format = 'tactical-masters-anim-catalog'
 	version = 1
@@ -50,6 +66,9 @@ $Merged = [ordered]@{
 	fps = $Catalog.fps
 	clips = $Clips
 	bodies = $Bodies
+	looks = $Looks
+	classes = $Classes
+	default = $Catalog.default
 }
 [IO.File]::WriteAllText("$Out\catalog.json", ($Merged | ConvertTo-Json -Depth 20), (New-Object Text.UTF8Encoding $false))
 # The line the class creator and this script's callers look for.

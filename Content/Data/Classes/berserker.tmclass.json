@@ -95,7 +95,7 @@
       },
       "fx": "earth_slash",
       "vfx": {
-        "system": "/Game/ParagonGrux/FX/Particles/Abilities/Primary/FX/P_Grux_Melee_ShockwaveImpact.P_Grux_Melee_ShockwaveImpact",
+        "system": "/Game/PotaVFX_Smoke/VFX/System/SmokeBurst/NS_MagicSmokeBurstAir.NS_MagicSmokeBurstAir",
         "at": "targets",
         "scale": 1
       }

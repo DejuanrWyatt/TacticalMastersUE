@@ -130,7 +130,7 @@
       ],
       "fx": "earth_slash",
       "vfx": {
-        "system": "/Game/ParagonKhaimera/FX/ParticleSystems/Abilities/ThreeStrikeBuff/FX/P_Khaimera_BeastActive_Looping.P_Khaimera_BeastActive_Looping",
+        "system": "/Game/ParagonKhaimera/FX/ParticleSystems/Abilities/ThreeStrikeBuff/FX/P_Axes_Deactiv.P_Axes_Deactiv",
         "at": "targets",
         "scale": 1
       }

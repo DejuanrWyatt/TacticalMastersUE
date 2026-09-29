@@ -86,7 +86,7 @@
       },
       "fx": "pin_shot",
       "vfx": {
-        "system": "/Game/ParagonDrongo/FX/Particles/Abilities/Boomerang/FX/P_Drongo_Boomerang_Out_Flare.P_Drongo_Boomerang_Out_Flare",
+        "system": "/Game/ParagonMinions/FX/Particles/Minions/Shared/P_Minion_Melee_Impact.P_Minion_Melee_Impact",
         "at": "targets",
         "scale": 1
       }

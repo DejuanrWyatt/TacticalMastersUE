@@ -38,7 +38,7 @@
       "cast": 1,
       "fx": "holy_blade",
       "vfx": {
-        "system": "/Game/ParticleSystemVFXVol1/Systems/NS_SparkleBurst.NS_SparkleBurst",
+        "system": "/Game/ParagonGideon/FX/Particles/Gideon/Skins/Undertow/P_Gideon_MeteorBigImpact_Undertow.P_Gideon_MeteorBigImpact_Undertow",
         "at": "targets",
         "scale": 1
       }
@@ -64,7 +64,7 @@
       },
       "fx": "holy_blade",
       "vfx": {
-        "system": "/Game/ParticleSystemVFXVol1/Systems/NS_SparkleBurst.NS_SparkleBurst",
+        "system": "/Game/ParagonGideon/FX/Particles/Gideon/Skins/Undertow/P_Meteor_Cast_Undertow.P_Meteor_Cast_Undertow",
         "at": "point",
         "scale": 1
       }
@@ -86,7 +86,7 @@
       "cast": 0,
       "fx": "attack",
       "vfx": {
-        "system": "/Game/ParagonMinions/FX/Particles/Minions/Shared/P_Minion_Melee_Impact.P_Minion_Melee_Impact",
+        "system": "/Game/ParagonGideon/FX/Particles/Gideon/Abilities/Primary/FX/P_Gideon_Primary_HitCharacter.P_Gideon_Primary_HitCharacter",
         "at": "targets",
         "scale": 1
       }

@@ -38,7 +38,7 @@
       "cast": 1,
       "fx": "haste",
       "vfx": {
-        "system": "/Game/ParticleSystemVFXVol1/Systems/NS_EnergyVortex.NS_EnergyVortex",
+        "system": "/Game/ParagonGideon/FX/Particles/Gideon/Abilities/Primary/FX/P_Gideon_Primary_HitCharacter.P_Gideon_Primary_HitCharacter",
         "at": "targets",
         "scale": 1
       }
@@ -61,7 +61,7 @@
       "tg": -25,
       "fx": "haste",
       "vfx": {
-        "system": "/Game/ParticleSystemVFXVol1/Systems/NS_EnergyVortex.NS_EnergyVortex",
+        "system": "/Game/ParagonGideon/FX/Particles/Gideon/Abilities/ProjectileMeteor/FX/P_Gideon_RMB_Proj.P_Gideon_RMB_Proj",
         "at": "point",
         "scale": 1
       }
@@ -83,7 +83,7 @@
       "cast": 0,
       "fx": "attack",
       "vfx": {
-        "system": "/Game/ParagonMinions/FX/Particles/Minions/Shared/P_Minion_Melee_Impact.P_Minion_Melee_Impact",
+        "system": "/Game/ParagonGideon/FX/Particles/Gideon/Abilities/Meteor/FX/P_Gideon_MeteorBigImpact.P_Gideon_MeteorBigImpact",
         "at": "targets",
         "scale": 1
       }
