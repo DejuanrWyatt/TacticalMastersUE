@@ -18,5 +18,13 @@ public class TacticalMasters : ModuleRules
 		{
 			"Niagara", "AssetRegistry", "ImageCore", "Json", "RenderCore"
 		});
+
+		// Online play (Docs/tech/feat-online.md): one TCP connection between two
+		// players, and HTTP to ask the router to open the port (UPnP). Slate for
+		// typed text: the address to join, and chat.
+		PrivateDependencyModuleNames.AddRange(new string[]
+		{
+			"Sockets", "Networking", "HTTP", "Slate", "SlateCore", "ApplicationCore"
+		});
 	}
 }

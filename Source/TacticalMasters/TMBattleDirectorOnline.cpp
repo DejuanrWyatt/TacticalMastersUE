@@ -1,0 +1,759 @@
+// Online play: two players, each on their own machine, one battle between them
+// (Docs/design/feat-online.md, after the Godot game's net.gd and battle.gd).
+//
+// The host plays blue and is the referee. Its own orders are checked, sent to
+// the joiner, then applied; the joiner's come to it as requests, which it
+// checks like its own (and a little more) before doing the same. Only the host
+// moves time. So both machines apply exactly the same orders in exactly the
+// same order, and since the rules are deterministic the two battles are the
+// same battle -- which the host's checksums, every five seconds of battle,
+// keep proving. The connection itself is FTMNet's (TMNet.cpp).
+
+#include "TMBattleDirector.h"
+
+#include "Framework/Application/SlateApplication.h"
+#include "HAL/FileManager.h"
+#include "Misc/App.h"
+#include "Misc/FileHelper.h"
+#include "Misc/Paths.h"
+#include "SocketSubsystem.h"
+#include "IPAddress.h"
+
+#include "SimClassFile.h"
+#include "SimMap.h"
+#include "SimOrderText.h"
+#include "TMSettings.h"
+#include "TMTextInput.h"
+#include "TMViewportClient.h"
+
+#include <cstring>
+
+namespace
+{
+	/** How often the host sends where the battle stands: every 5 s of battle (battle.gd:35). */
+	constexpr int32 ChecksumEveryTicks = 50;
+	/** The longest chat line (net.gd:36). */
+	constexpr int32 MaxChat = 120;
+
+	/** A double as its exact bits, since a JSON number could come back a hair different. */
+	FString DoubleBits(double Value)
+	{
+		uint64 Bits = 0;
+		std::memcpy(&Bits, &Value, sizeof(Bits));
+		return FString::Printf(TEXT("%llx"), Bits);
+	}
+
+	bool FromBits(const FString& Text, double& Out)
+	{
+		if (Text.IsEmpty() || Text.Len() > 16)
+		{
+			return false;
+		}
+		for (const TCHAR Character : Text)
+		{
+			if (!FChar::IsHexDigit(Character))
+			{
+				return false;
+			}
+		}
+		const uint64 Bits = FCString::Strtoui64(*Text, nullptr, 16);
+		std::memcpy(&Out, &Bits, sizeof(Out));
+		return FMath::IsFinite(Out);
+	}
+
+	/** A class or map file's text as this machine has it, line endings aside; "" if it has none. */
+	FString LocalFile(const FString& Folder, const FString& Name)
+	{
+		FString Text;
+		FFileHelper::LoadFileToString(Text, *(FPaths::ProjectContentDir() / TEXT("Data") / Folder / Name));
+		Text.ReplaceInline(TEXT("\r"), TEXT(""));
+		return Text;
+	}
+}
+
+// ---------------------------------------------------------------- the screens
+
+void ATMBattleDirector::OpenOnline()
+{
+	// Remember the offline setup once, on the way in, to put back on leaving.
+	if (!Net.IsValid() && Setup.Mode != TEXT("online"))
+	{
+		OfflineSetup = Setup;
+	}
+	Screen = EScreen::Online;
+	bMenuOpen = false;
+	bPaused = false;
+}
+
+void ATMBattleDirector::HostOnline()
+{
+	const int32 Port = FMath::Clamp(FCString::Atoi(*JoinPort), 1, 65535);
+	Net = MakeUnique<FTMNet>();
+	const FString Refused = Net->Host(Port);
+	if (!Refused.IsEmpty())
+	{
+		OnlineStatus = Refused;
+		Net.Reset();
+		return;
+	}
+	OnlineStatus = FString::Printf(TEXT("Hosting %hs on port %d. Waiting for an opponent..."), TMSim::FindMap(Setup.MapId).Name.c_str(), Port);
+	// The addresses a player on the same network would type (main_menu.gd:204-210).
+	TArray<FString> Near;
+	TArray<TSharedPtr<FInternetAddr>> Mine;
+	if (ISocketSubsystem::Get(PLATFORM_SOCKETSUBSYSTEM)->GetLocalAdapterAddresses(Mine))
+	{
+		for (const TSharedPtr<FInternetAddr>& Address : Mine)
+		{
+			const FString Text = Address->ToString(false);
+			if (Text.Contains(TEXT(".")) && !Text.StartsWith(TEXT("127.")) && !Text.StartsWith(TEXT("169.254.")))
+			{
+				Near.AddUnique(Text);
+			}
+		}
+	}
+	OnlineAddresses = TEXT("On your network: ") + (Near.Num() > 0 ? FString::Join(Near, TEXT(", ")) : FString(TEXT("unknown")));
+	OnlineRouter = TEXT("Trying to open the port on your router...");
+	Upnp = MakeUnique<FTMUpnp>();
+	Upnp->Start(Port);
+	UE_LOG(LogTemp, Log, TEXT("ONLINE: hosting on port %d"), Port);
+}
+
+void ATMBattleDirector::JoinOnline()
+{
+	FString Address = JoinAddress.TrimStartAndEnd();
+	int32 Port = FMath::Clamp(FCString::Atoi(*JoinPort), 1, 65535);
+	// "host:port" typed into the address works too.
+	FString Host;
+	FString PortText;
+	if (Address.Split(TEXT(":"), &Host, &PortText, ESearchCase::IgnoreCase, ESearchDir::FromEnd) && PortText.IsNumeric() && !Host.Contains(TEXT(":")))
+	{
+		Address = Host;
+		Port = FMath::Clamp(FCString::Atoi(*PortText), 1, 65535);
+	}
+	if (Address.IsEmpty())
+	{
+		OnlineStatus = TEXT("Enter the host's address first.");
+		return;
+	}
+	OnlineAddresses.Reset();
+	OnlineRouter.Reset();
+	Net = MakeUnique<FTMNet>();
+	const FString Refused = Net->Join(Address, Port);
+	if (!Refused.IsEmpty())
+	{
+		OnlineStatus = Refused;
+		Net.Reset();
+		return;
+	}
+	OnlineStatus = FString::Printf(TEXT("Connecting to %s..."), *Address);
+	UE_LOG(LogTemp, Log, TEXT("ONLINE: joining %s:%d"), *Address, Port);
+}
+
+void ATMBattleDirector::LeaveOnline()
+{
+	Upnp.Reset();
+	Net.Reset();
+	const bool bWasOnline = Setup.Mode == TEXT("online");
+	bOnline = false;
+	bOnlineHost = false;
+	bWaitingForHost = false;
+	bWantRematch = false;
+	bOpponentWantsRematch = false;
+	OnlineStopped.Reset();
+	OnlineStatus.Reset();
+	OnlineAddresses.Reset();
+	OnlineRouter.Reset();
+	HostSums.Reset();
+	if (bWasOnline)
+	{
+		Setup = OfflineSetup;
+	}
+	if (TextInput.IsValid())
+	{
+		TextInput->Stop();
+	}
+	Typing = ETypeField::None;
+}
+
+void ATMBattleDirector::EndPlay(const EEndPlayReason::Type Reason)
+{
+	LeaveOnline();
+	if (TextInput.IsValid() && FSlateApplication::IsInitialized())
+	{
+		FSlateApplication::Get().UnregisterInputPreProcessor(TextInput);
+	}
+	TextInput.Reset();
+	UTMViewportClient::Typist = nullptr;
+	Super::EndPlay(Reason);
+}
+
+// ---------------------------------------------------------------- typing
+
+void ATMBattleDirector::StartTyping(ETypeField Field)
+{
+	if (!TextInput.IsValid())
+	{
+		return;
+	}
+	FString* Into = Field == ETypeField::Address ? &JoinAddress : Field == ETypeField::Port ? &JoinPort : &ChatLine;
+	const int32 Longest = Field == ETypeField::Chat ? MaxChat : Field == ETypeField::Port ? 5 : 200;
+	Typing = Field;
+	TextInput->Begin(Into, Longest, [this](bool bSubmit) { TypedDone(bSubmit); });
+}
+
+bool ATMBattleDirector::IsTyping() const
+{
+	return TextInput.IsValid() && TextInput->IsTyping();
+}
+
+void ATMBattleDirector::TypedDone(bool bSubmit)
+{
+	const ETypeField Was = Typing;
+	Typing = ETypeField::None;
+	if (Was == ETypeField::Chat)
+	{
+		if (bSubmit)
+		{
+			SendChat();
+		}
+		ChatLine.Reset();
+	}
+	else if (Was == ETypeField::Address && bSubmit)
+	{
+		JoinOnline();
+	}
+}
+
+void ATMBattleDirector::SendChat()
+{
+	const FString Said = ChatLine.TrimStartAndEnd().Left(MaxChat);
+	if (Said.IsEmpty() || !bOnline)
+	{
+		return;
+	}
+	SendOnline(TEXT("chat"), [&Said](FJsonObject& Message) { Message.SetStringField(TEXT("text"), Said); });
+	Log.Add(TEXT("You: ") + Said);
+}
+
+// ---------------------------------------------------------------- messages
+
+void ATMBattleDirector::SendOnline(const TCHAR* Kind, TFunctionRef<void(FJsonObject&)> Fill)
+{
+	if (!Net.IsValid() || !Net->IsConnected())
+	{
+		return;
+	}
+	TSharedRef<FJsonObject> Message = MakeShared<FJsonObject>();
+	Message->SetStringField(TEXT("t"), Kind);
+	Fill(*Message);
+	Net->Send(Message);
+}
+
+void ATMBattleDirector::AdvanceOnline(float DeltaSeconds)
+{
+	if (Upnp.IsValid())
+	{
+		Upnp->Poll(DeltaSeconds);
+		if (Upnp->bDone)
+		{
+			OnlineRouter = Upnp->Message;
+		}
+	}
+	// An unattended run (the online test) that can't play ends rather than waits.
+	if (FApp::IsUnattended() && (!OnlineStopped.IsEmpty() || (Screen == EScreen::Online && !Net.IsValid() && !OnlineStatus.IsEmpty())))
+	{
+		DecidedFor += DeltaSeconds;
+		if (DecidedFor > 1.5f)
+		{
+			UE_LOG(LogTemp, Log, TEXT("ONLINE ENDED: %s"), OnlineStopped.IsEmpty() ? *OnlineStatus : *OnlineStopped);
+			FPlatformMisc::RequestExit(false);
+		}
+	}
+	if (!Net.IsValid())
+	{
+		return;
+	}
+	Net->Poll(DeltaSeconds);
+	if (Net->bJustConnected)
+	{
+		Net->bJustConnected = false;
+		if (Net->IsHost())
+		{
+			OnlineStatus = TEXT("An opponent is connecting...");
+		}
+		else
+		{
+			// net.gd:168-170: say hello with this build's version.
+			OnlineStatus = TEXT("Connected! Checking versions...");
+			SendOnline(TEXT("hello"), [](FJsonObject& Message) { Message.SetNumberField(TEXT("version"), FTMNet::ProtocolVersion); });
+		}
+	}
+	TArray<TSharedPtr<FJsonObject>> Arrived = MoveTemp(Net->Received);
+	Net->Received.Reset();
+	for (const TSharedPtr<FJsonObject>& Message : Arrived)
+	{
+		if (!Net.IsValid())
+		{
+			break;  // a refusal closed it
+		}
+		OnNetMessage(*Message);
+	}
+	if (Net.IsValid() && !Net->Lost.IsEmpty())
+	{
+		const FString Why = Net->Lost;
+		Net->Lost.Reset();
+		if (bOnline && Screen == EScreen::Battle)
+		{
+			if (Battle.Winner == -1)
+			{
+				// battle.gd:691-694.
+				StopOnline(TEXT("Opponent disconnected"));
+			}
+			else
+			{
+				Log.Add(TEXT("Your opponent left."));
+				bOpponentWantsRematch = false;
+			}
+		}
+		else
+		{
+			OnlineStatus = Why;
+		}
+		if (!Net->IsHost())
+		{
+			Net.Reset();
+		}
+	}
+
+	// -tmnetdesync: the joiner's game made to differ, once, to prove the split is caught.
+	if (bNetDesync && !bDesyncDone && bOnline && !bOnlineHost && Battle.TickCount > 30 && !Battle.Units.empty())
+	{
+		bDesyncDone = true;
+		Battle.Units[0].Hp = FMath::Max(1, Battle.Units[0].Hp - 1);
+		UE_LOG(LogTemp, Log, TEXT("ONLINE: this game was made to differ on purpose (-tmnetdesync)"));
+	}
+}
+
+void ATMBattleDirector::OnNetMessage(const FJsonObject& Message)
+{
+	FString Kind;
+	Message.TryGetStringField(TEXT("t"), Kind);
+	const bool bHost = Net->IsHost();
+
+	if (Kind == TEXT("hello") && bHost)
+	{
+		// net.gd:173-196: a different build would play a different game.
+		int32 Version = 0;
+		Message.TryGetNumberField(TEXT("version"), Version);
+		if (Version != FTMNet::ProtocolVersion)
+		{
+			Net->Kick(FString::Printf(TEXT("Version mismatch: the host runs version %d, you run %d. Both players need the same build."),
+				FTMNet::ProtocolVersion, Version));
+			OnlineStatus = FString::Printf(TEXT("Refused a player on a different version (%d)."), Version);
+			return;
+		}
+		StartOnlineAsHost();
+	}
+	else if (Kind == TEXT("refuse") && !bHost)
+	{
+		FString Reason;
+		Message.TryGetStringField(TEXT("reason"), Reason);
+		OnlineStatus = Reason;
+		UE_LOG(LogTemp, Log, TEXT("ONLINE: refused: %s"), *Reason);
+		Net.Reset();
+	}
+	else if (Kind == TEXT("start") && !bHost)
+	{
+		const FString Refused = StartOnlineFrom(Message);
+		if (!Refused.IsEmpty())
+		{
+			OnlineStatus = Refused;
+			UE_LOG(LogTemp, Log, TEXT("ONLINE: can't play the host's battle: %s"), *Refused);
+			SendOnline(TEXT("desync"), [&Refused](FJsonObject& Out) { Out.SetStringField(TEXT("detail"), TEXT("the other player can't play this battle: ") + Refused); });
+		}
+	}
+	else if (Kind == TEXT("cmd") && !bHost && bOnline)
+	{
+		// The host's word, applied as it comes (battle.gd:623-631). The rules
+		// still check it: an order the host could play and this game can't
+		// means the two games have already parted.
+		FString Line;
+		Message.TryGetStringField(TEXT("o"), Line);
+		TMSim::FOrder Order;
+		const std::string Unreadable = TMSim::OrderFromText(TCHAR_TO_UTF8(*Line), Order);
+		if (!Unreadable.empty())
+		{
+			ReportOutOfSync(FString::Printf(TEXT("the host sent an order this game can't read (%hs)"), Unreadable.c_str()));
+			return;
+		}
+		bApplyingFromHost = true;
+		const FString Refused = Submit(Order);
+		bApplyingFromHost = false;
+		if (!Refused.IsEmpty())
+		{
+			ReportOutOfSync(TEXT("the host played something this game can't: ") + Refused);
+			return;
+		}
+		// Anything but time passing answers the last request (battle.gd:415-417).
+		if (Order.Type != TMSim::EOrderType::Advance)
+		{
+			bWaitingForHost = false;
+		}
+	}
+	else if (Kind == TEXT("req") && bHost && bOnline)
+	{
+		FString Line;
+		Message.TryGetStringField(TEXT("o"), Line);
+		TMSim::FOrder Order;
+		const std::string Unreadable = TMSim::OrderFromText(TCHAR_TO_UTF8(*Line), Order);
+		FString Refused = Unreadable.empty() ? RefereeCheck(Order) : FString(TEXT("That order couldn't be read."));
+		if (Refused.IsEmpty())
+		{
+			// Checked, sent back, applied: Submit does all three on the host.
+			Refused = Submit(Order);
+		}
+		if (!Refused.IsEmpty())
+		{
+			SendOnline(TEXT("reject"), [&Refused](FJsonObject& Out) { Out.SetStringField(TEXT("reason"), Refused); });
+		}
+	}
+	else if (Kind == TEXT("reject") && !bHost)
+	{
+		FString Reason;
+		Message.TryGetStringField(TEXT("reason"), Reason);
+		bWaitingForHost = false;
+		Tell(Reason);
+		Log.Add(Reason);
+	}
+	else if (Kind == TEXT("sum") && !bHost && bOnline)
+	{
+		int32 Tick = 0;
+		FString Value;
+		Message.TryGetNumberField(TEXT("tick"), Tick);
+		Message.TryGetStringField(TEXT("value"), Value);
+		HostSums.Add(Tick, FCString::Strtoui64(*Value, nullptr, 10));
+		CheckHostSums();
+	}
+	else if (Kind == TEXT("desync"))
+	{
+		FString Detail;
+		Message.TryGetStringField(TEXT("detail"), Detail);
+		StopOnline(TEXT("Out of sync: ") + Detail.Left(200));
+	}
+	else if (Kind == TEXT("chat") && bOnline)
+	{
+		FString Said;
+		Message.TryGetStringField(TEXT("text"), Said);
+		Said = Said.Left(MaxChat);
+		Log.Add(TEXT("Opponent: ") + Said);
+		Tell(TEXT("Opponent: ") + Said);
+	}
+	else if (Kind == TEXT("rematch") && bOnline)
+	{
+		bOpponentWantsRematch = true;
+		Log.Add(TEXT("Your opponent wants a rematch: press Rematch to accept."));
+		if (bOnlineHost && bWantRematch)
+		{
+			StartOnlineAsHost();
+		}
+	}
+}
+
+// ---------------------------------------------------------------- starting
+
+void ATMBattleDirector::StartOnlineAsHost()
+{
+	// net.gd:190-201: the host plays blue and sends everything the battle
+	// starts from, so the joiner starts the very same one.
+	if (Setup.Mode != TEXT("online"))
+	{
+		OfflineSetup = Setup;
+	}
+	bWantRematch = false;
+	bOpponentWantsRematch = false;
+	bOnline = true;
+	bOnlineHost = true;
+	LocalTeam = 0;
+	bWaitingForHost = false;
+	OnlineStopped.Reset();
+	HostSums.Reset();
+	Setup.Mode = TEXT("online");
+	Setup.bRandomSeed = true;
+	OnlineTuning = FTMSettings::Get().Tuning;
+	StartMatch(true);
+	LastSumTick = Battle.TickCount;
+
+	SendOnline(TEXT("start"), [this](FJsonObject& Message)
+	{
+		Message.SetNumberField(TEXT("team"), 1);
+		Message.SetStringField(TEXT("seed"), FString::Printf(TEXT("%llu"), BattleSeed));
+		const FString MapId = UTF8_TO_TCHAR(Setup.MapId.c_str());
+		Message.SetStringField(TEXT("map"), MapId);
+		// The map file itself, so a map only the host has still plays.
+		const FString MapText = LocalFile(TEXT("Maps"), MapId + TEXT(".tmmap.json"));
+		if (!MapText.IsEmpty())
+		{
+			Message.SetStringField(TEXT("map_file"), MapText);
+		}
+		Message.SetStringField(TEXT("theme"), Setup.ThemeId);
+		TArray<TSharedPtr<FJsonValue>> Sides;
+		TSharedRef<FJsonObject> Classes = MakeShared<FJsonObject>();
+		for (int32 Team = 0; Team < 2; ++Team)
+		{
+			TArray<TSharedPtr<FJsonValue>> Ids;
+			for (int32 Slot = 0; Slot < 4; ++Slot)
+			{
+				const FString Id = UTF8_TO_TCHAR(Setup.Rosters[Team][Slot].c_str());
+				Ids.Add(MakeShared<FJsonValueString>(Id));
+				// Classes from files go with it; the six built into the game don't need to.
+				const FString ClassText = LocalFile(TEXT("Classes"), Id + TEXT(".tmclass.json"));
+				if (!ClassText.IsEmpty())
+				{
+					Classes->SetStringField(Id, ClassText);
+				}
+			}
+			Sides.Add(MakeShared<FJsonValueArray>(Ids));
+		}
+		Message.SetArrayField(TEXT("rosters"), Sides);
+		Message.SetObjectField(TEXT("classes"), Classes);
+		TSharedRef<FJsonObject> Tuning = MakeShared<FJsonObject>();
+		for (const TPair<FString, double>& Rule : OnlineTuning)
+		{
+			Tuning->SetStringField(Rule.Key, DoubleBits(Rule.Value));
+		}
+		Message.SetObjectField(TEXT("tuning"), Tuning);
+		Message.SetStringField(TEXT("capture"), DoubleBits(Setup.CaptureSeconds));
+		Message.SetStringField(TEXT("limit"), DoubleBits(Setup.BattleSeconds));
+		Message.SetStringField(TEXT("planning"), DoubleBits(Setup.PlanningSeconds));
+	});
+	UE_LOG(LogTemp, Log, TEXT("ONLINE: started as host, seed %llu"), BattleSeed);
+}
+
+FString ATMBattleDirector::StartOnlineFrom(const FJsonObject& Start)
+{
+	// net.gd:224-247. Everything the host sends is checked before it reaches
+	// the rules: a class or map file goes through the same reader a file on
+	// disk does.
+	int32 Team = 1;
+	Start.TryGetNumberField(TEXT("team"), Team);
+	FString SeedText;
+	Start.TryGetStringField(TEXT("seed"), SeedText);
+	if (Team != 1 || !SeedText.IsNumeric())
+	{
+		return TEXT("The host's battle couldn't be read.");
+	}
+
+	FString MapId;
+	Start.TryGetStringField(TEXT("map"), MapId);
+	FString MapText;
+	if (Start.TryGetStringField(TEXT("map_file"), MapText))
+	{
+		TMSim::FMapDef Map;
+		std::string Refused = TMSim::ReadMapFile(TCHAR_TO_UTF8(*MapText), Map);
+		if (Refused.empty())
+		{
+			Refused = TMSim::RegisterMap(Map);
+		}
+		if (!Refused.empty())
+		{
+			return FString::Printf(TEXT("The host's map can't be played: %hs"), Refused.c_str());
+		}
+	}
+	else if (!TMSim::HasMap(TCHAR_TO_UTF8(*MapId)))
+	{
+		return FString::Printf(TEXT("The host's map %s isn't in this game."), *MapId);
+	}
+
+	// Classes: one this game doesn't have is loaded; one it has must be the same file.
+	const TSharedPtr<FJsonObject>* Classes = nullptr;
+	if (Start.TryGetObjectField(TEXT("classes"), Classes))
+	{
+		for (const TPair<FString, TSharedPtr<FJsonValue>>& Entry : (*Classes)->Values)
+		{
+			FString Text = Entry.Value->AsString();
+			Text.ReplaceInline(TEXT("\r"), TEXT(""));
+			if (TMSim::FindJob(TCHAR_TO_UTF8(*Entry.Key)))
+			{
+				if (LocalFile(TEXT("Classes"), Entry.Key + TEXT(".tmclass.json")) != Text)
+				{
+					return FString::Printf(TEXT("The host's %s is not the same as yours: both players need the same class files."), *Entry.Key);
+				}
+				continue;
+			}
+			const std::string Refused = TMSim::LoadClassFile(TCHAR_TO_UTF8(*Text));
+			if (!Refused.empty())
+			{
+				return FString::Printf(TEXT("The host's class %s can't be used: %hs"), *Entry.Key, Refused.c_str());
+			}
+		}
+	}
+
+	FMatchSetup Next = Setup;
+	const TArray<TSharedPtr<FJsonValue>>* Sides = nullptr;
+	if (!Start.TryGetArrayField(TEXT("rosters"), Sides) || Sides->Num() != 2)
+	{
+		return TEXT("The host's teams couldn't be read.");
+	}
+	for (int32 Side = 0; Side < 2; ++Side)
+	{
+		const TArray<TSharedPtr<FJsonValue>>& Ids = (*Sides)[Side]->AsArray();
+		if (Ids.Num() != 4)
+		{
+			return TEXT("The host's teams couldn't be read.");
+		}
+		for (int32 Slot = 0; Slot < 4; ++Slot)
+		{
+			const std::string Id = TCHAR_TO_UTF8(*Ids[Slot]->AsString());
+			if (!TMSim::FindJob(Id))
+			{
+				return FString::Printf(TEXT("The host's team has a class this game doesn't: %hs."), Id.c_str());
+			}
+			Next.Rosters[Side][Slot] = Id;
+		}
+	}
+
+	OnlineTuning.Reset();
+	const TSharedPtr<FJsonObject>* Tuning = nullptr;
+	if (Start.TryGetObjectField(TEXT("tuning"), Tuning))
+	{
+		for (const TPair<FString, TSharedPtr<FJsonValue>>& Rule : (*Tuning)->Values)
+		{
+			double Value = 0.0;
+			if (FromBits(Rule.Value->AsString(), Value))
+			{
+				OnlineTuning.Add(Rule.Key, Value);
+			}
+		}
+	}
+	FString Bits;
+	double Seconds = 0.0;
+	Next.CaptureSeconds = Start.TryGetStringField(TEXT("capture"), Bits) && FromBits(Bits, Seconds) ? Seconds : 0.0;
+	Next.BattleSeconds = Start.TryGetStringField(TEXT("limit"), Bits) && FromBits(Bits, Seconds) ? Seconds : 0.0;
+	Next.PlanningSeconds = Start.TryGetStringField(TEXT("planning"), Bits) && FromBits(Bits, Seconds) ? Seconds : 0.0;
+	Next.MapId = TCHAR_TO_UTF8(*MapId);
+	Start.TryGetStringField(TEXT("theme"), Next.ThemeId);
+	Next.Mode = TEXT("online");
+	Next.bRandomSeed = false;
+	Next.FixedSeed = FCString::Strtoui64(*SeedText, nullptr, 10);
+
+	if (Setup.Mode != TEXT("online"))
+	{
+		OfflineSetup = Setup;
+	}
+	Setup = Next;
+	bOnline = true;
+	bOnlineHost = false;
+	LocalTeam = Team;
+	bWaitingForHost = false;
+	bWantRematch = false;
+	bOpponentWantsRematch = false;
+	OnlineStopped.Reset();
+	HostSums.Reset();
+	StartMatch(false);
+	Log.Add(FString::Printf(TEXT("Press %s to chat with your opponent."), *FTMSettings::Get().KeyName(ETMAction::Chat)));
+	UE_LOG(LogTemp, Log, TEXT("ONLINE: started as joiner, seed %llu"), BattleSeed);
+	return FString();
+}
+
+// ---------------------------------------------------------------- playing
+
+FString ATMBattleDirector::RefereeCheck(const TMSim::FOrder& Order) const
+{
+	// battle.gd:634-646: the host's own checks on top of the rules'.
+	if (Order.Type == TMSim::EOrderType::Advance || Order.Type == TMSim::EOrderType::Tune)
+	{
+		return TEXT("Only the host moves time forward or changes the rules.");
+	}
+	const std::string Refused = const_cast<TMSim::FBattle&>(Battle).Validate(Order);
+	if (!Refused.empty())
+	{
+		return UTF8_TO_TCHAR(Refused.c_str());
+	}
+	if (Order.Type == TMSim::EOrderType::Ready)
+	{
+		return Order.Team == LocalTeam ? TEXT("That isn't your side.") : TEXT("");
+	}
+	const TMSim::FUnit* Unit = const_cast<TMSim::FBattle&>(Battle).FindUnit(Order.UnitId);
+	return !Unit || Unit->Team == LocalTeam ? TEXT("That isn't your unit.") : TEXT("");
+}
+
+void ATMBattleDirector::AfterOnlineApply(const TMSim::FOrder& Order)
+{
+	if (bOnlineHost)
+	{
+		// battle.gd:650-655: every so often, where the battle stands.
+		if (Order.Type == TMSim::EOrderType::Advance && Battle.TickCount - LastSumTick >= ChecksumEveryTicks)
+		{
+			LastSumTick = Battle.TickCount;
+			const uint64 Sum = Battle.Checksum();
+			const int32 Tick = Battle.TickCount;
+			SendOnline(TEXT("sum"), [Sum, Tick](FJsonObject& Message)
+			{
+				Message.SetNumberField(TEXT("tick"), Tick);
+				// As text: a JSON number is a double, and a checksum is 64 bits.
+				Message.SetStringField(TEXT("value"), FString::Printf(TEXT("%llu"), Sum));
+			});
+		}
+	}
+	else
+	{
+		CheckHostSums();
+	}
+}
+
+void ATMBattleDirector::CheckHostSums()
+{
+	// battle.gd:657-671: each of the host's checksums, once this game is at its tick.
+	for (auto It = HostSums.CreateIterator(); It; ++It)
+	{
+		if (It.Key() > Battle.TickCount)
+		{
+			continue;
+		}
+		if (It.Key() == Battle.TickCount && It.Value() != Battle.Checksum())
+		{
+			const float Seconds = It.Key() / static_cast<float>(TMSim::Pace::TicksPerSecond);
+			It.RemoveCurrent();
+			ReportOutOfSync(FString::Printf(TEXT("the two games no longer match at %.1f s"), Seconds));
+			return;
+		}
+		It.RemoveCurrent();
+	}
+}
+
+void ATMBattleDirector::ReportOutOfSync(const FString& Detail)
+{
+	// Both stop: neither plays on alone in a battle the other isn't in (net.gd:120-124).
+	SendOnline(TEXT("desync"), [&Detail](FJsonObject& Message) { Message.SetStringField(TEXT("detail"), Detail); });
+	StopOnline(TEXT("Out of sync: ") + Detail);
+}
+
+void ATMBattleDirector::StopOnline(const FString& Why)
+{
+	if (!OnlineStopped.IsEmpty() || Battle.Winner != -1)
+	{
+		return;
+	}
+	OnlineStopped = Why;
+	Log.Add(Why);
+	CancelAim();
+	DecidedFor = 0.0f;
+	UE_LOG(LogTemp, Log, TEXT("ONLINE STOPPED: %s"), *Why);
+}
+
+void ATMBattleDirector::RequestRematch()
+{
+	// net.gd:139-143, 283-287: it starts once both have asked.
+	if (!bOnline || !Net.IsValid() || !Net->IsConnected())
+	{
+		Tell(TEXT("Your opponent has left."));
+		return;
+	}
+	bWantRematch = true;
+	SendOnline(TEXT("rematch"), [](FJsonObject&) {});
+	Log.Add(TEXT("Rematch requested: waiting for your opponent to accept..."));
+	if (bOnlineHost && bOpponentWantsRematch)
+	{
+		StartOnlineAsHost();
+	}
+}

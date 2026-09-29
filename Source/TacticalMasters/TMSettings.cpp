@@ -43,6 +43,7 @@ namespace
 			{ TEXT("cam_rotate_left"), TEXT("Rotate camera left"), { EKeys::Q } },
 			{ TEXT("cam_rotate_right"), TEXT("Rotate camera right"), { EKeys::E } },
 			{ TEXT("edit_layout"), TEXT("Edit layout / lock it"), { EKeys::F2 } },
+			{ TEXT("chat"), TEXT("Chat (online)"), { EKeys::T } },
 		};
 		return List;
 	}

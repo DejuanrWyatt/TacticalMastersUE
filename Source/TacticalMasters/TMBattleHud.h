@@ -46,6 +46,13 @@ enum class ETMHudAction : uint8
 	TitleTwoPlayers,
 	TitleWatch,
 	Quit,
+	// Online (main_menu.gd:79-230): the title's button, then host or join.
+	// OnlineField's value is the field to type in (ATMBattleDirector::ETypeField).
+	TitleOnline,
+	OnlineHost,
+	OnlineJoin,
+	OnlineField,
+	OnlineBack,
 
 	// The setup screen. SetupClass's value is team * 4 + slot; the others' is the team.
 	SetupClass,
@@ -154,6 +161,10 @@ private:
 	void DrawBanners(ATMBattleDirector& Director);
 	void DrawTitle(ATMBattleDirector& Director);
 	void DrawSetup(ATMBattleDirector& Director);
+	/** Host or join a match against another machine (main_menu.gd:79-230). */
+	void DrawOnline(ATMBattleDirector& From);
+	/** A box to type in: click to type, and a caret while typing. */
+	void TextField(float X, float Y, float W, float H, const FString& Value, const FString& Placeholder, bool bTyping, int32 Field);
 	void DrawBattleMenu(ATMBattleDirector& Director);
 	void DrawCornerButtons(ATMBattleDirector& Director);
 	void DrawField(ATMBattleDirector& Director);

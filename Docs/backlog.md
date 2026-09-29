@@ -88,4 +88,10 @@ Not yet broken down; run `/plan-milestone` to split it into slices.
 | character-setup | Paragon heroes (and later Tripo/Blender characters) animated and worn by classes | unit-animation | human | Todo: steps in `Docs/CharacterSetup.md` (IK Rigs, a retargeter from the mannequin, copied clips, a set and a body in the character map) |
 
 ## Later (not yet broken down)
-Ultimates · animation from events on the canonical skeleton · CharacterMap data · networking over `Submit` + checksums.
+Ultimates · animation from events on the canonical skeleton · CharacterMap data.
+
+## Online play (feat-online): built, spec Draft
+Direct IP as Godot's `net.gd`: host/join, version check, the host's battle sent (map, classes, rules, seed),
+the host as referee, checksums, chat, rematch, router port by UPnP. Tests: `SimOrderTextTest`, `Tests\OnlineTest.bat`.
+Still to do: a person playing a person on two machines (not yet tried by a human), lobbies/relays
+(Epic Online Services or Steam), reconnecting mid-match, replays of online matches.

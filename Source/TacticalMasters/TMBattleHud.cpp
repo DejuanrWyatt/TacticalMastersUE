@@ -301,6 +301,10 @@ void ATMBattleHud::DrawHUD()
 		{
 			DrawTitle(*Found);
 		}
+		else if (Found->Screen == ATMBattleDirector::EScreen::Online)
+		{
+			DrawOnline(*Found);
+		}
 		else
 		{
 			DrawSetup(*Found);
@@ -883,6 +887,32 @@ void ATMBattleHud::DrawBanners(ATMBattleDirector& From)
 		Text(Line, CentreX - Size.X * 0.5f, Y, Gold, Big, 0.7f * S);
 	}
 
+	// Typing a line to the other player (battle.gd:732, hud.gd's chat line).
+	if (From.Typing == ATMBattleDirector::ETypeField::Chat)
+	{
+		const float CW = 620.0f * S;
+		const float CY = Canvas->ClipY * 0.62f;
+		Text(TEXT("Say to your opponent (Enter sends, Esc closes):"), CentreX - CW * 0.5f, CY - 24.0f * S, Dim, Font, 0.5f * S);
+		TextField(CentreX - CW * 0.5f, CY, CW, 44.0f * S, From.ChatLine, FString(), true, static_cast<int32>(ATMBattleDirector::ETypeField::Chat));
+	}
+
+	// An online match that can't go on (battle.gd:676-694).
+	if (!From.OnlineStopped.IsEmpty() && From.Battle.Winner == -1)
+	{
+		const FString Line = From.OnlineStopped;
+		const FString Under = TEXT("The match can't continue.");
+		const FVector2D Size = TextSize(Line, Big, 0.8f * S);
+		const float PW = FMath::Max(Size.X + 80.0f * S, 560.0f * S);
+		const float PH = 170.0f * S;
+		const float PX = CentreX - PW * 0.5f;
+		const float PY = Canvas->ClipY * 0.32f;
+		Panel(PX, PY, PW, PH, FLinearColor(0.05f, 0.06f, 0.1f, 0.94f), Urgent, 2.0f);
+		Text(Line, CentreX - Size.X * 0.5f, PY + 20.0f * S, Urgent, Big, 0.8f * S);
+		const FVector2D UnderSize = TextSize(Under, Font, 0.6f * S);
+		Text(Under, CentreX - UnderSize.X * 0.5f, PY + 66.0f * S, Dim, Font, 0.6f * S);
+		MenuButton(CentreX - 90.0f * S, PY + PH - 64.0f * S, 180.0f * S, 44.0f * S, TEXT("Main menu"), ETMHudAction::MenuTitle);
+	}
+
 	// The end of a battle (hud.gd:911, the game-over panel).
 	if (From.Battle.Winner != -1)
 	{
@@ -892,6 +922,11 @@ void ATMBattleHud::DrawBanners(ATMBattleDirector& From)
 		{
 			Line = From.HowWon().IsEmpty() ? TEXT("Nobody is left standing") : TEXT("A draw");
 			Colour = Dim;
+		}
+		else if (From.bOnline)
+		{
+			Line = From.Battle.Winner == From.LocalTeam ? TEXT("You win!") : TEXT("Your opponent wins");
+			Colour = From.Battle.Winner == From.LocalTeam ? Gold : Urgent;
 		}
 		else if (From.ComputerPlays(0) == From.ComputerPlays(1))
 		{
@@ -923,12 +958,25 @@ void ATMBattleHud::DrawBanners(ATMBattleDirector& From)
 			const float BH = 44.0f * S;
 			const float Gap = 10.0f * S;
 			const float BY = PY + PH - BH - 20.0f * S;
-			float BX = CentreX - (3.0f * BW + 2.0f * Gap) * 0.5f;
-			MenuButton(BX, BY, BW, BH, TEXT("Rematch  (R)"), ETMHudAction::NewBattle, -1, true);
-			BX += BW + Gap;
-			MenuButton(BX, BY, BW, BH, TEXT("Change setup"), ETMHudAction::MenuSetup);
-			BX += BW + Gap;
-			MenuButton(BX, BY, BW, BH, TEXT("Main menu"), ETMHudAction::MenuTitle);
+			if (From.bOnline)
+			{
+				// Online, a rematch starts once both have asked (net.gd:139-143).
+				const FString Again = From.bWantRematch ? TEXT("Waiting for opponent...")
+					: From.bOpponentWantsRematch ? TEXT("Accept rematch  (R)") : TEXT("Rematch  (R)");
+				float BX = CentreX - (2.0f * BW + Gap) * 0.5f - 20.0f * S;
+				MenuButton(BX, BY, BW + 40.0f * S, BH, Again, ETMHudAction::NewBattle, -1, !From.bWantRematch);
+				BX += BW + 40.0f * S + Gap;
+				MenuButton(BX, BY, BW, BH, TEXT("Main menu"), ETMHudAction::MenuTitle);
+			}
+			else
+			{
+				float BX = CentreX - (3.0f * BW + 2.0f * Gap) * 0.5f;
+				MenuButton(BX, BY, BW, BH, TEXT("Rematch  (R)"), ETMHudAction::NewBattle, -1, true);
+				BX += BW + Gap;
+				MenuButton(BX, BY, BW, BH, TEXT("Change setup"), ETMHudAction::MenuSetup);
+				BX += BW + Gap;
+				MenuButton(BX, BY, BW, BH, TEXT("Main menu"), ETMHudAction::MenuTitle);
+			}
 		}
 	}
 }
@@ -998,6 +1046,8 @@ void ATMBattleHud::DrawTitle(ATMBattleDirector& From)
 	MenuButton(X, Y, W, H, TEXT("Two Players (Same Device)"), ETMHudAction::TitleTwoPlayers);
 	Y += H + Gap;
 	MenuButton(X, Y, W, H, TEXT("Computer vs Computer"), ETMHudAction::TitleWatch);
+	Y += H + Gap;
+	MenuButton(X, Y, W, H, TEXT("Play Online"), ETMHudAction::TitleOnline, -1, false, TEXT("host a battle, or join one"));
 	Y += H + Gap * 3.0f;
 	MenuButton(X, Y, W, 44.0f * S, FString::Printf(TEXT("Unit Guide  (%s)"), *FTMSettings::Get().KeyName(ETMAction::UnitGuide)), ETMHudAction::ToggleGuide);
 	Y += 44.0f * S + Gap;
@@ -1009,7 +1059,7 @@ void ATMBattleHud::DrawTitle(ATMBattleDirector& From)
 	Y += 44.0f * S + 30.0f * S;
 
 	// Said rather than left out quietly: what the Godot title has that this one does not yet.
-	const FString Missing = TEXT("Online play and How to Play are not ported yet.");
+	const FString Missing = TEXT("How to Play is not ported yet.");
 	const FVector2D MissingSize = TextSize(Missing, Font, 0.5f * S);
 	Text(Missing, CentreX - MissingSize.X * 0.5f, Y, Dim, Font, 0.5f * S);
 }
@@ -1024,6 +1074,7 @@ void ATMBattleHud::DrawSetup(ATMBattleDirector& From)
 	const ATMBattleDirector::FMatchSetup& Setup = From.Setup;
 	const bool bVsComputer = Setup.Mode == TEXT("ai");
 	const bool bWatch = Setup.Mode == TEXT("cpu");
+	const bool bHosting = Setup.Mode == TEXT("online");
 
 	const float PW = 1180.0f * S;
 	const float PH = 720.0f * S;
@@ -1032,7 +1083,8 @@ void ATMBattleHud::DrawSetup(ATMBattleDirector& From)
 	Panel(PX, PY, PW, PH, FLinearColor(0.05f, 0.06f, 0.1f, 0.94f), FLinearColor(0.4f, 0.45f, 0.55f, 0.8f), 1.5f);
 
 	const FString Heading = bVsComputer ? TEXT("Battle Setup: Play vs Computer")
-		: bWatch ? TEXT("Battle Setup: Computer vs Computer") : TEXT("Battle Setup: Two Players");
+		: bWatch ? TEXT("Battle Setup: Computer vs Computer")
+		: bHosting ? TEXT("Battle Setup: Host an Online Game") : TEXT("Battle Setup: Two Players");
 	Text(Heading, PX + 30.0f * S, PY + 20.0f * S, TextColour, Big, 0.9f * S);
 
 	// The two teams, side by side.
@@ -1044,6 +1096,7 @@ void ATMBattleHud::DrawSetup(ATMBattleDirector& From)
 		const bool bComputer = bWatch || (bVsComputer && Setup.PlayerTeam != Team);
 		const FString Who = bComputer
 			? FString::Printf(TEXT("Computer (%s)"), *Setup.Difficulty[Team])
+			: bHosting ? FString(Team == 0 ? TEXT("You (the host)") : TEXT("Your opponent"))
 			: bVsComputer ? FString(TEXT("You")) : FString::Printf(TEXT("Player %d"), Team + 1);
 		Text(FString::Printf(TEXT("%s   %s"), Team == 0 ? TEXT("Blue") : TEXT("Red"), *Who),
 			CX, ColumnTop, TeamColour(Team), Font, 0.8f * S);
@@ -1094,8 +1147,12 @@ void ATMBattleHud::DrawSetup(ATMBattleDirector& From)
 				Setup.Difficulty[Team], ETMHudAction::SetupDifficulty, Team);
 		}
 	}
-	Row(TEXT("Seed"), Setup.bRandomSeed ? FString(TEXT("New each battle"))
-		: FString::Printf(TEXT("Fixed: %llu"), Setup.FixedSeed), ETMHudAction::SetupSeed, -1);
+	// Online, every match gets a fresh seed from the host.
+	if (!bHosting)
+	{
+		Row(TEXT("Seed"), Setup.bRandomSeed ? FString(TEXT("New each battle"))
+			: FString::Printf(TEXT("Fixed: %llu"), Setup.FixedSeed), ETMHudAction::SetupSeed, -1);
+	}
 	{
 		const TMSim::FMapDef& Map = TMSim::FindMap(Setup.MapId);
 		Row(TEXT("Map"), UTF8_TO_TCHAR(Map.Name.c_str()), ETMHudAction::SetupMap, -1);
@@ -1158,7 +1215,117 @@ void ATMBattleHud::DrawSetup(ATMBattleDirector& From)
 	const float BH = 52.0f * S;
 	const float BY = PY + PH - BH - 24.0f * S;
 	MenuButton(PX + 30.0f * S, BY, 160.0f * S, BH, TEXT("Back  (Esc)"), ETMHudAction::SetupBack);
-	MenuButton(PX + PW - BW - 30.0f * S, BY, BW, BH, TEXT("Start Battle"), ETMHudAction::SetupStart, -1, true);
+	if (!bHosting)
+	{
+		MenuButton(PX + PW - BW - 30.0f * S, BY, BW, BH, TEXT("Start Battle"), ETMHudAction::SetupStart, -1, true);
+		return;
+	}
+	// Hosting: the battle starts when an opponent joins. What is happening, over the buttons.
+	if (From.IsWaitingOnline())
+	{
+		Panel(PX + PW - BW - 30.0f * S, BY, BW, BH, FLinearColor(0.1f, 0.12f, 0.18f, 0.95f), Gold, 1.0f);
+		const FString Waiting = TEXT("Waiting for an opponent...");
+		const FVector2D WaitSize = TextSize(Waiting, Font, 0.55f * S);
+		Text(Waiting, PX + PW - BW - 30.0f * S + (BW - WaitSize.X) * 0.5f, BY + (BH - WaitSize.Y) * 0.5f, Gold, Font, 0.55f * S);
+	}
+	else
+	{
+		MenuButton(PX + PW - BW - 30.0f * S, BY, BW, BH, TEXT("Host Game"), ETMHudAction::SetupStart, -1, true,
+			FString::Printf(TEXT("on port %s"), *From.JoinPort));
+	}
+	float StatusY = BY - 76.0f * S;
+	for (const FString& Line : { From.OnlineStatus, From.OnlineAddresses, From.OnlineRouter })
+	{
+		if (!Line.IsEmpty())
+		{
+			Text(Line, PX + 210.0f * S, StatusY, Line == From.OnlineStatus ? TextColour : Dim, Font, 0.5f * S);
+			StatusY += 22.0f * S;
+		}
+	}
+}
+
+void ATMBattleHud::TextField(float X, float Y, float W, float H, const FString& Value, const FString& Placeholder, bool bTyping, int32 Field)
+{
+	UFont* Font = GEngine->GetMediumFont();
+	Panel(X, Y, W, H, FLinearColor(0.02f, 0.03f, 0.05f, 0.95f), bTyping ? Gold : FLinearColor(0.4f, 0.45f, 0.55f, 0.8f), bTyping ? 2.0f : 1.0f);
+	const bool bEmpty = Value.IsEmpty();
+	// A caret that blinks while typing.
+	const bool bCaret = bTyping && FMath::Fmod(GetWorld() ? GetWorld()->GetRealTimeSeconds() : 0.0, 1.0) < 0.55;
+	const FString Shown = (bEmpty && !bTyping ? Placeholder : Value) + (bCaret ? TEXT("|") : TEXT(""));
+	const FVector2D Size = TextSize(Shown.IsEmpty() ? FString(TEXT("A")) : Shown, Font, 0.6f * S);
+	Text(Shown, X + 10.0f * S, Y + (H - Size.Y) * 0.5f, bEmpty && !bTyping ? Dim : TextColour, Font, 0.6f * S);
+	AddButton(X, Y, W, H, ETMHudAction::OnlineField, Field);
+}
+
+void ATMBattleHud::DrawOnline(ATMBattleDirector& From)
+{
+	// main_menu.gd:79-230: an address and a port, Host or Join, and what is happening.
+	DrawRect(FLinearColor(0.02f, 0.03f, 0.06f, 0.6f), 0.0f, 0.0f, Canvas->ClipX, Canvas->ClipY);
+	UFont* Font = GEngine->GetMediumFont();
+	UFont* Big = GEngine->GetLargeFont();
+	const float PW = 940.0f * S;
+	const float PH = 560.0f * S;
+	const float PX = (Canvas->ClipX - PW) * 0.5f;
+	const float PY = (Canvas->ClipY - PH) * 0.5f;
+	Panel(PX, PY, PW, PH, FLinearColor(0.05f, 0.06f, 0.1f, 0.95f), Gold, 1.5f);
+	Text(TEXT("Play Online"), PX + 30.0f * S, PY + 20.0f * S, Gold, Big, 0.9f * S);
+	Text(TEXT("The host chooses the battle and plays Blue; the other player joins with the host's address."),
+		PX + 30.0f * S, PY + 70.0f * S, Dim, Font, 0.55f * S);
+
+	using EField = ATMBattleDirector::ETypeField;
+	float Y = PY + 120.0f * S;
+	const float FieldH = 48.0f * S;
+	const float AddressW = PW - 60.0f * S - 190.0f * S;
+	Text(TEXT("Host address"), PX + 30.0f * S, Y, Dim, Font, 0.55f * S);
+	Text(TEXT("Port"), PX + 30.0f * S + AddressW + 30.0f * S, Y, Dim, Font, 0.55f * S);
+	Y += 26.0f * S;
+	TextField(PX + 30.0f * S, Y, AddressW, FieldH, From.JoinAddress, TEXT("click and type the host's address"),
+		From.Typing == EField::Address, static_cast<int32>(EField::Address));
+	TextField(PX + 30.0f * S + AddressW + 30.0f * S, Y, 160.0f * S, FieldH, From.JoinPort, TEXT("7777"),
+		From.Typing == EField::Port, static_cast<int32>(EField::Port));
+	Y += FieldH + 24.0f * S;
+
+	const float BW = (PW - 60.0f * S - 20.0f * S) * 0.5f;
+	const float BH = 56.0f * S;
+	const bool bBusy = From.IsWaitingOnline();
+	if (bBusy)
+	{
+		Panel(PX + 30.0f * S, Y, PW - 60.0f * S, BH, FLinearColor(0.1f, 0.12f, 0.18f, 0.95f), Gold, 1.0f);
+		const FString Busy = TEXT("Connecting... (Back to give up)");
+		const FVector2D BusySize = TextSize(Busy, Font, 0.62f * S);
+		Text(Busy, PX + (PW - BusySize.X) * 0.5f, Y + (BH - BusySize.Y) * 0.5f, Gold, Font, 0.62f * S);
+	}
+	else
+	{
+		MenuButton(PX + 30.0f * S, Y, BW, BH, TEXT("Host Game"), ETMHudAction::OnlineHost, -1, true, TEXT("choose the battle, then wait for a player"));
+		MenuButton(PX + 30.0f * S + BW + 20.0f * S, Y, BW, BH, TEXT("Join Game"), ETMHudAction::OnlineJoin, -1, true, TEXT("connect to the address above"));
+	}
+	Y += BH + 30.0f * S;
+
+	for (const FString& Line : { From.OnlineStatus, From.OnlineAddresses, From.OnlineRouter })
+	{
+		if (!Line.IsEmpty())
+		{
+			Text(Line, PX + 30.0f * S, Y, Line == From.OnlineStatus ? TextColour : Dim, Font, 0.55f * S);
+			Y += 26.0f * S;
+		}
+	}
+
+	const float HelpY = PY + PH - 150.0f * S;
+	const TCHAR* Help[] =
+	{
+		TEXT("On the same network, join with the address the host's screen shows."),
+		TEXT("Over the internet the host needs TCP port 7777 open: the game asks the router itself, and says if it can't."),
+		TEXT("If it can't, forward the port on the router by hand, or both players join a VPN such as Tailscale."),
+		TEXT("Both players need the same build of the game, and the same class files."),
+	};
+	float LineY = HelpY;
+	for (const TCHAR* Line : Help)
+	{
+		Text(Line, PX + 30.0f * S, LineY, Dim, Font, 0.5f * S);
+		LineY += 22.0f * S;
+	}
+	MenuButton(PX + 30.0f * S, PY + PH - 60.0f * S, 160.0f * S, 44.0f * S, TEXT("Back  (Esc)"), ETMHudAction::OnlineBack);
 }
 
 void ATMBattleHud::DrawBattleMenu(ATMBattleDirector& From)
@@ -1174,7 +1341,7 @@ void ATMBattleHud::DrawBattleMenu(ATMBattleDirector& From)
 	const float PX = (Canvas->ClipX - PW) * 0.5f;
 	const float PY = (Canvas->ClipY - PH) * 0.5f;
 	Panel(PX, PY, PW, PH, FLinearColor(0.05f, 0.06f, 0.1f, 0.95f), Gold, 1.5f);
-	const FString Title = TEXT("Paused");
+	const FString Title = From.bOnline ? TEXT("Menu (the battle goes on)") : TEXT("Paused");
 	const FVector2D Size = TextSize(Title, Big, 0.9f * S);
 	Text(Title, PX + (PW - Size.X) * 0.5f, PY + 18.0f * S, Gold, Big, 0.9f * S);
 
@@ -1182,9 +1349,12 @@ void ATMBattleHud::DrawBattleMenu(ATMBattleDirector& From)
 	const float X = PX + 30.0f * S;
 	MenuButton(X, Y, W, H, TEXT("Resume  (Esc)"), ETMHudAction::MenuResume, -1, true);
 	Y += H + Gap;
-	MenuButton(X, Y, W, H, TEXT("Restart battle"), ETMHudAction::MenuRestart, -1, false,
-		FString::Printf(TEXT("same teams, same seed (%llu)"), From.BattleSeed));
-	Y += H + Gap;
+	if (!From.bOnline)
+	{
+		MenuButton(X, Y, W, H, TEXT("Restart battle"), ETMHudAction::MenuRestart, -1, false,
+			FString::Printf(TEXT("same teams, same seed (%llu)"), From.BattleSeed));
+		Y += H + Gap;
+	}
 	MenuButton(X, Y, W, H, TEXT("Options"), ETMHudAction::OpenOptions);
 	Y += H + Gap;
 	MenuButton(X, Y, W, H, TEXT("Developer Tools"), ETMHudAction::OpenDevTools);

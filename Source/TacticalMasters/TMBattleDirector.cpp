@@ -30,6 +30,10 @@
 #include "Kismet/KismetSystemLibrary.h"
 #include "Misc/DateTime.h"
 
+#include "SimOrderText.h"
+#include "TMTextInput.h"
+#include "TMViewportClient.h"
+#include "Framework/Application/SlateApplication.h"
 #include "SimAbility.h"
 #include "SimClassFile.h"
 #include "HAL/FileManager.h"
@@ -186,6 +190,28 @@ void ATMBattleDirector::BeginPlay()
 		// board built behind it and the clock stopped until a battle is started.
 		SetUpPlayerInput();
 		Screen = EScreen::Title;
+	}
+	// The online test (scripts\online-test.bat): -tmhost[=port] hosts the battle
+	// the other switches set up, -tmjoin=address[:port] joins one, -tmnetbots
+	// has the computer play this machine's side through the online path, and
+	// -tmnetdesync makes the joiner's game differ once, to prove it is caught.
+	bNetBots = FParse::Param(FCommandLine::Get(), TEXT("tmnetbots"));
+	bNetDesync = FParse::Param(FCommandLine::Get(), TEXT("tmnetdesync"));
+	FString NetSwitch;
+	if (FParse::Value(FCommandLine::Get(), TEXT("tmhost="), NetSwitch) || FParse::Param(FCommandLine::Get(), TEXT("tmhost")))
+	{
+		JoinPort = NetSwitch.IsNumeric() ? NetSwitch : FString::FromInt(FTMNet::DefaultPort);
+		OfflineSetup = Setup;
+		Setup.Mode = TEXT("online");
+		Screen = EScreen::Setup;
+		HostOnline();
+	}
+	else if (FParse::Value(FCommandLine::Get(), TEXT("tmjoin="), NetSwitch))
+	{
+		JoinAddress = NetSwitch;
+		OfflineSetup = Setup;
+		Screen = EScreen::Online;
+		JoinOnline();
 	}
 	// Up even while watching: the turn order and the log are how a battle is read.
 	ShowHud();
@@ -375,7 +401,9 @@ void ATMBattleDirector::BuildBattle()
 	Battle.Tuning = TMSim::FTuning();
 	for (const TMSim::FTuningKey& Key : TMSim::TuningKeys())
 	{
-		if (const double* Saved = FTMSettings::Get().Tuning.Find(UTF8_TO_TCHAR(Key.Key)))
+		// Online, the host's rule numbers, so both battles run on the same rules.
+		const TMap<FString, double>& Rules = bOnline ? OnlineTuning : FTMSettings::Get().Tuning;
+		if (const double* Saved = Rules.Find(UTF8_TO_TCHAR(Key.Key)))
 		{
 			Battle.Tuning.*Key.Member = FMath::Clamp(*Saved, Key.Low, Key.High);
 		}
@@ -412,10 +440,19 @@ void ATMBattleDirector::BuildBattle()
 	// Which body each class wears is data (TMBattleDirectorMotion.cpp); the
 	// level's mesh is what a unit wears when the map has nothing for it.
 	LoadCharacterMap();
+	// A name no living component has. A rebuilt battle's parts must not take
+	// the names of the old ones still being torn down: Unreal would build the
+	// new one in the old one's memory while the old one's work is still in
+	// flight -- a hero's hair and cloth being animated in the background, say --
+	// and that crashed the game whenever a battle was started from the menu.
+	auto Fresh = [this](UClass* Class, const TCHAR* Kind, int32 Id)
+	{
+		return MakeUniqueObjectName(this, Class, *FString::Printf(TEXT("%s_%d"), Kind, Id));
+	};
 	for (size_t i = 0; i < Battle.Units.size(); ++i)
 	{
-		const FName Name = *FString::Printf(TEXT("Unit_%d"), Battle.Units[i].Id);
-		USkeletalMeshComponent* Visual = NewObject<USkeletalMeshComponent>(this, Name, RF_Transient);
+		USkeletalMeshComponent* Visual = NewObject<USkeletalMeshComponent>(
+			this, Fresh(USkeletalMeshComponent::StaticClass(), TEXT("Unit"), Battle.Units[i].Id), RF_Transient);
 		Visual->SetupAttachment(RootComponent);
 		Visual->RegisterComponent();
 		const FTMBody* Body = BodyFor(Battle.Units[i]);
@@ -439,7 +476,7 @@ void ATMBattleDirector::BuildBattle()
 		// Whose turn it is is said with light at their feet rather than by
 		// lifting them off the ground, which only ever looked like a bug.
 		UTextRenderComponent* Plate = NewObject<UTextRenderComponent>(
-			this, *FString::Printf(TEXT("Plate_%d"), Battle.Units[i].Id), RF_Transient);
+			this, Fresh(UTextRenderComponent::StaticClass(), TEXT("Plate"), Battle.Units[i].Id), RF_Transient);
 		Plate->SetMobility(EComponentMobility::Movable);
 		Plate->SetupAttachment(RootComponent);
 		Plate->RegisterComponent();
@@ -448,7 +485,7 @@ void ATMBattleDirector::BuildBattle()
 		Plates.Add(Plate);
 
 		UPointLightComponent* Light = NewObject<UPointLightComponent>(
-			this, *FString::Printf(TEXT("Ready_%d"), Battle.Units[i].Id), RF_Transient);
+			this, Fresh(UPointLightComponent::StaticClass(), TEXT("Ready"), Battle.Units[i].Id), RF_Transient);
 		Light->SetupAttachment(RootComponent);
 		Light->RegisterComponent();
 		Light->SetLightColor(ReadyColour);
@@ -460,7 +497,7 @@ void ATMBattleDirector::BuildBattle()
 
 		// A second light for what it carries: the glow of a burn, a shield, a freeze.
 		UPointLightComponent* Glow = NewObject<UPointLightComponent>(
-			this, *FString::Printf(TEXT("Status_%d"), Battle.Units[i].Id), RF_Transient);
+			this, Fresh(UPointLightComponent::StaticClass(), TEXT("Status"), Battle.Units[i].Id), RF_Transient);
 		Glow->SetupAttachment(RootComponent);
 		Glow->RegisterComponent();
 		Glow->SetAttenuationRadius(180.0f);
@@ -696,10 +733,39 @@ FString ATMBattleDirector::Submit(const TMSim::FOrder& Order)
 	// will arrive from the network; all three are strangers here and all three
 	// are checked. It is also what makes a battle replayable: it is exactly the
 	// list of orders that got through this function.
+	//
+	// Online (battle.gd:398-412), the joiner doesn't apply its own orders: it
+	// asks the host, and applies what the host sends back. The host sends each
+	// order it applies to the joiner first, so anything it sets off follows it.
+	if (bOnline && !bOnlineHost && !bApplyingFromHost)
+	{
+		if (Order.Type == TMSim::EOrderType::Advance || Order.Type == TMSim::EOrderType::Tune)
+		{
+			return TEXT("Only the host moves time forward or changes the rules.");
+		}
+		if (bWaitingForHost)
+		{
+			return TEXT("Waiting for the host to answer the last order.");
+		}
+		const std::string Early = Battle.Validate(Order);
+		if (!Early.empty())
+		{
+			return UTF8_TO_TCHAR(Early.c_str());
+		}
+		const std::string Line = TMSim::OrderToText(Order);
+		bWaitingForHost = true;
+		SendOnline(TEXT("req"), [&Line](FJsonObject& Message) { Message.SetStringField(TEXT("o"), UTF8_TO_TCHAR(Line.c_str())); });
+		return FString();
+	}
 	const std::string Refused = Battle.Validate(Order);
 	if (!Refused.empty())
 	{
 		return UTF8_TO_TCHAR(Refused.c_str());
+	}
+	if (bOnline && bOnlineHost)
+	{
+		const std::string Line = TMSim::OrderToText(Order);
+		SendOnline(TEXT("cmd"), [&Line](FJsonObject& Message) { Message.SetStringField(TEXT("o"), UTF8_TO_TCHAR(Line.c_str())); });
 	}
 
 	TMSim::FTickReport Report;
@@ -718,6 +784,10 @@ FString ATMBattleDirector::Submit(const TMSim::FOrder& Order)
 	Narrate(Report);
 	ShowEvents(Report);
 	RefreshVisuals();
+	if (bOnline)
+	{
+		AfterOnlineApply(Order);
+	}
 	return FString();
 }
 
@@ -1078,6 +1148,11 @@ FString ATMBattleDirector::OrderAbilityAt(int32 UnitId, int32 Slot, int32 Target
 
 bool ATMBattleDirector::ComputerPlays(int32 Team) const
 {
+	// Online, a person on each machine; the computer only in the online test (-tmnetbots).
+	if (bOnline)
+	{
+		return bNetBots && Team == LocalTeam;
+	}
 	return Team == 0 ? bComputerPlaysTeam0 : bComputerPlaysTeam1;
 }
 
@@ -1247,6 +1322,7 @@ void ATMBattleDirector::Tick(float DeltaSeconds)
 	}
 
 	NoticeLeft -= DeltaSeconds;
+	AdvanceOnline(DeltaSeconds);
 
 	// On the title and setup screens the board stands behind the menu with its
 	// clock stopped; a battle begins only when one is started.
@@ -1403,7 +1479,15 @@ void ATMBattleDirector::Tick(float DeltaSeconds)
 	// passes by an Advance order. Online, both machines would have to agree to
 	// one; there is no online play yet, so this is a local-only key for now.
 	// The in-battle menu pauses the same way.
-	if (bPaused || bMenuOpen)
+	//
+	// Online, time can't stop (battle.gd:1030-1044): the menu stays open over a
+	// battle that goes on. A match that can't go on stops for good.
+	if ((bPaused || bMenuOpen) && !bOnline)
+	{
+		TickRemainder = 0.0f;
+		return;
+	}
+	if (!OnlineStopped.IsEmpty())
 	{
 		TickRemainder = 0.0f;
 		return;
@@ -1421,7 +1505,9 @@ void ATMBattleDirector::Tick(float DeltaSeconds)
 		TickRemainder -= SecondsPerTick;
 		++Steps;
 	}
-	if (Steps > 0)
+	// Online, only the host moves time; the joiner's clock moves as the host's
+	// Advance orders arrive (battle.gd:316-322).
+	if (Steps > 0 && (!bOnline || bOnlineHost))
 	{
 		StepTicks(Steps);
 	}
@@ -1439,6 +1525,7 @@ void ATMBattleDirector::Tick(float DeltaSeconds)
 				Battle.Winner, Battle.TickCount / float(TMSim::Pace::TicksPerSecond),
 				OrdersGiven, NumbersShown, EffectsPlayed);
 			UE_LOG(LogTemp, Log, TEXT("%s"), *DescribeBattle());
+			UE_LOG(LogTemp, Log, TEXT("FINAL CHECKSUM %llu at tick %d"), Battle.Checksum(), Battle.TickCount);
 			DecidedFor = 0.0f;
 		}
 		// The robot decides when its session is over, not the first result.
@@ -1467,7 +1554,8 @@ void ATMBattleDirector::Tick(float DeltaSeconds)
 	// takes a moment to think and then gives one order. The pause is what makes
 	// it readable: a side that emptied its whole turn into one frame would be
 	// impossible to learn anything from.
-	const TMSim::FUnit* Unit = WaitingOnComputer();
+	// A joiner's computer (-tmnetbots) waits for the host's answer like a person does.
+	const TMSim::FUnit* Unit = bWaitingForHost ? nullptr : WaitingOnComputer();
 	if (!Unit)
 	{
 		ThinkingAbout = -1;
@@ -1572,6 +1660,18 @@ void ATMBattleDirector::SetUpPlayerInput()
 		InputComponent->BindKey(Button, IE_Released, this, &ATMBattleDirector::OnKeyUp);
 	}
 	bPlayerInput = true;
+	// Typed text -- the address to join, chat -- goes past the key bindings (TMTextInput.h).
+	if (!TextInput.IsValid() && FSlateApplication::IsInitialized())
+	{
+		TextInput = MakeShared<FTMTextInput>();
+		FSlateApplication::Get().RegisterInputPreProcessor(TextInput);
+		TWeakPtr<FTMTextInput> Weak = TextInput;
+		UTMViewportClient::Typist = [Weak](TCHAR Character)
+		{
+			const TSharedPtr<FTMTextInput> Input = Weak.Pin();
+			return Input.IsValid() && Input->TakeCharacter(Character);
+		};
+	}
 	UE_LOG(LogTemp, Log, TEXT("taking orders from the mouse and keyboard"));
 }
 
@@ -1685,8 +1785,20 @@ void ATMBattleDirector::OnKey(FKey Key)
 		{
 			PickerSlot = -1;
 		}
+		else if (Is(ETMAction::Cancel) && Screen == EScreen::Setup && Setup.Mode == TEXT("online"))
+		{
+			Upnp.Reset();
+			Net.Reset();
+			OnlineStatus.Reset();
+			OpenOnline();
+		}
 		else if (Is(ETMAction::Cancel) && Screen == EScreen::Setup)
 		{
+			OpenTitle();
+		}
+		else if (Is(ETMAction::Cancel) && Screen == EScreen::Online)
+		{
+			LeaveOnline();
 			OpenTitle();
 		}
 		else if (Is(ETMAction::UnitGuide))
@@ -1801,17 +1913,33 @@ void ATMBattleDirector::OnKey(FKey Key)
 	}
 	else if (Is(ETMAction::Pause))
 	{
-		if (Battle.Winner == -1)
+		if (bOnline)
+		{
+			Tell(TEXT("Time can't stop in an online match."));
+		}
+		else if (Battle.Winner == -1)
 		{
 			bPaused = !bPaused;
 			Tell(bPaused ? TEXT("Paused.") : TEXT("Resumed."));
 		}
 	}
+	else if (Is(ETMAction::Chat) && bOnline)
+	{
+		StartTyping(ETypeField::Chat);
+	}
 	else if (Key == EKeys::R && Battle.Winner != -1)
 	{
 		// Rematch, only once a battle is decided, so a stray key cannot throw
-		// one away; while it is being fought R raises the camera.
-		StartMatch(true);
+		// one away; while it is being fought R raises the camera. Online, both
+		// players have to ask for it.
+		if (bOnline)
+		{
+			RequestRematch();
+		}
+		else
+		{
+			StartMatch(true);
+		}
 	}
 }
 
@@ -1850,8 +1978,13 @@ void ATMBattleDirector::OnKeyUp(FKey Key)
 bool ATMBattleDirector::PlayerCanOrder(const TMSim::FUnit* Unit) const
 {
 	// battle.gd:293-295, _commandable.
+	if (bOnline && (Unit == nullptr || Unit->Team != LocalTeam || bWaitingForHost || !OnlineStopped.IsEmpty()))
+	{
+		// Online, only this machine's own side, and one order at a time (battle.gd:293-295).
+		return false;
+	}
 	return Unit && Unit->IsAlive() && Unit->bReady && !ComputerPlays(Unit->Team)
-		&& Battle.Winner == -1 && !bPaused && !bMenuOpen && Screen == EScreen::Battle;
+		&& Battle.Winner == -1 && (bOnline || (!bPaused && !bMenuOpen)) && Screen == EScreen::Battle;
 }
 
 const TMSim::FUnit* ATMBattleDirector::SelectedUnit() const
@@ -2596,8 +2729,9 @@ void ATMBattleDirector::PressHudButton(const FTMHudButton& Button)
 void ATMBattleDirector::StartMatch(bool bNewSeed)
 {
 	// Who plays each side (game_config.gd:219-231, ai_teams).
-	if (Setup.Mode == TEXT("hotseat"))
+	if (Setup.Mode == TEXT("hotseat") || Setup.Mode == TEXT("online"))
 	{
+		// Online, ComputerPlays answers from LocalTeam instead.
 		bComputerPlaysTeam0 = false;
 		bComputerPlaysTeam1 = false;
 	}
@@ -2640,6 +2774,10 @@ void ATMBattleDirector::StartMatch(bool bNewSeed)
 
 	auto Who = [this](int32 Team)
 	{
+		if (bOnline)
+		{
+			return Team == LocalTeam ? FString(TEXT("you")) : FString(TEXT("your opponent"));
+		}
 		return ComputerPlays(Team)
 			? FString::Printf(TEXT("the computer (%s)"), *Setup.Difficulty[Team])
 			: FString(TEXT("a person"));
@@ -2997,9 +3135,51 @@ void ATMBattleDirector::PressMenuButton(const FTMHudButton& Button)
 		break;
 	}
 	case ETMHudAction::SetupStart:
-		StartMatch(true);
+		if (Setup.Mode == TEXT("online"))
+		{
+			HostOnline();
+		}
+		else
+		{
+			StartMatch(true);
+		}
 		break;
 	case ETMHudAction::SetupBack:
+		if (Setup.Mode == TEXT("online"))
+		{
+			// Back to hosting or joining, no longer hosting.
+			Upnp.Reset();
+			Net.Reset();
+			OnlineStatus.Reset();
+			OpenOnline();
+		}
+		else
+		{
+			OpenTitle();
+		}
+		break;
+
+	// Playing online (main_menu.gd:79-230).
+	case ETMHudAction::TitleOnline:
+		OpenOnline();
+		break;
+	case ETMHudAction::OnlineHost:
+		// The host chooses the battle on the setup screen first.
+		if (Setup.Mode != TEXT("online"))
+		{
+			OfflineSetup = Setup;
+		}
+		Setup.Mode = TEXT("online");
+		OpenSetup();
+		break;
+	case ETMHudAction::OnlineJoin:
+		JoinOnline();
+		break;
+	case ETMHudAction::OnlineField:
+		StartTyping(static_cast<ETypeField>(Button.Value));
+		break;
+	case ETMHudAction::OnlineBack:
+		LeaveOnline();
 		OpenTitle();
 		break;
 
@@ -3008,13 +3188,25 @@ void ATMBattleDirector::PressMenuButton(const FTMHudButton& Button)
 		bMenuOpen = false;
 		break;
 	case ETMHudAction::MenuRestart:
-		// The same battle again from the start: same classes, same seed.
-		StartMatch(false);
+		// The same battle again from the start: same classes, same seed. Not online:
+		// a battle both are in can't be taken back by one of them.
+		if (!bOnline)
+		{
+			StartMatch(false);
+		}
 		break;
 	case ETMHudAction::MenuSetup:
-		OpenSetup();
+		if (!bOnline)
+		{
+			OpenSetup();
+		}
 		break;
 	case ETMHudAction::MenuTitle:
+		// Leaving an online match closes the connection (battle.gd:1100).
+		if (bOnline || Net.IsValid())
+		{
+			LeaveOnline();
+		}
 		OpenTitle();
 		break;
 	default:
@@ -3027,7 +3219,16 @@ int32 ATMBattleDirector::ViewerTeam() const
 {
 	// One person against the computer sees what their side sees. Two people at
 	// one screen, or nobody playing at all, see everything (battle.gd viewer_team).
-	if (Screen != EScreen::Battle || ComputerPlays(0) == ComputerPlays(1))
+	if (Screen != EScreen::Battle)
+	{
+		return -1;
+	}
+	// Online, each player sees through their own side's eyes (battle.gd:141-142).
+	if (bOnline)
+	{
+		return LocalTeam;
+	}
+	if (ComputerPlays(0) == ComputerPlays(1))
 	{
 		return -1;
 	}
@@ -3418,6 +3619,12 @@ void ATMBattleDirector::FlushTuning()
 		Values.push_back({ Entry.Key, Entry.Value });
 	}
 	TunePending.Reset();
+	if (bOnline)
+	{
+		// battle.gd:150-152, 1226: the host's rule numbers hold for the match.
+		Tell(TEXT("The rules can't change during an online match: the change is kept for the next battle."));
+		return;
+	}
 	if (Screen == EScreen::Battle && Battle.Winner == -1)
 	{
 		const FString Refused = Submit(TMSim::FOrder::MakeTune(Values));
@@ -3502,6 +3709,10 @@ int32 ATMBattleDirector::PlanningTeam() const
 	if (Setup.Mode == TEXT("cpu"))
 	{
 		return -1;
+	}
+	if (bOnline)
+	{
+		return OnlineStopped.IsEmpty() ? LocalTeam : -1;
 	}
 	// Two people at one machine: Godot places for blue only (battle.gd:351).
 	return 0;

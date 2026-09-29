@@ -94,6 +94,7 @@ be hard to kill (`Stop-Process` and `taskkill` may both refuse; WMI `Terminate` 
 | Make a Fab environment pack into a theme built from its meshes | `Tools\AddKit.bat <pack folder> <theme id> [--base ruined_keep] [--name Name] [--write]` (reads the pack's meshes by name and shape, writes only a theme file; `Docs/Maps.md`) |
 | Play a chosen map and theme | add `-tmmap=crown_keep -tmtheme=winter` to a game run (`Docs/Maps.md`) |
 | Watch chosen classes fight | add `-tmroster=a,b,c,d` to a game run: both sides field those four; `-tmhold=30` / `-tmtime=180` switch on the other ways to win, `-tmplan=30` planning time |
+| Online: two copies of the game play each other over 127.0.0.1, headless; same battle on both, and a split caught | `Tests\OnlineTest.bat` (close the editor first; about five minutes; `Docs/design/feat-online.md`) |
 | A whole battle in a real game world | `scriptsattle-test.bat` (no window, no rendering; ends itself) |
 
 Paths on this machine: engine `E:\UE_5.8`, Visual Studio `E:\VS2022`.
@@ -152,6 +153,10 @@ nothing for equal ends and rejects biased draws as PCG's bounded draw does.
 Maps are files now (`Content/Data/Maps`, read and checked by `TMSim::ReadMapFile`; `SimMapTest`), with Highlands
 built in as Godot has it. The port's own large map, Crown Keep (20x16), and four view-only themes
 (`Content/Data/Themes`) are described in `Docs/Maps.md`.
+Online play (`Docs/design/feat-online.md`, from Godot's `net.gd`): direct IP, the host plays blue and is the
+referee, only the host moves time, checksums every 50 ticks, chat, rematch. Orders cross as text
+(`SimOrderText`, bit for bit; `SimOrderTextTest`), and `Tests\OnlineTest.bat` plays two copies against each other.
+TCP rather than Godot's ENet, so a Godot build and this one can't play each other.
 Not yet ported (see `Docs/backlog.md`): Godot's other four maps, and saved teams.
 **Deliberate divergence from Godot** (the human's decision, 2026-09-28): the computer player respects
 Root, Freeze, Knockdown and Taunt (`FAIPlayer::NextCommand`, `BestAction`). Godot's (`ai_player.gd:43-50`)

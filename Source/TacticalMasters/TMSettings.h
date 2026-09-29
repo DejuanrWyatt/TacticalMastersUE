@@ -41,6 +41,8 @@ enum class ETMAction : uint8
 	CamRotateRight,
 	/** Customise the screen, and lock it again: one press each. */
 	EditLayout,
+	/** Online: type a line to the other player. */
+	Chat,
 	Count
 };
 

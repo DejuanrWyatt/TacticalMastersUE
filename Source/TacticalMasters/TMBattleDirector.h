@@ -18,6 +18,8 @@
 #include "SimAI.h"
 #include "SimBattle.h"
 #include "SimOrder.h"
+#include "TMNet.h"
+#include "TMUpnp.h"
 
 #include "TMBattleDirector.generated.h"
 
@@ -369,7 +371,7 @@ private:
 	// view, none of it is rules state: what it produces is a roster for each side,
 	// who plays each side, and a seed, and those are what BuildBattle starts from.
 
-	enum class EScreen : uint8 { Title, Setup, Battle };
+	enum class EScreen : uint8 { Title, Setup, Battle, Online };
 
 	/** What the next battle will be (game_config.gd: mode, rosters, ai_team, difficulties). */
 	struct FMatchSetup
@@ -420,6 +422,49 @@ private:
 	void StartMatch(bool bNewSeed);
 	void OpenTitle();
 	void OpenSetup();
+
+	// ------------------------------------------------ online (TMBattleDirectorOnline.cpp)
+	// Two players, each on their own machine (Docs/design/feat-online.md). The
+	// host plays blue and is the referee; the joiner plays red.
+
+	/** A match against another machine is being played (or has just ended). */
+	bool bOnline = false;
+	/** This machine hosts: it moves time and checks the joiner's orders. */
+	bool bOnlineHost = false;
+	/** The side this machine plays online. */
+	int32 LocalTeam = 0;
+	/** The joiner has an order out with the host, and gives no other until it is answered (battle.gd:295). */
+	bool bWaitingForHost = false;
+	/** Set when an online match can't go on -- out of sync, the other player gone -- and why. */
+	FString OnlineStopped;
+	/** What the online and setup screens say is happening: hosting, connecting, refused. */
+	FString OnlineStatus;
+	/** The host's addresses on this network, and what the router said about the port. */
+	FString OnlineAddresses;
+	FString OnlineRouter;
+	/** This player and the other have asked for a rematch (net.gd:139-143). */
+	bool bWantRematch = false;
+	bool bOpponentWantsRematch = false;
+	/** Typed fields: the host to join, the port, and a chat line. */
+	enum class ETypeField : uint8 { None, Address, Port, Chat };
+	ETypeField Typing = ETypeField::None;
+	FString JoinAddress;
+	FString JoinPort = TEXT("7777");
+	FString ChatLine;
+
+	/** The online screen: host or join. */
+	void OpenOnline();
+	/** Starts listening, with the setup on screen as the battle to play. */
+	void HostOnline();
+	/** Starts connecting to JoinAddress:JoinPort. */
+	void JoinOnline();
+	/** Leaves: closes the connection and forgets the match. */
+	void LeaveOnline();
+	void RequestRematch();
+	void StartTyping(ETypeField Field);
+	bool IsTyping() const;
+	/** A hosted or joined match is waiting for its opponent, or for the host's battle. */
+	bool IsWaitingOnline() const { return Net.IsValid() && !bOnline; }
 	/** One of the buttons on the title, setup or in-battle menu. */
 	void PressMenuButton(const struct FTMHudButton& Button);
 	/** The setup slot a class is being picked for (team * 4 + slot), or -1 (class_picker.gd). */
@@ -900,6 +945,38 @@ private:
 	void Animate(int32 Index, UAnimSequence* Clip, bool bLoop);
 	/** Where a unit is drawn now: part way along a walk, or where the rules have it. */
 	FVector ShownAt(const TMSim::FUnit& Unit) const;
+
+	// Online, behind the scenes.
+	TUniquePtr<FTMNet> Net;
+	TUniquePtr<FTMUpnp> Upnp;
+	TSharedPtr<class FTMTextInput> TextInput;
+	/** An order from the host is being applied: it goes straight to the rules, not back out. */
+	bool bApplyingFromHost = false;
+	/** The host's checksums by tick, until this battle reaches each (battle.gd:657-671). */
+	TMap<int32, uint64> HostSums;
+	int32 LastSumTick = 0;
+	/** The rule numbers of the match, from the host: Developer Tools as the host had them. */
+	TMap<FString, double> OnlineTuning;
+	/** The setup from before going online, put back on leaving. */
+	FMatchSetup OfflineSetup;
+	/** -tmnetbots: the computer plays this machine's side, through the online path. -tmnetdesync: the joiner's game is made to differ once. */
+	bool bNetBots = false;
+	bool bNetDesync = false;
+	bool bDesyncDone = false;
+	void AdvanceOnline(float DeltaSeconds);
+	void OnNetMessage(const FJsonObject& Message);
+	void StartOnlineAsHost();
+	FString StartOnlineFrom(const FJsonObject& Start);
+	/** The host's check on a joiner's order, on top of the rules' (battle.gd:634-646). "" to play it. */
+	FString RefereeCheck(const TMSim::FOrder& Order) const;
+	void AfterOnlineApply(const TMSim::FOrder& Order);
+	void CheckHostSums();
+	void StopOnline(const FString& Why);
+	void ReportOutOfSync(const FString& Detail);
+	void SendOnline(const TCHAR* Kind, TFunctionRef<void(FJsonObject&)> Fill);
+	void SendChat();
+	void TypedDone(bool bSubmit);
+	void EndPlay(const EEndPlayReason::Type Reason) override;
 
 	bool bCharacterMapRead = false;
 	TMap<FString, FTMAnimSet> AnimSets;
