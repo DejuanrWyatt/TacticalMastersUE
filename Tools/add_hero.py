@@ -90,7 +90,7 @@ def pick_mesh(meshes, hero):
 
 def skeleton_of(path):
     mesh = unreal.load_asset(path)
-    return mesh.get_editor_property("skeleton") if mesh else None
+    return mesh.get_editor_property("skeleton").get_path_name() if mesh and mesh.get_editor_property("skeleton") else None
 
 
 def find_skins(meshes, main_mesh):
@@ -100,9 +100,11 @@ def find_skins(meshes, main_mesh):
     by_skin = {}
     for a in meshes:
         parts = str(a.package_name).split("/")
-        if "Skins" not in parts or parts.index("Skins") + 1 >= len(parts):
+        # Skins/<skin>/Meshes, or in later packs Skins/<tier>/<skin>/Meshes:
+        # the skin is named by the folder that holds its Meshes.
+        if "Skins" not in parts or "Meshes" not in parts or parts.index("Meshes") - 1 <= parts.index("Skins"):
             continue
-        by_skin.setdefault(parts[parts.index("Skins") + 1], []).append(a)
+        by_skin.setdefault(parts[parts.index("Meshes") - 1], []).append(a)
     skins = {}
     for skin, found in sorted(by_skin.items()):
         path = object_path(sorted(found, key=lambda a: len(str(a.asset_name)))[0])
@@ -127,7 +129,11 @@ def installed_heroes():
         if not str(pack).split("/")[-1].startswith("Paragon"):
             continue
         for folder in sorted(registry.get_sub_paths(str(pack) + "/Characters/Heroes", False)):
-            heroes.append(str(folder))
+            # A hero has its own meshes and clips; a pack also keeps sounds and
+            # parts beside its heroes (ParagonCountess/.../Countess_Sounds).
+            subs = [str(p).split("/")[-1] for p in registry.get_sub_paths(str(folder), False)]
+            if "Meshes" in subs and "Animations" in subs:
+                heroes.append(str(folder))
     return heroes
 
 
@@ -280,6 +286,9 @@ def main(args):
         say("%d Paragon heroes in the project: %s" % (len(folders), ", ".join(f.split("/")[-1] for f in folders)))
         for folder in folders:
             add_one(the_map, folder, body_name(folder.split("/")[-1]), [], replace)
+            # Every clip was loaded to see whether it can play alone; let a
+            # hero's go before the next one's come in, or fifteen heroes do not fit.
+            unreal.SystemLibrary.collect_garbage()
     elif not add_one(the_map, args[0].rstrip("/"), args[1], args[2:], replace):
         return 1
 

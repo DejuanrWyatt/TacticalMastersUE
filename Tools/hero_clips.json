@@ -4,10 +4,6 @@
     "idle": "Idle",
     "run": "Run_Fwd",
     "cast": "Cast",
-    "hitFront": "HitReact_Front",
-    "hitBack": "HitReact_Back",
-    "hitLeft": "HitReact_Left",
-    "hitRight": "HitReact_Right",
     "victory": ["Emote_Bravo", "Emote_Taunt_PraiseMe_T1", "Emote_Master_Levitate_T3"],
     "motions": {
       "bolt": { "release": ["Primary_Attack_A_Medium", "Primary_Attack_B_Medium", "Primary_Attack_C_Medium"] },
