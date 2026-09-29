@@ -141,6 +141,8 @@ public:
 	/** The slider being dragged, or -1. 0 is the camera speed; 100 + i is rule number i. */
 	int32 DragSlider = -1;
 	static constexpr int32 SliderCameraSpeed = 0;
+	static constexpr int32 SliderOverhead = 1;
+	static constexpr int32 SliderStatusIcons = 2;
 	static constexpr int32 SliderTuning = 100;
 	/** Rule numbers changed during a battle, sent as one order once the dragging stops. */
 	TMap<int32, double> TunePending;

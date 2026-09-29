@@ -66,6 +66,14 @@ void ATMBattleHud::DrawOptions(ATMBattleDirector& From)
 	Slider(PX + LabelW, Y + 6.0f * S, ControlW, RowH - 12.0f * S, ATMBattleDirector::SliderCameraSpeed, Settings.CameraSpeed, 0.5, 2.0);
 	Text(FString::Printf(TEXT("%.2f"), Settings.CameraSpeed), PX + LabelW + ControlW + 16.0f * S, Y + 8.0f * S, TextColour, Font, 0.62f * S);
 	Y += RowH + 8.0f * S;
+	Label(TEXT("Overhead bar size"), Y, PX, TEXT("How big each unit's name and health bar are drawn over its head."));
+	Slider(PX + LabelW, Y + 6.0f * S, ControlW, RowH - 12.0f * S, ATMBattleDirector::SliderOverhead, Settings.OverheadScale, 0.6, 2.5);
+	Text(FString::Printf(TEXT("%.2fx"), Settings.OverheadScale), PX + LabelW + ControlW + 16.0f * S, Y + 8.0f * S, TextColour, Font, 0.62f * S);
+	Y += RowH + 8.0f * S;
+	Label(TEXT("Status icon size"), Y, PX, TEXT("How big the status icons under each unit's health bar are drawn."));
+	Slider(PX + LabelW, Y + 6.0f * S, ControlW, RowH - 12.0f * S, ATMBattleDirector::SliderStatusIcons, Settings.StatusIconScale, 0.6, 3.0);
+	Text(FString::Printf(TEXT("%.2fx"), Settings.StatusIconScale), PX + LabelW + ControlW + 16.0f * S, Y + 8.0f * S, TextColour, Font, 0.62f * S);
+	Y += RowH + 8.0f * S;
 	Label(TEXT("UI scale"), Y, PX, TEXT("How big the menus and battle panels are drawn."));
 	MenuButton(PX + LabelW, Y, 160.0f * S, RowH, FString::Printf(TEXT("%.0f%%"), Settings.UiScale * 100.0f), ETMHudAction::OptionUiScale);
 	Y += RowH + 8.0f * S;

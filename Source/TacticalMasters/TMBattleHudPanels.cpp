@@ -15,6 +15,10 @@
 #include "ImageUtils.h"
 #include "ImageCore.h"
 #include "Misc/Paths.h"
+#include "Misc/FileHelper.h"
+#include "HAL/FileManager.h"
+#include "Dom/JsonObject.h"
+#include "Serialization/JsonSerializer.h"
 #include "GameFramework/PlayerController.h"
 
 #include "TMBattleDirector.h"
@@ -51,6 +55,133 @@ namespace
 			return Unit.Casting.Ticks / Tps;
 		}
 		return Battle.TicksToReady(Unit) / Tps;
+	}
+
+	/**
+	 * The damage type the class creator gave each of a class's four abilities,
+	 * read once from the class files' creator notes ("creator.plan[slot].damageType",
+	 * else the class's first "creator.damageTypes"). The rules have no damage
+	 * types: this is only a word on the ability's tile.
+	 */
+	FString CreatorDamageType(const std::string& Job, int32 Slot)
+	{
+		static TMap<FString, TArray<FString>> Types;
+		static bool bRead = false;
+		if (!bRead)
+		{
+			bRead = true;
+			const FString Dir = FPaths::ProjectContentDir() / TEXT("Data/Classes");
+			TArray<FString> Files;
+			IFileManager::Get().FindFiles(Files, *(Dir / TEXT("*.tmclass.json")), true, false);
+			for (const FString& File : Files)
+			{
+				FString Json;
+				TSharedPtr<FJsonObject> Root;
+				if (!FFileHelper::LoadFileToString(Json, *(Dir / File))
+					|| !FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(Json), Root) || !Root.IsValid())
+				{
+					continue;
+				}
+				const TSharedPtr<FJsonObject>* Creator = nullptr;
+				if (!Root->TryGetObjectField(TEXT("creator"), Creator))
+				{
+					continue;
+				}
+				FString Whole;
+				const TArray<TSharedPtr<FJsonValue>>* List = nullptr;
+				if ((*Creator)->TryGetArrayField(TEXT("damageTypes"), List) && List->Num() > 0)
+				{
+					Whole = (*List)[0]->AsString();
+				}
+				TArray<FString> PerSlot = { Whole, Whole, Whole, Whole };
+				const TArray<TSharedPtr<FJsonValue>>* Plan = nullptr;
+				if ((*Creator)->TryGetArrayField(TEXT("plan"), Plan))
+				{
+					for (int32 i = 0; i < 4 && i < Plan->Num(); ++i)
+					{
+						const TSharedPtr<FJsonObject>* Step = nullptr;
+						FString Type;
+						if ((*Plan)[i]->TryGetObject(Step) && (*Step)->TryGetStringField(TEXT("damageType"), Type) && !Type.IsEmpty())
+						{
+							PerSlot[i] = Type;
+						}
+					}
+				}
+				Types.Add(Root->GetStringField(TEXT("id")), PerSlot);
+			}
+		}
+		const TArray<FString>* Found = Types.Find(UTF8_TO_TCHAR(Job.c_str()));
+		return Found && Slot >= 0 && Slot < Found->Num() ? (*Found)[Slot] : FString();
+	}
+
+	/**
+	 * An ability's damage type and its colour: the creator's word when it gave
+	 * one, else guessed from the animation it borrows, else physical or magic
+	 * by which defence resists it.
+	 */
+	FString DamageType(const std::string& Job, int32 Slot, const TMSim::FAbility& Ability, FLinearColor& Colour)
+	{
+		FString Type = CreatorDamageType(Job, Slot).ToLower();
+		if (Type.IsEmpty())
+		{
+			const std::string& Fx = Ability.Fx;
+			Type = Fx == "fire" || Fx == "meteor" ? TEXT("fire")
+				: Fx == "blizzard" ? TEXT("ice")
+				: Fx == "holy_blade" || Fx == "sanctuary" ? TEXT("holy")
+				: Fx == "earth_slash" ? TEXT("earth")
+				: Ability.Scale == TMSim::EScale::Att ? TEXT("physical") : TEXT("magic");
+		}
+		static const TMap<FString, FLinearColor> Colours =
+		{
+			{ TEXT("fire"), FLinearColor(1.0f, 0.55f, 0.2f) },
+			{ TEXT("ice"), FLinearColor(0.6f, 0.9f, 1.0f) },
+			{ TEXT("water"), FLinearColor(0.35f, 0.6f, 1.0f) },
+			{ TEXT("lightning"), FLinearColor(1.0f, 0.95f, 0.35f) },
+			{ TEXT("earth"), FLinearColor(0.8f, 0.6f, 0.35f) },
+			{ TEXT("wind"), FLinearColor(0.65f, 1.0f, 0.8f) },
+			{ TEXT("nature"), FLinearColor(0.5f, 0.95f, 0.4f) },
+			{ TEXT("holy"), FLinearColor(1.0f, 0.9f, 0.55f) },
+			{ TEXT("shadow"), FLinearColor(0.75f, 0.5f, 1.0f) },
+			{ TEXT("magic"), FLinearColor(0.75f, 0.6f, 1.0f) },
+			{ TEXT("physical"), FLinearColor(0.9f, 0.85f, 0.8f) },
+		};
+		const FLinearColor* Found = Colours.Find(Type);
+		Colour = Found ? *Found : FLinearColor(0.9f, 0.9f, 0.9f);
+		return Type.Left(1).ToUpper() + Type.Mid(1);
+	}
+
+	/** What an ability does, in two or three words for its tile: "36 Fire", "+30 Heal". */
+	FString TileEffect(const TMSim::FUnit& Unit, int32 Slot, const TMSim::FAbility& Ability, FLinearColor& Colour)
+	{
+		auto Word = [](const std::string& Id)
+		{
+			FString Out = UTF8_TO_TCHAR(Id.c_str());
+			Out.ReplaceInline(TEXT("_"), TEXT(" "));
+			return Out.Left(1).ToUpper() + Out.Mid(1);
+		};
+		switch (Ability.Effect)
+		{
+		case TMSim::EEffect::Damage:
+			return FString::Printf(TEXT("%d %s"), TMSim::RoundToInt(Ability.Power), *DamageType(Unit.Job, Slot, Ability, Colour));
+		case TMSim::EEffect::Heal:
+			Colour = FLinearColor(0.45f, 0.95f, 0.5f);
+			return FString::Printf(TEXT("+%d Heal"), TMSim::RoundToInt(Ability.Power));
+		case TMSim::EEffect::Revive:
+			Colour = FLinearColor(0.45f, 0.95f, 0.5f);
+			return FString::Printf(TEXT("Revive %d%%"), TMSim::RoundToInt(Ability.Power * 100.0f));
+		default:
+			break;
+		}
+		Colour = FLinearColor(0.45f, 0.8f, 1.0f);
+		if (Ability.HasStatus())
+		{
+			return Word(Ability.StatusId);
+		}
+		if (Ability.TgChange != 0)
+		{
+			return FString::Printf(TEXT("TG %+d%%"), Ability.TgChange);
+		}
+		return Ability.Buffs.empty() ? FString(TEXT("Utility")) : FString(TEXT("Buff"));
 	}
 
 	/** What an ability is for, and its colour (jobs.gd:345-366). */
@@ -1022,16 +1153,18 @@ void ATMBattleHud::DrawOverheads(ATMBattleDirector& From)
 	{
 		const TMSim::FUnit& Unit = *Head.Unit;
 		const bool bFriend = From.IsFriend(Unit);
-		const float W = 124.0f * S;
-		const float H = 14.0f * S;
+		// Sized as Options says (Overhead bar size, Status icon size).
+		const float O = FTMSettings::Get().OverheadScale;
+		const float W = 124.0f * S * O;
+		const float H = 14.0f * S * O;
 		const float X = Head.At.X - W * 0.5f;
 		float Y = Head.At.Y;
 
 		// The name, gold for the unit being ordered.
 		const FString Name = FString::Printf(TEXT("%s %d"), *JobName(Unit), Unit.Id);
-		const FVector2D NameSize = TextSize(Name, Font, 0.36f * S);
+		const FVector2D NameSize = TextSize(Name, Font, 0.36f * S * O);
 		Text(Name, Head.At.X - NameSize.X * 0.5f, Y - NameSize.Y - 1.0f * S,
-			Unit.Id == From.SelectedId ? Gold : TextColour, Font, 0.36f * S);
+			Unit.Id == From.SelectedId ? Gold : TextColour, Font, 0.36f * S * O);
 
 		if (!Unit.IsAlive())
 		{
@@ -1060,7 +1193,7 @@ void ATMBattleHud::DrawOverheads(ATMBattleDirector& From)
 			Slant(X + From0, Y, FMath::Min(W - From0, W * Soak / MaxHp), H, FLinearColor(1.0f, 1.0f, 1.0f, 0.75f), 6.0f * S);
 		}
 		const FString Hp = FString::FromInt(Unit.Hp);
-		Text(Hp, X + 10.0f * S, Y + (H - TextSize(Hp, Font, 0.34f * S).Y) * 0.5f, FLinearColor::White, Font, 0.34f * S);
+		Text(Hp, X + 10.0f * S * O, Y + (H - TextSize(Hp, Font, 0.34f * S * O).Y) * 0.5f, FLinearColor::White, Font, 0.34f * S * O);
 		Y += H + 3.0f * S;
 
 		// A spell on its way out: how long it has left.
@@ -1072,7 +1205,7 @@ void ATMBattleHud::DrawOverheads(ATMBattleDirector& From)
 		}
 
 		// Its statuses, centred under the bar.
-		const float Chip = 18.0f * S;
+		const float Chip = 18.0f * S * FTMSettings::Get().StatusIconScale;
 		const float Across = Unit.Statuses.size() * Chip * 1.15f - Chip * 0.15f;
 		StatusChips(Unit, Head.At.X - Across * 0.5f, Y, Chip, false, false);
 	}
@@ -1126,25 +1259,59 @@ void ATMBattleHud::AbilityTile(ATMBattleDirector& From, const TMSim::FUnit& Unit
 		const FVector2D TurnSize = TextSize(Turns, Big, Size / 110.0f);
 		Text(Turns, X + (Size - TurnSize.X) * 0.5f, Y + (Size - TurnSize.Y) * 0.5f, FLinearColor::White, Big, Size / 110.0f);
 	}
-	if (bPassive)
+	// On the action bar, the tile says what it is: its name across the top and
+	// what it does across the bottom ("36 Fire"), in the damage type's colour.
+	// The enemy panel's tiles are too small for words; their tooltips say it.
+	float Top = Y;
+	if (bButton)
+	{
+		const float Band = Size * 0.2f;
+		auto Fitted = [&](const FString& What, float Row, const FLinearColor& Colour)
+		{
+			float Scale = Size / 260.0f;
+			FVector2D Wide = TextSize(What, Font, Scale);
+			if (Wide.X > Size - 6.0f * S)
+			{
+				Scale *= (Size - 6.0f * S) / Wide.X;
+				Wide = TextSize(What, Font, Scale);
+			}
+			Text(What, X + (Size - Wide.X) * 0.5f, Row + (Band - Wide.Y) * 0.5f, Colour, Font, Scale);
+		};
+		const float Fade = bColour || bPassive ? 1.0f : 0.6f;
+		DrawRect(FLinearColor(0.0f, 0.0f, 0.0f, 0.7f), X, Y, Size, Band);
+		Fitted(UTF8_TO_TCHAR(Ability->Name.c_str()), Y, TextColour * FLinearColor(1, 1, 1, Fade));
+		DrawRect(FLinearColor(0.0f, 0.0f, 0.0f, 0.7f), X, Y + Size - Band, Size, Band);
+		FLinearColor EffectColour = TextColour;
+		FString Effect = bPassive ? FString(Ability->Kind == "aura" ? TEXT("AURA") : TEXT("PASSIVE"))
+			: TileEffect(Unit, Slot, *Ability, EffectColour);
+		if (bPassive)
+		{
+			EffectColour = Dim;
+		}
+		Fitted(Effect, Y + Size - Band, EffectColour * FLinearColor(1, 1, 1, Fade));
+		Top = Y + Band;
+	}
+	else if (bPassive)
 	{
 		const FString Word = Ability->Kind == "aura" ? TEXT("AURA") : TEXT("PASSIVE");
 		DrawRect(FLinearColor(0.0f, 0.0f, 0.0f, 0.6f), X, Y, Size, Size * 0.22f);
 		Text(Word, X + 3.0f * S, Y + 1.0f * S, Dim, Font, Size / 300.0f);
 	}
-	else if (Ability->Cast > 0.0f && bColour)
+	if (!bPassive && Ability->Cast > 0.0f && bColour)
 	{
 		// A cast time, in the corner.
 		const FString Cast = FString::Printf(TEXT("%.1fs"), From.Battle.CastTicks(*Ability) / Tps);
 		const FVector2D CastSize = TextSize(Cast, Font, Size / 300.0f);
-		DrawRect(CastColour * FLinearColor(0.4f, 0.4f, 0.4f, 0.9f), X + Size - CastSize.X - 6.0f * S, Y, CastSize.X + 6.0f * S, CastSize.Y);
-		Text(Cast, X + Size - CastSize.X - 3.0f * S, Y, FLinearColor::White, Font, Size / 300.0f);
+		DrawRect(CastColour * FLinearColor(0.4f, 0.4f, 0.4f, 0.9f), X + Size - CastSize.X - 6.0f * S, Top, CastSize.X + 6.0f * S, CastSize.Y);
+		Text(Cast, X + Size - CastSize.X - 3.0f * S, Top, FLinearColor::White, Font, Size / 300.0f);
 	}
 	if (bButton)
 	{
-		// Its key, bottom left.
+		// Its key, in a badge on the tile's top left corner.
 		const FString Key = FTMSettings::Get().KeyName(static_cast<ETMAction>(static_cast<int32>(ETMAction::Ability1) + Slot));
-		Text(Key, X + 4.0f * S, Y + Size - TextSize(Key, Font, Size / 260.0f).Y - 1.0f * S, bColour ? TextColour : Dim, Font, Size / 260.0f);
+		const FVector2D KeySize = TextSize(Key, Font, Size / 300.0f);
+		DrawRect(FLinearColor(0.0f, 0.0f, 0.0f, 0.85f), X - 4.0f * S, Y - KeySize.Y - 2.0f * S, KeySize.X + 8.0f * S, KeySize.Y + 2.0f * S);
+		Text(Key, X, Y - KeySize.Y - 1.0f * S, bColour ? TextColour : Dim, Font, Size / 300.0f);
 		AddButton(X, Y, Size, Size, ETMHudAction::Ability, Slot);
 	}
 	FString ClassName;

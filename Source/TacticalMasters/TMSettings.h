@@ -70,6 +70,10 @@ public:
 	 */
 	bool bTurnSquares = true;
 
+	/** How big the name and health over each unit are drawn, and its status icons (Options). */
+	float OverheadScale = 1.35f;
+	float StatusIconScale = 1.5f;
+
 	/**
 	 * Where each panel has been moved to in Edit layout, as how far it is
 	 * nudged from where it normally sits, in 1080p pixels -- so it still

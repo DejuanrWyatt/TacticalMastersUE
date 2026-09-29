@@ -3310,6 +3310,13 @@ bool ATMBattleDirector::SliderRange(int32 Id, double& Low, double& High, double&
 		Step = 0.05;
 		return true;
 	}
+	if (Id == SliderOverhead || Id == SliderStatusIcons)
+	{
+		Low = 0.6;
+		High = Id == SliderOverhead ? 2.5 : 3.0;
+		Step = 0.05;
+		return true;
+	}
 	const int32 Index = Id - SliderTuning;
 	if (Index >= 0 && Index < static_cast<int32>(TMSim::TuningKeys().size()))
 	{
@@ -3327,6 +3334,14 @@ double ATMBattleDirector::SliderValue(int32 Id) const
 	if (Id == SliderCameraSpeed)
 	{
 		return FTMSettings::Get().CameraSpeed;
+	}
+	if (Id == SliderOverhead)
+	{
+		return FTMSettings::Get().OverheadScale;
+	}
+	if (Id == SliderStatusIcons)
+	{
+		return FTMSettings::Get().StatusIconScale;
 	}
 	const int32 Index = Id - SliderTuning;
 	if (Index < 0 || Index >= static_cast<int32>(TMSim::TuningKeys().size()))
@@ -3348,6 +3363,16 @@ void ATMBattleDirector::SetSlider(int32 Id, double Value)
 	if (Id == SliderCameraSpeed)
 	{
 		Settings.CameraSpeed = static_cast<float>(Value);
+		return;
+	}
+	if (Id == SliderOverhead)
+	{
+		Settings.OverheadScale = static_cast<float>(Value);
+		return;
+	}
+	if (Id == SliderStatusIcons)
+	{
+		Settings.StatusIconScale = static_cast<float>(Value);
 		return;
 	}
 	const int32 Index = Id - SliderTuning;

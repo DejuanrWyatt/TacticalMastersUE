@@ -601,7 +601,7 @@ void ATMBattleHud::DrawActionBar(ATMBattleDirector& From)
 	const bool bControllable = From.PlayerCanOrder(Unit);
 
 	UFont* Font = GEngine->GetMediumFont();
-	const float Tile = 86.0f * S;
+	const float Tile = 100.0f * S;
 	const float Small = 64.0f * S;
 	const float Gap = 10.0f * S;
 	const float Total = 3.0f * Small + 4.0f * Tile + 6.0f * Gap + 20.0f * S;
