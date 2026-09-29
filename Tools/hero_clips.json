@@ -53,7 +53,8 @@
           "Cast"
         ]
       }
-    }
+    },
+    "ult": "Blackhole_Start"
   },
   "countess": {
     "idle": "Idle_Straight",
@@ -108,7 +109,8 @@
     "hit": [
       "Knock_Fwd",
       "Knock_Bwd"
-    ]
+    ],
+    "ult": "Ability_Ultimate"
   },
   "dekker": {
     "stunned": "Stun_Loop",
@@ -225,7 +227,8 @@
     "hit": [
       "Knock_Fwd",
       "Knock_Bwd"
-    ]
+    ],
+    "ult": "Ultimate_V2"
   },
   "grim": {
     "stunned": "Stun_Loop",
@@ -321,7 +324,8 @@
     "hit": [
       "KnockBack",
       "Knock_Back"
-    ]
+    ],
+    "ult": "Ability_Q"
   },
   "howitzer": {
     "walk": "Run_Fwd",
@@ -437,7 +441,8 @@
     "hit": [
       "Knockback_Fwd",
       "Knockback_Bwd"
-    ]
+    ],
+    "ult": "TheEleven"
   },
   "muriel": {
     "stunned": "Stun_Loop",
@@ -492,7 +497,9 @@
     "hit": [
       "Knock_Back_Fwd",
       "Knock_Back_Bwd"
-    ]
+    ],
+    "ult": "Ultimate_Flare",
+    "ult_support": "Ultimate_Flare"
   },
   "serath": {
     "stunned": "Stun_Idle",
@@ -554,7 +561,9 @@
     "hit": [
       "Knockback_Fwd",
       "Knockback_Bwd"
-    ]
+    ],
+    "ult": "Q_Ability_Attack_C",
+    "ult_support": "E_Ability_Wing_Flap_Holy"
   },
   "sevarog": {
     "stunned": "Stun_Loop",
@@ -617,7 +626,8 @@
     "hit": [
       "Knock_back",
       "Knock_back_bwd"
-    ]
+    ],
+    "ult": "Ultimate_Swing_120fps"
   },
   "shinbi": {
     "stunned": "Stunned_Loop",
@@ -674,6 +684,1132 @@
     "hit": [
       "Knockback_Front",
       "Knockback_Rear"
-    ]
+    ],
+    "ult": "Ability_R_PeaceOut"
+  },
+  "greystone": {
+    "idle": "Idle",
+    "death": [
+      "Death"
+    ],
+    "stunned": "Stun_Idle",
+    "block": "Deflect_InPlace",
+    "victory": [
+      "Emote_Taunt_BringItOn_T1",
+      "Emote_Taunt_SwordPoint_T1",
+      "Emote_Master_SwordPlay_T3"
+    ],
+    "motions": {
+      "melee": {
+        "release": [
+          "Attack_A_Med",
+          "Attack_B_Med",
+          "Attack_C_Med"
+        ]
+      },
+      "heavy": {
+        "release": [
+          "Ability_Ultimate"
+        ]
+      },
+      "area": {
+        "release": [
+          "Ability_E"
+        ]
+      },
+      "bolt": {
+        "release": [
+          "Ability_Q"
+        ]
+      },
+      "dash": {
+        "release": [
+          "Ability_R"
+        ]
+      },
+      "buff": {
+        "release": [
+          "Cast"
+        ]
+      },
+      "heal": {
+        "release": [
+          "Cast"
+        ]
+      }
+    },
+    "ult": "Ability_Ultimate"
+  },
+  "steel": {
+    "idle": "Steel_Idle_Combat",
+    "walk": "Steel_Jog_Fwd_Combat",
+    "run": "Steel_Run_Fwd",
+    "death": [
+      "Steel_Death_A",
+      "Steel_Death_B"
+    ],
+    "hit": [
+      "Steel_KnockBack",
+      "Steel_KnockBack_Bwd"
+    ],
+    "block": "Steel_Ability_Block_Idle",
+    "victory": [
+      "Victory_Emote",
+      "Emote_Taunt_Bow_T1",
+      "Emote_Master_ShieldBang_T3"
+    ],
+    "motions": {
+      "melee": {
+        "release": [
+          "Steel_Attack_Melee_A_Normal_V1",
+          "Steel_Attack_Melee_B_Normal_V1",
+          "Steel_Attack_Melee_C_Normal_V1"
+        ]
+      },
+      "heavy": {
+        "release": [
+          "Steel_Attack_GuardBreak_A"
+        ]
+      },
+      "area": {
+        "windup": "Steel_Ability_GroundSmash_Loop",
+        "release": [
+          "Steel_Ability_GroundSmash_End"
+        ]
+      },
+      "bolt": {
+        "release": [
+          "Steel_Ability_Shield_Throw"
+        ]
+      },
+      "dash": {
+        "release": [
+          "Steel_Ability_CowCatcher_Charge"
+        ]
+      },
+      "buff": {
+        "release": [
+          "Steel_Ability_ShieldBlock_Deploy"
+        ]
+      },
+      "heal": {
+        "release": [
+          "Cast"
+        ]
+      }
+    },
+    "ult": "Steel_Ability_Ultimate_Intro"
+  },
+  "terra": {
+    "idle": "Idle",
+    "death": [
+      "Death"
+    ],
+    "hit": [
+      "Knockback_front",
+      "Knockback_back"
+    ],
+    "stunned": "Stun_Idle",
+    "victory": [
+      "Emote_HooRah",
+      "Emote_Laugh",
+      "Emote_SharpenAxe"
+    ],
+    "motions": {
+      "melee": {
+        "release": [
+          "Primary_Melee_A_slow",
+          "Primary_Melee_B_slow",
+          "Primary_Melee_C_slow"
+        ]
+      },
+      "heavy": {
+        "release": [
+          "Q_swing_B"
+        ]
+      },
+      "area": {
+        "release": [
+          "E_ability"
+        ]
+      },
+      "dash": {
+        "release": [
+          "RMB_melee"
+        ]
+      },
+      "buff": {
+        "intro": "R_Intro",
+        "release": [
+          "R_helmet_closing"
+        ]
+      },
+      "heal": {
+        "release": [
+          "Cast"
+        ]
+      }
+    },
+    "ult": "R_ending"
+  },
+  "kwang": {
+    "idle": "Idle",
+    "death": [
+      "Death_Bwd"
+    ],
+    "hit": [
+      "Knockback_Fwd",
+      "Knockback_Bwd"
+    ],
+    "stunned": "Stun_Loop",
+    "victory": [
+      "Emote_SwordPoint_M1",
+      "Emote_Laugh",
+      "Emote_RallyUp"
+    ],
+    "motions": {
+      "melee": {
+        "release": [
+          "PrimaryAttack_A_Slow",
+          "PrimaryAttack_B_Slow",
+          "PrimaryAttack_C_Slow"
+        ]
+      },
+      "heavy": {
+        "intro": "Ability_R_Intro",
+        "release": [
+          "Ability_R"
+        ]
+      },
+      "bolt": {
+        "intro": "Ability_Q_Targeting_Intro",
+        "windup": "Ability_Q_Targeting",
+        "release": [
+          "Ability_Q_Throw"
+        ]
+      },
+      "area": {
+        "release": [
+          "Ability_RMB"
+        ]
+      },
+      "dash": {
+        "release": [
+          "Ability_RMB"
+        ]
+      },
+      "buff": {
+        "release": [
+          "Cast"
+        ]
+      },
+      "heal": {
+        "release": [
+          "Cast"
+        ]
+      }
+    },
+    "ult": "Ability_R"
+  },
+  "iggyscorch": {
+    "death": [
+      "Death_Front",
+      "Death_Back"
+    ],
+    "hit": [
+      "IggyScorch_KnockBack",
+      "IggyScorch_KnockBack_Bwd"
+    ],
+    "stunned": "IggyScorch_Stun_Loop",
+    "victory": [
+      "Emote_NaNaBooBoo",
+      "Emote_Master_BuckingBronco_T3"
+    ],
+    "motions": {
+      "shoot": {
+        "release": [
+          "Primary_Med_Fire",
+          "Primary_Fast_Fire",
+          "Primary_Slow_Fire"
+        ]
+      },
+      "bolt": {
+        "release": [
+          "Primary_Med_Fire",
+          "Primary_Fast_Fire",
+          "Primary_Slow_Fire"
+        ]
+      },
+      "melee": {
+        "release": [
+          "Primary_Med_Fire"
+        ]
+      },
+      "area": {
+        "release": [
+          "Q_Ability_Throw"
+        ]
+      },
+      "heavy": {
+        "windup": "IggyScorch_Ultimate_Targeting_Loop",
+        "release": [
+          "IggyScorch_Ultimate"
+        ]
+      },
+      "channel": {
+        "intro": "R_Ability_Fire",
+        "release": [
+          "R_Ability_FireBreath_Loop"
+        ]
+      },
+      "buff": {
+        "release": [
+          "E_Ability"
+        ]
+      },
+      "heal": {
+        "release": [
+          "Cast"
+        ]
+      }
+    },
+    "ult": "IggyScorch_Ultimate"
+  },
+  "aurora": {
+    "idle": "Idle",
+    "death": [
+      "Death"
+    ],
+    "hit": [
+      "Knockback_Fwd",
+      "Knockback_Bwd"
+    ],
+    "stunned": "Stun_Loop",
+    "victory": [
+      "Emote_Ice_Sculpture",
+      "Emote_Laugh_T1",
+      "Emote_Slice"
+    ],
+    "motions": {
+      "melee": {
+        "release": [
+          "Primary_Attack_A",
+          "Primary_Attack_B",
+          "Primary_Attack_C"
+        ]
+      },
+      "bolt": {
+        "intro": "Ability_Q_Targeting_Intro",
+        "windup": "Ability_Q_Targeting",
+        "release": [
+          "Ability_Q"
+        ]
+      },
+      "area": {
+        "release": [
+          "Ability_E"
+        ]
+      },
+      "heavy": {
+        "windup": "Ability_R_Targeting",
+        "release": [
+          "Ability_R"
+        ]
+      },
+      "dash": {
+        "release": [
+          "Ability_RMB_Fwd"
+        ]
+      },
+      "buff": {
+        "release": [
+          "Cast"
+        ]
+      },
+      "heal": {
+        "release": [
+          "Cast"
+        ]
+      }
+    },
+    "ult": "Ability_R"
+  },
+  "morigesh": {
+    "idle": "Idle",
+    "death": [
+      "Death"
+    ],
+    "hit": [
+      "Knock_Back",
+      "Knock_Back_Bwd"
+    ],
+    "stunned": "Stun_Loop",
+    "victory": [
+      "Emote_BlowSmoke",
+      "Emote_Taunt",
+      "Emote_SwordSwallow"
+    ],
+    "motions": {
+      "melee": {
+        "release": [
+          "PrimaryAttack_A_Slow",
+          "PrimaryAttack_B_Slow",
+          "PrimaryAttack_C_Slow"
+        ]
+      },
+      "bolt": {
+        "windup": "Ability_Q_Targeting",
+        "release": [
+          "Ability_Q"
+        ]
+      },
+      "area": {
+        "windup": "Ability_E_Targeting_Idle",
+        "release": [
+          "Ability_E"
+        ]
+      },
+      "heavy": {
+        "release": [
+          "Ability_R"
+        ]
+      },
+      "channel": {
+        "release": [
+          "Ability_R_SpectralVersion"
+        ]
+      },
+      "dash": {
+        "release": [
+          "Ability_RMB"
+        ]
+      },
+      "buff": {
+        "release": [
+          "Cast"
+        ]
+      },
+      "heal": {
+        "release": [
+          "Cast"
+        ]
+      }
+    },
+    "ult": "Ability_R"
+  },
+  "revenant": {
+    "idle": "Idle",
+    "death": [
+      "Death_Forward",
+      "Death_Backward"
+    ],
+    "hit": [
+      "Knockback_Fwd",
+      "Knockback_Bwd"
+    ],
+    "stunned": "Stun_Idle",
+    "victory": [
+      "Emote_Hat_Lift",
+      "Emote_I_See_You",
+      "Emote_ComeHere"
+    ],
+    "motions": {
+      "shoot": {
+        "release": [
+          "Primary_Fire_Med",
+          "Primary_Fire_Fast",
+          "Primary_Fire_Slow"
+        ]
+      },
+      "melee": {
+        "release": [
+          "Primary_Fire_Med"
+        ]
+      },
+      "bolt": {
+        "windup": "Q_Ability_Targeting_Loop",
+        "release": [
+          "Q_Ability"
+        ]
+      },
+      "area": {
+        "windup": "E_Targeting_Loop",
+        "release": [
+          "E_Ability"
+        ]
+      },
+      "heavy": {
+        "windup": "R_Ability_Targeting_Loop",
+        "release": [
+          "R_Ability"
+        ]
+      },
+      "dash": {
+        "release": [
+          "RMB"
+        ]
+      },
+      "buff": {
+        "release": [
+          "Cast"
+        ]
+      },
+      "heal": {
+        "release": [
+          "Cast"
+        ]
+      }
+    },
+    "ult": "R_Ability"
+  },
+  "fey": {
+    "idle": "Idle",
+    "death": [
+      "Death_Fwd"
+    ],
+    "hit": [
+      "Knockback_Fwd",
+      "KnockBack_Bwd"
+    ],
+    "stunned": "Stunned_Loop",
+    "victory": [
+      "Emote_GiveFlower_M1",
+      "Emote_Dance_Flapper_T3",
+      "Emote_Stomp_M2"
+    ],
+    "motions": {
+      "bolt": {
+        "release": [
+          "Ability_LMB_A_Medium",
+          "Ability_LMB_B_Medium"
+        ]
+      },
+      "melee": {
+        "release": [
+          "Ability_LMB_A_Medium",
+          "Ability_LMB_B_Medium"
+        ]
+      },
+      "area": {
+        "intro": "Ability_E_Intro",
+        "windup": "Ability_E_Targeting",
+        "release": [
+          "Ability_E"
+        ]
+      },
+      "heal": {
+        "intro": "Ability_Q_Intro",
+        "windup": "Ability_Q_Targeting",
+        "release": [
+          "Ability_Q"
+        ]
+      },
+      "revive": {
+        "intro": "Ability_Q_Intro",
+        "release": [
+          "Ability_Q"
+        ]
+      },
+      "buff": {
+        "intro": "Ability_RMB_Intro",
+        "release": [
+          "Ability_RMB"
+        ]
+      },
+      "heavy": {
+        "intro": "Ability_R_Intro",
+        "windup": "Ability_R_Targeting",
+        "release": [
+          "Ability_R"
+        ]
+      }
+    },
+    "ult": "Ability_R",
+    "ult_support": "Ability_R"
+  },
+  "phase": {
+    "idle": "Idle",
+    "death": [
+      "Death"
+    ],
+    "hit": [
+      "KnockBack",
+      "KnockBack_BWD"
+    ],
+    "stunned": "Stun_Loop",
+    "victory": [
+      "Emote_Headphones",
+      "Emote_TalkToHand",
+      "Emote_TeddySaysNo"
+    ],
+    "motions": {
+      "bolt": {
+        "release": [
+          "Primary_Attack_A_Medium",
+          "Primary_Attack_B_Medium",
+          "Primary_Attack_C_Medium"
+        ]
+      },
+      "melee": {
+        "release": [
+          "Primary_Attack_A_Medium"
+        ]
+      },
+      "area": {
+        "release": [
+          "Ability_E"
+        ]
+      },
+      "heal": {
+        "release": [
+          "Ability_Q"
+        ]
+      },
+      "buff": {
+        "release": [
+          "Ability_Q"
+        ]
+      },
+      "channel": {
+        "intro": "R_Ability_Intro",
+        "release": [
+          "R_Ability_Loop"
+        ]
+      },
+      "heavy": {
+        "intro": "RMB_Intro",
+        "windup": "RMB_Loop",
+        "release": [
+          "RMB_Throw"
+        ]
+      }
+    },
+    "ult": "RMB_Throw",
+    "ult_support": "R_Ability_Intro"
+  },
+  "kallari": {
+    "death": [
+      "Death_A",
+      "Death_B"
+    ],
+    "hit": [
+      "Knock_Back",
+      "Knock_Back_Bwd"
+    ],
+    "stunned": "Stun_Idle",
+    "block": "Ability_Block",
+    "evade": "Evade_Bwd_Mid",
+    "victory": [
+      "Victory_Emote",
+      "Emote_Taunt_Shhh_T1",
+      "Emote_Master_DaggerFlourish_T3"
+    ],
+    "motions": {
+      "melee": {
+        "release": [
+          "Attack_Melee_A",
+          "Attack_Melee_B",
+          "Attack_Melee_C"
+        ]
+      },
+      "heavy": {
+        "release": [
+          "Ability_Ultimate"
+        ]
+      },
+      "dash": {
+        "release": [
+          "Attack_Melee_C_Dash"
+        ]
+      },
+      "bolt": {
+        "windup": "Ability_MarkedForDeath_Targeting",
+        "release": [
+          "Ability_MarkedForDeath_Cast"
+        ]
+      },
+      "area": {
+        "release": [
+          "Attack_GuardBreak_A"
+        ]
+      },
+      "buff": {
+        "release": [
+          "Cast"
+        ]
+      },
+      "heal": {
+        "release": [
+          "Cast"
+        ]
+      }
+    },
+    "ult": "Ability_Ultimate"
+  },
+  "yin": {
+    "idle": "Idle_Combat",
+    "death": [
+      "Death"
+    ],
+    "hit": [
+      "Knockback_Fwd",
+      "Knockback_Bwd"
+    ],
+    "stunned": "Stun_Idle",
+    "victory": [
+      "Emote_WhipCrack",
+      "Emote_WannaPlay",
+      "Emote_Indie"
+    ],
+    "motions": {
+      "melee": {
+        "release": [
+          "Primary_Attack_A_Slow",
+          "Primary_Attack_B_Slow",
+          "Primary_Attack_C_Medium"
+        ]
+      },
+      "heavy": {
+        "release": [
+          "R_Ability"
+        ]
+      },
+      "bolt": {
+        "intro": "Q_Targeting_Intro",
+        "windup": "Q_Targeting_Loop",
+        "release": [
+          "Q_Pull_Kick"
+        ]
+      },
+      "area": {
+        "intro": "E_Ability_Intro",
+        "release": [
+          "E_Ability_Attack_A",
+          "E_Ability_Attack_B"
+        ]
+      },
+      "dash": {
+        "release": [
+          "RMB"
+        ]
+      },
+      "buff": {
+        "release": [
+          "Cast"
+        ]
+      },
+      "heal": {
+        "release": [
+          "Cast"
+        ]
+      }
+    },
+    "ult": "R_Ability"
+  },
+  "wukong": {
+    "idle": "Idle",
+    "death": [
+      "Death"
+    ],
+    "hit": [
+      "Knockback",
+      "Knockfwd"
+    ],
+    "stunned": "Stun_Loop",
+    "victory": [
+      "Emote_MonkeyTaunt",
+      "Emote_ComeHere",
+      "Emote_Sleepy"
+    ],
+    "motions": {
+      "melee": {
+        "release": [
+          "Primary_Melee_A_Slow",
+          "Primary_Melee_B_Slow",
+          "Primary_Melee_C_Slow"
+        ]
+      },
+      "heavy": {
+        "release": [
+          "Q_Slam"
+        ]
+      },
+      "dash": {
+        "release": [
+          "Q_Flip_Fwd"
+        ]
+      },
+      "area": {
+        "release": [
+          "RMB_Hit"
+        ]
+      },
+      "bolt": {
+        "windup": "RMB_Targeting_Loop",
+        "release": [
+          "RMB_Push"
+        ]
+      },
+      "buff": {
+        "release": [
+          "Cast"
+        ]
+      },
+      "heal": {
+        "release": [
+          "Cast"
+        ]
+      }
+    },
+    "ult": "Q_Slam"
+  },
+  "crunch": {
+    "idle": "Idle_Combat",
+    "death": [
+      "Death_A"
+    ],
+    "hit": [
+      "Knockback_Front",
+      "Knockback_Back"
+    ],
+    "stunned": "Stunned_Loop",
+    "victory": [
+      "Emote_RaisedFist",
+      "Emote_King",
+      "Emote_ThrowDown"
+    ],
+    "motions": {
+      "melee": {
+        "release": [
+          "Ability_Combo_01",
+          "Ability_Combo_02",
+          "Ability_Combo_03"
+        ]
+      },
+      "heavy": {
+        "release": [
+          "Ability_Hook_Empowered"
+        ]
+      },
+      "bolt": {
+        "release": [
+          "Ability_Hook"
+        ]
+      },
+      "area": {
+        "release": [
+          "Ability_Uppercut"
+        ]
+      },
+      "dash": {
+        "release": [
+          "Ability_DashingCross"
+        ]
+      },
+      "buff": {
+        "release": [
+          "Cast"
+        ]
+      },
+      "heal": {
+        "release": [
+          "Cast"
+        ]
+      }
+    },
+    "ult": "Ability_Hook_Empowered"
+  },
+  "rampage": {
+    "idle": "Idle",
+    "walk": "Jog_Biped_Fwd",
+    "run": "Run_Fwd",
+    "death": [
+      "Death_A"
+    ],
+    "hit": [
+      "KnockBack",
+      "KnockBack_Bwd"
+    ],
+    "stunned": "Stun_Idle",
+    "victory": [
+      "Emote_Master_Roar_T3",
+      "Emote_Taunt_ThrowDirtRoar_T1"
+    ],
+    "motions": {
+      "melee": {
+        "release": [
+          "Attack_Biped_Melee_A",
+          "Attack_Biped_Melee_B",
+          "Attack_Biped_Melee_C"
+        ]
+      },
+      "heavy": {
+        "release": [
+          "Ability_RipNToss_Toss"
+        ]
+      },
+      "bolt": {
+        "release": [
+          "Ability_RipNToss_Toss"
+        ]
+      },
+      "area": {
+        "windup": "Ability_GroundSmash_Loop",
+        "release": [
+          "Ability_GroundSmash_End"
+        ]
+      },
+      "dash": {
+        "release": [
+          "Ability_RMB_Smash"
+        ]
+      },
+      "buff": {
+        "release": [
+          "Ability_Energize"
+        ]
+      },
+      "heal": {
+        "release": [
+          "Cast"
+        ]
+      }
+    },
+    "ult": "Ability_RipNToss_Toss_Enraged"
+  },
+  "grux": {
+    "idle": "Idle",
+    "death": [
+      "Death_A",
+      "Death_B"
+    ],
+    "hit": [
+      "Knock_Back",
+      "Knock_Back_Bwd"
+    ],
+    "stunned": "Stun_Idle",
+    "victory": [
+      "Emote_Master_BattleCry_T3",
+      "Emote_Taunt_FootSlide_T1"
+    ],
+    "motions": {
+      "melee": {
+        "release": [
+          "PrimaryAttack_LA",
+          "PrimaryAttack_RA",
+          "PrimaryAttack_LB"
+        ]
+      },
+      "heavy": {
+        "release": [
+          "PrimaryAttack_FourStrikes"
+        ]
+      },
+      "dash": {
+        "release": [
+          "Stampede"
+        ]
+      },
+      "area": {
+        "release": [
+          "DoublePain"
+        ]
+      },
+      "bolt": {
+        "release": [
+          "PrimaryAttack_RB"
+        ]
+      },
+      "buff": {
+        "release": [
+          "Ultimate_Roar"
+        ]
+      },
+      "heal": {
+        "release": [
+          "Cast"
+        ]
+      }
+    },
+    "ult": "PrimaryAttack_FourStrikes"
+  },
+  "khaimera": {
+    "death": [
+      "Death_A",
+      "Death_B"
+    ],
+    "hit": [
+      "Knockback_Front",
+      "Knockback_Back"
+    ],
+    "stunned": "Stunned_Loop",
+    "victory": [
+      "Emote_Taunt_Howl_T1",
+      "Emote_Master_Haunted_T3"
+    ],
+    "motions": {
+      "melee": {
+        "release": [
+          "Melee_A",
+          "Melee_B",
+          "Melee_C"
+        ]
+      },
+      "heavy": {
+        "intro": "R_Ability_Intro",
+        "release": [
+          "R_Ability"
+        ]
+      },
+      "bolt": {
+        "release": [
+          "E_Ability_Throw"
+        ]
+      },
+      "dash": {
+        "release": [
+          "RMB_60fps"
+        ]
+      },
+      "area": {
+        "release": [
+          "R_Ability"
+        ]
+      },
+      "buff": {
+        "release": [
+          "Cast"
+        ]
+      },
+      "heal": {
+        "release": [
+          "Cast"
+        ]
+      }
+    },
+    "ult": "R_Ability"
+  },
+  "narbash": {
+    "idle": "Idle_combat",
+    "death": [
+      "Death_Fwd"
+    ],
+    "hit": [
+      "Knockback",
+      "Knockback_Bwd"
+    ],
+    "stunned": "Stun_Loop",
+    "victory": [
+      "Emote_DrumSolo",
+      "Emote_Master_RockOut_T3",
+      "Emote_Taunt_MarchingBand_T2"
+    ],
+    "motions": {
+      "melee": {
+        "release": [
+          "Primary_Swing1_Medium",
+          "Primary_Swing2_Medium",
+          "Primary_Swing3_Medium"
+        ]
+      },
+      "buff": {
+        "intro": "E_ability_intro",
+        "release": [
+          "E_ability_loop"
+        ]
+      },
+      "heal": {
+        "intro": "E_ability_intro",
+        "release": [
+          "E_ability_repeat"
+        ]
+      },
+      "bolt": {
+        "intro": "RMB_Ability_Intro",
+        "windup": "RMB_Ability_Targeting_Loop",
+        "release": [
+          "RMB_Ability_Throw"
+        ]
+      },
+      "area": {
+        "intro": "R_Ability_Intro",
+        "windup": "R_Ability_Targeting_Loop",
+        "release": [
+          "R_Ability"
+        ]
+      },
+      "heavy": {
+        "release": [
+          "R_Ability"
+        ]
+      },
+      "dash": {
+        "release": [
+          "Q_Ability_Charge"
+        ]
+      },
+      "channel": {
+        "release": [
+          "E_ability_loop"
+        ]
+      }
+    },
+    "ult": "R_Ability",
+    "ult_support": "R_Ability"
+  },
+  "drongo": {
+    "idle": "Idle_Combat",
+    "death": [
+      "Death"
+    ],
+    "stunned": "Stun_Idle",
+    "victory": [
+      "Emote_Guitar",
+      "Emote_Laugh",
+      "Emote_Horse"
+    ],
+    "motions": {
+      "shoot": {
+        "release": [
+          "Primary_Fire"
+        ]
+      },
+      "melee": {
+        "release": [
+          "Primary_Fire"
+        ]
+      },
+      "bolt": {
+        "intro": "Ability_Boomerang_Prep",
+        "windup": "Ability_Boomerang_Hold",
+        "release": [
+          "Ability_Boomerang_Throw"
+        ]
+      },
+      "area": {
+        "intro": "Ability_Grenade_Prep",
+        "windup": "Ability_Grenade_Hold",
+        "release": [
+          "Ability_Grenade_Throw"
+        ]
+      },
+      "heavy": {
+        "intro": "Ability_BazookaEquip",
+        "release": [
+          "Ability_BazookaFire"
+        ]
+      },
+      "buff": {
+        "release": [
+          "Ability_DrongoRounds"
+        ]
+      },
+      "heal": {
+        "release": [
+          "Cast"
+        ]
+      }
+    },
+    "ult": "Ability_BazookaFire"
   }
 }

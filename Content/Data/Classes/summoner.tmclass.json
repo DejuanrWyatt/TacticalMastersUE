@@ -37,7 +37,12 @@
       "aoe": 0,
       "cooldown": 0,
       "cast": 0,
-      "fx": "attack"
+      "fx": "attack",
+      "vfx": {
+        "system": "/Game/ParagonMinions/FX/Particles/Minions/Shared/P_Minion_Melee_Impact.P_Minion_Melee_Impact",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "summoner_ifrit",
@@ -58,7 +63,12 @@
         "id": "burn",
         "turns": 2
       },
-      "fx": "fire"
+      "fx": "fire",
+      "vfx": {
+        "system": "/Game/TorchFire/FX/NS_TorchFire_Wild.NS_TorchFire_Wild",
+        "at": "point",
+        "scale": 1
+      }
     },
     {
       "id": "summoner_carbuncle",
@@ -82,7 +92,12 @@
           "turns": 2
         }
       ],
-      "fx": "haste"
+      "fx": "haste",
+      "vfx": {
+        "system": "/Game/FreeParticle_SoftTofu/Niagara/NS_Sparkling_Heart.NS_Sparkling_Heart",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "summoner_bahamut",
@@ -99,7 +114,12 @@
       "aoe": 4,
       "cooldown": 0,
       "cast": 4,
-      "fx": "meteor"
+      "fx": "meteor",
+      "vfx": {
+        "system": "/Game/TorchFire/FX/NS_TorchFire_Wild.NS_TorchFire_Wild",
+        "at": "point",
+        "scale": 1
+      }
     }
   ]
 }

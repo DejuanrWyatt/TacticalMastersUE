@@ -69,10 +69,13 @@ def find(folder):
     for a in found:
         if str(a.asset_class_path.asset_name) != "AnimSequence":
             continue
-        sequence = unreal.load_asset(object_path(a))
-        if sequence is None:
+        # Read off the asset registry rather than loading every clip: fifteen
+        # heroes' worth of loaded clips ran the machine out of memory.
+        additive = str(a.get_tag_value("AdditiveAnimType") or "")
+        if additive and additive != "AAT_None":
+            skipped.append(str(a.asset_name))
             continue
-        if is_additive(sequence):
+        if not additive and is_additive(unreal.load_asset(object_path(a))):
             skipped.append(str(a.asset_name))
             continue
         clips[str(a.asset_name)] = object_path(a)
@@ -88,7 +91,12 @@ def pick_mesh(meshes, hero):
     return object_path(sorted(meshes, key=score)[0]) if meshes else None
 
 
-def skeleton_of(path):
+def skeleton_of(path, asset_data=None):
+    # The registry says which skeleton a mesh is on; load it only if it doesn't.
+    if asset_data is not None:
+        tag = str(asset_data.get_tag_value("Skeleton") or "")
+        if tag and tag != "None":
+            return tag.split("'")[1] if "'" in tag else tag
     mesh = unreal.load_asset(path)
     return mesh.get_editor_property("skeleton").get_path_name() if mesh and mesh.get_editor_property("skeleton") else None
 
@@ -96,7 +104,8 @@ def skeleton_of(path):
 def find_skins(meshes, main_mesh):
     """Each skin's mesh, by skin name -- only those on the hero's own skeleton,
     since only they can play its clips."""
-    skeleton = skeleton_of(main_mesh)
+    main_data = next((a for a in meshes if object_path(a) == main_mesh), None)
+    skeleton = skeleton_of(main_mesh, main_data)
     by_skin = {}
     for a in meshes:
         parts = str(a.package_name).split("/")
@@ -108,7 +117,8 @@ def find_skins(meshes, main_mesh):
     skins = {}
     for skin, found in sorted(by_skin.items()):
         path = object_path(sorted(found, key=lambda a: len(str(a.asset_name)))[0])
-        if skeleton is not None and skeleton_of(path) == skeleton:
+        chosen = next(a for a in found if object_path(a) == path)
+        if skeleton is not None and skeleton_of(path, chosen) == skeleton:
             skins[skin] = path
         else:
             say("  skin %s left out: not on the hero's skeleton" % skin)
@@ -230,13 +240,29 @@ def corrected(anim_set, body, clips):
             say("  hero_clips.json names %s for %s, which is not one of its clips that can play alone" % (value, body))
         return found
 
+    # An ultimate's own clip for each motion ("<motion>_ult", which the game
+    # plays for slot 4): the hero's big blow, or for a healer its big blessing.
+    for key, motions in (("ult", ["melee", "heavy", "dash", "area", "bolt", "shoot", "channel"]),
+                         ("ult_support", ["heal", "buff", "revive"])):
+        found = path_of(fixes[key]) if key in fixes else None
+        if found:
+            for motion in motions:
+                anim_set.setdefault("motions", {})[motion + "_ult"] = {"release": [found]}
     for role, value in fixes.items():
+        if role in ("ult", "ult_support"):
+            continue
         if role == "motions":
             motions = anim_set.setdefault("motions", {})
             for motion, parts in value.items():
-                motions[motion] = {part: path_of(v) for part, v in parts.items()}
+                chosen = {part: path_of(v) for part, v in parts.items()}
+                chosen = {part: v for part, v in chosen.items() if v}
+                if chosen.get("release") or chosen.get("windup"):
+                    motions[motion] = chosen
         else:
-            anim_set[role] = path_of(value)
+            # A clip that can't play alone is left out, and the guess stands.
+            found = path_of(value)
+            if found:
+                anim_set[role] = found
     if fixes:
         say("  %d roles set from hero_clips.json" % len(fixes))
     return anim_set

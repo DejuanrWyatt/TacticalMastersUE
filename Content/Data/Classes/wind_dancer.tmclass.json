@@ -36,7 +36,12 @@
       "aoe": 0,
       "cooldown": 0,
       "cast": 0,
-      "fx": "attack"
+      "fx": "attack",
+      "vfx": {
+        "system": "/Game/ParagonShinbi/FX/Particles/Abilities/Primary/FX/P_Mudang_Primary_Impact.P_Mudang_Primary_Impact",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "wind_dancer_gale_kunai",
@@ -54,7 +59,12 @@
       "cooldown": 1,
       "cast": 0,
       "tg": -25,
-      "fx": "throw_stone"
+      "fx": "throw_stone",
+      "vfx": {
+        "system": "/Game/ParagonShinbi/FX/Particles/Abilities/AttackWolves/FX/P_Mudang_AttackWolves_Impact.P_Mudang_AttackWolves_Impact",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "wind_dancer_gale_veil",
@@ -75,7 +85,12 @@
         "id": "slow",
         "turns": 2
       },
-      "fx": "haste"
+      "fx": "haste",
+      "vfx": {
+        "system": "/Game/ParticleSystemVFXVol1/Systems/NS_EnergyVortex.NS_EnergyVortex",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "wind_dancer_gale_execution",
@@ -93,7 +108,12 @@
       "cooldown": 0,
       "cast": 0,
       "tg": -25,
-      "fx": "brave_slash"
+      "fx": "brave_slash",
+      "vfx": {
+        "system": "/Game/ParagonMinions/FX/Particles/Minions/Shared/P_Minion_Melee_Impact.P_Minion_Melee_Impact",
+        "at": "targets",
+        "scale": 1
+      }
     }
   ]
 }

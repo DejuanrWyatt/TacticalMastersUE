@@ -36,7 +36,12 @@
       "aoe": 0,
       "cooldown": 0,
       "cast": 0,
-      "fx": "attack"
+      "fx": "attack",
+      "vfx": {
+        "system": "/Game/ParagonMinions/FX/Particles/Minions/Shared/P_Minion_Melee_Impact.P_Minion_Melee_Impact",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "blood_cleric_shadow_mend",
@@ -53,7 +58,12 @@
       "aoe": 0,
       "cooldown": 0,
       "cast": 1,
-      "fx": "cure"
+      "fx": "cure",
+      "vfx": {
+        "system": "/Game/FreeParticle_SoftTofu/Niagara/NS_Sparkling_Heart.NS_Sparkling_Heart",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "blood_cleric_shadow_rebirth",
@@ -70,7 +80,12 @@
       "aoe": 0,
       "cooldown": 4,
       "cast": 2,
-      "fx": "raise"
+      "fx": "raise",
+      "vfx": {
+        "system": "/Game/ParticleSystemVFXVol1/Systems/NS_SparkleBurst.NS_SparkleBurst",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "blood_cleric_shadow_sanctuary",
@@ -91,7 +106,12 @@
         "id": "regen",
         "turns": 3
       },
-      "fx": "sanctuary"
+      "fx": "sanctuary",
+      "vfx": {
+        "system": "/Game/FreeParticle_SoftTofu/Niagara/NS_Sparkling_Heart.NS_Sparkling_Heart",
+        "at": "targets",
+        "scale": 1
+      }
     }
   ]
 }

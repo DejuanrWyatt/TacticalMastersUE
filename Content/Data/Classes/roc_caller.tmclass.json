@@ -37,7 +37,12 @@
       "aoe": 0,
       "cooldown": 0,
       "cast": 0,
-      "fx": "attack"
+      "fx": "attack",
+      "vfx": {
+        "system": "/Game/ParagonSerath/FX/Particles/Abilities/Primary/FX/P_PrimaryImpactEvil.P_PrimaryImpactEvil",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "roc_caller_summon_roc",
@@ -55,7 +60,12 @@
       "cooldown": 2,
       "cast": 2,
       "tg": -25,
-      "fx": "haste"
+      "fx": "haste",
+      "vfx": {
+        "system": "/Game/ParagonSerath/FX/Particles/Abilities/Chastise/FX/P_WingBlastFallen.P_WingBlastFallen",
+        "at": "point",
+        "scale": 1
+      }
     },
     {
       "id": "roc_caller_roc_pact",
@@ -73,7 +83,12 @@
       "cooldown": 3,
       "cast": 1,
       "tg": 20,
-      "fx": "haste"
+      "fx": "haste",
+      "vfx": {
+        "system": "/Game/FreeParticle_SoftTofu/Niagara/NS_Sparkling_Heart.NS_Sparkling_Heart",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "roc_caller_roc_ascendant",
@@ -91,7 +106,12 @@
       "cooldown": 0,
       "cast": 4,
       "tg": -25,
-      "fx": "blizzard"
+      "fx": "blizzard",
+      "vfx": {
+        "system": "/Game/ParagonSerath/FX/Particles/Abilities/Chastise/FX/P_WingBlast.P_WingBlast",
+        "at": "point",
+        "scale": 1
+      }
     }
   ]
 }

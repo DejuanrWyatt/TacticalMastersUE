@@ -36,7 +36,12 @@
       "aoe": 0,
       "cooldown": 0,
       "cast": 0,
-      "fx": "bow_shot"
+      "fx": "bow_shot",
+      "vfx": {
+        "system": "/Game/ParagonSparrow/FX/Particles/Sparrow/Abilities/Primary/FX/P_Sparrow_Primary_Ballistic_HitPlayer.P_Sparrow_Primary_Ballistic_HitPlayer",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "wind_archer_gale_snipe",
@@ -53,7 +58,12 @@
       "aoe": 0.7,
       "cooldown": 1,
       "cast": 1,
-      "fx": "aimed_shot"
+      "fx": "aimed_shot",
+      "vfx": {
+        "system": "/Game/ParagonSparrow/FX/Particles/Sparrow/Abilities/Primary/FX/P_Sparrow_HitHero.P_Sparrow_HitHero",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "wind_archer_gale_barb",
@@ -71,7 +81,12 @@
       "cooldown": 2,
       "cast": 0,
       "tg": -25,
-      "fx": "pin_shot"
+      "fx": "pin_shot",
+      "vfx": {
+        "system": "/Game/ParagonMinions/FX/Particles/Minions/Shared/P_Minion_Melee_Impact.P_Minion_Melee_Impact",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "wind_archer_cyclone_volley",
@@ -89,7 +104,12 @@
       "cooldown": 0,
       "cast": 2,
       "tg": -25,
-      "fx": "arrow_rain"
+      "fx": "arrow_rain",
+      "vfx": {
+        "system": "/Game/ParagonSparrow/FX/Particles/Sparrow/Abilities/Ultimate/FX/P_Sparrow_UltHit.P_Sparrow_UltHit",
+        "at": "targets",
+        "scale": 1
+      }
     }
   ]
 }

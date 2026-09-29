@@ -37,7 +37,12 @@
       "aoe": 0,
       "cooldown": 0,
       "cast": 0,
-      "fx": "attack"
+      "fx": "attack",
+      "vfx": {
+        "system": "/Game/ParagonSevarog/FX/Particles/Abilities/Primary/FX/P_Sevarog_Melee_SucessfulImpact.P_Sevarog_Melee_SucessfulImpact",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "dread_knight_shadow_bash",
@@ -66,7 +71,12 @@
           "turns": 2
         }
       ],
-      "fx": "shield_bash"
+      "fx": "shield_bash",
+      "vfx": {
+        "system": "/Game/ParagonSevarog/FX/Particles/Abilities/SoulSiphon/FX/P_SiphonImpact.P_SiphonImpact",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "dread_knight_shadow_ward",
@@ -124,7 +134,12 @@
           "turns": 2
         }
       ],
-      "fx": "holy_blade"
+      "fx": "holy_blade",
+      "vfx": {
+        "system": "/Game/ParticleSystemVFXVol1/Systems/NS_SparkleBurst.NS_SparkleBurst",
+        "at": "targets",
+        "scale": 1
+      }
     }
   ]
 }

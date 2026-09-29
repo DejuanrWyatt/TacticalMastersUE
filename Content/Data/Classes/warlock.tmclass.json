@@ -36,7 +36,12 @@
       "aoe": 0,
       "cooldown": 0,
       "cast": 0,
-      "fx": "pin_shot"
+      "fx": "pin_shot",
+      "vfx": {
+        "system": "/Game/ParticleSystemVFXVol1/Systems/NS_EnergyVortex.NS_EnergyVortex",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "warlock_shadow_curse",
@@ -65,7 +70,12 @@
           "turns": 2
         }
       ],
-      "fx": "pin_shot"
+      "fx": "pin_shot",
+      "vfx": {
+        "system": "/Game/ParticleSystemVFXVol1/Systems/NS_EnergyVortex.NS_EnergyVortex",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "warlock_shadow_slumber",
@@ -86,7 +96,12 @@
         "id": "stun",
         "turns": 1
       },
-      "fx": "haste"
+      "fx": "haste",
+      "vfx": {
+        "system": "/Game/ParticleSystemVFXVol1/Systems/NS_EnergyVortex.NS_EnergyVortex",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "warlock_shadow_doom",
@@ -115,7 +130,12 @@
           "turns": 2
         }
       ],
-      "fx": "meteor"
+      "fx": "meteor",
+      "vfx": {
+        "system": "/Game/TorchFire/FX/NS_TorchFire_Wild.NS_TorchFire_Wild",
+        "at": "point",
+        "scale": 1
+      }
     }
   ]
 }

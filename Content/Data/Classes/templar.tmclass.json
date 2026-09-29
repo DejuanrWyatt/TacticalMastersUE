@@ -37,7 +37,12 @@
       "aoe": 0,
       "cooldown": 0,
       "cast": 0,
-      "fx": "attack"
+      "fx": "attack",
+      "vfx": {
+        "system": "/Game/ParagonSerath/FX/Particles/Abilities/Primary/FX/P_PrimaryImpactEvil.P_PrimaryImpactEvil",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "templar_holy_bash",
@@ -54,7 +59,12 @@
       "aoe": 0,
       "cooldown": 2,
       "cast": 0,
-      "fx": "shield_bash"
+      "fx": "shield_bash",
+      "vfx": {
+        "system": "/Game/ParagonSerath/FX/Particles/Abilities/Primary/FX/P_PrimaryImpact.P_PrimaryImpact",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "templar_holy_ward",
@@ -100,7 +110,12 @@
       "aoe": 3,
       "cooldown": 0,
       "cast": 1,
-      "fx": "holy_blade"
+      "fx": "holy_blade",
+      "vfx": {
+        "system": "/Game/ParagonSerath/FX/Particles/Abilities/Fury/FX/P_Fury_Impact.P_Fury_Impact",
+        "at": "targets",
+        "scale": 1
+      }
     }
   ]
 }

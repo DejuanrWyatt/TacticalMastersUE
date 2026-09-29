@@ -38,7 +38,12 @@
       "aoe": 0,
       "cooldown": 0,
       "cast": 0,
-      "fx": "attack"
+      "fx": "attack",
+      "vfx": {
+        "system": "/Game/ParagonMinions/FX/Particles/Minions/Shared/P_Minion_Melee_Impact.P_Minion_Melee_Impact",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "samurai_draw_out",
@@ -55,7 +60,12 @@
       "aoe": 2,
       "cooldown": 2,
       "cast": 1,
-      "fx": "holy_blade"
+      "fx": "holy_blade",
+      "vfx": {
+        "system": "/Game/ParticleSystemVFXVol1/Systems/NS_SparkleBurst.NS_SparkleBurst",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "samurai_meditate",
@@ -84,7 +94,12 @@
           "turns": 2
         }
       ],
-      "fx": "focus"
+      "fx": "focus",
+      "vfx": {
+        "system": "/Game/FreeParticle_SoftTofu/Niagara/NS_Sparkling_Star.NS_Sparkling_Star",
+        "at": "user",
+        "scale": 1
+      }
     },
     {
       "id": "samurai_masamune",
@@ -105,7 +120,12 @@
         "id": "regen",
         "turns": 3
       },
-      "fx": "sanctuary"
+      "fx": "sanctuary",
+      "vfx": {
+        "system": "/Game/FreeParticle_SoftTofu/Niagara/NS_Sparkling_Heart.NS_Sparkling_Heart",
+        "at": "targets",
+        "scale": 1
+      }
     }
   ]
 }

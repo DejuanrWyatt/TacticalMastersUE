@@ -38,7 +38,12 @@
       "aoe": 0,
       "cooldown": 0,
       "cast": 0,
-      "fx": "throw_stone"
+      "fx": "throw_stone",
+      "vfx": {
+        "system": "/Game/ParagonTerra/FX/Particles/Terra/Abilities/DoubleSweep/FX/P_Terra_DoubleSweep_Impact.P_Terra_DoubleSweep_Impact",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "geomancer_quake",
@@ -59,7 +64,12 @@
         "id": "stun",
         "turns": 1
       },
-      "fx": "earth_slash"
+      "fx": "earth_slash",
+      "vfx": {
+        "system": "/Game/ParagonTerra/FX/Particles/Terra/Abilities/DoubleSweep/FX/P_Terra_DoubleSweep_Impact.P_Terra_DoubleSweep_Impact",
+        "at": "point",
+        "scale": 1
+      }
     },
     {
       "id": "geomancer_stone_skin",
@@ -83,7 +93,12 @@
           "turns": 2
         }
       ],
-      "fx": "guard"
+      "fx": "guard",
+      "vfx": {
+        "system": "/Game/FreeParticle_SoftTofu/Niagara/NS_Sparkling_Heart.NS_Sparkling_Heart",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "geomancer_tectonic_rift",
@@ -104,7 +119,12 @@
         "id": "slow",
         "turns": 2
       },
-      "fx": "earth_slash"
+      "fx": "earth_slash",
+      "vfx": {
+        "system": "/Game/ParagonTerra/FX/Particles/Terra/Abilities/DoubleSweep/FX/P_Terra_DoubleSweep_DustImpact.P_Terra_DoubleSweep_DustImpact",
+        "at": "point",
+        "scale": 1
+      }
     }
   ]
 }

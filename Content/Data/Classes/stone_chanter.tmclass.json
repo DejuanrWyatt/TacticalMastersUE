@@ -36,7 +36,12 @@
       "aoe": 0,
       "cooldown": 0,
       "cast": 0,
-      "fx": "pin_shot"
+      "fx": "pin_shot",
+      "vfx": {
+        "system": "/Game/ParagonTerra/FX/Particles/Terra/Abilities/DoubleSweep/FX/P_Terra_DoubleSweep_Impact.P_Terra_DoubleSweep_Impact",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "stone_chanter_stone_anthem",
@@ -54,7 +59,12 @@
       "cooldown": 3,
       "cast": 1.5,
       "tg": 25,
-      "fx": "haste"
+      "fx": "haste",
+      "vfx": {
+        "system": "/Game/FreeParticle_SoftTofu/Niagara/NS_Sparkling_Heart.NS_Sparkling_Heart",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "stone_chanter_stone_ballad",
@@ -99,7 +109,12 @@
         "id": "regen",
         "turns": 3
       },
-      "fx": "sanctuary"
+      "fx": "sanctuary",
+      "vfx": {
+        "system": "/Game/FreeParticle_SoftTofu/Niagara/NS_Sparkling_Heart.NS_Sparkling_Heart",
+        "at": "targets",
+        "scale": 1
+      }
     }
   ]
 }

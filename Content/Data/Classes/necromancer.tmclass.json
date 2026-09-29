@@ -36,7 +36,12 @@
       "aoe": 0,
       "cooldown": 0,
       "cast": 1,
-      "fx": "pin_shot"
+      "fx": "pin_shot",
+      "vfx": {
+        "system": "/Game/ParagonMorigesh/FX/Particles/Morigesh/Skins/NorthernMystic/P_Morigesh_NorthernMystic_Primary_HitCharacter.P_Morigesh_NorthernMystic_Primary_HitCharacter",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "necromancer_umbral_burst",
@@ -65,7 +70,12 @@
           "turns": 2
         }
       ],
-      "fx": "pin_shot"
+      "fx": "pin_shot",
+      "vfx": {
+        "system": "/Game/ParagonMorigesh/FX/Particles/Morigesh/Skins/NorthernMystic/P_Morigesh_NorthernMystic_SkillshotAOE_Projectile.P_Morigesh_NorthernMystic_SkillshotAOE_Projectile",
+        "at": "point",
+        "scale": 1
+      }
     },
     {
       "id": "necromancer_shadow_staff",
@@ -82,7 +92,12 @@
       "aoe": 0,
       "cooldown": 0,
       "cast": 0,
-      "fx": "attack"
+      "fx": "attack",
+      "vfx": {
+        "system": "/Game/ParagonMorigesh/FX/Particles/Morigesh/Skins/NorthernMystic/P_Morigesh_NorthernMystic_StabDoll_IMPACT.P_Morigesh_NorthernMystic_StabDoll_IMPACT",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "necromancer_eclipse",
@@ -112,7 +127,12 @@
           "turns": 2
         }
       ],
-      "fx": "meteor"
+      "fx": "meteor",
+      "vfx": {
+        "system": "/Game/ParagonMorigesh/FX/Particles/Morigesh/Skins/NorthernMystic/P_Morigesh_NorthernMystic_PhaseShift_Looping.P_Morigesh_NorthernMystic_PhaseShift_Looping",
+        "at": "user",
+        "scale": 1
+      }
     }
   ]
 }

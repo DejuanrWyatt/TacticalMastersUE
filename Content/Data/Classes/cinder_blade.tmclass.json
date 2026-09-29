@@ -36,7 +36,12 @@
       "aoe": 0,
       "cooldown": 0,
       "cast": 0,
-      "fx": "attack"
+      "fx": "attack",
+      "vfx": {
+        "system": "/Game/ParagonKwang/FX/Particles/Abilities/Primary/FX/P_Kwang_Primary_Impact.P_Kwang_Primary_Impact",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "cinder_blade_flame_kunai",
@@ -57,7 +62,12 @@
         "id": "burn",
         "turns": 2
       },
-      "fx": "throw_stone"
+      "fx": "throw_stone",
+      "vfx": {
+        "system": "/Game/ParagonKwang/FX/Particles/Abilities/Sword/FX/P_Kwang_Sword_Impact.P_Kwang_Sword_Impact",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "cinder_blade_flame_veil",
@@ -78,7 +88,12 @@
         "id": "slow",
         "turns": 2
       },
-      "fx": "haste"
+      "fx": "haste",
+      "vfx": {
+        "system": "/Game/ParagonKwang/FX/Particles/Abilities/LightStrike/FX/P_LightStrikeImpact.P_LightStrikeImpact",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "cinder_blade_flame_execution",
@@ -99,7 +114,12 @@
         "id": "burn",
         "turns": 2
       },
-      "fx": "brave_slash"
+      "fx": "brave_slash",
+      "vfx": {
+        "system": "/Game/ParagonKwang/FX/Particles/Abilities/LightStrike/FX/P_Kwang_LightStrike_Burst_Holding.P_Kwang_LightStrike_Burst_Holding",
+        "at": "targets",
+        "scale": 1
+      }
     }
   ]
 }

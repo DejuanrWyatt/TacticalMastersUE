@@ -36,7 +36,12 @@
       "aoe": 0,
       "cooldown": 0,
       "cast": 0,
-      "fx": "pin_shot"
+      "fx": "pin_shot",
+      "vfx": {
+        "system": "/Game/ParagonMorigesh/FX/Particles/Morigesh/Abilities/Primary/FX/P_Morigesh_Primary_HitCharacter.P_Morigesh_Primary_HitCharacter",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "sea_witch_tide_curse",
@@ -60,7 +65,12 @@
           "turns": 2
         }
       ],
-      "fx": "pin_shot"
+      "fx": "pin_shot",
+      "vfx": {
+        "system": "/Game/ParagonMorigesh/FX/Particles/Morigesh/Abilities/StabDoll/FX/P_Morigesh_StabDoll_IMPACT.P_Morigesh_StabDoll_IMPACT",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "sea_witch_tide_slumber",
@@ -81,7 +91,12 @@
         "id": "stun",
         "turns": 1
       },
-      "fx": "haste"
+      "fx": "haste",
+      "vfx": {
+        "system": "/Game/ParagonMorigesh/FX/Particles/Morigesh/Abilities/SkillshotAOE/FX/P_Morigesh_SkillshotAOE_Explosion.P_Morigesh_SkillshotAOE_Explosion",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "sea_witch_tide_doom",
@@ -102,7 +117,12 @@
         "id": "slow",
         "turns": 2
       },
-      "fx": "blizzard"
+      "fx": "blizzard",
+      "vfx": {
+        "system": "/Game/ParagonMorigesh/FX/Particles/Morigesh/Abilities/LifeDrain/FX/P_Morigesh_LifeDrain_DamageImpact.P_Morigesh_LifeDrain_DamageImpact",
+        "at": "point",
+        "scale": 1
+      }
     }
   ]
 }

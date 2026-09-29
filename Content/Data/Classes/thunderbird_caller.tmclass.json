@@ -37,7 +37,12 @@
       "aoe": 0,
       "cooldown": 0,
       "cast": 0,
-      "fx": "attack"
+      "fx": "attack",
+      "vfx": {
+        "system": "/Game/ParagonSerath/FX/Particles/Abilities/Primary/FX/P_PrimaryImpactEvil.P_PrimaryImpactEvil",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "thunderbird_caller_summon_thunderbird",
@@ -58,7 +63,12 @@
         "id": "stun",
         "turns": 1
       },
-      "fx": "holy_blade"
+      "fx": "holy_blade",
+      "vfx": {
+        "system": "/Game/ParagonSerath/FX/Particles/Abilities/Chastise/FX/P_WingBlastFallen.P_WingBlastFallen",
+        "at": "point",
+        "scale": 1
+      }
     },
     {
       "id": "thunderbird_caller_thunderbird_pact",
@@ -82,7 +92,12 @@
           "turns": 2
         }
       ],
-      "fx": "haste"
+      "fx": "haste",
+      "vfx": {
+        "system": "/Game/FreeParticle_SoftTofu/Niagara/NS_Sparkling_Heart.NS_Sparkling_Heart",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "thunderbird_caller_thunderbird_ascendant",
@@ -103,7 +118,12 @@
         "id": "stun",
         "turns": 1
       },
-      "fx": "holy_blade"
+      "fx": "holy_blade",
+      "vfx": {
+        "system": "/Game/ParagonSerath/FX/Particles/Abilities/Chastise/FX/P_WingBlast.P_WingBlast",
+        "at": "point",
+        "scale": 1
+      }
     }
   ]
 }

@@ -37,7 +37,12 @@
       "aoe": 0,
       "cooldown": 0,
       "cast": 0,
-      "fx": "attack"
+      "fx": "attack",
+      "vfx": {
+        "system": "/Game/ParagonIggyScorch/FX/Particles/IggyScorch/Abilities/Primary/FX/P_IggyScorch_Molotov_HitPlayer.P_IggyScorch_Molotov_HitPlayer",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "salamander_caller_summon_salamander",
@@ -58,7 +63,12 @@
         "id": "burn",
         "turns": 2
       },
-      "fx": "fire"
+      "fx": "fire",
+      "vfx": {
+        "system": "/Game/ParagonIggyScorch/FX/Particles/IggyScorch/Abilities/Turret/FX/P_IggyScorch_Turret_Explosion.P_IggyScorch_Turret_Explosion",
+        "at": "point",
+        "scale": 1
+      }
     },
     {
       "id": "salamander_caller_salamander_pact",
@@ -82,7 +92,12 @@
           "turns": 2
         }
       ],
-      "fx": "haste"
+      "fx": "haste",
+      "vfx": {
+        "system": "/Game/FreeParticle_SoftTofu/Niagara/NS_Sparkling_Heart.NS_Sparkling_Heart",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "salamander_caller_salamander_ascendant",
@@ -103,7 +118,12 @@
         "id": "burn",
         "turns": 2
       },
-      "fx": "meteor"
+      "fx": "meteor",
+      "vfx": {
+        "system": "/Game/ParagonIggyScorch/FX/Particles/IggyScorch/Abilities/OilTrap/FX/P_IggyScorch_OilTrap_Explosion.P_IggyScorch_OilTrap_Explosion",
+        "at": "point",
+        "scale": 1
+      }
     }
   ]
 }

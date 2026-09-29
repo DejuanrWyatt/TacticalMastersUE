@@ -36,7 +36,12 @@
       "aoe": 0,
       "cooldown": 0,
       "cast": 0,
-      "fx": "punch"
+      "fx": "punch",
+      "vfx": {
+        "system": "/Game/ParagonKhaimera/FX/ParticleSystems/Abilities/ThreeStrikeBuff/FX/P_THawk_Lens.P_THawk_Lens",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "shade_brawler_shadow_uppercut",
@@ -65,7 +70,12 @@
           "turns": 2
         }
       ],
-      "fx": "wave_fist"
+      "fx": "wave_fist",
+      "vfx": {
+        "system": "/Game/ParagonKhaimera/FX/ParticleSystems/Abilities/ThreeStrikeBuff/FX/P_Khaimera_ThreeStrikeBuff_App.P_Khaimera_ThreeStrikeBuff_App",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "shade_brawler_shadow_stance",
@@ -118,7 +128,12 @@
           "turns": 2
         }
       ],
-      "fx": "earth_slash"
+      "fx": "earth_slash",
+      "vfx": {
+        "system": "/Game/ParagonKhaimera/FX/ParticleSystems/Abilities/ThreeStrikeBuff/FX/P_Khaimera_BeastActive_Looping.P_Khaimera_BeastActive_Looping",
+        "at": "targets",
+        "scale": 1
+      }
     }
   ]
 }

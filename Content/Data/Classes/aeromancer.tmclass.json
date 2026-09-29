@@ -36,7 +36,12 @@
       "aoe": 0,
       "cooldown": 0,
       "cast": 1,
-      "fx": "haste"
+      "fx": "haste",
+      "vfx": {
+        "system": "/Game/ParticleSystemVFXVol1/Systems/NS_EnergyVortex.NS_EnergyVortex",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "aeromancer_cyclone",
@@ -54,7 +59,12 @@
       "cooldown": 2,
       "cast": 2,
       "tg": -25,
-      "fx": "haste"
+      "fx": "haste",
+      "vfx": {
+        "system": "/Game/ParticleSystemVFXVol1/Systems/NS_EnergyVortex.NS_EnergyVortex",
+        "at": "point",
+        "scale": 1
+      }
     },
     {
       "id": "aeromancer_gale_staff",
@@ -71,7 +81,12 @@
       "aoe": 0,
       "cooldown": 0,
       "cast": 0,
-      "fx": "attack"
+      "fx": "attack",
+      "vfx": {
+        "system": "/Game/ParagonMinions/FX/Particles/Minions/Shared/P_Minion_Melee_Impact.P_Minion_Melee_Impact",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "aeromancer_hurricane",
@@ -90,7 +105,12 @@
       "cooldown": 0,
       "cast": 1,
       "tg": -25,
-      "fx": "blizzard"
+      "fx": "blizzard",
+      "vfx": {
+        "system": "/Game/ParticleSystemVFXVol1/Systems/NS_EnergyVortex.NS_EnergyVortex",
+        "at": "user",
+        "scale": 1
+      }
     }
   ]
 }

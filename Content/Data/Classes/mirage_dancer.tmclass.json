@@ -36,7 +36,12 @@
       "aoe": 0,
       "cooldown": 0,
       "cast": 0,
-      "fx": "attack"
+      "fx": "attack",
+      "vfx": {
+        "system": "/Game/ParagonShinbi/FX/Particles/Abilities/Primary/FX/P_Mudang_Primary_Impact.P_Mudang_Primary_Impact",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "mirage_dancer_sand_veil",
@@ -65,7 +70,12 @@
           "turns": 2
         }
       ],
-      "fx": "focus"
+      "fx": "focus",
+      "vfx": {
+        "system": "/Game/FreeParticle_SoftTofu/Niagara/NS_Sparkling_Star.NS_Sparkling_Star",
+        "at": "user",
+        "scale": 1
+      }
     },
     {
       "id": "mirage_dancer_sirocco",
@@ -87,7 +97,12 @@
         "id": "blind",
         "turns": 2
       },
-      "fx": "earth_slash"
+      "fx": "earth_slash",
+      "vfx": {
+        "system": "/Game/ParagonShinbi/FX/Particles/Abilities/AttackWolves/FX/P_Mudang_AttackWolves_Impact.P_Mudang_AttackWolves_Impact",
+        "at": "point",
+        "scale": 1
+      }
     },
     {
       "id": "mirage_dancer_thousand_veils",
@@ -108,7 +123,12 @@
         "id": "blind",
         "turns": 2
       },
-      "fx": "brave_slash"
+      "fx": "brave_slash",
+      "vfx": {
+        "system": "/Game/PotaVFX_Smoke/VFX/System/SmokeBurst/NS_MagicSmokeBurstAir.NS_MagicSmokeBurstAir",
+        "at": "targets",
+        "scale": 1
+      }
     }
   ],
   "creator": {

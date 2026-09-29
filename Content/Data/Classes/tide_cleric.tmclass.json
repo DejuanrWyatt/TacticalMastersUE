@@ -36,7 +36,12 @@
       "aoe": 0,
       "cooldown": 0,
       "cast": 0,
-      "fx": "attack"
+      "fx": "attack",
+      "vfx": {
+        "system": "/Game/ParagonMuriel/FX/Particles/Abilities/Primary/FX/P_Muriel_Primary_HitCharacter.P_Muriel_Primary_HitCharacter",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "tide_cleric_mend",
@@ -53,7 +58,12 @@
       "aoe": 0,
       "cooldown": 0,
       "cast": 1,
-      "fx": "cure"
+      "fx": "cure",
+      "vfx": {
+        "system": "/Game/ParagonMuriel/FX/Particles/Abilities/LifeLock/FX/P_Lifelock_Charged_Hands.P_Lifelock_Charged_Hands",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "tide_cleric_rebirth",
@@ -70,7 +80,12 @@
       "aoe": 0,
       "cooldown": 4,
       "cast": 2,
-      "fx": "raise"
+      "fx": "raise",
+      "vfx": {
+        "system": "/Game/ParagonMuriel/FX/Particles/Abilities/LifeLock/FX/P_Lifelock_Charged.P_Lifelock_Charged",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "tide_cleric_sanctuary",
@@ -87,7 +102,12 @@
       "aoe": 3.5,
       "cooldown": 0,
       "cast": 3,
-      "fx": "sanctuary"
+      "fx": "sanctuary",
+      "vfx": {
+        "system": "/Game/ParagonMuriel/FX/Particles/Abilities/LifeLock/FX/P_LifeLock_Projectile.P_LifeLock_Projectile",
+        "at": "targets",
+        "scale": 1
+      }
     }
   ],
   "creator": {

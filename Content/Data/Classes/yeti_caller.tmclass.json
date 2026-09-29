@@ -37,7 +37,12 @@
       "aoe": 0,
       "cooldown": 0,
       "cast": 0,
-      "fx": "attack"
+      "fx": "attack",
+      "vfx": {
+        "system": "/Game/ParagonAurora/FX/Particles/Abilities/Primary/FX/P_Aurora_Melee_SucessfulImpact.P_Aurora_Melee_SucessfulImpact",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "yeti_caller_summon_yeti",
@@ -58,7 +63,12 @@
         "id": "slow",
         "turns": 2
       },
-      "fx": "blizzard"
+      "fx": "blizzard",
+      "vfx": {
+        "system": "/Game/ParagonAurora/FX/Particles/Abilities/Leap/FX/P_Aurora_Decoy_Explode_Fragments.P_Aurora_Decoy_Explode_Fragments",
+        "at": "point",
+        "scale": 1
+      }
     },
     {
       "id": "yeti_caller_yeti_pact",
@@ -82,7 +92,12 @@
           "turns": 2
         }
       ],
-      "fx": "haste"
+      "fx": "haste",
+      "vfx": {
+        "system": "/Game/FreeParticle_SoftTofu/Niagara/NS_Sparkling_Heart.NS_Sparkling_Heart",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "yeti_caller_yeti_ascendant",
@@ -103,7 +118,12 @@
         "id": "slow",
         "turns": 2
       },
-      "fx": "blizzard"
+      "fx": "blizzard",
+      "vfx": {
+        "system": "/Game/ParagonAurora/FX/Particles/Abilities/Ultimate/FX/P_Aurora_Ultimate_Explode.P_Aurora_Ultimate_Explode",
+        "at": "point",
+        "scale": 1
+      }
     }
   ]
 }

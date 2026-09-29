@@ -36,7 +36,12 @@
       "aoe": 0,
       "cooldown": 0,
       "cast": 0,
-      "fx": "punch"
+      "fx": "punch",
+      "vfx": {
+        "system": "/Game/ParagonYin/FX/Particles/Yin/Abilities/Primary/FX/P_Yin_Primary_Impact.P_Yin_Primary_Impact",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "ember_pugilist_flame_uppercut",
@@ -57,7 +62,12 @@
         "id": "burn",
         "turns": 2
       },
-      "fx": "wave_fist"
+      "fx": "wave_fist",
+      "vfx": {
+        "system": "/Game/ParagonMinions/FX/Particles/Minions/Shared/P_Minion_Melee_Impact.P_Minion_Melee_Impact",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "ember_pugilist_flame_stance",
@@ -102,7 +112,12 @@
         "id": "burn",
         "turns": 2
       },
-      "fx": "earth_slash"
+      "fx": "earth_slash",
+      "vfx": {
+        "system": "/Game/PotaVFX_Smoke/VFX/System/SmokeBurst/NS_MagicSmokeBurstAir.NS_MagicSmokeBurstAir",
+        "at": "targets",
+        "scale": 1
+      }
     }
   ]
 }

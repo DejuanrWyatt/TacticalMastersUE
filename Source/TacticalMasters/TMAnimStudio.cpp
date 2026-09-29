@@ -125,7 +125,22 @@ void ATMAnimStudio::Begin(const ATMBattleDirector* InDirector)
 	}
 
 	OutDir = FPaths::ProjectSavedDir() / TEXT("AnimCatalog");
-	IFileManager::Get().DeleteDirectory(*OutDir, false, true);
+	FString OnlyList;
+	if (FParse::Value(FCommandLine::Get(), TEXT("tmanimonly="), OnlyList, false))
+	{
+		TArray<FString> Names;
+		OnlyList.ParseIntoArray(Names, TEXT(","));
+		for (const FString& Name : Names)
+		{
+			Only.Add(Name.TrimStartAndEnd());
+		}
+		// One batch of several: the others' films stay, and this one's list is its own.
+		CatalogName = FString::Printf(TEXT("catalog-%s.json"), Names.Num() > 0 ? *Names[0] : TEXT("part"));
+	}
+	else
+	{
+		IFileManager::Get().DeleteDirectory(*OutDir, false, true);
+	}
 	IFileManager::Get().MakeDirectory(*OutDir, true);
 
 	// Every clip each body's set names, once per body, in the order bodies are
@@ -136,10 +151,15 @@ void ATMAnimStudio::Begin(const ATMBattleDirector* InDirector)
 	for (const FString& Name : Names)
 	{
 		const ATMBattleDirector::FTMBody& Body = Director->Bodies[Name];
-		const ATMBattleDirector::FTMAnimSet* Set = Body.Animations;
 		// A hero's skins play the hero's own clips: filming the hero once is enough.
-		// (Loading a mesh only fills the director's cache, hence the const_cast.)
-		if (!Set || Name.StartsWith(Body.SetName + TEXT("_")) || !const_cast<ATMBattleDirector*>(&*Director)->MeshOf(Body))
+		// (Loading a mesh and its clips only fills the director's cache, hence the const_cast.)
+		if (Name.StartsWith(Body.SetName + TEXT("_")) || (Only.Num() > 0 && !Only.Contains(Body.SetName))
+			|| !const_cast<ATMBattleDirector*>(&*Director)->MeshOf(Body))
+		{
+			continue;
+		}
+		const ATMBattleDirector::FTMAnimSet* Set = Body.Animations;
+		if (!Set)
 		{
 			continue;
 		}
@@ -427,5 +447,5 @@ void ATMAnimStudio::WriteCatalogue() const
 	};
 	Json += FString::Printf(TEXT("  \"looks\": %s,\n  \"classes\": %s,\n  \"default\": \"%s\"\n}\n"),
 		*Names2(Director->LookBodies), *Names2(Director->ClassBodies), *Escaped(Director->DefaultBody));
-	FFileHelper::SaveStringToFile(Json, *(OutDir / TEXT("catalog.json")), FFileHelper::EEncodingOptions::ForceUTF8WithoutBOM);
+	FFileHelper::SaveStringToFile(Json, *(OutDir / CatalogName), FFileHelper::EEncodingOptions::ForceUTF8WithoutBOM);
 }

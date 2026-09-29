@@ -36,7 +36,12 @@
       "aoe": 0,
       "cooldown": 0,
       "cast": 0,
-      "fx": "bow_shot"
+      "fx": "bow_shot",
+      "vfx": {
+        "system": "/Game/ParagonDrongo/FX/Particles/Abilities/Grenade/FX/P_Drongo_Grenade_EndExplosion.P_Drongo_Grenade_EndExplosion",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "stone_slinger_stone_snipe",
@@ -53,7 +58,12 @@
       "aoe": 0.7,
       "cooldown": 1,
       "cast": 1,
-      "fx": "aimed_shot"
+      "fx": "aimed_shot",
+      "vfx": {
+        "system": "/Game/ParagonDrongo/FX/Particles/Abilities/Shards/FX/P_Drongo_Shards_Hit_World.P_Drongo_Shards_Hit_World",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "stone_slinger_stone_barb",
@@ -74,7 +84,12 @@
         "id": "stun",
         "turns": 1
       },
-      "fx": "pin_shot"
+      "fx": "pin_shot",
+      "vfx": {
+        "system": "/Game/ParagonDrongo/FX/Particles/Abilities/Boomerang/FX/P_Drongo_Boomerang_Out_Flare.P_Drongo_Boomerang_Out_Flare",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "stone_slinger_rockslide_volley",
@@ -95,7 +110,12 @@
         "id": "stun",
         "turns": 1
       },
-      "fx": "arrow_rain"
+      "fx": "arrow_rain",
+      "vfx": {
+        "system": "/Game/ParagonDrongo/FX/Particles/Abilities/Ultimate/FX/P_Drongo_Ultimate_Explosion.P_Drongo_Ultimate_Explosion",
+        "at": "targets",
+        "scale": 1
+      }
     }
   ]
 }

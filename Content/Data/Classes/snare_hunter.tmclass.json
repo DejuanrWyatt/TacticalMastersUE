@@ -41,7 +41,12 @@
         "id": "bleed",
         "turns": 2
       },
-      "fx": "bow_shot"
+      "fx": "bow_shot",
+      "vfx": {
+        "system": "/Game/ParagonSparrow/FX/Particles/Sparrow/Abilities/Primary/FX/P_Sparrow_Primary_Ballistic_HitPlayer.P_Sparrow_Primary_Ballistic_HitPlayer",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "snare_hunter_hamstring",
@@ -62,7 +67,12 @@
         "id": "crippled",
         "turns": 2
       },
-      "fx": "pin_shot"
+      "fx": "pin_shot",
+      "vfx": {
+        "system": "/Game/ParagonSparrow/FX/Particles/Sparrow/Abilities/Primary/FX/P_Sparrow_HitHero.P_Sparrow_HitHero",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "snare_hunter_hawk_eye",
@@ -111,7 +121,12 @@
         "id": "sleep",
         "turns": 2
       },
-      "fx": "arrow_rain"
+      "fx": "arrow_rain",
+      "vfx": {
+        "system": "/Game/ParagonSparrow/FX/Particles/Sparrow/Abilities/Ultimate/FX/P_Sparrow_UltHit.P_Sparrow_UltHit",
+        "at": "targets",
+        "scale": 1
+      }
     }
   ],
   "creator": {

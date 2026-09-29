@@ -38,7 +38,12 @@
       "aoe": 0,
       "cooldown": 0,
       "cast": 0,
-      "fx": "attack"
+      "fx": "attack",
+      "vfx": {
+        "system": "/Game/ParagonGreystone/FX/Particles/Greystone/Abilities/ClearAPath/FX/P_Greystone_ClearAPath_Impacts.P_Greystone_ClearAPath_Impacts",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "paladin_aegis",
@@ -62,7 +67,12 @@
           "turns": 2
         }
       ],
-      "fx": "guard"
+      "fx": "guard",
+      "vfx": {
+        "system": "/Game/FreeParticle_SoftTofu/Niagara/NS_Sparkling_Heart.NS_Sparkling_Heart",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "paladin_lay_on_hands",
@@ -79,7 +89,12 @@
       "aoe": 0,
       "cooldown": 2,
       "cast": 1,
-      "fx": "cure"
+      "fx": "cure",
+      "vfx": {
+        "system": "/Game/FreeParticle_SoftTofu/Niagara/NS_Sparkling_Heart.NS_Sparkling_Heart",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "paladin_judgment",
@@ -96,7 +111,12 @@
       "aoe": 3,
       "cooldown": 0,
       "cast": 1.5,
-      "fx": "holy_blade"
+      "fx": "holy_blade",
+      "vfx": {
+        "system": "/Game/ParagonGreystone/FX/Particles/Greystone/Abilities/LeapAOE/FX/P_LeapSmash_Location.P_LeapSmash_Location",
+        "at": "point",
+        "scale": 1
+      }
     }
   ]
 }

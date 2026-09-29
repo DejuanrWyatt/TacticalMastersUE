@@ -99,5 +99,12 @@ private:
 	static constexpr int32 SettleTicks = 2;
 	TArray<FColor> Strip;
 	FString OutDir;
+	/**
+	 * -tmanimonly=a,b,c: film only the bodies of these animation sets, into
+	 * catalog-<first>.json beside the others, for Tools\AnimCatalog.bat to merge.
+	 * Thirty heroes' clips at once are more than the editor build can hold.
+	 */
+	TSet<FString> Only;
+	FString CatalogName = TEXT("catalog.json");
 	bool bDone = true;
 };

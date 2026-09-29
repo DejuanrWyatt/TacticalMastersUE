@@ -37,7 +37,12 @@
       "aoe": 0,
       "cooldown": 0,
       "cast": 0,
-      "fx": "attack"
+      "fx": "attack",
+      "vfx": {
+        "system": "/Game/ParagonTerra/FX/Particles/Terra/Abilities/DoubleSweep/FX/P_Terra_DoubleSweep_Impact.P_Terra_DoubleSweep_Impact",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "reef_guardian_tide_bash",
@@ -58,7 +63,12 @@
         "id": "slow",
         "turns": 2
       },
-      "fx": "shield_bash"
+      "fx": "shield_bash",
+      "vfx": {
+        "system": "/Game/ParagonTerra/FX/Particles/Terra/Abilities/DoubleSweep/FX/P_Terra_DoubleSweep_Impact.P_Terra_DoubleSweep_Impact",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "reef_guardian_tide_ward",
@@ -108,7 +118,12 @@
         "id": "slow",
         "turns": 2
       },
-      "fx": "holy_blade"
+      "fx": "holy_blade",
+      "vfx": {
+        "system": "/Game/ParagonTerra/FX/Particles/Terra/Abilities/DoubleSweep/FX/P_Terra_DoubleSweep_DustImpact.P_Terra_DoubleSweep_DustImpact",
+        "at": "targets",
+        "scale": 1
+      }
     }
   ]
 }

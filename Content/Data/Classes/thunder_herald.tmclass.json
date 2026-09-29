@@ -36,7 +36,12 @@
       "aoe": 0,
       "cooldown": 0,
       "cast": 0,
-      "fx": "pin_shot"
+      "fx": "pin_shot",
+      "vfx": {
+        "system": "/Game/ParagonKwang/FX/Particles/Abilities/Primary/FX/P_Kwang_Primary_Impact.P_Kwang_Primary_Impact",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "thunder_herald_thunder_anthem",
@@ -54,7 +59,12 @@
       "cooldown": 3,
       "cast": 1.5,
       "tg": 25,
-      "fx": "haste"
+      "fx": "haste",
+      "vfx": {
+        "system": "/Game/FreeParticle_SoftTofu/Niagara/NS_Sparkling_Heart.NS_Sparkling_Heart",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "thunder_herald_thunder_ballad",
@@ -99,7 +109,12 @@
         "id": "regen",
         "turns": 3
       },
-      "fx": "sanctuary"
+      "fx": "sanctuary",
+      "vfx": {
+        "system": "/Game/FreeParticle_SoftTofu/Niagara/NS_Sparkling_Heart.NS_Sparkling_Heart",
+        "at": "targets",
+        "scale": 1
+      }
     }
   ]
 }

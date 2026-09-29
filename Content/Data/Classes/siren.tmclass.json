@@ -36,7 +36,12 @@
       "aoe": 0,
       "cooldown": 0,
       "cast": 0,
-      "fx": "pin_shot"
+      "fx": "pin_shot",
+      "vfx": {
+        "system": "/Game/ParagonMorigesh/FX/Particles/Morigesh/Abilities/Primary/FX/P_Morigesh_Primary_HitCharacter.P_Morigesh_Primary_HitCharacter",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "siren_tide_anthem",
@@ -54,7 +59,12 @@
       "cooldown": 3,
       "cast": 1.5,
       "tg": 25,
-      "fx": "haste"
+      "fx": "haste",
+      "vfx": {
+        "system": "/Game/ParagonMorigesh/FX/Particles/Morigesh/Abilities/LifeDrain/FX/P_Morigesh_PhaseShift_Looping.P_Morigesh_PhaseShift_Looping",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "siren_tide_ballad",
@@ -99,7 +109,12 @@
         "id": "regen",
         "turns": 3
       },
-      "fx": "sanctuary"
+      "fx": "sanctuary",
+      "vfx": {
+        "system": "/Game/ParagonMorigesh/FX/Particles/Morigesh/Abilities/LifeDrain/FX/P_Morigesh_PhaseShift_Deactivate.P_Morigesh_PhaseShift_Deactivate",
+        "at": "targets",
+        "scale": 1
+      }
     }
   ]
 }

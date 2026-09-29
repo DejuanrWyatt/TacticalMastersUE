@@ -37,7 +37,12 @@
       "aoe": 0,
       "cooldown": 0,
       "cast": 0,
-      "fx": "pin_shot"
+      "fx": "pin_shot",
+      "vfx": {
+        "system": "/Game/ParagonSparrow/FX/Particles/Sparrow/Abilities/Primary/FX/P_Sparrow_Primary_Ballistic_HitPlayer.P_Sparrow_Primary_Ballistic_HitPlayer",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "bard_song_of_haste",
@@ -55,7 +60,12 @@
       "cooldown": 3,
       "cast": 1.5,
       "tg": 25,
-      "fx": "haste"
+      "fx": "haste",
+      "vfx": {
+        "system": "/Game/FreeParticle_SoftTofu/Niagara/NS_Sparkling_Heart.NS_Sparkling_Heart",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "bard_lullaby",
@@ -76,7 +86,12 @@
         "id": "slow",
         "turns": 2
       },
-      "fx": "blizzard"
+      "fx": "blizzard",
+      "vfx": {
+        "system": "/Game/ParagonSparrow/FX/Particles/Sparrow/Abilities/Primary/FX/P_Sparrow_HitHero.P_Sparrow_HitHero",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "bard_hymn_of_life",
@@ -97,7 +112,12 @@
         "id": "regen",
         "turns": 3
       },
-      "fx": "sanctuary"
+      "fx": "sanctuary",
+      "vfx": {
+        "system": "/Game/FreeParticle_SoftTofu/Niagara/NS_Sparkling_Heart.NS_Sparkling_Heart",
+        "at": "targets",
+        "scale": 1
+      }
     }
   ]
 }

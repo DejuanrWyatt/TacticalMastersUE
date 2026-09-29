@@ -36,7 +36,12 @@
       "aoe": 0,
       "cooldown": 0,
       "cast": 0,
-      "fx": "bow_shot"
+      "fx": "bow_shot",
+      "vfx": {
+        "system": "/Game/ParagonRevenant/FX/Particles/Revenant/Abilities/Obliterate/FX/P_Revenant_Obliterate_Hit.P_Revenant_Obliterate_Hit",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "night_hunter_shadow_snipe",
@@ -53,7 +58,12 @@
       "aoe": 0.7,
       "cooldown": 1,
       "cast": 1,
-      "fx": "aimed_shot"
+      "fx": "aimed_shot",
+      "vfx": {
+        "system": "/Game/ParagonMinions/FX/Particles/Minions/Shared/P_Minion_Melee_Impact.P_Minion_Melee_Impact",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "night_hunter_shadow_barb",
@@ -82,7 +92,12 @@
           "turns": 2
         }
       ],
-      "fx": "pin_shot"
+      "fx": "pin_shot",
+      "vfx": {
+        "system": "/Game/ParagonMinions/FX/Particles/Minions/Shared/P_Minion_Melee_Impact.P_Minion_Melee_Impact",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "night_hunter_umbral_burst_volley",
@@ -111,7 +126,12 @@
           "turns": 2
         }
       ],
-      "fx": "arrow_rain"
+      "fx": "arrow_rain",
+      "vfx": {
+        "system": "/Game/ParagonRevenant/FX/Particles/Revenant/Abilities/Ultimate/FX/P_Revenant_Ultimate_Hit.P_Revenant_Ultimate_Hit",
+        "at": "targets",
+        "scale": 1
+      }
     }
   ]
 }

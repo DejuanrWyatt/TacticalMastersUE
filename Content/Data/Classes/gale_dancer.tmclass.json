@@ -36,7 +36,12 @@
       "aoe": 0,
       "cooldown": 0,
       "cast": 0,
-      "fx": "punch"
+      "fx": "punch",
+      "vfx": {
+        "system": "/Game/ParagonShinbi/FX/Particles/Abilities/Primary/FX/P_Mudang_Primary_Impact.P_Mudang_Primary_Impact",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "gale_dancer_gale_uppercut",
@@ -54,7 +59,12 @@
       "cooldown": 2,
       "cast": 0,
       "tg": -25,
-      "fx": "wave_fist"
+      "fx": "wave_fist",
+      "vfx": {
+        "system": "/Game/ParagonShinbi/FX/Particles/Abilities/AttackWolves/FX/P_Mudang_AttackWolves_Impact.P_Mudang_AttackWolves_Impact",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "gale_dancer_gale_stance",
@@ -90,7 +100,12 @@
       "cooldown": 0,
       "cast": 0,
       "tg": -25,
-      "fx": "earth_slash"
+      "fx": "earth_slash",
+      "vfx": {
+        "system": "/Game/PotaVFX_Smoke/VFX/System/SmokeBurst/NS_MagicSmokeBurstAir.NS_MagicSmokeBurstAir",
+        "at": "targets",
+        "scale": 1
+      }
     }
   ]
 }

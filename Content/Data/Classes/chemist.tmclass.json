@@ -41,7 +41,12 @@
         "id": "burn",
         "turns": 2
       },
-      "fx": "throw_stone"
+      "fx": "throw_stone",
+      "vfx": {
+        "system": "/Game/ParagonGadget/FX/Abilities/Primary/FX/P_PrimaryZap_Projectile_Explode_Player.P_PrimaryZap_Projectile_Explode_Player",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "chemist_potion",
@@ -58,7 +63,12 @@
       "aoe": 0,
       "cooldown": 1,
       "cast": 0,
-      "fx": "cure"
+      "fx": "cure",
+      "vfx": {
+        "system": "/Game/FreeParticle_SoftTofu/Niagara/NS_Sparkling_Heart.NS_Sparkling_Heart",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "chemist_phoenix_down",
@@ -75,7 +85,12 @@
       "aoe": 0,
       "cooldown": 4,
       "cast": 1,
-      "fx": "raise"
+      "fx": "raise",
+      "vfx": {
+        "system": "/Game/ParticleSystemVFXVol1/Systems/NS_SparkleBurst.NS_SparkleBurst",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "chemist_elixir_mist",
@@ -92,7 +107,12 @@
       "aoe": 3.5,
       "cooldown": 0,
       "cast": 0,
-      "fx": "sanctuary"
+      "fx": "sanctuary",
+      "vfx": {
+        "system": "/Game/FreeParticle_SoftTofu/Niagara/NS_Sparkling_Heart.NS_Sparkling_Heart",
+        "at": "targets",
+        "scale": 1
+      }
     }
   ]
 }

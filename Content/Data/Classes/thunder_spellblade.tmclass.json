@@ -37,7 +37,12 @@
       "aoe": 0,
       "cooldown": 0,
       "cast": 0,
-      "fx": "attack"
+      "fx": "attack",
+      "vfx": {
+        "system": "/Game/ParagonKwang/FX/Particles/Abilities/Primary/FX/P_Kwang_Primary_Impact.P_Kwang_Primary_Impact",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "thunder_spellblade_edge",
@@ -58,7 +63,12 @@
         "id": "stun",
         "turns": 1
       },
-      "fx": "holy_blade"
+      "fx": "holy_blade",
+      "vfx": {
+        "system": "/Game/ParagonKwang/FX/Particles/Abilities/Sword/FX/P_Kwang_Sword_Impact.P_Kwang_Sword_Impact",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "thunder_spellblade_lance",
@@ -75,7 +85,12 @@
       "aoe": 0.7,
       "cooldown": 0,
       "cast": 1,
-      "fx": "fire"
+      "fx": "fire",
+      "vfx": {
+        "system": "/Game/ParagonKwang/FX/Particles/Abilities/LightStrike/FX/P_LightStrikeImpact.P_LightStrikeImpact",
+        "at": "point",
+        "scale": 1
+      }
     },
     {
       "id": "thunder_spellblade_maelstrom",
@@ -96,7 +111,12 @@
         "id": "stun",
         "turns": 1
       },
-      "fx": "meteor"
+      "fx": "meteor",
+      "vfx": {
+        "system": "/Game/TorchFire/FX/NS_TorchFire_Magic.NS_TorchFire_Magic",
+        "at": "point",
+        "scale": 1
+      }
     }
   ],
   "creator": {

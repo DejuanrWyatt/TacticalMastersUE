@@ -36,7 +36,12 @@
       "aoe": 0,
       "cooldown": 0,
       "cast": 0,
-      "fx": "attack"
+      "fx": "attack",
+      "vfx": {
+        "system": "/Game/ParagonFey/FX/Particles/Fey/Abilities/Primary/FX/P_Fey_Primary_HitPlayer.P_Fey_Primary_HitPlayer",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "herbalist_thorn_mend",
@@ -57,7 +62,12 @@
         "id": "regen",
         "turns": 2
       },
-      "fx": "cure"
+      "fx": "cure",
+      "vfx": {
+        "system": "/Game/FreeParticle_SoftTofu/Niagara/NS_Sparkling_Heart.NS_Sparkling_Heart",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "herbalist_thorn_rebirth",
@@ -74,7 +84,12 @@
       "aoe": 0,
       "cooldown": 4,
       "cast": 2,
-      "fx": "raise"
+      "fx": "raise",
+      "vfx": {
+        "system": "/Game/ParticleSystemVFXVol1/Systems/NS_SparkleBurst.NS_SparkleBurst",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "herbalist_thorn_sanctuary",
@@ -95,7 +110,12 @@
         "id": "regen",
         "turns": 3
       },
-      "fx": "sanctuary"
+      "fx": "sanctuary",
+      "vfx": {
+        "system": "/Game/FreeParticle_SoftTofu/Niagara/NS_Sparkling_Heart.NS_Sparkling_Heart",
+        "at": "targets",
+        "scale": 1
+      }
     }
   ]
 }

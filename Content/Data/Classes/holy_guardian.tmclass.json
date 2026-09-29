@@ -37,7 +37,12 @@
       "aoe": 0,
       "cooldown": 0,
       "cast": 0,
-      "fx": "attack"
+      "fx": "attack",
+      "vfx": {
+        "system": "/Game/ParagonGreystone/FX/Particles/Greystone/Abilities/ClearAPath/FX/P_Greystone_ClearAPath_Impacts.P_Greystone_ClearAPath_Impacts",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "holy_guardian_bash",
@@ -54,7 +59,12 @@
       "aoe": 0,
       "cooldown": 2,
       "cast": 0,
-      "fx": "shield_bash"
+      "fx": "shield_bash",
+      "vfx": {
+        "system": "/Game/ParagonGreystone/FX/Particles/Greystone/Abilities/ClearAPath/FX/P_Greystone_ClearAPath_Impact.P_Greystone_ClearAPath_Impact",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "holy_guardian_ward",
@@ -100,7 +110,12 @@
       "aoe": 3,
       "cooldown": 0,
       "cast": 1,
-      "fx": "holy_blade"
+      "fx": "holy_blade",
+      "vfx": {
+        "system": "/Game/ParagonGreystone/FX/Particles/Greystone/Abilities/LeapAOE/FX/P_LeapSmash_Location.P_LeapSmash_Location",
+        "at": "targets",
+        "scale": 1
+      }
     }
   ],
   "creator": {

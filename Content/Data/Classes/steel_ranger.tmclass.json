@@ -36,7 +36,12 @@
       "aoe": 0,
       "cooldown": 0,
       "cast": 0,
-      "fx": "bow_shot"
+      "fx": "bow_shot",
+      "vfx": {
+        "system": "/Game/ParagonMurdock/FX/Particles/Abilities/SpreadShot/FX/P_SpreadShotImpact_Radial.P_SpreadShotImpact_Radial",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "steel_ranger_snipe",
@@ -53,7 +58,12 @@
       "aoe": 0.7,
       "cooldown": 1,
       "cast": 1,
-      "fx": "aimed_shot"
+      "fx": "aimed_shot",
+      "vfx": {
+        "system": "/Game/ParagonMurdock/FX/Particles/Abilities/SpreadShot/FX/P_SpreadShotImpact.P_SpreadShotImpact",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "steel_ranger_barb",
@@ -74,7 +84,12 @@
         "id": "bleed",
         "turns": 2
       },
-      "fx": "pin_shot"
+      "fx": "pin_shot",
+      "vfx": {
+        "system": "/Game/ParagonMurdock/FX/Particles/Abilities/GunShield/fx/P_GunShield_Impact_World.P_GunShield_Impact_World",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "steel_ranger_volley",
@@ -95,7 +110,12 @@
         "id": "bleed",
         "turns": 2
       },
-      "fx": "arrow_rain"
+      "fx": "arrow_rain",
+      "vfx": {
+        "system": "/Game/ParagonMurdock/FX/Particles/Abilities/Ultimate/FX/P_Eleven_Impact_Player.P_Eleven_Impact_Player",
+        "at": "targets",
+        "scale": 1
+      }
     }
   ],
   "creator": {

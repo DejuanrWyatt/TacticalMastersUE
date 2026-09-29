@@ -11,10 +11,10 @@ REM creator's Effects tab has a button that does the same.
 REM
 REM It draws off-screen, so no window appears, but it needs the graphics card:
 REM -nullrhi would film nothing.
+REM
+REM A few heroes per run (Tools\AnimCatalog.ps1): the editor build cannot hold
+REM every hero's clips at once.
 setlocal
-set LOG=%~dp0..\Saved\Logs\agent-anim-catalog.log
 echo Filming the characters' animations ...
-"E:\UE_5.8\Engine\Binaries\Win64\UnrealEditor-Cmd.exe" "%~dp0..\TacticalMasters.uproject" /Game/Maps/Showcase -game -unattended -RenderOffscreen -NoTextureStreaming -nosound -tmanimcatalog -stdout -FullStdOutLogOutput > "%LOG%" 2>&1
-findstr /C:"ANIM STUDIO DONE" "%LOG%"
-if errorlevel 1 (echo THE ANIMATIONS WERE NOT FILMED -- see %LOG% & exit /b 1)
-exit /b 0
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0AnimCatalog.ps1"
+exit /b %ERRORLEVEL%

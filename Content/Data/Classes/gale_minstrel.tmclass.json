@@ -36,7 +36,12 @@
       "aoe": 0,
       "cooldown": 0,
       "cast": 0,
-      "fx": "pin_shot"
+      "fx": "pin_shot",
+      "vfx": {
+        "system": "/Game/ParagonNarbash/FX/Particles/Abilities/Throw/FX/P_Narbash_Throw_HitCharacter.P_Narbash_Throw_HitCharacter",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "gale_minstrel_anthem",
@@ -54,7 +59,12 @@
       "cooldown": 3,
       "cast": 1.5,
       "tg": 25,
-      "fx": "haste"
+      "fx": "haste",
+      "vfx": {
+        "system": "/Game/FreeParticle_SoftTofu/Niagara/NS_Sparkling_Heart.NS_Sparkling_Heart",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "gale_minstrel_ballad",
@@ -96,7 +106,12 @@
       "aoe": 4,
       "cooldown": 0,
       "cast": 2,
-      "fx": "sanctuary"
+      "fx": "sanctuary",
+      "vfx": {
+        "system": "/Game/FreeParticle_SoftTofu/Niagara/NS_Sparkling_Heart.NS_Sparkling_Heart",
+        "at": "targets",
+        "scale": 1
+      }
     }
   ],
   "creator": {

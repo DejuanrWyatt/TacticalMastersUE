@@ -95,7 +95,9 @@ void ATMVfxStudio::BeginPlay()
 	Lamp->SetIntensity(6.0f);
 	Lamp->SetCastShadows(false);
 
-	OutDir = FPaths::ProjectSavedDir() / TEXT("VfxCatalog");
+	// A filtered run (-tmvfxonly) is a check, filmed apart, so the creator's
+	// full catalogue is left as it was.
+	OutDir = FPaths::ProjectSavedDir() / (FParse::Param(FCommandLine::Get(), TEXT("tmvfxonly")) || FCString::Strifind(FCommandLine::Get(), TEXT("tmvfxonly=")) ? TEXT("VfxCheck") : TEXT("VfxCatalog"));
 	// A fresh catalogue each time: an effect removed from the project must not
 	// linger in the creator as a strip it can still pick.
 	IFileManager::Get().DeleteDirectory(*OutDir, false, true);
@@ -118,9 +120,30 @@ void ATMVfxStudio::FindEffects()
 	Filter.ClassPaths.Add(UParticleSystem::StaticClass()->GetClassPathName());
 	TArray<FAssetData> Found;
 	Registry.GetAssets(Filter, Found);
+	// -tmvfxonly=<file>: only the effects listed in it, one object path a line --
+	// the ones Tools/assign_vfx.py chose, say, rather than every one of a
+	// thousand and more.
+	TSet<FString> Only;
+	FString OnlyFile;
+	if (FParse::Value(FCommandLine::Get(), TEXT("tmvfxonly="), OnlyFile))
+	{
+		TArray<FString> Lines;
+		FFileHelper::LoadFileToStringArray(Lines, *OnlyFile);
+		for (const FString& Line : Lines)
+		{
+			if (!Line.TrimStartAndEnd().IsEmpty())
+			{
+				Only.Add(Line.TrimStartAndEnd());
+			}
+		}
+		UE_LOG(LogTemp, Log, TEXT("VFX STUDIO: only the %d effects listed in %s"), Only.Num(), *OnlyFile);
+	}
 	for (const FAssetData& Asset : Found)
 	{
-		ToFilm.Add(Asset.GetSoftObjectPath());
+		if (Only.Num() == 0 || Only.Contains(Asset.GetSoftObjectPath().ToString()))
+		{
+			ToFilm.Add(Asset.GetSoftObjectPath());
+		}
 	}
 	// Alphabetical, so the catalogue reads the same from one run to the next.
 	ToFilm.Sort([](const FSoftObjectPath& A, const FSoftObjectPath& B) { return A.ToString() < B.ToString(); });

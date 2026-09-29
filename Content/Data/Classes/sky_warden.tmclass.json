@@ -37,7 +37,12 @@
       "aoe": 0,
       "cooldown": 0,
       "cast": 0,
-      "fx": "attack"
+      "fx": "attack",
+      "vfx": {
+        "system": "/Game/ParagonSteel/FX/Particles/Steel/Abilities/Primary/FX/P_Steel_Melee_SucessfulImpact.P_Steel_Melee_SucessfulImpact",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "sky_warden_gale_bash",
@@ -55,7 +60,12 @@
       "cooldown": 2,
       "cast": 0,
       "tg": -25,
-      "fx": "shield_bash"
+      "fx": "shield_bash",
+      "vfx": {
+        "system": "/Game/ParagonSteel/FX/Particles/Steel/Abilities/Bash/FX/P_ShieldBashImpact.P_ShieldBashImpact",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "sky_warden_gale_ward",
@@ -98,7 +108,12 @@
       "cooldown": 0,
       "cast": 1,
       "tg": -25,
-      "fx": "holy_blade"
+      "fx": "holy_blade",
+      "vfx": {
+        "system": "/Game/ParagonSteel/FX/Particles/Steel/Abilities/Ultimate/FX/P_Steel_Ultimate_Impact.P_Steel_Ultimate_Impact",
+        "at": "targets",
+        "scale": 1
+      }
     }
   ]
 }

@@ -37,7 +37,12 @@
       "cooldown": 0,
       "cast": 0,
       "tg": -10,
-      "fx": "pin_shot"
+      "fx": "pin_shot",
+      "vfx": {
+        "system": "/Game/ParagonPhase/FX/Particles/Abilities/Primary/FX/P_PhasePrimaryImpact.P_PhasePrimaryImpact",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "time_mage_slowga",
@@ -58,7 +63,12 @@
         "id": "slow",
         "turns": 2
       },
-      "fx": "haste"
+      "fx": "haste",
+      "vfx": {
+        "system": "/Game/ParagonPhase/FX/Particles/Abilities/Link/FX/P_PhaseLinkImpact.P_PhaseLinkImpact",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "time_mage_quicken",
@@ -76,7 +86,12 @@
       "cooldown": 3,
       "cast": 1,
       "tg": 40,
-      "fx": "haste"
+      "fx": "haste",
+      "vfx": {
+        "system": "/Game/FreeParticle_SoftTofu/Niagara/NS_Sparkling_Heart.NS_Sparkling_Heart",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "time_mage_time_stop",
@@ -97,7 +112,12 @@
         "id": "stun",
         "turns": 1
       },
-      "fx": "meteor"
+      "fx": "meteor",
+      "vfx": {
+        "system": "/Game/ParagonPhase/FX/Particles/Abilities/Flash/FX/P_FlashImpact.P_FlashImpact",
+        "at": "point",
+        "scale": 1
+      }
     }
   ]
 }

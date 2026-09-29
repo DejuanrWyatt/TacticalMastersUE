@@ -37,7 +37,12 @@
       "aoe": 0,
       "cooldown": 0,
       "cast": 0,
-      "fx": "attack"
+      "fx": "attack",
+      "vfx": {
+        "system": "/Game/ParagonMorigesh/FX/Particles/Morigesh/Abilities/Primary/FX/P_Morigesh_Primary_HitCharacter.P_Morigesh_Primary_HitCharacter",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "lich_caller_summon_lich",
@@ -66,7 +71,12 @@
           "turns": 2
         }
       ],
-      "fx": "pin_shot"
+      "fx": "pin_shot",
+      "vfx": {
+        "system": "/Game/ParagonMorigesh/FX/Particles/Morigesh/Abilities/SkillshotAOE/FX/P_Morigesh_SkillshotAOE_Explosion.P_Morigesh_SkillshotAOE_Explosion",
+        "at": "point",
+        "scale": 1
+      }
     },
     {
       "id": "lich_caller_lich_pact",
@@ -90,7 +100,12 @@
           "turns": 2
         }
       ],
-      "fx": "haste"
+      "fx": "haste",
+      "vfx": {
+        "system": "/Game/ParagonMorigesh/FX/Particles/Morigesh/Abilities/LifeDrain/FX/P_Morigesh_PhaseShift_Looping.P_Morigesh_PhaseShift_Looping",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "lich_caller_lich_ascendant",
@@ -119,7 +134,12 @@
           "turns": 2
         }
       ],
-      "fx": "meteor"
+      "fx": "meteor",
+      "vfx": {
+        "system": "/Game/ParagonMorigesh/FX/Particles/Morigesh/Abilities/StabDoll/FX/P_Morigesh_StabDoll_IMPACT.P_Morigesh_StabDoll_IMPACT",
+        "at": "point",
+        "scale": 1
+      }
     }
   ]
 }

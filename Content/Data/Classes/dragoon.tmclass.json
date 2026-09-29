@@ -37,7 +37,12 @@
       "aoe": 0,
       "cooldown": 0,
       "cast": 0,
-      "fx": "attack"
+      "fx": "attack",
+      "vfx": {
+        "system": "/Game/ParagonMinions/FX/Particles/Minions/Shared/P_Minion_Melee_Impact.P_Minion_Melee_Impact",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "dragoon_jump",
@@ -54,7 +59,12 @@
       "aoe": 0.8,
       "cooldown": 2,
       "cast": 0,
-      "fx": "brave_slash"
+      "fx": "brave_slash",
+      "vfx": {
+        "system": "/Game/ParagonMinions/FX/Particles/Minions/Shared/P_Minion_Melee_Impact.P_Minion_Melee_Impact",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "dragoon_dragon_spirit",
@@ -78,7 +88,12 @@
           "turns": 2
         }
       ],
-      "fx": "focus"
+      "fx": "focus",
+      "vfx": {
+        "system": "/Game/FreeParticle_SoftTofu/Niagara/NS_Sparkling_Star.NS_Sparkling_Star",
+        "at": "user",
+        "scale": 1
+      }
     },
     {
       "id": "dragoon_highwind",
@@ -95,7 +110,12 @@
       "aoe": 2.5,
       "cooldown": 0,
       "cast": 2,
-      "fx": "earth_slash"
+      "fx": "earth_slash",
+      "vfx": {
+        "system": "/Game/ParagonFengMao/FX/Particles/Abilities/Ultimate/FX/P_FengMao_Ult_Impact_03.P_FengMao_Ult_Impact_03",
+        "at": "targets",
+        "scale": 1
+      }
     }
   ]
 }

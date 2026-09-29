@@ -36,7 +36,12 @@
       "aoe": 0,
       "cooldown": 0,
       "cast": 0,
-      "fx": "holy_blade"
+      "fx": "holy_blade",
+      "vfx": {
+        "system": "/Game/ParagonSerath/FX/Particles/Abilities/Primary/FX/P_PrimaryImpactEvil.P_PrimaryImpactEvil",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "dawn_aegis_sun_shield",
@@ -57,7 +62,12 @@
         "id": "shield",
         "turns": 2
       },
-      "fx": "guard"
+      "fx": "guard",
+      "vfx": {
+        "system": "/Game/FreeParticle_SoftTofu/Niagara/NS_Sparkling_Heart.NS_Sparkling_Heart",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "dawn_aegis_dawnlight",
@@ -74,7 +84,12 @@
       "aoe": 2.5,
       "cooldown": 2,
       "cast": 0,
-      "fx": "sanctuary"
+      "fx": "sanctuary",
+      "vfx": {
+        "system": "/Game/FreeParticle_SoftTofu/Niagara/NS_Sparkling_Heart.NS_Sparkling_Heart",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "dawn_aegis_aegis_of_dawn",
@@ -95,7 +110,12 @@
         "id": "invuln",
         "turns": 2
       },
-      "fx": "holy_blade"
+      "fx": "holy_blade",
+      "vfx": {
+        "system": "/Game/FreeParticle_SoftTofu/Niagara/NS_Sparkling_Heart.NS_Sparkling_Heart",
+        "at": "targets",
+        "scale": 1
+      }
     }
   ],
   "creator": {

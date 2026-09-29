@@ -36,7 +36,12 @@
       "aoe": 0,
       "cooldown": 0,
       "cast": 0,
-      "fx": "bow_shot"
+      "fx": "bow_shot",
+      "vfx": {
+        "system": "/Game/ParagonSparrow/FX/Particles/Sparrow/Skins/Rogue/P_Sparrow_Primary_Ballistic_HitPlayer.P_Sparrow_Primary_Ballistic_HitPlayer",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "sun_archer_holy_snipe",
@@ -53,7 +58,12 @@
       "aoe": 0.7,
       "cooldown": 1,
       "cast": 1,
-      "fx": "aimed_shot"
+      "fx": "aimed_shot",
+      "vfx": {
+        "system": "/Game/ParagonSparrow/FX/Particles/Sparrow/Abilities/Primary/FX/P_Sparrow_Primary_Ballistic_HitPlayer.P_Sparrow_Primary_Ballistic_HitPlayer",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "sun_archer_holy_barb",
@@ -70,7 +80,12 @@
       "aoe": 0,
       "cooldown": 2,
       "cast": 0,
-      "fx": "pin_shot"
+      "fx": "pin_shot",
+      "vfx": {
+        "system": "/Game/ParagonSparrow/FX/Particles/Sparrow/Skins/Rogue/P_Sparrow_Primary_Ballistic_HitWorld.P_Sparrow_Primary_Ballistic_HitWorld",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "sun_archer_radiance_volley",
@@ -87,7 +102,12 @@
       "aoe": 2.5,
       "cooldown": 0,
       "cast": 2,
-      "fx": "arrow_rain"
+      "fx": "arrow_rain",
+      "vfx": {
+        "system": "/Game/ParagonSparrow/FX/Particles/Sparrow/Skins/Rogue/P_Sparrow_UltHit.P_Sparrow_UltHit",
+        "at": "targets",
+        "scale": 1
+      }
     }
   ]
 }

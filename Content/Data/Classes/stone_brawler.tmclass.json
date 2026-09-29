@@ -36,7 +36,12 @@
       "aoe": 0,
       "cooldown": 0,
       "cast": 0,
-      "fx": "punch"
+      "fx": "punch",
+      "vfx": {
+        "system": "/Game/ParagonRampage/FX/Particles/Abilities/Primary/FX/P_Rampage_Melee_Impact.P_Rampage_Melee_Impact",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "stone_brawler_uppercut",
@@ -57,7 +62,12 @@
         "id": "stun",
         "turns": 1
       },
-      "fx": "wave_fist"
+      "fx": "wave_fist",
+      "vfx": {
+        "system": "/Game/ParagonRampage/FX/Particles/Rampage_v001_IceBlue/FX/P_Rampage_Lunge_ImpactBlueEnraged.P_Rampage_Lunge_ImpactBlueEnraged",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "stone_brawler_stance",
@@ -102,7 +112,12 @@
         "id": "stun",
         "turns": 1
       },
-      "fx": "earth_slash"
+      "fx": "earth_slash",
+      "vfx": {
+        "system": "/Game/ParagonRampage/FX/Particles/Rampage_v001_IceBlue/FX/P_Rampage_Lunge_ImpactBlue.P_Rampage_Lunge_ImpactBlue",
+        "at": "targets",
+        "scale": 1
+      }
     }
   ],
   "creator": {

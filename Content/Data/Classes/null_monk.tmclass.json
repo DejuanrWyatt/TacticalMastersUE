@@ -36,7 +36,12 @@
       "aoe": 0,
       "cooldown": 0,
       "cast": 0,
-      "fx": "punch"
+      "fx": "punch",
+      "vfx": {
+        "system": "/Game/ParagonYin/FX/Particles/Yin/Abilities/Primary/FX/P_Yin_Primary_Impact.P_Yin_Primary_Impact",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "null_monk_hush",
@@ -57,7 +62,12 @@
         "id": "silence",
         "turns": 2
       },
-      "fx": "chakra"
+      "fx": "chakra",
+      "vfx": {
+        "system": "/Game/ParticleSystemVFXVol1/Systems/NS_SparkleBurst.NS_SparkleBurst",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "null_monk_null_ward",
@@ -78,7 +88,12 @@
         "id": "immunity",
         "turns": 2
       },
-      "fx": "chakra"
+      "fx": "chakra",
+      "vfx": {
+        "system": "/Game/FreeParticle_SoftTofu/Niagara/NS_Sparkling_Heart.NS_Sparkling_Heart",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "null_monk_void_mantra",
@@ -99,7 +114,12 @@
         "id": "silence",
         "turns": 2
       },
-      "fx": "wave_fist"
+      "fx": "wave_fist",
+      "vfx": {
+        "system": "/Game/ParticleSystemVFXVol1/Systems/NS_SparkleBurst.NS_SparkleBurst",
+        "at": "point",
+        "scale": 1
+      }
     }
   ],
   "creator": {

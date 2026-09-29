@@ -36,7 +36,12 @@
       "aoe": 0,
       "cooldown": 0,
       "cast": 0,
-      "fx": "attack"
+      "fx": "attack",
+      "vfx": {
+        "system": "/Game/ParagonKallari/FX/Particles/Kallari/Abilities/Primary/FX/P_Kallari_Melee_SucessfulImpact.P_Kallari_Melee_SucessfulImpact",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "sand_viper_stone_kunai",
@@ -57,7 +62,12 @@
         "id": "stun",
         "turns": 1
       },
-      "fx": "throw_stone"
+      "fx": "throw_stone",
+      "vfx": {
+        "system": "/Game/ParagonKallari/FX/Particles/Kallari/Abilities/DaggerThrow/FX/P_Kallari_DaggerThrow_HitPlayer.P_Kallari_DaggerThrow_HitPlayer",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "sand_viper_stone_veil",
@@ -78,7 +88,12 @@
         "id": "slow",
         "turns": 2
       },
-      "fx": "haste"
+      "fx": "haste",
+      "vfx": {
+        "system": "/Game/ParticleSystemVFXVol1/Systems/NS_EnergyVortex.NS_EnergyVortex",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "sand_viper_stone_execution",
@@ -99,7 +114,12 @@
         "id": "stun",
         "turns": 1
       },
-      "fx": "brave_slash"
+      "fx": "brave_slash",
+      "vfx": {
+        "system": "/Game/ParagonMinions/FX/Particles/Minions/Shared/P_Minion_Melee_Impact.P_Minion_Melee_Impact",
+        "at": "targets",
+        "scale": 1
+      }
     }
   ]
 }

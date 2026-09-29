@@ -36,7 +36,12 @@
       "aoe": 0,
       "cooldown": 0,
       "cast": 0,
-      "fx": "shield_bash"
+      "fx": "shield_bash",
+      "vfx": {
+        "system": "/Game/ParagonSteel/FX/Particles/Steel/Abilities/Primary/FX/P_Steel_Melee_SucessfulImpact.P_Steel_Melee_SucessfulImpact",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "bastion_challenge",
@@ -58,7 +63,12 @@
         "id": "taunt",
         "turns": 2
       },
-      "fx": "guard"
+      "fx": "guard",
+      "vfx": {
+        "system": "/Game/ParagonSteel/FX/Particles/Steel/Abilities/Bash/FX/P_ShieldBashImpact.P_ShieldBashImpact",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "bastion_bulwark",
@@ -79,7 +89,12 @@
         "id": "barrier",
         "turns": 3
       },
-      "fx": "guard"
+      "fx": "guard",
+      "vfx": {
+        "system": "/Game/FreeParticle_SoftTofu/Niagara/NS_Sparkling_Heart.NS_Sparkling_Heart",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "bastion_rallying_wall",
@@ -100,7 +115,12 @@
         "id": "barrier",
         "turns": 3
       },
-      "fx": "sanctuary"
+      "fx": "sanctuary",
+      "vfx": {
+        "system": "/Game/ParagonSteel/FX/Particles/Steel/Cinematics/FX/P_ShieldSolar.P_ShieldSolar",
+        "at": "targets",
+        "scale": 1
+      }
     }
   ],
   "creator": {

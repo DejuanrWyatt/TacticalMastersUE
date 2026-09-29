@@ -37,7 +37,12 @@
       "aoe": 0,
       "cooldown": 0,
       "cast": 0,
-      "fx": "attack"
+      "fx": "attack",
+      "vfx": {
+        "system": "/Game/ParagonMinions/FX/Particles/Minions/Shared/P_Minion_Melee_Impact.P_Minion_Melee_Impact",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "frostblade_frost_edge",
@@ -58,7 +63,12 @@
         "id": "slow",
         "turns": 2
       },
-      "fx": "holy_blade"
+      "fx": "holy_blade",
+      "vfx": {
+        "system": "/Game/ParticleSystemVFXVol1/Systems/NS_SparkleBurst.NS_SparkleBurst",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "frostblade_frost_lance",
@@ -75,7 +85,12 @@
       "aoe": 0.7,
       "cooldown": 0,
       "cast": 1,
-      "fx": "blizzard"
+      "fx": "blizzard",
+      "vfx": {
+        "system": "/Game/TorchFire/FX/NS_TorchFire_Ice.NS_TorchFire_Ice",
+        "at": "point",
+        "scale": 1
+      }
     },
     {
       "id": "frostblade_frost_maelstrom",
@@ -96,7 +111,12 @@
         "id": "slow",
         "turns": 2
       },
-      "fx": "blizzard"
+      "fx": "blizzard",
+      "vfx": {
+        "system": "/Game/ParagonFengMao/FX/Particles/Abilities/Ultimate/FX/P_FengMao_Ult_Impact_03.P_FengMao_Ult_Impact_03",
+        "at": "point",
+        "scale": 1
+      }
     }
   ]
 }

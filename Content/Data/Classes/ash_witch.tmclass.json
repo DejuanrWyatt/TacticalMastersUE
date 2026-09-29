@@ -36,7 +36,12 @@
       "aoe": 0,
       "cooldown": 0,
       "cast": 0,
-      "fx": "pin_shot"
+      "fx": "pin_shot",
+      "vfx": {
+        "system": "/Game/ParagonIggyScorch/FX/Particles/IggyScorch/Abilities/Primary/FX/P_IggyScorch_Molotov_HitPlayer.P_IggyScorch_Molotov_HitPlayer",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "ash_witch_flame_curse",
@@ -60,7 +65,12 @@
           "turns": 2
         }
       ],
-      "fx": "pin_shot"
+      "fx": "pin_shot",
+      "vfx": {
+        "system": "/Game/ParagonIggyScorch/FX/Particles/IggyScorch/Abilities/Turret/FX/Alternate/P_Turret_Proj_HitPlayer.P_Turret_Proj_HitPlayer",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "ash_witch_flame_slumber",
@@ -81,7 +91,12 @@
         "id": "stun",
         "turns": 1
       },
-      "fx": "haste"
+      "fx": "haste",
+      "vfx": {
+        "system": "/Game/ParagonIggyScorch/FX/Particles/IggyScorch/Abilities/Turret/FX/P_IggyScorch_Turret_Impact.P_IggyScorch_Turret_Impact",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "ash_witch_flame_doom",
@@ -102,7 +117,12 @@
         "id": "burn",
         "turns": 2
       },
-      "fx": "meteor"
+      "fx": "meteor",
+      "vfx": {
+        "system": "/Game/ParagonIggyScorch/FX/Particles/IggyScorch/Abilities/Turret/FX/P_IggyScorch_Turret_Explosion.P_IggyScorch_Turret_Explosion",
+        "at": "point",
+        "scale": 1
+      }
     }
   ]
 }

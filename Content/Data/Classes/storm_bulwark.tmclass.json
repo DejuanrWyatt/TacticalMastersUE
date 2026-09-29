@@ -37,7 +37,12 @@
       "aoe": 0,
       "cooldown": 0,
       "cast": 0,
-      "fx": "attack"
+      "fx": "attack",
+      "vfx": {
+        "system": "/Game/ParagonSteel/FX/Particles/Steel/Abilities/Primary/FX/P_Steel_Melee_SucessfulImpact.P_Steel_Melee_SucessfulImpact",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "storm_bulwark_thunder_bash",
@@ -58,7 +63,12 @@
         "id": "stun",
         "turns": 1
       },
-      "fx": "shield_bash"
+      "fx": "shield_bash",
+      "vfx": {
+        "system": "/Game/ParagonSteel/FX/Particles/Steel/Abilities/Bash/FX/P_ShieldBashImpact.P_ShieldBashImpact",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "storm_bulwark_thunder_ward",
@@ -108,7 +118,12 @@
         "id": "stun",
         "turns": 1
       },
-      "fx": "holy_blade"
+      "fx": "holy_blade",
+      "vfx": {
+        "system": "/Game/ParagonSteel/FX/Particles/Steel/Abilities/Ultimate/FX/P_Steel_Ultimate_Impact.P_Steel_Ultimate_Impact",
+        "at": "targets",
+        "scale": 1
+      }
     }
   ]
 }

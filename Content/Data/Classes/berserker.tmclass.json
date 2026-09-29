@@ -38,7 +38,12 @@
       "angle": 90,
       "cooldown": 0,
       "cast": 0,
-      "fx": "brave_slash"
+      "fx": "brave_slash",
+      "vfx": {
+        "system": "/Game/ParagonGrux/FX/Particles/Abilities/Primary/FX/P_Grux_Melee_ShockwaveImpact.P_Grux_Melee_ShockwaveImpact",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "berserker_rage",
@@ -88,7 +93,12 @@
         "id": "stun",
         "turns": 1
       },
-      "fx": "earth_slash"
+      "fx": "earth_slash",
+      "vfx": {
+        "system": "/Game/ParagonGrux/FX/Particles/Abilities/Primary/FX/P_Grux_Melee_ShockwaveImpact.P_Grux_Melee_ShockwaveImpact",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "berserker_rampage",
@@ -105,7 +115,12 @@
       "aoe": 2.5,
       "cooldown": 0,
       "cast": 0,
-      "fx": "earth_slash"
+      "fx": "earth_slash",
+      "vfx": {
+        "system": "/Game/PotaVFX_Smoke/VFX/System/SmokeBurst/NS_MagicSmokeBurstAir.NS_MagicSmokeBurstAir",
+        "at": "targets",
+        "scale": 1
+      }
     }
   ]
 }

@@ -36,7 +36,12 @@
       "aoe": 0,
       "cooldown": 0,
       "cast": 1,
-      "fx": "blizzard"
+      "fx": "blizzard",
+      "vfx": {
+        "system": "/Game/ParagonAurora/FX/Particles/Abilities/Primary/FX/P_Aurora_Melee_SucessfulImpact.P_Aurora_Melee_SucessfulImpact",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "cryomancer_hailstorm",
@@ -57,7 +62,12 @@
         "id": "slow",
         "turns": 2
       },
-      "fx": "blizzard"
+      "fx": "blizzard",
+      "vfx": {
+        "system": "/Game/ParagonAurora/FX/Particles/Abilities/Leap/FX/P_Aurora_Decoy_Explode_Fragments.P_Aurora_Decoy_Explode_Fragments",
+        "at": "point",
+        "scale": 1
+      }
     },
     {
       "id": "cryomancer_frost_staff",
@@ -74,7 +84,12 @@
       "aoe": 0,
       "cooldown": 0,
       "cast": 0,
-      "fx": "attack"
+      "fx": "attack",
+      "vfx": {
+        "system": "/Game/ParagonMinions/FX/Particles/Minions/Shared/P_Minion_Melee_Impact.P_Minion_Melee_Impact",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "cryomancer_absolute_zero",
@@ -96,7 +111,12 @@
         "id": "slow",
         "turns": 2
       },
-      "fx": "blizzard"
+      "fx": "blizzard",
+      "vfx": {
+        "system": "/Game/ParticleSystemVFXVol1/Systems/NS_EnergyVortex.NS_EnergyVortex",
+        "at": "user",
+        "scale": 1
+      }
     }
   ]
 }

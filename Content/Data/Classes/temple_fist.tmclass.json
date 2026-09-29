@@ -36,7 +36,12 @@
       "aoe": 0,
       "cooldown": 0,
       "cast": 0,
-      "fx": "punch"
+      "fx": "punch",
+      "vfx": {
+        "system": "/Game/ParagonSunWukong/FX/Particles/Wukong/Abilities/Primary/FX/P_Wukong_Impact_Empowered.P_Wukong_Impact_Empowered",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "temple_fist_holy_uppercut",
@@ -53,7 +58,12 @@
       "aoe": 0,
       "cooldown": 2,
       "cast": 0,
-      "fx": "wave_fist"
+      "fx": "wave_fist",
+      "vfx": {
+        "system": "/Game/ParagonMinions/FX/Particles/Minions/Shared/P_Minion_Melee_Impact.P_Minion_Melee_Impact",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "temple_fist_holy_stance",
@@ -99,7 +109,12 @@
       "aoe": 2.5,
       "cooldown": 0,
       "cast": 0,
-      "fx": "earth_slash"
+      "fx": "earth_slash",
+      "vfx": {
+        "system": "/Game/PotaVFX_Smoke/VFX/System/SmokeBurst/NS_MagicSmokeBurstAir.NS_MagicSmokeBurstAir",
+        "at": "targets",
+        "scale": 1
+      }
     }
   ]
 }

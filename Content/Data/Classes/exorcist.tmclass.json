@@ -36,7 +36,12 @@
       "aoe": 0,
       "cooldown": 0,
       "cast": 0,
-      "fx": "pin_shot"
+      "fx": "pin_shot",
+      "vfx": {
+        "system": "/Game/ParagonSerath/FX/Particles/Abilities/Primary/FX/P_PrimaryImpactEvil.P_PrimaryImpactEvil",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "exorcist_holy_curse",
@@ -60,7 +65,12 @@
           "turns": 2
         }
       ],
-      "fx": "pin_shot"
+      "fx": "pin_shot",
+      "vfx": {
+        "system": "/Game/ParagonSerath/FX/Particles/Abilities/Primary/FX/P_PrimaryImpact.P_PrimaryImpact",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "exorcist_holy_slumber",
@@ -81,7 +91,12 @@
         "id": "stun",
         "turns": 1
       },
-      "fx": "haste"
+      "fx": "haste",
+      "vfx": {
+        "system": "/Game/ParagonSerath/FX/Particles/Abilities/Fury/FX/P_Fury_Impact.P_Fury_Impact",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "exorcist_holy_doom",
@@ -98,7 +113,12 @@
       "aoe": 3.5,
       "cooldown": 0,
       "cast": 2.5,
-      "fx": "holy_blade"
+      "fx": "holy_blade",
+      "vfx": {
+        "system": "/Game/ParagonSerath/FX/Particles/Abilities/Chastise/FX/P_WingBlastFallen.P_WingBlastFallen",
+        "at": "point",
+        "scale": 1
+      }
     }
   ]
 }

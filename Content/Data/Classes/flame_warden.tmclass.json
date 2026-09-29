@@ -37,7 +37,12 @@
       "aoe": 0,
       "cooldown": 0,
       "cast": 0,
-      "fx": "attack"
+      "fx": "attack",
+      "vfx": {
+        "system": "/Game/ParagonGreystone/FX/Particles/Greystone/Skins/Novaborn/P_Greystone_Novaborn_Primary_Impact.P_Greystone_Novaborn_Primary_Impact",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "flame_warden_flame_bash",
@@ -58,7 +63,12 @@
         "id": "burn",
         "turns": 2
       },
-      "fx": "shield_bash"
+      "fx": "shield_bash",
+      "vfx": {
+        "system": "/Game/ParagonGreystone/FX/Particles/Greystone/Skins/Novaborn/P_Greystone_Novaborn_HToKill_Impact.P_Greystone_Novaborn_HToKill_Impact",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "flame_warden_flame_ward",
@@ -108,7 +118,12 @@
         "id": "burn",
         "turns": 2
       },
-      "fx": "holy_blade"
+      "fx": "holy_blade",
+      "vfx": {
+        "system": "/Game/ParagonGreystone/FX/Particles/Greystone/Abilities/ClearAPath/FX/P_Greystone_ClearAPath_Impacts.P_Greystone_ClearAPath_Impacts",
+        "at": "targets",
+        "scale": 1
+      }
     }
   ]
 }

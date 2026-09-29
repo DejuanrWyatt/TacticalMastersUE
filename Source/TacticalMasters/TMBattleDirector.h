@@ -794,14 +794,17 @@ private:
 		mutable USkeletalMesh* Mesh = nullptr;
 		FString MeshPath;
 		float Yaw = 0.0f;
-		const FTMAnimSet* Animations = nullptr;
+		/** Its clips: loaded with the mesh, the first time a unit wears it (MeshOf). */
+		mutable const FTMAnimSet* Animations = nullptr;
 		/** The animation set's name; a skin is a body named "<set>_<skin>". */
 		FString SetName;
 		/** How big it is drawn: a hero built as a giant is brought nearer everyone else's size. */
 		float Scale = 1.0f;
 	};
-	/** The body's mesh, loaded now if it has not been yet. */
+	/** The body's mesh, and its animation set, loaded now if they have not been yet. */
 	USkeletalMesh* MeshOf(const FTMBody& Body);
+	/** An animation set by name, its clips loaded the first time it is asked for. */
+	const FTMAnimSet* SetOf(const FString& Name);
 
 	/** What one unit is doing on screen. */
 	struct FTMMotion
@@ -979,7 +982,15 @@ private:
 	void EndPlay(const EEndPlayReason::Type Reason) override;
 
 	bool bCharacterMapRead = false;
+	/**
+	 * Every set as the map writes it, and the sets loaded so far. Loaded only
+	 * when worn: thirty heroes' clips at once ran the editor out of memory, and
+	 * a battle wears eight at most. AnimSets is given room for every set when
+	 * the map is read, so adding one never moves the others (bodies point at them).
+	 */
+	TMap<FString, TSharedPtr<FJsonObject>> SetSources;
 	TMap<FString, FTMAnimSet> AnimSets;
+	void BuildAnimSet(const FJsonObject& Set, FTMAnimSet& Out);
 	TMap<FString, FTMBody> Bodies;
 	TMap<FString, FString> LookBodies;
 	TMap<FString, FString> ClassBodies;

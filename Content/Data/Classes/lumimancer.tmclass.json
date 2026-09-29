@@ -36,7 +36,12 @@
       "aoe": 0,
       "cooldown": 0,
       "cast": 1,
-      "fx": "holy_blade"
+      "fx": "holy_blade",
+      "vfx": {
+        "system": "/Game/ParagonSerath/FX/Particles/Abilities/Primary/FX/P_PrimaryImpactEvil.P_PrimaryImpactEvil",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "lumimancer_radiance",
@@ -53,7 +58,12 @@
       "aoe": 2,
       "cooldown": 2,
       "cast": 2,
-      "fx": "holy_blade"
+      "fx": "holy_blade",
+      "vfx": {
+        "system": "/Game/ParagonSerath/FX/Particles/Abilities/Chastise/FX/P_WingBlastFallen.P_WingBlastFallen",
+        "at": "point",
+        "scale": 1
+      }
     },
     {
       "id": "lumimancer_holy_staff",
@@ -70,7 +80,12 @@
       "aoe": 0,
       "cooldown": 0,
       "cast": 0,
-      "fx": "attack"
+      "fx": "attack",
+      "vfx": {
+        "system": "/Game/ParagonSerath/FX/Particles/Abilities/Primary/FX/P_PrimaryImpact.P_PrimaryImpact",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "lumimancer_divine_wrath",
@@ -88,7 +103,12 @@
       "channel": 2,
       "cooldown": 0,
       "cast": 1,
-      "fx": "holy_blade"
+      "fx": "holy_blade",
+      "vfx": {
+        "system": "/Game/ParticleSystemVFXVol1/Systems/NS_EnergyVortex.NS_EnergyVortex",
+        "at": "user",
+        "scale": 1
+      }
     }
   ]
 }

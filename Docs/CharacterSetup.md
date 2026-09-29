@@ -249,3 +249,26 @@ code change on my side once the blueprint exists, so ask when you get there.
 | feet sliding | walk speed doesn't match the clip | tune `walkSpeed` / `runSpeed` |
 | nothing changed | the map is read once per run | stop and start Play |
 | a unit invisible | the mesh path is wrong | the log says `character map: nothing at …` with the path |
+
+## Every class on a hero, with skills that look like the hero's (2026-09-29)
+
+All 38 Paragon heroes are in the project. Four tools keep the classes dressed:
+
+1. `Tools\AddHero.bat --all --write` brings in every hero. Each skin
+   (`Skins/<skin>/Meshes`) becomes a body of its own on the hero's clips. The
+   clips are chosen by `Tools/hero_clips.json`, per hero, from its own
+   Animations folder: idle, hits (the knockbacks; Paragon's HitReact clips are
+   additive and can't play alone), deaths, and a motion for each kind of skill.
+   `ult` and `ult_support` name the clip slot 4 plays (`<motion>_ult`).
+2. `Tools/assign_bodies.py` (run by the above) gives each class its hero from
+   `heroPlan` in the character map, and the hero's skins in turn to the classes
+   that share it. `bodyScale` shrinks heroes built as giants.
+3. `Tools/assign_vfx.py --avoid --write --list Saved/vfx-chosen.txt` gives each
+   ability an effect from its hero's own pack (a skin's own effects for a class in
+   that skin), or a general one by damage type. Film the choices with the effects
+   studio (`-tmvfxcatalog -tmvfxonly=Saved\vfx-chosen.txt`, into `Saved\VfxCheck`)
+   and run it again with `--avoid`: effects that film as nothing (some of
+   Paragon's old Cascade effects draw nothing in UE5) are passed over for the next best.
+4. `Tools\AnimCatalog.bat` films the clips four heroes a run: the editor build
+   can't hold every hero's clips at once. The game itself loads a hero's clips
+   only when a unit wears it.

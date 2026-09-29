@@ -36,7 +36,12 @@
       "aoe": 0,
       "cooldown": 0,
       "cast": 0,
-      "fx": "pin_shot"
+      "fx": "pin_shot",
+      "vfx": {
+        "system": "/Game/ParticleSystemVFXVol1/Systems/NS_EnergyVortex.NS_EnergyVortex",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "arc_warlock_thunder_curse",
@@ -60,7 +65,12 @@
           "turns": 2
         }
       ],
-      "fx": "pin_shot"
+      "fx": "pin_shot",
+      "vfx": {
+        "system": "/Game/ParticleSystemVFXVol1/Systems/NS_EnergyVortex.NS_EnergyVortex",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "arc_warlock_thunder_slumber",
@@ -81,7 +91,12 @@
         "id": "stun",
         "turns": 1
       },
-      "fx": "haste"
+      "fx": "haste",
+      "vfx": {
+        "system": "/Game/ParticleSystemVFXVol1/Systems/NS_EnergyVortex.NS_EnergyVortex",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "arc_warlock_thunder_doom",
@@ -102,7 +117,12 @@
         "id": "stun",
         "turns": 1
       },
-      "fx": "holy_blade"
+      "fx": "holy_blade",
+      "vfx": {
+        "system": "/Game/ParticleSystemVFXVol1/Systems/NS_SparkleBurst.NS_SparkleBurst",
+        "at": "point",
+        "scale": 1
+      }
     }
   ]
 }

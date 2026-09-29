@@ -37,7 +37,12 @@
       "aoe": 0,
       "cooldown": 0,
       "cast": 0,
-      "fx": "attack"
+      "fx": "attack",
+      "vfx": {
+        "system": "/Game/ParagonTerra/FX/Particles/Terra/Abilities/DoubleSweep/FX/P_Terra_DoubleSweep_Impact.P_Terra_DoubleSweep_Impact",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "earthshaker_stone_edge",
@@ -58,7 +63,12 @@
         "id": "stun",
         "turns": 1
       },
-      "fx": "holy_blade"
+      "fx": "holy_blade",
+      "vfx": {
+        "system": "/Game/ParagonTerra/FX/Particles/Terra/Abilities/DoubleSweep/FX/P_Terra_DoubleSweep_Impact.P_Terra_DoubleSweep_Impact",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "earthshaker_stone_lance",
@@ -75,7 +85,12 @@
       "aoe": 0.7,
       "cooldown": 0,
       "cast": 1,
-      "fx": "earth_slash"
+      "fx": "earth_slash",
+      "vfx": {
+        "system": "/Game/ParagonTerra/FX/Particles/Terra/Abilities/DoubleSweep/FX/P_Terra_DoubleSweep_DustImpact.P_Terra_DoubleSweep_DustImpact",
+        "at": "point",
+        "scale": 1
+      }
     },
     {
       "id": "earthshaker_stone_maelstrom",
@@ -96,7 +111,12 @@
         "id": "stun",
         "turns": 1
       },
-      "fx": "earth_slash"
+      "fx": "earth_slash",
+      "vfx": {
+        "system": "/Game/PotaVFX_Smoke/VFX/System/SmokeBurst/NS_MagicSmokeBurstAir.NS_MagicSmokeBurstAir",
+        "at": "point",
+        "scale": 1
+      }
     }
   ]
 }

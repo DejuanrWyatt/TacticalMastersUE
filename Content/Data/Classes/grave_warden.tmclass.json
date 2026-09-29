@@ -36,7 +36,12 @@
       "aoe": 0,
       "cooldown": 0,
       "cast": 0,
-      "fx": "pin_shot"
+      "fx": "pin_shot",
+      "vfx": {
+        "system": "/Game/ParagonRevenant/FX/Particles/Revenant/Abilities/Obliterate/FX/P_Revenant_Obliterate_Hit.P_Revenant_Obliterate_Hit",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "grave_warden_rend_soul",
@@ -57,7 +62,12 @@
         "id": "shred",
         "turns": 2
       },
-      "fx": "pin_shot"
+      "fx": "pin_shot",
+      "vfx": {
+        "system": "/Game/PotaVFX_Smoke/VFX/System/SmokeBurst/NS_MagicSmokeBurstAir.NS_MagicSmokeBurstAir",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "grave_warden_deathless",
@@ -106,7 +116,12 @@
         "id": "doom",
         "turns": 3
       },
-      "fx": "meteor"
+      "fx": "meteor",
+      "vfx": {
+        "system": "/Game/ParagonRevenant/FX/Particles/Revenant/Abilities/Ultimate/FX/P_Revenant_Ultimate_Hit.P_Revenant_Ultimate_Hit",
+        "at": "targets",
+        "scale": 1
+      }
     }
   ],
   "creator": {

@@ -37,7 +37,12 @@
       "aoe": 0,
       "cooldown": 0,
       "cast": 0,
-      "fx": "brave_slash"
+      "fx": "brave_slash",
+      "vfx": {
+        "system": "/Game/ParagonSteel/FX/Particles/Steel/Abilities/Primary/FX/P_Steel_Melee_SucessfulImpact.P_Steel_Melee_SucessfulImpact",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "war_marshal_shield_slam",
@@ -58,7 +63,12 @@
         "id": "knockdown",
         "turns": 1
       },
-      "fx": "shield_bash"
+      "fx": "shield_bash",
+      "vfx": {
+        "system": "/Game/ParagonSteel/FX/Particles/Steel/Abilities/Bash/FX/P_ShieldBashImpact.P_ShieldBashImpact",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "war_marshal_battle_standard",
@@ -92,7 +102,12 @@
           "turns": 2
         }
       ],
-      "fx": "guard"
+      "fx": "guard",
+      "vfx": {
+        "system": "/Game/ParagonSteel/FX/Particles/Steel/Cinematics/FX/P_ShieldSolar.P_ShieldSolar",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "war_marshal_rally_the_line",
@@ -122,7 +137,12 @@
           "turns": 3
         }
       ],
-      "fx": "haste"
+      "fx": "haste",
+      "vfx": {
+        "system": "/Game/ParagonSteel/FX/Particles/Steel/Abilities/ShieldBlock/FX/P_Steel_Shieldwall_CustomHit.P_Steel_Shieldwall_CustomHit",
+        "at": "targets",
+        "scale": 1
+      }
     }
   ],
   "creator": {

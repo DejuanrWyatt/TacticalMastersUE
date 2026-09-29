@@ -37,7 +37,12 @@
       "aoe": 0,
       "cooldown": 0,
       "cast": 0,
-      "fx": "attack"
+      "fx": "attack",
+      "vfx": {
+        "system": "/Game/ParagonFey/FX/Particles/Fey/Abilities/Primary/FX/P_Fey_Primary_HitPlayer.P_Fey_Primary_HitPlayer",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "oakheart_thorn_bash",
@@ -58,7 +63,12 @@
         "id": "burn",
         "turns": 2
       },
-      "fx": "shield_bash"
+      "fx": "shield_bash",
+      "vfx": {
+        "system": "/Game/ParagonFey/FX/Particles/Fey/Abilities/Nettles/FX/P_Fey_Nettles_HitPlayer_Plants.P_Fey_Nettles_HitPlayer_Plants",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "oakheart_thorn_ward",
@@ -108,7 +118,12 @@
         "id": "burn",
         "turns": 2
       },
-      "fx": "holy_blade"
+      "fx": "holy_blade",
+      "vfx": {
+        "system": "/Game/ParagonFey/FX/Particles/Fey/Abilities/Nettles/FX/P_Fey_Nettles_HitPlayer.P_Fey_Nettles_HitPlayer",
+        "at": "targets",
+        "scale": 1
+      }
     }
   ]
 }

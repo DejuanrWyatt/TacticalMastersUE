@@ -36,7 +36,12 @@
       "aoe": 0,
       "cooldown": 0,
       "cast": 0,
-      "fx": "pin_shot"
+      "fx": "pin_shot",
+      "vfx": {
+        "system": "/Game/ParagonAurora/FX/Particles/Abilities/Primary/FX/P_Aurora_Melee_SucessfulImpact.P_Aurora_Melee_SucessfulImpact",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "frost_hexer_curse",
@@ -60,7 +65,12 @@
           "turns": 2
         }
       ],
-      "fx": "pin_shot"
+      "fx": "pin_shot",
+      "vfx": {
+        "system": "/Game/ParagonAurora/FX/Particles/Abilities/Leap/FX/P_Aurora_Decoy_Explode_Fragments.P_Aurora_Decoy_Explode_Fragments",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "frost_hexer_slumber",
@@ -81,7 +91,12 @@
         "id": "sleep",
         "turns": 1
       },
-      "fx": "haste"
+      "fx": "haste",
+      "vfx": {
+        "system": "/Game/TorchFire/FX/NS_TorchFire_Ice.NS_TorchFire_Ice",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "frost_hexer_doom",
@@ -102,7 +117,12 @@
         "id": "slow",
         "turns": 2
       },
-      "fx": "meteor"
+      "fx": "meteor",
+      "vfx": {
+        "system": "/Game/ParagonAurora/FX/Particles/Abilities/Ultimate/FX/P_Aurora_Ultimate_Explode.P_Aurora_Ultimate_Explode",
+        "at": "point",
+        "scale": 1
+      }
     }
   ],
   "creator": {

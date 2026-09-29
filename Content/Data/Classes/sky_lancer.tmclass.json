@@ -36,7 +36,12 @@
       "aoe": 0,
       "cooldown": 0,
       "cast": 0,
-      "fx": "attack"
+      "fx": "attack",
+      "vfx": {
+        "system": "/Game/PotaVFX_Smoke/VFX/System/SmokeRing/NS_SmokeRing.NS_SmokeRing",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "sky_lancer_take_wing",
@@ -57,7 +62,12 @@
         "id": "fly",
         "turns": 3
       },
-      "fx": "haste"
+      "fx": "haste",
+      "vfx": {
+        "system": "/Game/FreeParticle_SoftTofu/Niagara/NS_Sparkling_Star.NS_Sparkling_Star",
+        "at": "user",
+        "scale": 1
+      }
     },
     {
       "id": "sky_lancer_diving_charge",
@@ -79,7 +89,12 @@
         "turns": 1
       },
       "fx": "brave_slash",
-      "anim": "dash"
+      "anim": "dash",
+      "vfx": {
+        "system": "/Game/PotaVFX_Smoke/VFX/System/SmokeRing/NS_SmokeRing.NS_SmokeRing",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "sky_lancer_skyfall",
@@ -101,7 +116,12 @@
         "turns": 2
       },
       "fx": "earth_slash",
-      "anim": "heavy"
+      "anim": "heavy",
+      "vfx": {
+        "system": "/Game/ParagonFengMao/FX/Particles/Abilities/Ultimate/FX/P_FengMao_Ult_Impact_03.P_FengMao_Ult_Impact_03",
+        "at": "targets",
+        "scale": 1
+      }
     }
   ],
   "creator": {

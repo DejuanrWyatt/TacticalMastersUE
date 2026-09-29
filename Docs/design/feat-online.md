@@ -42,7 +42,7 @@ lines cited below) and `scripts/main_menu.gd:79-230`.
   both games: "Out of sync: the two games no longer match at 12.5 s. The match can't continue."
 - **Time can't stop online.** Pause does nothing, and the menu, Options and the Unit Guide don't pause
   (`battle.gd:1030-1044`). Developer Tools can't change the rules mid-match (`battle.gd:150-152, 1226`).
-- **Chat** (`net.gd:127-131`, `battle.gd:732, 1214-1221`). A key (Enter by default) opens a line to type in;
+- **Chat** (`net.gd:127-131`, `battle.gd:732, 1214-1221`). A key (T by default, as in Godot) opens a line to type in;
   Enter sends, Esc closes. At most 120 characters. Lines show in the log as "You: …" and "Opponent: …".
 - **The opponent leaves**: the battle stops with "Opponent disconnected" (`battle.gd:691-694`).
 - The computer plays no side online.

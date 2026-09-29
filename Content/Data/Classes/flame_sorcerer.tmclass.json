@@ -36,7 +36,12 @@
       "aoe": 0,
       "cooldown": 0,
       "cast": 1,
-      "fx": "fire"
+      "fx": "fire",
+      "vfx": {
+        "system": "/Game/ParagonIggyScorch/FX/Particles/IggyScorch/Abilities/Primary/FX/P_IggyScorch_Molotov_HitPlayer.P_IggyScorch_Molotov_HitPlayer",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "flame_sorcerer_burst",
@@ -57,7 +62,12 @@
         "id": "burn",
         "turns": 2
       },
-      "fx": "fire"
+      "fx": "fire",
+      "vfx": {
+        "system": "/Game/ParagonIggyScorch/FX/Particles/IggyScorch/Abilities/Turret/FX/P_IggyScorch_Turret_Explosion.P_IggyScorch_Turret_Explosion",
+        "at": "point",
+        "scale": 1
+      }
     },
     {
       "id": "flame_sorcerer_staff",
@@ -74,7 +84,12 @@
       "aoe": 0,
       "cooldown": 0,
       "cast": 0,
-      "fx": "attack"
+      "fx": "attack",
+      "vfx": {
+        "system": "/Game/ParagonIggyScorch/FX/Particles/IggyScorch/Abilities/Turret/FX/P_IggyScorch_Turret_Impact.P_IggyScorch_Turret_Impact",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "flame_sorcerer_cataclysm",
@@ -96,7 +111,12 @@
         "id": "burn",
         "turns": 2
       },
-      "fx": "meteor"
+      "fx": "meteor",
+      "vfx": {
+        "system": "/Game/ParticleSystemVFXVol1/Systems/NS_EnergyVortex.NS_EnergyVortex",
+        "at": "user",
+        "scale": 1
+      }
     }
   ],
   "creator": {

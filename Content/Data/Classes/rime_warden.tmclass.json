@@ -37,7 +37,12 @@
       "aoe": 0,
       "cooldown": 0,
       "cast": 0,
-      "fx": "blizzard"
+      "fx": "blizzard",
+      "vfx": {
+        "system": "/Game/ParagonAurora/FX/Particles/Abilities/Primary/FX/P_Aurora_Melee_SucessfulImpact.P_Aurora_Melee_SucessfulImpact",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "rime_warden_rime_snare",
@@ -58,7 +63,12 @@
         "id": "root",
         "turns": 2
       },
-      "fx": "blizzard"
+      "fx": "blizzard",
+      "vfx": {
+        "system": "/Game/ParagonAurora/FX/Particles/Abilities/Leap/FX/P_Aurora_Decoy_Explode_Fragments.P_Aurora_Decoy_Explode_Fragments",
+        "at": "point",
+        "scale": 1
+      }
     },
     {
       "id": "rime_warden_glacial_prison",
@@ -79,7 +89,12 @@
         "id": "freeze",
         "turns": 1
       },
-      "fx": "blizzard"
+      "fx": "blizzard",
+      "vfx": {
+        "system": "/Game/TorchFire/FX/NS_TorchFire_Ice.NS_TorchFire_Ice",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "rime_warden_absolute_zero",
@@ -100,7 +115,12 @@
         "id": "freeze",
         "turns": 1
       },
-      "fx": "blizzard"
+      "fx": "blizzard",
+      "vfx": {
+        "system": "/Game/ParagonAurora/FX/Particles/Abilities/Ultimate/FX/P_Aurora_Ultimate_Explode.P_Aurora_Ultimate_Explode",
+        "at": "point",
+        "scale": 1
+      }
     }
   ],
   "creator": {

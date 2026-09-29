@@ -37,7 +37,12 @@
       "aoe": 0,
       "cooldown": 0,
       "cast": 0,
-      "fx": "attack"
+      "fx": "attack",
+      "vfx": {
+        "system": "/Game/ParagonSerath/FX/Particles/Abilities/Primary/FX/P_PrimaryImpactEvil.P_PrimaryImpactEvil",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "seraph_caller_summon_seraph",
@@ -54,7 +59,12 @@
       "aoe": 2,
       "cooldown": 2,
       "cast": 2,
-      "fx": "holy_blade"
+      "fx": "holy_blade",
+      "vfx": {
+        "system": "/Game/ParagonSerath/FX/Particles/Abilities/Chastise/FX/P_WingBlastFallen.P_WingBlastFallen",
+        "at": "point",
+        "scale": 1
+      }
     },
     {
       "id": "seraph_caller_seraph_pact",
@@ -83,7 +93,12 @@
           "turns": 2
         }
       ],
-      "fx": "haste"
+      "fx": "haste",
+      "vfx": {
+        "system": "/Game/FreeParticle_SoftTofu/Niagara/NS_Sparkling_Heart.NS_Sparkling_Heart",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "seraph_caller_seraph_ascendant",
@@ -100,7 +115,12 @@
       "aoe": 4,
       "cooldown": 0,
       "cast": 4,
-      "fx": "holy_blade"
+      "fx": "holy_blade",
+      "vfx": {
+        "system": "/Game/ParagonSerath/FX/Particles/Abilities/Chastise/FX/P_WingBlast.P_WingBlast",
+        "at": "point",
+        "scale": 1
+      }
     }
   ]
 }

@@ -38,7 +38,12 @@
       "cooldown": 0,
       "cast": 0,
       "tg": -15,
-      "fx": "pin_shot"
+      "fx": "pin_shot",
+      "vfx": {
+        "system": "/Game/ParagonPhase/FX/Particles/Abilities/Primary/FX/P_PhasePrimaryImpact.P_PhasePrimaryImpact",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "chrono_sage_quicken",
@@ -60,7 +65,12 @@
         "id": "stride",
         "turns": 2
       },
-      "fx": "haste"
+      "fx": "haste",
+      "vfx": {
+        "system": "/Game/FreeParticle_SoftTofu/Niagara/NS_Sparkling_Heart.NS_Sparkling_Heart",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "chrono_sage_borrowed_time",
@@ -81,7 +91,12 @@
         "id": "relentless",
         "turns": 1
       },
-      "fx": "focus"
+      "fx": "focus",
+      "vfx": {
+        "system": "/Game/FreeParticle_SoftTofu/Niagara/NS_Sparkling_Heart.NS_Sparkling_Heart",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "chrono_sage_stasis_field",
@@ -103,7 +118,12 @@
         "id": "slow",
         "turns": 2
       },
-      "fx": "blizzard"
+      "fx": "blizzard",
+      "vfx": {
+        "system": "/Game/ParagonPhase/FX/Particles/Abilities/Beam/FX/P_PhaseUltAura.P_PhaseUltAura",
+        "at": "targets",
+        "scale": 1
+      }
     }
   ],
   "creator": {

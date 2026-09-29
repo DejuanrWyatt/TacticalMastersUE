@@ -37,7 +37,12 @@
       "aoe": 0,
       "cooldown": 0,
       "cast": 0,
-      "fx": "pin_shot"
+      "fx": "pin_shot",
+      "vfx": {
+        "system": "/Game/ParagonMuriel/FX/Particles/Abilities/Primary/FX/P_Muriel_Primary_HitCharacter.P_Muriel_Primary_HitCharacter",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "oracle_curse",
@@ -66,7 +71,12 @@
           "turns": 2
         }
       ],
-      "fx": "pin_shot"
+      "fx": "pin_shot",
+      "vfx": {
+        "system": "/Game/ParagonMuriel/FX/Particles/Abilities/LifeLock/FX/P_LifeLock_HitCharacter.P_LifeLock_HitCharacter",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "oracle_sleep",
@@ -87,7 +97,12 @@
         "id": "stun",
         "turns": 1
       },
-      "fx": "haste"
+      "fx": "haste",
+      "vfx": {
+        "system": "/Game/ParticleSystemVFXVol1/Systems/NS_EnergyVortex.NS_EnergyVortex",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "oracle_divination",
@@ -108,7 +123,12 @@
         "id": "slow",
         "turns": 3
       },
-      "fx": "blizzard"
+      "fx": "blizzard",
+      "vfx": {
+        "system": "/Game/ParagonMuriel/FX/Particles/Abilities/Ultimate/FX/P_FortuneReverse_GroundImpact.P_FortuneReverse_GroundImpact",
+        "at": "point",
+        "scale": 1
+      }
     }
   ]
 }

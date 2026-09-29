@@ -36,7 +36,12 @@
       "aoe": 0,
       "cooldown": 0,
       "cast": 0,
-      "fx": "punch"
+      "fx": "punch",
+      "vfx": {
+        "system": "/Game/ParagonCrunch/FX/Particles/Abilities/Uppercut/FX/P_Crunch_GutPunch_Impact.P_Crunch_GutPunch_Impact",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "thorn_brawler_thorn_uppercut",
@@ -57,7 +62,12 @@
         "id": "burn",
         "turns": 2
       },
-      "fx": "wave_fist"
+      "fx": "wave_fist",
+      "vfx": {
+        "system": "/Game/ParagonCrunch/FX/Particles/Abilities/Hook/FX/P_Crunch_Hook_Impact.P_Crunch_Hook_Impact",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "thorn_brawler_thorn_stance",
@@ -107,7 +117,12 @@
         "id": "burn",
         "turns": 2
       },
-      "fx": "earth_slash"
+      "fx": "earth_slash",
+      "vfx": {
+        "system": "/Game/ParagonCrunch/FX/Particles/Abilities/Hook/FX/P_Crunch_Hook_Enemy_Impact.P_Crunch_Hook_Enemy_Impact",
+        "at": "targets",
+        "scale": 1
+      }
     }
   ]
 }

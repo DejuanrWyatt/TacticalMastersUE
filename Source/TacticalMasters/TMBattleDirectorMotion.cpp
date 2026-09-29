@@ -88,117 +88,20 @@ bool ATMBattleDirector::LoadCharacterMap()
 		return false;
 	}
 
-	// The animation sets first, since bodies name them.
+	// The animation sets as written; each is loaded when first worn (SetOf).
 	const TSharedPtr<FJsonObject>* Sets = nullptr;
 	if (Root->TryGetObjectField(TEXT("animations"), Sets))
 	{
 		for (const TPair<FString, TSharedPtr<FJsonValue>>& Entry : (*Sets)->Values)
 		{
 			const TSharedPtr<FJsonObject> Set = Entry.Value->AsObject();
-			if (!Set.IsValid())
+			if (Set.IsValid())
 			{
-				continue;
-			}
-			FTMAnimSet& Out = AnimSets.Add(Entry.Key);
-			auto One = [&](const TCHAR* Key) { FString Path; Set->TryGetStringField(Key, Path); return LoadNamed<UAnimSequence>(Path, CharacterAssets); };
-			auto Many = [&](const TCHAR* Key, TArray<UAnimSequence*>& Into)
-			{
-				const TArray<TSharedPtr<FJsonValue>>* List = nullptr;
-				if (Set->TryGetArrayField(Key, List))
-				{
-					for (const TSharedPtr<FJsonValue>& Item : *List)
-					{
-						if (UAnimSequence* Clip = LoadNamed<UAnimSequence>(Item->AsString(), CharacterAssets))
-						{
-							Into.Add(Clip);
-						}
-					}
-				}
-			};
-			Out.Idle = One(TEXT("idle"));
-			Out.Walk = One(TEXT("walk"));
-			Out.Run = One(TEXT("run"));
-			Out.Cast = One(TEXT("cast"));
-			Out.Rise = One(TEXT("rise"));
-			Many(TEXT("attack"), Out.Attack);
-			const TSharedPtr<FJsonObject>* MotionList = nullptr;
-			if (Set->TryGetObjectField(TEXT("motions"), MotionList))
-			{
-				for (const TPair<FString, TSharedPtr<FJsonValue>>& Motion : (*MotionList)->Values)
-				{
-					const TSharedPtr<FJsonObject> Clips = Motion.Value->AsObject();
-					if (!Clips.IsValid())
-					{
-						continue;
-					}
-					FTMMotionClips& Into = Out.Motions.Add(Motion.Key);
-					auto Clip = [&](const TCHAR* Key) { FString Path; Clips->TryGetStringField(Key, Path); return LoadNamed<UAnimSequence>(Path, CharacterAssets); };
-					Into.Intro = Clip(TEXT("intro"));
-					Into.Windup = Clip(TEXT("windup"));
-					Into.CastRelease = Clip(TEXT("castRelease"));
-					double Impact = -1.0;
-					if (Clips->TryGetNumberField(TEXT("impact"), Impact))
-					{
-						Into.Impact = FMath::Clamp(static_cast<float>(Impact), 0.0f, 1.0f);
-					}
-					const TArray<TSharedPtr<FJsonValue>>* Releases = nullptr;
-					if (Clips->TryGetArrayField(TEXT("release"), Releases))
-					{
-						for (const TSharedPtr<FJsonValue>& Item : *Releases)
-						{
-							if (UAnimSequence* Loaded = LoadNamed<UAnimSequence>(Item->AsString(), CharacterAssets))
-							{
-								Into.Release.Add(Loaded);
-							}
-						}
-					}
-					else if (UAnimSequence* Single = Clip(TEXT("release")))
-					{
-						Into.Release.Add(Single);
-					}
-				}
-			}
-			Many(TEXT("hit"), Out.Hit);
-			Many(TEXT("death"), Out.Death);
-			// Reactions, statuses and moments: a name, or a list of names.
-			for (const FString& Key : ExtraKeys())
-			{
-				TArray<UAnimSequence*> Clips;
-				Many(*Key, Clips);
-				if (Clips.Num() == 0)
-				{
-					if (UAnimSequence* Single = One(*Key))
-					{
-						Clips.Add(Single);
-					}
-				}
-				if (Clips.Num() > 0)
-				{
-					Out.Extras.Add(Key, Clips);
-				}
-			}
-			const TSharedPtr<FJsonObject>* Idles = nullptr;
-			if (Set->TryGetObjectField(TEXT("idles"), Idles))
-			{
-				for (const TPair<FString, TSharedPtr<FJsonValue>>& Idle : (*Idles)->Values)
-				{
-					if (UAnimSequence* Loaded = LoadNamed<UAnimSequence>(Idle.Value->AsString(), CharacterAssets))
-					{
-						Out.Extras.Add(TEXT("idle:") + Idle.Key, { Loaded });
-					}
-				}
-			}
-			double Speed = 0.0;
-			if (Set->TryGetNumberField(TEXT("walkSpeed"), Speed) && Speed > 0.0)
-			{
-				Out.WalkSpeed = static_cast<float>(Speed);
-			}
-			if (Set->TryGetNumberField(TEXT("runSpeed"), Speed) && Speed > 0.0)
-			{
-				Out.RunSpeed = static_cast<float>(Speed);
+				SetSources.Add(Entry.Key, Set);
 			}
 		}
 	}
+	AnimSets.Reserve(SetSources.Num());
 
 	// "bodyScale": a size by body, or by animation set so a hero's skins share it.
 	const TSharedPtr<FJsonObject>* Scales = nullptr;
@@ -219,7 +122,7 @@ bool ATMBattleDirector::LoadCharacterMap()
 			Body->TryGetNumberField(TEXT("yaw"), Yaw);
 			Out.Yaw = static_cast<float>(Yaw);
 			Body->TryGetStringField(TEXT("animations"), Out.SetName);
-			Out.Animations = AnimSets.Find(Out.SetName);
+			// Its set comes with its mesh, when a unit first wears it (MeshOf).
 			double Scale = 1.0;
 			if (Scales && ((*Scales)->TryGetNumberField(Entry.Key, Scale) || (*Scales)->TryGetNumberField(Out.SetName, Scale)) && Scale > 0.0)
 			{
@@ -251,7 +154,7 @@ bool ATMBattleDirector::LoadCharacterMap()
 	Names(TEXT("looks"), LookBodies);
 	Names(TEXT("classes"), ClassBodies);
 	Root->TryGetStringField(TEXT("default"), DefaultBody);
-	UE_LOG(LogTemp, Log, TEXT("character map: %d bodies, %d animation sets"), Bodies.Num(), AnimSets.Num());
+	UE_LOG(LogTemp, Log, TEXT("character map: %d bodies, %d animation sets"), Bodies.Num(), SetSources.Num());
 	return Bodies.Num() > 0;
 }
 
@@ -261,7 +164,128 @@ USkeletalMesh* ATMBattleDirector::MeshOf(const FTMBody& Body)
 	{
 		Body.Mesh = LoadNamed<USkeletalMesh>(Body.MeshPath, CharacterAssets);
 	}
+	if (Body.Mesh && !Body.Animations)
+	{
+		Body.Animations = SetOf(Body.SetName);
+	}
 	return Body.Mesh;
+}
+
+const ATMBattleDirector::FTMAnimSet* ATMBattleDirector::SetOf(const FString& Name)
+{
+	if (const FTMAnimSet* Loaded = AnimSets.Find(Name))
+	{
+		return Loaded;
+	}
+	const TSharedPtr<FJsonObject>* Source = SetSources.Find(Name);
+	if (!Source)
+	{
+		return nullptr;
+	}
+	FTMAnimSet& Out = AnimSets.Add(Name);
+	BuildAnimSet(**Source, Out);
+	return &Out;
+}
+
+void ATMBattleDirector::BuildAnimSet(const FJsonObject& Set, FTMAnimSet& Out)
+{
+	auto One = [&](const TCHAR* Key) { FString Path; Set.TryGetStringField(Key, Path); return LoadNamed<UAnimSequence>(Path, CharacterAssets); };
+	auto Many = [&](const TCHAR* Key, TArray<UAnimSequence*>& Into)
+	{
+		const TArray<TSharedPtr<FJsonValue>>* List = nullptr;
+		if (Set.TryGetArrayField(Key, List))
+		{
+			for (const TSharedPtr<FJsonValue>& Item : *List)
+			{
+				if (UAnimSequence* Clip = LoadNamed<UAnimSequence>(Item->AsString(), CharacterAssets))
+				{
+					Into.Add(Clip);
+				}
+			}
+		}
+	};
+	Out.Idle = One(TEXT("idle"));
+	Out.Walk = One(TEXT("walk"));
+	Out.Run = One(TEXT("run"));
+	Out.Cast = One(TEXT("cast"));
+	Out.Rise = One(TEXT("rise"));
+	Many(TEXT("attack"), Out.Attack);
+	const TSharedPtr<FJsonObject>* MotionList = nullptr;
+	if (Set.TryGetObjectField(TEXT("motions"), MotionList))
+	{
+		for (const TPair<FString, TSharedPtr<FJsonValue>>& Motion : (*MotionList)->Values)
+		{
+			const TSharedPtr<FJsonObject> Clips = Motion.Value->AsObject();
+			if (!Clips.IsValid())
+			{
+				continue;
+			}
+			FTMMotionClips& Into = Out.Motions.Add(Motion.Key);
+			auto Clip = [&](const TCHAR* Key) { FString Path; Clips->TryGetStringField(Key, Path); return LoadNamed<UAnimSequence>(Path, CharacterAssets); };
+			Into.Intro = Clip(TEXT("intro"));
+			Into.Windup = Clip(TEXT("windup"));
+			Into.CastRelease = Clip(TEXT("castRelease"));
+			double Impact = -1.0;
+			if (Clips->TryGetNumberField(TEXT("impact"), Impact))
+			{
+				Into.Impact = FMath::Clamp(static_cast<float>(Impact), 0.0f, 1.0f);
+			}
+			const TArray<TSharedPtr<FJsonValue>>* Releases = nullptr;
+			if (Clips->TryGetArrayField(TEXT("release"), Releases))
+			{
+				for (const TSharedPtr<FJsonValue>& Item : *Releases)
+				{
+					if (UAnimSequence* Loaded = LoadNamed<UAnimSequence>(Item->AsString(), CharacterAssets))
+					{
+						Into.Release.Add(Loaded);
+					}
+				}
+			}
+			else if (UAnimSequence* Single = Clip(TEXT("release")))
+			{
+				Into.Release.Add(Single);
+			}
+		}
+	}
+	Many(TEXT("hit"), Out.Hit);
+	Many(TEXT("death"), Out.Death);
+	// Reactions, statuses and moments: a name, or a list of names.
+	for (const FString& Key : ExtraKeys())
+	{
+		TArray<UAnimSequence*> Clips;
+		Many(*Key, Clips);
+		if (Clips.Num() == 0)
+		{
+			if (UAnimSequence* Single = One(*Key))
+			{
+				Clips.Add(Single);
+			}
+		}
+		if (Clips.Num() > 0)
+		{
+			Out.Extras.Add(Key, Clips);
+		}
+	}
+	const TSharedPtr<FJsonObject>* Idles = nullptr;
+	if (Set.TryGetObjectField(TEXT("idles"), Idles))
+	{
+		for (const TPair<FString, TSharedPtr<FJsonValue>>& Idle : (*Idles)->Values)
+		{
+			if (UAnimSequence* Loaded = LoadNamed<UAnimSequence>(Idle.Value->AsString(), CharacterAssets))
+			{
+				Out.Extras.Add(TEXT("idle:") + Idle.Key, { Loaded });
+			}
+		}
+	}
+	double Speed = 0.0;
+	if (Set.TryGetNumberField(TEXT("walkSpeed"), Speed) && Speed > 0.0)
+	{
+		Out.WalkSpeed = static_cast<float>(Speed);
+	}
+	if (Set.TryGetNumberField(TEXT("runSpeed"), Speed) && Speed > 0.0)
+	{
+		Out.RunSpeed = static_cast<float>(Speed);
+	}
 }
 
 const ATMBattleDirector::FTMBody* ATMBattleDirector::BodyFor(const TMSim::FUnit& Unit) const

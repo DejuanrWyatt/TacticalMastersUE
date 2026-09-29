@@ -36,7 +36,12 @@
       "aoe": 0,
       "cooldown": 0,
       "cast": 1,
-      "fx": "throw_stone"
+      "fx": "throw_stone",
+      "vfx": {
+        "system": "/Game/ParagonFey/FX/Particles/Fey/Abilities/Primary/FX/P_Fey_Primary_HitPlayer.P_Fey_Primary_HitPlayer",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "druid_bramble_burst",
@@ -57,7 +62,12 @@
         "id": "burn",
         "turns": 2
       },
-      "fx": "throw_stone"
+      "fx": "throw_stone",
+      "vfx": {
+        "system": "/Game/ParagonFey/FX/Particles/Fey/Abilities/Growth/FX/P_Growth_PoisonSpores_Boom.P_Growth_PoisonSpores_Boom",
+        "at": "point",
+        "scale": 1
+      }
     },
     {
       "id": "druid_thorn_staff",
@@ -74,7 +84,12 @@
       "aoe": 0,
       "cooldown": 0,
       "cast": 0,
-      "fx": "attack"
+      "fx": "attack",
+      "vfx": {
+        "system": "/Game/ParagonFey/FX/Particles/Fey/Abilities/Nettles/FX/P_Fey_Nettles_HitPlayer_Plants.P_Fey_Nettles_HitPlayer_Plants",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "druid_wild_growth",
@@ -96,7 +111,12 @@
         "id": "burn",
         "turns": 2
       },
-      "fx": "chakra"
+      "fx": "chakra",
+      "vfx": {
+        "system": "/Game/ParagonFey/FX/Particles/Fey/Abilities/Ultimate/FX/P_Ultimate_Tethered_End.P_Ultimate_Tethered_End",
+        "at": "user",
+        "scale": 1
+      }
     }
   ]
 }

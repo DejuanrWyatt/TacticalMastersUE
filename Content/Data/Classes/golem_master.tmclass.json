@@ -37,7 +37,12 @@
       "aoe": 0,
       "cooldown": 0,
       "cast": 0,
-      "fx": "attack"
+      "fx": "attack",
+      "vfx": {
+        "system": "/Game/ParagonMinions/FX/Particles/Minions/Shared/P_Minion_Melee_Impact.P_Minion_Melee_Impact",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "golem_master_summon_golem",
@@ -58,7 +63,12 @@
         "id": "stun",
         "turns": 1
       },
-      "fx": "earth_slash"
+      "fx": "earth_slash",
+      "vfx": {
+        "system": "/Game/ParagonGadget/FX/Abilities/StickyBomb/FX/P_StickyBomb_Explosion_Unattached.P_StickyBomb_Explosion_Unattached",
+        "at": "point",
+        "scale": 1
+      }
     },
     {
       "id": "golem_master_golem_pact",
@@ -82,7 +92,12 @@
           "turns": 2
         }
       ],
-      "fx": "haste"
+      "fx": "haste",
+      "vfx": {
+        "system": "/Game/FreeParticle_SoftTofu/Niagara/NS_Sparkling_Heart.NS_Sparkling_Heart",
+        "at": "targets",
+        "scale": 1
+      }
     },
     {
       "id": "golem_master_golem_ascendant",
@@ -103,7 +118,12 @@
         "id": "stun",
         "turns": 1
       },
-      "fx": "earth_slash"
+      "fx": "earth_slash",
+      "vfx": {
+        "system": "/Game/ParagonGadget/FX/Abilities/Primary/FX/P_PrimaryZap_Projectile_Explode_Player.P_PrimaryZap_Projectile_Explode_Player",
+        "at": "point",
+        "scale": 1
+      }
     }
   ]
 }
