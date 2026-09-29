@@ -261,6 +261,13 @@ UTextureRenderTarget2D* ATMBattleDirector::PortraitOf(int32 Side, const TMSim::F
 		Camera->ShowFlags.SetMotionBlur(false);
 		Camera->FOVAngle = 28.0f;
 	}
+	FramePortrait(Camera, Index);
+	Camera->CaptureScene();
+	return Film;
+}
+
+void ATMBattleDirector::FramePortrait(USceneCaptureComponent2D* Camera, int32 Index)
+{
 	Camera->ShowOnlyComponents.Reset();
 	Camera->ShowOnlyComponents.Add(UnitVisuals[Index]);
 	// Face to face with it, a little above: head and shoulders.
@@ -269,8 +276,64 @@ UTextureRenderTarget2D* ATMBattleDirector::PortraitOf(int32 Side, const TMSim::F
 	const FVector Head = Motion.Shown + FVector(0.0f, 0.0f, 150.0f);
 	const FVector Eye = Head + Facing * 175.0f + FVector(0.0f, 0.0f, 20.0f);
 	Camera->SetRelativeLocationAndRotation(Eye, (Head - Eye).Rotation());
-	Camera->CaptureScene();
-	return Film;
+}
+
+UTextureRenderTarget2D* ATMBattleDirector::CardPortrait(const TMSim::FUnit& Unit) const
+{
+	for (int32 i = 0; i < static_cast<int32>(Battle.Units.size()) && i < CardFilms.Num(); ++i)
+	{
+		if (Battle.Units[i].Id == Unit.Id)
+		{
+			return CardFilms[i];
+		}
+	}
+	return nullptr;
+}
+
+void ATMBattleDirector::AdvanceCardPortraits()
+{
+	// Every unit's face for the turn cards along the top, two a frame in turn:
+	// a live picture of each, without eight cameras filming every frame.
+	const int32 Count = FMath::Min(static_cast<int32>(Battle.Units.size()), FMath::Min(UnitVisuals.Num(), Motions.Num()));
+	if (Count == 0 || Screen != EScreen::Battle)
+	{
+		return;
+	}
+	if (!CardCamera)
+	{
+		CardCamera = NewObject<USceneCaptureComponent2D>(this);
+		CardCamera->SetupAttachment(RootComponent);
+		CardCamera->RegisterComponent();
+		CardCamera->bCaptureEveryFrame = false;
+		CardCamera->bCaptureOnMovement = false;
+		CardCamera->bAlwaysPersistRenderingState = true;
+		CardCamera->CaptureSource = ESceneCaptureSource::SCS_FinalColorLDR;
+		CardCamera->PrimitiveRenderMode = ESceneCapturePrimitiveRenderMode::PRM_UseShowOnlyList;
+		CardCamera->ShowFlags.SetFog(false);
+		CardCamera->ShowFlags.SetAtmosphere(false);
+		CardCamera->ShowFlags.SetMotionBlur(false);
+		CardCamera->FOVAngle = 28.0f;
+	}
+	while (CardFilms.Num() < Count)
+	{
+		UTextureRenderTarget2D* Film = NewObject<UTextureRenderTarget2D>(this);
+		Film->RenderTargetFormat = RTF_RGBA8;
+		Film->ClearColor = FLinearColor(0.02f, 0.03f, 0.05f, 1.0f);
+		Film->InitAutoFormat(128, 128);
+		Film->UpdateResourceImmediate(true);
+		CardFilms.Add(Film);
+	}
+	for (int32 k = 0; k < 2; ++k)
+	{
+		const int32 Index = CardNext++ % Count;
+		if (!UnitVisuals[Index] || !CardFilms[Index])
+		{
+			continue;
+		}
+		CardCamera->TextureTarget = CardFilms[Index];
+		FramePortrait(CardCamera, Index);
+		CardCamera->CaptureScene();
+	}
 }
 
 void ATMBattleDirector::ClearLooks()
@@ -286,4 +349,6 @@ void ATMBattleDirector::ClearLooks()
 	TurnRingTargets.Reset();
 	TurnRingPaint.Reset();
 	TurnRingDrawn.Reset();
+	CardFilms.Reset();
+	CardNext = 0;
 }

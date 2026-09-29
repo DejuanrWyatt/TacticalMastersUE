@@ -482,6 +482,43 @@ private:
 	};
 	FAim Aim();
 
+	/**
+	 * An ability ordered from out of range: the unit walks to the nearest spot
+	 * it can be used from, and it goes off on arrival (battle.gd:109-113,
+	 * 838-892, _walk_into_range).
+	 */
+	struct FPendingAbility
+	{
+		int32 UnitId = -1;
+		int32 Serial = -1;
+		int32 Slot = -1;
+		TMSim::FVec2 Target;
+	};
+	FPendingAbility PendingAbility;
+	/** The reachable spot this ability could be used from with the shortest walk; false if none. */
+	bool ClosestSpotInRange(const TMSim::FUnit& Unit, int32 Slot, const TMSim::FVec2& Point, TMSim::FVec2& OutSpot, double& OutWalk);
+	bool WalkIntoRange(const TMSim::FUnit& Unit, const TMSim::FVec2& Point);
+	/** Uses the ability the unit walked over for, once its walk has ended on screen. */
+	void FirePendingAbility();
+	static constexpr const char* OutOfRange = "That target is out of range.";
+
+	// ------------------------------------------------ indicators on the ground
+	// (TMBattleDirectorIndicators.cpp): the walk area and ability shapes painted
+	// into a picture that a decal lays on the board, under the units.
+	void BuildIndicators();
+	void AdvanceIndicators();
+	void PaintMoveArea(void* Painter, const TMSim::FUnit& Unit);
+	void PaintAbility(void* Painter, const TMSim::FUnit& Unit, const FAim& Where);
+	/** Whether the decal is up; without its material the HUD draws outlines instead. */
+	bool bIndicatorDecal = false;
+	/** Turns the picture on the board if a decal's axes come out otherwise. */
+	float IndicatorRoll = 0.0f;
+	FString IndicatorSignature;
+	UPROPERTY()
+	TObjectPtr<class UDecalComponent> IndicatorDecal = nullptr;
+	UPROPERTY()
+	TObjectPtr<class UTextureRenderTarget2D> IndicatorFilm = nullptr;
+
 	/** Works out the way to the spot under the pointer, only when that spot changes. */
 	void UpdateHoverPath();
 
@@ -966,6 +1003,8 @@ public:
 	 * Side 0 is the ally panel's camera and 1 the enemy's, so both can show at once.
 	 */
 	class UTextureRenderTarget2D* PortraitOf(int32 Side, const TMSim::FUnit& Unit);
+	/** A small portrait of a unit for its turn card, refreshed a few units a frame. */
+	class UTextureRenderTarget2D* CardPortrait(const TMSim::FUnit& Unit) const;
 
 private:
 	void BuildTurnRings();
@@ -993,6 +1032,15 @@ private:
 	UPROPERTY()
 	TObjectPtr<class UTextureRenderTarget2D> PortraitFilm1 = nullptr;
 	bool bOutlineAdded = false;
+	/** Refreshes two units' card portraits a frame, in turn. */
+	void AdvanceCardPortraits();
+	/** Points a portrait camera at a unit's head and shoulders. */
+	void FramePortrait(class USceneCaptureComponent2D* Camera, int32 Index);
+	UPROPERTY()
+	TObjectPtr<class USceneCaptureComponent2D> CardCamera = nullptr;
+	UPROPERTY()
+	TArray<TObjectPtr<class UTextureRenderTarget2D>> CardFilms;
+	int32 CardNext = 0;
 
 	/** Left over from the last frame, so the clock runs at its own rate. */
 	float TickRemainder = 0.0f;

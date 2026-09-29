@@ -244,6 +244,8 @@ UStaticMeshComponent* ATMBattleDirector::Shape(const TCHAR* Name, const FVector&
 	Part->SetRelativeRotation(Turn);
 	Part->SetRelativeScale3D(Size / 100.0f);
 	Part->SetMaterial(0, Paint(Colour));
+	// Only the top of the ground takes the indicators (Solid turns it on).
+	Part->SetReceivesDecals(false);
 	BoardProps.Add(Part);
 	return Part;
 }
@@ -292,6 +294,7 @@ UStaticMeshComponent* ATMBattleDirector::KitPiece(const FString& Path, const FVe
 	Part->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	Part->RegisterComponent();
 	Part->SetStaticMesh(Mesh);
+	Part->SetReceivesDecals(false);
 	Part->SetRelativeScale3D(Scale);
 	Part->SetRelativeRotation(Turn);
 	Part->SetRelativeLocation(Foot - Turn.RotateVector(Pivot * Scale));
@@ -342,12 +345,17 @@ void ATMBattleDirector::BuildBoard()
 				UStaticMeshComponent* Slab = Shape(TEXT("Cube"), Centre + FVector(0, 0, Top - SlabMetres * M * 0.5f), FVector(Across, Across, SlabMetres * M),
 					FRotator::ZeroRotator, Surface);
 				Solid(Slab);
+				if (Slab)
+				{
+					Slab->SetReceivesDecals(true);
+				}
 				if (Hazard == 0 && Theme.KitTop.Num() > 0 && Slab
 					&& KitPiece(Theme.KitTop[Dice.RandHelper(Theme.KitTop.Num())], Centre + FVector(0, 0, Top - SlabMetres * M), Across,
 						SlabMetres * M, 90.0f * Dice.RandHelper(4), true))
 				{
 					// Hidden, not gone: it is still what a click on the board finds.
 					Slab->SetHiddenInGame(true);
+					Cast<UStaticMeshComponent>(BoardProps.Last())->SetReceivesDecals(true);
 				}
 
 				if (Hazard != 0)

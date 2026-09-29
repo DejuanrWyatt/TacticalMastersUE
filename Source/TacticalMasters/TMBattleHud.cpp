@@ -412,17 +412,62 @@ void ATMBattleHud::DrawBoardAids(ATMBattleDirector& From)
 	// Whose orders these are.
 	BoardRing(From, Unit->Pos, 0.45f, FLinearColor(0.35f, 0.86f, 1.0f), 3.0f);
 
+	if (From.AimMode == ATMBattleDirector::EAimMode::Move && From.bIndicatorDecal)
+	{
+		return;  // the walk area and the way are on the ground (TMBattleDirectorIndicators.cpp)
+	}
 	if (From.AimMode == ATMBattleDirector::EAimMode::Move)
 	{
-		// Every spot it can walk to, and the way to the one under the pointer.
-		const FLinearColor Spot = From.bSprinting ? FLinearColor(1.0f, 0.67f, 0.24f, 0.9f) : FLinearColor(0.31f, 0.63f, 1.0f, 0.9f);
-		const float Dot = FMath::Max(3.0f, 5.0f * S);
+		// How far it can walk, as one line round the edge of that ground, and
+		// the way to the spot under the pointer. Each reachable node's side that
+		// faces ground it cannot reach is a piece of the line; the gaps other
+		// units leave (nobody may stand on them) are not edges, so a unit
+		// standing in the middle of the ground is not boxed in.
+		const FLinearColor Edge = From.bSprinting ? FLinearColor(1.0f, 0.67f, 0.24f, 0.95f) : FLinearColor(0.31f, 0.63f, 1.0f, 0.95f);
+		const TMSim::FMap& Map = From.Battle.Map;
+		TSet<int32> Inside;
 		for (const std::pair<TMSim::FNode, double>& Entry : From.Reachable)
 		{
-			FVector2D At;
-			if (ToScreen(From, TMSim::FMap::NodePos(Entry.first), 4.0f, At))
+			Inside.Add(Map.NodeIndex(Entry.first));
+		}
+		auto Taken = [&From, Unit](const TMSim::FNode& Node)
+		{
+			const TMSim::FVec2 At = TMSim::FMap::NodePos(Node);
+			for (const TMSim::FUnit& Other : From.Battle.Units)
 			{
-				DrawRect(Spot, At.X - Dot * 0.5f, At.Y - Dot * 0.5f, Dot, Dot);
+				if (&Other != Unit && Other.IsAlive() && Other.Pos.DistanceTo(At) < TMSim::Ground::UnitSpacing)
+				{
+					return true;
+				}
+			}
+			return false;
+		};
+		const float Half = TMSim::Ground::NavStep * 0.5f * From.TileSize;
+		const float Thick = FMath::Max(2.0f, 3.0f * S);
+		const int Steps[4][2] = { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } };
+		for (const std::pair<TMSim::FNode, double>& Entry : From.Reachable)
+		{
+			const TMSim::FNode Node = Entry.first;
+			// Lifted to this node's own height, so a cliff edge sits on its cliff.
+			const FVector Middle = From.BoardPoint(TMSim::FMap::NodePos(Node), 6.0f);
+			for (const auto& Step : Steps)
+			{
+				const TMSim::FNode Next{ Node.X + Step[0], Node.Y + Step[1] };
+				const bool bOnMap = Next.X >= 0 && Next.Y >= 0 && Next.X < Map.NavX && Next.Y < Map.NavY;
+				if (bOnMap && (Inside.Contains(Map.NodeIndex(Next)) || Taken(Next)))
+				{
+					continue;
+				}
+				// The side of this node's square facing that way.
+				const FVector Out = From.GetActorTransform().TransformVector(FVector(Step[0], Step[1], 0.0f)) * Half;
+				const FVector Along = From.GetActorTransform().TransformVector(FVector(-Step[1], Step[0], 0.0f)) * Half;
+				FVector2D A;
+				FVector2D B;
+				if (PlayerOwner && PlayerOwner->ProjectWorldLocationToScreen(Middle + Out + Along, A)
+					&& PlayerOwner->ProjectWorldLocationToScreen(Middle + Out - Along, B))
+				{
+					DrawLine(A.X, A.Y, B.X, B.Y, Edge, Thick);
+				}
 			}
 		}
 		for (size_t i = 1; i < From.PathShown.size(); ++i)
@@ -441,17 +486,28 @@ void ATMBattleHud::DrawBoardAids(ATMBattleDirector& From)
 	{
 		return;
 	}
+	// The walk an out-of-range aim would take first.
+	for (size_t i = 1; i < From.PathShown.size() && !From.bIndicatorDecal; ++i)
+	{
+		FVector2D A;
+		FVector2D B;
+		if (ToScreen(From, From.PathShown[i - 1], 10.0f, A) && ToScreen(From, From.PathShown[i], 10.0f, B))
+		{
+			DrawLine(A.X, A.Y, B.X, B.Y, FLinearColor(1.0f, 0.9f, 0.35f), 4.0f);
+		}
+	}
 	const TMSim::FAbility* Ability = TMSim::JobAbility(Unit->Job, From.AimSlot);
 	if (!Ability)
 	{
 		return;
 	}
-	// How far it reaches, and the ring it cannot be used inside.
-	if (Ability->MaxRange > 0.0f)
+	// How far it reaches, and the ring it cannot be used inside (on the ground
+	// instead, when the indicator decal is up).
+	if (Ability->MaxRange > 0.0f && !From.bIndicatorDecal)
 	{
 		BoardRing(From, Unit->Pos, Ability->MaxRange, FLinearColor(0.8f, 0.8f, 0.86f, 0.9f), 2.0f);
 	}
-	if (Ability->MinRange > 0.0f)
+	if (Ability->MinRange > 0.0f && !From.bIndicatorDecal)
 	{
 		BoardRing(From, Unit->Pos, Ability->MinRange, FLinearColor(0.6f, 0.35f, 0.35f, 0.9f), 2.0f);
 	}
@@ -462,7 +518,10 @@ void ATMBattleHud::DrawBoardAids(ATMBattleDirector& From)
 		return;
 	}
 	const float Radius = FMath::Max(Ability->Aoe, TMSim::Ground::HitRadius);
-	BoardRing(From, Where.Point, Radius, Where.bOk ? FLinearColor(0.43f, 1.0f, 0.55f) : FLinearColor(1.0f, 0.35f, 0.31f), 3.0f);
+	if (!From.bIndicatorDecal)
+	{
+		BoardRing(From, Where.Point, Radius, Where.bOk ? FLinearColor(0.43f, 1.0f, 0.55f) : FLinearColor(1.0f, 0.35f, 0.31f), 3.0f);
+	}
 	if (!Where.bOk)
 	{
 		return;
@@ -709,7 +768,27 @@ void ATMBattleHud::DrawBanners(ATMBattleDirector& From)
 	else if (From.PlayerCanOrder(Unit) && From.AimMode == ATMBattleDirector::EAimMode::Ability)
 	{
 		const ATMBattleDirector::FAim Where = From.Aim();
-		if (!Where.bOk)
+		TMSim::FVec2 Spot;
+		double Walk = 0.0;
+		const TMSim::FAbility* Aimed = TMSim::JobAbility(Unit->Job, From.AimSlot);
+		if (!Where.bOk && Where.Why == UTF8_TO_TCHAR(ATMBattleDirector::OutOfRange) && !Unit->bMoved && Aimed)
+		{
+			// It can be used from somewhere it can walk to: say so, rather than
+			// simply refusing (battle.gd:1438-1447).
+			if (From.ClosestSpotInRange(*Unit, From.AimSlot, Where.Point, Spot, Walk))
+			{
+				const TMSim::FUnit* Target = From.Battle.FindUnit(Where.Follow);
+				Preview = FString::Printf(TEXT("%hs: out of range. Click to walk %.1f m and use it where %s is standing now."),
+					Aimed->Name.c_str(), Walk, Target ? *JobName(*Target) : TEXT("the target"));
+				PreviewColour = FLinearColor(1.0f, 0.9f, 0.35f);
+			}
+			else
+			{
+				Preview = FString::Printf(TEXT("%hs: out of range, and nowhere in reach to use it from."), Aimed->Name.c_str());
+				PreviewColour = Urgent;
+			}
+		}
+		else if (!Where.bOk)
 		{
 			Preview = Where.Why;
 			PreviewColour = Urgent;

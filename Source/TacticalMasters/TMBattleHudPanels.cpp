@@ -608,8 +608,8 @@ void ATMBattleHud::DrawTurnSquares(ATMBattleDirector& From)
 	for (int32 Team = 0; Team < 2; ++Team)
 	{
 		const FPanelScale Sized(*this, Team == 0 ? TEXT("turn_cards_blue") : TEXT("turn_cards_red"));
-		const float SW = 56.0f * S;
-		const float SH = 62.0f * S;
+		const float SW = 60.0f * S;
+		const float SH = 60.0f * S + 30.0f * S;
 		const float Gap = 5.0f * S;
 		// The order the player left them in, then anyone else by id.
 		TArray<const TMSim::FUnit*> Row;
@@ -678,29 +678,52 @@ void ATMBattleHud::DrawTurnSquares(ATMBattleDirector& From)
 				Edge = FLinearColor::White;
 				Thick = 3.5f;
 			}
-			Panel(X, RowY, SW, SH, Fill, Edge, Thick);
-			DrawRect(Meter, X + 2.0f, RowY + SH - SH * Level, SW - 4.0f, SH * Level - 2.0f);
-			// A strip of the side's colour along the top, so the rows read apart:
-			// blue for the player's side, red for the enemy's, as everywhere else.
-			DrawRect(SideColour(From.IsFriend(*Unit)) * FLinearColor(1, 1, 1, 0.9f * Alpha), X + 2.0f, RowY + 2.0f, SW - 4.0f, 4.0f * S);
-			// Its class's icon; a question mark for one hidden in the fog.
-			const float Face = 34.0f * S;
-			UTexture2D* Picture0 = bFogged ? nullptr : ClassIcon(*Unit);
-			if (Picture0)
+			// A card in the unit panel's style (DrawUnitPanel): a live portrait
+			// framed in its side's colour -- gold on its turn, white while being
+			// ordered -- its class badge, its health, its gauge, and the time.
+			const bool bFriend = From.IsFriend(*Unit);
+			FLinearColor Frame = SideColour(bFriend) * FLinearColor(1, 1, 1, 0.9f * Alpha);
+			float FrameWidth = 2.0f * S;
+			if (Unit->bReady)
 			{
-				Picture(Picture0, X + (SW - Face) * 0.5f, RowY + 7.0f * S, Face, Face,
-					FLinearColor(1, 1, 1, (Unit->bReady ? 1.0f : 0.8f) * Alpha));
+				Frame = FLinearColor(Gold.R, Gold.G, Gold.B, Pulse * Alpha);
+				FrameWidth = 3.0f * S;
+			}
+			if (Unit->Id == From.SelectedId)
+			{
+				Frame = FLinearColor::White;
+				FrameWidth = 3.5f * S;
+			}
+			DrawRect(FLinearColor(0.0f, 0.0f, 0.0f, 0.7f * Alpha), X - 1.0f, RowY - 1.0f, SW + 2.0f, SH + 2.0f);
+			DrawRect(Frame, X, RowY, SW, SW);
+			DrawRect(FLinearColor(0.02f, 0.03f, 0.05f, Alpha), X + FrameWidth, RowY + FrameWidth, SW - 2.0f * FrameWidth, SW - 2.0f * FrameWidth);
+			if (bFogged)
+			{
+				const FVector2D Mark = TextSize(TEXT("?"), Font, 0.9f * S);
+				Text(TEXT("?"), X + (SW - Mark.X) * 0.5f, RowY + (SW - Mark.Y) * 0.5f, Dim, Font, 0.9f * S);
 			}
 			else
 			{
-				const FString Mark = bFogged ? FString(TEXT("?")) : Initials(JobName(*Unit));
-				const float Letters = 0.62f * S;
-				const FVector2D MarkSize = TextSize(Mark, Font, Letters);
-				Text(Mark, X + (SW - MarkSize.X) * 0.5f, RowY + 8.0f * S, (Unit->bReady ? TextColour : Dim) * FLinearColor(1, 1, 1, Alpha), Font, Letters);
+				if (UTexture* Face0 = From.CardPortrait(*Unit))
+				{
+					Picture(Face0, X + FrameWidth, RowY + FrameWidth, SW - 2.0f * FrameWidth, SW - 2.0f * FrameWidth,
+						FLinearColor(1, 1, 1, Unit->bReady ? 1.0f : 0.85f));
+				}
+				const float Crest = 18.0f * S;
+				DrawRect(FLinearColor(0.0f, 0.0f, 0.0f, 0.6f), X + FrameWidth, RowY + FrameWidth, Crest, Crest);
+				Picture(ClassIcon(*Unit), X + FrameWidth, RowY + FrameWidth, Crest, Crest);
 			}
-			const float BadgeScale = 0.42f * S;
+			// Health in its side's colour, then the gauge (gold, draining, on its turn).
+			const float BarY = RowY + SW + 2.0f * S;
+			const float HpPart = bFogged ? 0.0f : static_cast<float>(Unit->Hp) / FMath::Max(1, Unit->MaxHp());
+			DrawRect(FLinearColor(0.03f, 0.04f, 0.06f, 0.95f * Alpha), X, BarY, SW, 5.0f * S);
+			DrawRect(SideColour(bFriend) * FLinearColor(1, 1, 1, Alpha), X, BarY, SW * HpPart, 5.0f * S);
+			const float GaugeY = BarY + 6.0f * S;
+			DrawRect(FLinearColor(0.03f, 0.04f, 0.06f, 0.95f * Alpha), X, GaugeY, SW, 4.0f * S);
+			DrawRect((Unit->bReady ? Gold : FLinearColor(0.55f, 0.75f, 0.95f)) * FLinearColor(1, 1, 1, Alpha), X, GaugeY, SW * Level, 4.0f * S);
+			const float BadgeScale = 0.4f * S;
 			const FVector2D BadgeSize = TextSize(Badge, Font, BadgeScale);
-			Text(Badge, X + (SW - BadgeSize.X) * 0.5f, RowY + SH - BadgeSize.Y - 2.0f * S, BadgeColour * FLinearColor(1, 1, 1, Alpha), Font, BadgeScale);
+			Text(Badge, X + (SW - BadgeSize.X) * 0.5f, GaugeY + 5.0f * S, BadgeColour * FLinearColor(1, 1, 1, Alpha), Font, BadgeScale);
 			AddButton(X, RowY, SW, SH, ETMHudAction::PickUnit, Unit->Id);
 			SquareAreas.Add(Unit->Id, FBox2D(FVector2D(X, RowY), FVector2D(X + SW, RowY + SH)));
 			FString Tip;

@@ -239,6 +239,7 @@ void ATMBattleDirector::ClearBattle()
 	ThreatNodes.clear();
 	LogScroll = 0;
 	bSaidWon = false;
+	PendingAbility = FPendingAbility();
 }
 
 namespace
@@ -469,6 +470,7 @@ void ATMBattleDirector::BuildBattle()
 
 	BuildBoard();
 	BuildTurnRings();
+	BuildIndicators();
 
 	bBuilt = true;
 	ResetMotion();
@@ -1216,6 +1218,8 @@ void ATMBattleDirector::Tick(float DeltaSeconds)
 	{
 		AdvanceMotion(DeltaSeconds);
 		AdvanceTurnRings();
+		AdvanceIndicators();
+		AdvanceCardPortraits();
 		AdvanceBoard(DeltaSeconds);
 		UpdateCamera(DeltaSeconds);
 		if (TunePendingFor >= 0.0f && DragSlider < 0)
@@ -1398,6 +1402,7 @@ void ATMBattleDirector::Tick(float DeltaSeconds)
 		TickRemainder = 0.0f;
 		return;
 	}
+	FirePendingAbility();
 
 	// The rules run at a fixed rate whatever the frame rate is doing. That is
 	// not a detail: the same battle has to play out the same way on both
@@ -1857,6 +1862,10 @@ void ATMBattleDirector::SelectUnit(int32 UnitId)
 	{
 		return;
 	}
+	if (PendingAbility.UnitId >= 0 && PendingAbility.UnitId != UnitId)
+	{
+		PendingAbility = FPendingAbility();  // a different unit was picked: call the attack off
+	}
 	SelectedId = UnitId;
 	SelectedSerial = Unit->Serial;
 	AimMode = EAimMode::None;
@@ -2289,11 +2298,12 @@ void ATMBattleDirector::OnClick()
 			{
 				OrderSelected(TMSim::FOrder::MakeUseAbility(Unit->Id, Unit->Serial, AimSlot, Where.Point, Where.Follow));
 			}
+			else if (Where.Why == UTF8_TO_TCHAR(OutOfRange) && WalkIntoRange(*Unit, Where.Point))
+			{
+				// Walking there first; the ability goes off on arrival (battle.gd:791).
+			}
 			else if (!Where.Why.IsEmpty())
 			{
-				// Godot walks into range and fires on arrival when the target is
-				// merely too far (battle.gd:791, _walk_into_range). Not ported yet:
-				// here the person walks there first and aims again.
 				Tell(Where.Why);
 			}
 			return;
@@ -2329,11 +2339,134 @@ FVector ATMBattleDirector::BoardPoint(const TMSim::FVec2& Point, float Lift) con
 	return GetActorTransform().TransformPosition(WorldFromMetres(Point, Level) + FVector(0.0f, 0.0f, Lift));
 }
 
+bool ATMBattleDirector::ClosestSpotInRange(const TMSim::FUnit& Unit, int32 Slot, const TMSim::FVec2& Point,
+	TMSim::FVec2& OutSpot, double& OutWalk)
+{
+	// battle.gd:860-874, _closest_spot_in_range: of everywhere it can walk this
+	// turn, the spot it could use the ability from -- in range, and in sight of
+	// the target where the ability needs that -- that is the least walk away.
+	// Godot runs through its reachable nodes in the order its search reached
+	// them; this runs through them in the order ReachableNodes gives, so between
+	// two spots exactly as far to walk it may pick the other. Either is a walk
+	// the person asked for, and nothing here is part of the rules.
+	const TMSim::FAbility* Ability = TMSim::JobAbility(Unit.Job, Slot);
+	if (!Ability)
+	{
+		return false;
+	}
+	bool bFound = false;
+	OutWalk = TNumericLimits<double>::Max();
+	for (const std::pair<TMSim::FNode, double>& Entry : Battle.ReachableNodes(Unit))
+	{
+		const TMSim::FVec2 Spot = TMSim::FMap::NodePos(Entry.first);
+		if (!Battle.InAbilityRange(Unit, Slot, Spot, Point))
+		{
+			continue;
+		}
+		if (TMSim::NeedsLineOfSight(*Ability) && !Battle.HasLineOfSight(Spot, Point))
+		{
+			continue;
+		}
+		if (Entry.second < OutWalk)
+		{
+			OutWalk = Entry.second;
+			OutSpot = Spot;
+			bFound = true;
+		}
+	}
+	return bFound;
+}
+
+bool ATMBattleDirector::WalkIntoRange(const TMSim::FUnit& Unit, const TMSim::FVec2& Point)
+{
+	// battle.gd:838-857. The unit is on its way while time runs on, so the
+	// ability goes off at the spot the target was standing on: if it has moved
+	// by then, the blow lands on empty ground.
+	if (Unit.bMoved || Unit.IsCasting())
+	{
+		return false;
+	}
+	// Held on to before the walk is ordered: ordering picks the unit's next
+	// step, which clears the ability that was chosen.
+	const int32 Slot = AimSlot;
+	TMSim::FVec2 Spot;
+	double Walk = 0.0;
+	if (!ClosestSpotInRange(Unit, Slot, Point, Spot, Walk))
+	{
+		return false;
+	}
+	const int32 UnitId = Unit.Id;
+	const int32 Serial = Unit.Serial;
+	const FString Refused = Submit(TMSim::FOrder::MakeMove(UnitId, Serial, Spot));
+	if (!Refused.IsEmpty())
+	{
+		Tell(Refused);
+		return true;
+	}
+	PendingAbility.UnitId = UnitId;
+	PendingAbility.Serial = Serial;
+	PendingAbility.Slot = Slot;
+	PendingAbility.Target = Point;
+	AimMode = EAimMode::None;
+	AimSlot = -1;
+	Reachable.clear();
+	PathShown.clear();
+	return true;
+}
+
+void ATMBattleDirector::FirePendingAbility()
+{
+	// battle.gd:877-892. Once the walk has ended on screen -- Godot waits the
+	// walk's own time -- the same ability, aimed where the target stood.
+	if (PendingAbility.UnitId < 0)
+	{
+		return;
+	}
+	int32 Index = INDEX_NONE;
+	for (int32 i = 0; i < static_cast<int32>(Battle.Units.size()); ++i)
+	{
+		Index = Battle.Units[i].Id == PendingAbility.UnitId ? i : Index;
+	}
+	const TMSim::FUnit* Unit = Index != INDEX_NONE ? &Battle.Units[Index] : nullptr;
+	if (!Unit || !Unit->IsAlive() || Unit->Serial != PendingAbility.Serial)
+	{
+		PendingAbility = FPendingAbility();  // its turn ended on the way over
+		return;
+	}
+	if (Motions.IsValidIndex(Index) && (Motions[Index].Path.Num() > 0 || Motions[Index].Queued))
+	{
+		return;  // still walking
+	}
+	const FPendingAbility Order = PendingAbility;
+	PendingAbility = FPendingAbility();
+	OrderSelected(TMSim::FOrder::MakeUseAbility(Order.UnitId, Order.Serial, Order.Slot, Order.Target, -1));
+}
+
 void ATMBattleDirector::UpdateHoverPath()
 {
 	// The HUD draws the way there; it is worked out here, and only when the spot
 	// under the pointer changes, because it is a search over the whole grid.
 	const TMSim::FUnit* Unit = SelectedUnit();
+	if (PlayerCanOrder(Unit) && AimMode == EAimMode::Ability && bHaveHover && !Unit->bMoved)
+	{
+		// Out of range, but usable from somewhere it can walk: show that walk
+		// (battle.gd:1438-1447).
+		const TMSim::FNode Node = TMSim::FMap::NodeOf(HoverPoint);
+		if (Node == PathNode)
+		{
+			return;
+		}
+		PathNode = Node;
+		PathShown.clear();
+		const FAim Where = Aim();
+		TMSim::FVec2 Spot;
+		double Walk = 0.0;
+		if (!Where.bOk && Where.Why == UTF8_TO_TCHAR(OutOfRange) && ClosestSpotInRange(*Unit, AimSlot, Where.Point, Spot, Walk))
+		{
+			PathShown = Battle.PathTo(*Unit, TMSim::FMap::NodeOf(Spot), false);
+		}
+		return;
+	}
 	if (!PlayerCanOrder(Unit) || AimMode != EAimMode::Move || !bHaveHover)
 	{
 		PathShown.clear();
