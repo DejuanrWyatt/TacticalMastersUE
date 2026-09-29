@@ -56,6 +56,7 @@ private:
 		USkeletalMesh* Mesh = nullptr;
 		float Yaw = 0.0f;
 		UAnimSequence* Clip = nullptr;
+		float Scale = 1.0f;
 	};
 
 	struct FFilmed

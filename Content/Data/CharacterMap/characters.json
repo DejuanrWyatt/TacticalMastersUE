@@ -1,7 +1,7 @@
 {
   "format": "tactical-masters-characters",
   "version": 1,
-  "about": "Which body each class wears, and which animation plays for what. Read by the director when a battle is built; see Docs/CharacterSetup.md. A class is looked up by its id under classes, then by its look under looks, then default. Every body names an animation set, and every animation in a set must be authored for that body's skeleton. The mannequin set has no hit clip: the template's hit reactions are additive, made to be layered over another pose, and cannot play on their own. Each set may map motions (melee, heavy, shoot, bolt, area, heal, buff, revive, channel, dash) to clips: 'release' when it goes off (one per slot, round), and for a cast 'intro' and a looping 'windup' while it charges, then 'castRelease'. A motion a set lacks falls back to a near one (heavy to melee, area to bolt, heal and buff to each other) and at last to the set's attack or cast. Sets may also name clips for reactions, statuses and moments, each a clip or a list: hitFront/hitBack/hitLeft/hitRight/hitHeavy (by where the blow came from; hitHeavy for a critical), evade, block, deathFront/deathBack/deathLeft/deathRight (the fall for a blow from that side: from the front, it goes over backwards), stunned and sleep (looped while it lasts), ready (its turn begins), victory and defeat (the battle is decided), and 'idles': {motion: clip} for a stance that suits a class whose first ability has that motion. A motion may also give 'impact': how far into its release the blow lands, 0 to 1. Clips were chosen by watching Tools\\AnimCatalog.bat's film; the hit reactions both packs ship are additive and cannot be used. heroPlan names the Paragon hero each class should wear, and heroLooks the hero for each look -- either one hero or a list, best first, of which the first installed is worn; Tools/assign_bodies.py turns them into classes and looks for the heroes that are installed, giving classes on the same hero different skins (a skin is a body '<hero>_<skin>' sharing the hero's animations).",
+  "about": "Which body each class wears, and which animation plays for what. Read by the director when a battle is built; see Docs/CharacterSetup.md. A class is looked up by its id under classes, then by its look under looks, then default. Every body names an animation set, and every animation in a set must be authored for that body's skeleton. The mannequin set has no hit clip: the template's hit reactions are additive, made to be layered over another pose, and cannot play on their own. Each set may map motions (melee, heavy, shoot, bolt, area, heal, buff, revive, channel, dash) to clips: 'release' when it goes off (one per slot, round), and for a cast 'intro' and a looping 'windup' while it charges, then 'castRelease'. A motion a set lacks falls back to a near one (heavy to melee, area to bolt, heal and buff to each other) and at last to the set's attack or cast. Sets may also name clips for reactions, statuses and moments, each a clip or a list: hitFront/hitBack/hitLeft/hitRight/hitHeavy (by where the blow came from; hitHeavy for a critical), evade, block, deathFront/deathBack/deathLeft/deathRight (the fall for a blow from that side: from the front, it goes over backwards), stunned and sleep (looped while it lasts), ready (its turn begins), victory and defeat (the battle is decided), and 'idles': {motion: clip} for a stance that suits a class whose first ability has that motion. A motion may also give 'impact': how far into its release the blow lands, 0 to 1. Clips were chosen by watching Tools\\AnimCatalog.bat's film; the hit reactions both packs ship are additive and cannot be used. heroPlan names the Paragon hero each class should wear, and heroLooks the hero for each look -- either one hero or a list, best first, of which the first installed is worn; Tools/assign_bodies.py turns them into classes and looks for the heroes that are installed, giving classes on the same hero different skins (a skin is a body '<hero>_<skin>' sharing the hero's animations). bodyScale sizes a body, or every body of an animation set (a hero and its skins): Sevarog and GRIM are built three metres tall.",
   "default": "manny",
   "looks": {
     "squire": "fengmao",
@@ -535,7 +535,7 @@
       ]
     },
     "countess": {
-      "idle": "/Game/ParagonCountess/Characters/Heroes/Countess/Animations/Idle_Facial.Idle_Facial",
+      "idle": "/Game/ParagonCountess/Characters/Heroes/Countess/Animations/Idle_Straight.Idle_Straight",
       "walk": "/Game/ParagonCountess/Characters/Heroes/Countess/Animations/Jog_Fwd.Jog_Fwd",
       "run": "/Game/ParagonCountess/Characters/Heroes/Countess/Animations/Sprint_Fwd.Sprint_Fwd",
       "attack": [
@@ -548,21 +548,21 @@
       "rise": "/Game/ParagonCountess/Characters/Heroes/Countess/Animations/Respawn.Respawn",
       "stunned": "/Game/ParagonCountess/Characters/Heroes/Countess/Animations/Stun_Loop.Stun_Loop",
       "victory": [
-        "/Game/ParagonCountess/Characters/Heroes/Countess/Animations/Emote_70sDance.Emote_70sDance",
         "/Game/ParagonCountess/Characters/Heroes/Countess/Animations/Emote_Laugh.Emote_Laugh",
-        "/Game/ParagonCountess/Characters/Heroes/Countess/Animations/Emote_Taunt_Nope.Emote_Taunt_Nope"
+        "/Game/ParagonCountess/Characters/Heroes/Countess/Animations/Emote_Taunt_Nope.Emote_Taunt_Nope",
+        "/Game/ParagonCountess/Characters/Heroes/Countess/Animations/EmoteALT_Master_SeductiveScare_T3.EmoteALT_Master_SeductiveScare_T3"
       ],
       "motions": {
         "melee": {
           "release": [
-            "/Game/ParagonCountess/Characters/Heroes/Countess/Animations/Primary_Attack_A_Fast_V1.Primary_Attack_A_Fast_V1",
             "/Game/ParagonCountess/Characters/Heroes/Countess/Animations/Primary_Attack_A_Normal.Primary_Attack_A_Normal",
-            "/Game/ParagonCountess/Characters/Heroes/Countess/Animations/Primary_Attack_A_Slow.Primary_Attack_A_Slow"
+            "/Game/ParagonCountess/Characters/Heroes/Countess/Animations/Primary_Attack_B_Normal.Primary_Attack_B_Normal",
+            "/Game/ParagonCountess/Characters/Heroes/Countess/Animations/Primary_Attack_Normal.Primary_Attack_Normal"
           ]
         },
         "heavy": {
           "release": [
-            "/Game/ParagonCountess/Characters/Heroes/Countess/Animations/Ability_RMB.Ability_RMB"
+            "/Game/ParagonCountess/Characters/Heroes/Countess/Animations/Ability_Ultimate.Ability_Ultimate"
           ]
         },
         "bolt": {
@@ -579,10 +579,27 @@
           "release": [
             "/Game/ParagonCountess/Characters/Heroes/Countess/Animations/Cast.Cast"
           ]
+        },
+        "dash": {
+          "release": [
+            "/Game/ParagonCountess/Characters/Heroes/Countess/Animations/Ability_RMB.Ability_RMB"
+          ]
+        },
+        "buff": {
+          "release": [
+            "/Game/ParagonCountess/Characters/Heroes/Countess/Animations/Cast.Cast"
+          ]
         }
       },
       "walkSpeed": 360,
-      "runSpeed": 600
+      "runSpeed": 600,
+      "death": [
+        "/Game/ParagonCountess/Characters/Heroes/Countess/Animations/Death.Death"
+      ],
+      "hit": [
+        "/Game/ParagonCountess/Characters/Heroes/Countess/Animations/Knock_Fwd.Knock_Fwd",
+        "/Game/ParagonCountess/Characters/Heroes/Countess/Animations/Knock_Bwd.Knock_Bwd"
+      ]
     },
     "dekker": {
       "idle": "/Game/ParagonDekker/Characters/Heroes/Dekker/Animations/Idle.Idle",
@@ -598,34 +615,69 @@
       "deathBack": "/Game/ParagonDekker/Characters/Heroes/Dekker/Animations/Death_Fwd.Death_Fwd",
       "stunned": "/Game/ParagonDekker/Characters/Heroes/Dekker/Animations/Stun_Loop.Stun_Loop",
       "victory": [
+        "/Game/ParagonDekker/Characters/Heroes/Dekker/Animations/Emote_FriendlyWave_M1.Emote_FriendlyWave_M1",
         "/Game/ParagonDekker/Characters/Heroes/Dekker/Animations/Emote_Centrifuge_M2.Emote_Centrifuge_M2",
-        "/Game/ParagonDekker/Characters/Heroes/Dekker/Animations/Emote_Dance_SingleLadies_T1.Emote_Dance_SingleLadies_T1",
-        "/Game/ParagonDekker/Characters/Heroes/Dekker/Animations/Emote_FriendlyWave_M1.Emote_FriendlyWave_M1"
+        "/Game/ParagonDekker/Characters/Heroes/Dekker/Animations/Emote_Dance_SingleLadies_T1.Emote_Dance_SingleLadies_T1"
       ],
       "motions": {
         "heavy": {
+          "intro": "/Game/ParagonDekker/Characters/Heroes/Dekker/Animations/Ability_R_V2_Targeting_Start.Ability_R_V2_Targeting_Start",
+          "windup": "/Game/ParagonDekker/Characters/Heroes/Dekker/Animations/Ability_R_V2_Targeting_Loop.Ability_R_V2_Targeting_Loop",
+          "castRelease": "/Game/ParagonDekker/Characters/Heroes/Dekker/Animations/R_Ability.R_Ability",
           "release": [
             "/Game/ParagonDekker/Characters/Heroes/Dekker/Animations/R_Ability.R_Ability"
           ]
         },
         "bolt": {
           "release": [
-            "/Game/ParagonDekker/Characters/Heroes/Dekker/Animations/Q_Ability.Q_Ability"
+            "/Game/ParagonDekker/Characters/Heroes/Dekker/Animations/Fire_Med.Fire_Med",
+            "/Game/ParagonDekker/Characters/Heroes/Dekker/Animations/Fire_Fast.Fire_Fast",
+            "/Game/ParagonDekker/Characters/Heroes/Dekker/Animations/Fire_Slow.Fire_Slow"
           ]
         },
         "area": {
+          "intro": "/Game/ParagonDekker/Characters/Heroes/Dekker/Animations/Ability_E_Targeting_Start.Ability_E_Targeting_Start",
+          "windup": "/Game/ParagonDekker/Characters/Heroes/Dekker/Animations/Ability_E_Targeting_Loop.Ability_E_Targeting_Loop",
+          "castRelease": "/Game/ParagonDekker/Characters/Heroes/Dekker/Animations/E_Ability.E_Ability",
           "release": [
             "/Game/ParagonDekker/Characters/Heroes/Dekker/Animations/E_Ability.E_Ability"
           ]
         },
         "heal": {
           "release": [
+            "/Game/ParagonDekker/Characters/Heroes/Dekker/Animations/Q_Ability.Q_Ability"
+          ]
+        },
+        "shoot": {
+          "release": [
+            "/Game/ParagonDekker/Characters/Heroes/Dekker/Animations/Fire_Med.Fire_Med",
+            "/Game/ParagonDekker/Characters/Heroes/Dekker/Animations/Fire_Fast.Fire_Fast",
+            "/Game/ParagonDekker/Characters/Heroes/Dekker/Animations/Fire_Slow.Fire_Slow"
+          ]
+        },
+        "melee": {
+          "release": [
+            "/Game/ParagonDekker/Characters/Heroes/Dekker/Animations/Fire_Med.Fire_Med"
+          ]
+        },
+        "buff": {
+          "release": [
             "/Game/ParagonDekker/Characters/Heroes/Dekker/Animations/Cast.Cast"
+          ]
+        },
+        "channel": {
+          "intro": "/Game/ParagonDekker/Characters/Heroes/Dekker/Animations/Q_Ability_Start.Q_Ability_Start",
+          "release": [
+            "/Game/ParagonDekker/Characters/Heroes/Dekker/Animations/Q_Ability_Loop.Q_Ability_Loop"
           ]
         }
       },
       "walkSpeed": 360,
-      "runSpeed": 600
+      "runSpeed": 600,
+      "hit": [
+        "/Game/ParagonDekker/Characters/Heroes/Dekker/Animations/KnockBack_Front.KnockBack_Front",
+        "/Game/ParagonDekker/Characters/Heroes/Dekker/Animations/KnockBack_Back.KnockBack_Back"
+      ]
     },
     "fengmao": {
       "idle": "/Game/ParagonFengMao/Characters/Heroes/FengMao/Animations/Idle.Idle",
@@ -658,10 +710,42 @@
           "release": [
             "/Game/ParagonFengMao/Characters/Heroes/FengMao/Animations/Cast.Cast"
           ]
+        },
+        "melee": {
+          "release": [
+            "/Game/ParagonFengMao/Characters/Heroes/FengMao/Animations/Melee_A_Med.Melee_A_Med",
+            "/Game/ParagonFengMao/Characters/Heroes/FengMao/Animations/Melee_B_Med.Melee_B_Med",
+            "/Game/ParagonFengMao/Characters/Heroes/FengMao/Animations/Melee_C_Med.Melee_C_Med"
+          ]
+        },
+        "dash": {
+          "release": [
+            "/Game/ParagonFengMao/Characters/Heroes/FengMao/Animations/Dash_Attack.Dash_Attack"
+          ]
+        },
+        "area": {
+          "release": [
+            "/Game/ParagonFengMao/Characters/Heroes/FengMao/Animations/SlowAbility.SlowAbility"
+          ]
+        },
+        "bolt": {
+          "release": [
+            "/Game/ParagonFengMao/Characters/Heroes/FengMao/Animations/Primary_B.Primary_B"
+          ]
+        },
+        "buff": {
+          "release": [
+            "/Game/ParagonFengMao/Characters/Heroes/FengMao/Animations/Cast.Cast"
+          ]
         }
       },
       "walkSpeed": 360,
-      "runSpeed": 600
+      "runSpeed": 600,
+      "block": "/Game/ParagonFengMao/Characters/Heroes/FengMao/Animations/Shield_v2.Shield_v2",
+      "hit": [
+        "/Game/ParagonFengMao/Characters/Heroes/FengMao/Animations/Knock_Fwd.Knock_Fwd",
+        "/Game/ParagonFengMao/Characters/Heroes/FengMao/Animations/Knock_Bwd.Knock_Bwd"
+      ]
     },
     "grim": {
       "idle": "/Game/ParagonGRIMexe/Characters/Heroes/GRIM/Animations/Idle.Idle",
@@ -680,36 +764,57 @@
       "deathBack": "/Game/ParagonGRIMexe/Characters/Heroes/GRIM/Animations/Death_Fwd.Death_Fwd",
       "stunned": "/Game/ParagonGRIMexe/Characters/Heroes/GRIM/Animations/Stun_Loop.Stun_Loop",
       "victory": [
-        "/Game/ParagonGRIMexe/Characters/Heroes/GRIM/Animations/Emote_Hug_T3.Emote_Hug_T3",
-        "/Game/ParagonGRIMexe/Characters/Heroes/GRIM/Animations/Emote_Master_DemoMode_T3.Emote_Master_DemoMode_T3",
-        "/Game/ParagonGRIMexe/Characters/Heroes/GRIM/Animations/Emote_Taunt_StrongMan_T2.Emote_Taunt_StrongMan_T2"
+        "/Game/ParagonGRIMexe/Characters/Heroes/GRIM/Animations/Victory_Emote.Victory_Emote",
+        "/Game/ParagonGRIMexe/Characters/Heroes/GRIM/Animations/Emote_Taunt_StrongMan_T2.Emote_Taunt_StrongMan_T2",
+        "/Game/ParagonGRIMexe/Characters/Heroes/GRIM/Animations/Emote_Hug_T3.Emote_Hug_T3"
       ],
       "motions": {
         "heavy": {
           "release": [
-            "/Game/ParagonGRIMexe/Characters/Heroes/GRIM/Animations/Ability_R_Deploy_End.Ability_R_Deploy_End"
+            "/Game/ParagonGRIMexe/Characters/Heroes/GRIM/Animations/Ability_R_Fire.Ability_R_Fire"
           ]
         },
         "shoot": {
           "release": [
-            "/Game/ParagonGRIMexe/Characters/Heroes/GRIM/Animations/Primary_Fire_Fast_A.Primary_Fire_Fast_A",
             "/Game/ParagonGRIMexe/Characters/Heroes/GRIM/Animations/Primary_Fire_Med_A.Primary_Fire_Med_A",
+            "/Game/ParagonGRIMexe/Characters/Heroes/GRIM/Animations/Primary_Fire_Fast_A.Primary_Fire_Fast_A",
             "/Game/ParagonGRIMexe/Characters/Heroes/GRIM/Animations/Primary_Fire_Slow_A.Primary_Fire_Slow_A"
           ]
         },
         "bolt": {
+          "intro": "/Game/ParagonGRIMexe/Characters/Heroes/GRIM/Animations/Ability_Deathbolt_Start.Ability_Deathbolt_Start",
           "release": [
-            "/Game/ParagonGRIMexe/Characters/Heroes/GRIM/Animations/Ability_Q_Deploy_Fire.Ability_Q_Deploy_Fire"
+            "/Game/ParagonGRIMexe/Characters/Heroes/GRIM/Animations/Ability_Deathbolt_Fire.Ability_Deathbolt_Fire"
           ]
         },
         "heal": {
+          "release": [
+            "/Game/ParagonGRIMexe/Characters/Heroes/GRIM/Animations/Ability_SapZap_Fire.Ability_SapZap_Fire"
+          ]
+        },
+        "melee": {
+          "release": [
+            "/Game/ParagonGRIMexe/Characters/Heroes/GRIM/Animations/Primary_Fire_Med_A.Primary_Fire_Med_A"
+          ]
+        },
+        "area": {
+          "intro": "/Game/ParagonGRIMexe/Characters/Heroes/GRIM/Animations/Ability_R_Start.Ability_R_Start",
+          "release": [
+            "/Game/ParagonGRIMexe/Characters/Heroes/GRIM/Animations/Ability_R_Fire.Ability_R_Fire"
+          ]
+        },
+        "buff": {
           "release": [
             "/Game/ParagonGRIMexe/Characters/Heroes/GRIM/Animations/Cast.Cast"
           ]
         }
       },
       "walkSpeed": 360,
-      "runSpeed": 600
+      "runSpeed": 600,
+      "hit": [
+        "/Game/ParagonGRIMexe/Characters/Heroes/GRIM/Animations/Knock_Fwd.Knock_Fwd",
+        "/Game/ParagonGRIMexe/Characters/Heroes/GRIM/Animations/Knock_Bwd.Knock_Bwd"
+      ]
     },
     "gadget": {
       "idle": "/Game/ParagonGadget/Characters/Heroes/Gadget/Animations/Idle.Idle",
@@ -724,19 +829,44 @@
       "deathBack": "/Game/ParagonGadget/Characters/Heroes/Gadget/Animations/Death_Fwd.Death_Fwd",
       "stunned": "/Game/ParagonGadget/Characters/Heroes/Gadget/Animations/Stun_Loop.Stun_Loop",
       "victory": [
-        "/Game/ParagonGadget/Characters/Heroes/Gadget/Animations/Emote_ChillOut_T3.Emote_ChillOut_T3",
+        "/Game/ParagonGadget/Characters/Heroes/Gadget/Animations/Emote_Laugh.Emote_Laugh",
         "/Game/ParagonGadget/Characters/Heroes/Gadget/Animations/Emote_Dance_Robot.Emote_Dance_Robot",
-        "/Game/ParagonGadget/Characters/Heroes/Gadget/Animations/Emote_Laugh.Emote_Laugh"
+        "/Game/ParagonGadget/Characters/Heroes/Gadget/Animations/Emote_RoShamBo.Emote_RoShamBo"
       ],
       "motions": {
         "heal": {
           "release": [
             "/Game/ParagonGadget/Characters/Heroes/Gadget/Animations/Cast.Cast"
           ]
+        },
+        "shoot": {
+          "release": [
+            "/Game/ParagonGadget/Characters/Heroes/Gadget/Animations/Cast.Cast"
+          ]
+        },
+        "bolt": {
+          "release": [
+            "/Game/ParagonGadget/Characters/Heroes/Gadget/Animations/Cast.Cast"
+          ]
+        },
+        "melee": {
+          "release": [
+            "/Game/ParagonGadget/Characters/Heroes/Gadget/Animations/Cast.Cast"
+          ]
+        },
+        "buff": {
+          "release": [
+            "/Game/ParagonGadget/Characters/Heroes/Gadget/Animations/Cast.Cast"
+          ]
         }
       },
       "walkSpeed": 360,
-      "runSpeed": 600
+      "runSpeed": 600,
+      "walk": "/Game/ParagonGadget/Characters/Heroes/Gadget/Animations/Run_Fwd.Run_Fwd",
+      "hit": [
+        "/Game/ParagonGadget/Characters/Heroes/Gadget/Animations/KnockBack.KnockBack",
+        "/Game/ParagonGadget/Characters/Heroes/Gadget/Animations/Knock_Back.Knock_Back"
+      ]
     },
     "gideon": {
       "idle": "/Game/ParagonGideon/Characters/Heroes/Gideon/Animations/Idle.Idle",
@@ -809,30 +939,10 @@
       "walkSpeed": 360,
       "runSpeed": 600
     },
-    "howitzer": {
-      "idle": "/Game/ParagonHowitzer/Characters/Heroes/Howitzer/Animations/Idle.Idle",
-      "run": "/Game/ParagonHowitzer/Characters/Heroes/Howitzer/Animations/Sprint_Fwd.Sprint_Fwd",
-      "cast": "/Game/ParagonHowitzer/Characters/Heroes/Howitzer/Animations/Cast.Cast",
-      "rise": "/Game/ParagonHowitzer/Characters/Heroes/Howitzer/Animations/Respawn.Respawn",
-      "victory": [
-        "/Game/ParagonHowitzer/Characters/Heroes/Howitzer/Animations/Emote_BootyShake_T3.Emote_BootyShake_T3",
-        "/Game/ParagonHowitzer/Characters/Heroes/Howitzer/Animations/Emote_FlyingMalfunction_MC_T3.Emote_FlyingMalfunction_MC_T3",
-        "/Game/ParagonHowitzer/Characters/Heroes/Howitzer/Animations/Emote_ShakeFist_MC_T3.Emote_ShakeFist_MC_T3"
-      ],
-      "motions": {
-        "heal": {
-          "release": [
-            "/Game/ParagonHowitzer/Characters/Heroes/Howitzer/Animations/Cast.Cast"
-          ]
-        }
-      },
-      "walkSpeed": 360,
-      "runSpeed": 600
-    },
     "murdock": {
       "idle": "/Game/ParagonMurdock/Characters/Heroes/Murdock/Animations/Idle.Idle",
       "walk": "/Game/ParagonMurdock/Characters/Heroes/Murdock/Animations/Jog_Fwd.Jog_Fwd",
-      "run": "/Game/ParagonMurdock/Characters/Heroes/Murdock/Animations/Run_Fwd.Run_Fwd",
+      "run": "/Game/ParagonMurdock/Characters/Heroes/Murdock/Animations/Sprint.Sprint",
       "cast": "/Game/ParagonMurdock/Characters/Heroes/Murdock/Animations/Cast.Cast",
       "death": [
         "/Game/ParagonMurdock/Characters/Heroes/Murdock/Animations/Death_Bwd.Death_Bwd",
@@ -843,24 +953,61 @@
       "deathBack": "/Game/ParagonMurdock/Characters/Heroes/Murdock/Animations/Death_Fwd.Death_Fwd",
       "stunned": "/Game/ParagonMurdock/Characters/Heroes/Murdock/Animations/Stunned_Loop.Stunned_Loop",
       "victory": [
-        "/Game/ParagonMurdock/Characters/Heroes/Murdock/Animations/Emote_Master_SevenShotSalute_T3.Emote_Master_SevenShotSalute_T3",
         "/Game/ParagonMurdock/Characters/Heroes/Murdock/Animations/Emote_Point.Emote_Point",
-        "/Game/ParagonMurdock/Characters/Heroes/Murdock/Animations/Emote_PushUps.Emote_PushUps"
+        "/Game/ParagonMurdock/Characters/Heroes/Murdock/Animations/Emote_PushUps.Emote_PushUps",
+        "/Game/ParagonMurdock/Characters/Heroes/Murdock/Animations/Emote_Master_SevenShotSalute_T3.Emote_Master_SevenShotSalute_T3"
       ],
       "motions": {
         "heavy": {
           "release": [
-            "/Game/ParagonMurdock/Characters/Heroes/Murdock/Animations/Ultimate_TurnLeft_135.Ultimate_TurnLeft_135"
+            "/Game/ParagonMurdock/Characters/Heroes/Murdock/Animations/TheEleven.TheEleven"
           ]
         },
         "heal": {
           "release": [
             "/Game/ParagonMurdock/Characters/Heroes/Murdock/Animations/Cast.Cast"
           ]
+        },
+        "shoot": {
+          "release": [
+            "/Game/ParagonMurdock/Characters/Heroes/Murdock/Animations/Fire_Reload.Fire_Reload",
+            "/Game/ParagonMurdock/Characters/Heroes/Murdock/Animations/Fire_NoReload.Fire_NoReload",
+            "/Game/ParagonMurdock/Characters/Heroes/Murdock/Animations/Fire_Fast.Fire_Fast"
+          ]
+        },
+        "melee": {
+          "release": [
+            "/Game/ParagonMurdock/Characters/Heroes/Murdock/Animations/Fire_Fast.Fire_Fast"
+          ]
+        },
+        "bolt": {
+          "release": [
+            "/Game/ParagonMurdock/Characters/Heroes/Murdock/Animations/SpreadShot.SpreadShot"
+          ]
+        },
+        "area": {
+          "release": [
+            "/Game/ParagonMurdock/Characters/Heroes/Murdock/Animations/TazerTrap.TazerTrap"
+          ]
+        },
+        "channel": {
+          "release": [
+            "/Game/ParagonMurdock/Characters/Heroes/Murdock/Animations/TheEleven_Loop.TheEleven_Loop"
+          ]
+        },
+        "buff": {
+          "release": [
+            "/Game/ParagonMurdock/Characters/Heroes/Murdock/Animations/Cast.Cast"
+          ]
         }
       },
       "walkSpeed": 360,
-      "runSpeed": 600
+      "runSpeed": 600,
+      "block": "/Game/ParagonMurdock/Characters/Heroes/Murdock/Animations/Shield.Shield",
+      "hit": [
+        "/Game/ParagonMurdock/Characters/Heroes/Murdock/Animations/Knockback_Fwd.Knockback_Fwd",
+        "/Game/ParagonMurdock/Characters/Heroes/Murdock/Animations/Knockback_Bwd.Knockback_Bwd"
+      ]
     },
     "muriel": {
       "idle": "/Game/ParagonMuriel/Characters/Heroes/Muriel/Animations/Idle.Idle",
@@ -876,9 +1023,9 @@
       "rise": "/Game/ParagonMuriel/Characters/Heroes/Muriel/Animations/Respawn.Respawn",
       "stunned": "/Game/ParagonMuriel/Characters/Heroes/Muriel/Animations/Stun_Loop.Stun_Loop",
       "victory": [
-        "/Game/ParagonMuriel/Characters/Heroes/Muriel/Animations/Emote_Master_ShowOffWings_T3.Emote_Master_ShowOffWings_T3",
         "/Game/ParagonMuriel/Characters/Heroes/Muriel/Animations/Emote_Small_Clap_T1.Emote_Small_Clap_T1",
-        "/Game/ParagonMuriel/Characters/Heroes/Muriel/Animations/Emote_Taunt_Curtsy_T1.Emote_Taunt_Curtsy_T1"
+        "/Game/ParagonMuriel/Characters/Heroes/Muriel/Animations/Emote_Taunt_Curtsy_T1.Emote_Taunt_Curtsy_T1",
+        "/Game/ParagonMuriel/Characters/Heroes/Muriel/Animations/Emote_Master_ShowOffWings_T3.Emote_Master_ShowOffWings_T3"
       ],
       "motions": {
         "heavy": {
@@ -894,13 +1041,48 @@
           ]
         },
         "heal": {
+          "intro": "/Game/ParagonMuriel/Characters/Heroes/Muriel/Animations/LifeLock_Start.LifeLock_Start",
+          "release": [
+            "/Game/ParagonMuriel/Characters/Heroes/Muriel/Animations/LifeLock_Fire.LifeLock_Fire"
+          ]
+        },
+        "bolt": {
+          "release": [
+            "/Game/ParagonMuriel/Characters/Heroes/Muriel/Animations/Primary_Fire_Slow_V1.Primary_Fire_Slow_V1",
+            "/Game/ParagonMuriel/Characters/Heroes/Muriel/Animations/Primary_Fire_A_Slow_V1.Primary_Fire_A_Slow_V1",
+            "/Game/ParagonMuriel/Characters/Heroes/Muriel/Animations/Primary_Fire_B_Slow_V1.Primary_Fire_B_Slow_V1"
+          ]
+        },
+        "melee": {
+          "release": [
+            "/Game/ParagonMuriel/Characters/Heroes/Muriel/Animations/Primary_Fire_Slow_V1.Primary_Fire_Slow_V1"
+          ]
+        },
+        "area": {
+          "intro": "/Game/ParagonMuriel/Characters/Heroes/Muriel/Animations/ConsecratedGround_Prepare.ConsecratedGround_Prepare",
+          "castRelease": "/Game/ParagonMuriel/Characters/Heroes/Muriel/Animations/ConsecratedGround_Cast.ConsecratedGround_Cast",
+          "release": [
+            "/Game/ParagonMuriel/Characters/Heroes/Muriel/Animations/ConsecratedGround_Cast.ConsecratedGround_Cast"
+          ]
+        },
+        "revive": {
+          "intro": "/Game/ParagonMuriel/Characters/Heroes/Muriel/Animations/Ultimate_Prepare.Ultimate_Prepare",
+          "release": [
+            "/Game/ParagonMuriel/Characters/Heroes/Muriel/Animations/Ultimate_Flare.Ultimate_Flare"
+          ]
+        },
+        "buff": {
           "release": [
             "/Game/ParagonMuriel/Characters/Heroes/Muriel/Animations/Cast.Cast"
           ]
         }
       },
       "walkSpeed": 360,
-      "runSpeed": 600
+      "runSpeed": 600,
+      "hit": [
+        "/Game/ParagonMuriel/Characters/Heroes/Muriel/Animations/Knock_Back_Fwd.Knock_Back_Fwd",
+        "/Game/ParagonMuriel/Characters/Heroes/Muriel/Animations/Knock_Back_Bwd.Knock_Back_Bwd"
+      ]
     },
     "serath": {
       "idle": "/Game/ParagonSerath/Characters/Heroes/Serath/Animations/Idle.Idle",
@@ -919,26 +1101,64 @@
       "rise": "/Game/ParagonSerath/Characters/Heroes/Serath/Animations/Respawn.Respawn",
       "deathBack": "/Game/ParagonSerath/Characters/Heroes/Serath/Animations/Death_Fwd.Death_Fwd",
       "victory": [
-        "/Game/ParagonSerath/Characters/Heroes/Serath/Animations/Emote_BringItOn.Emote_BringItOn",
         "/Game/ParagonSerath/Characters/Heroes/Serath/Animations/Emote_Celebration.Emote_Celebration",
-        "/Game/ParagonSerath/Characters/Heroes/Serath/Animations/Emote_EvilLaugh.Emote_EvilLaugh"
+        "/Game/ParagonSerath/Characters/Heroes/Serath/Animations/Emote_ForHonor.Emote_ForHonor",
+        "/Game/ParagonSerath/Characters/Heroes/Serath/Animations/Emote_BringItOn.Emote_BringItOn"
       ],
       "motions": {
         "melee": {
           "release": [
-            "/Game/ParagonSerath/Characters/Heroes/Serath/Animations/Primary_Attack_A_Fast.Primary_Attack_A_Fast",
-            "/Game/ParagonSerath/Characters/Heroes/Serath/Animations/Primary_Attack_A_Fast_Additive.Primary_Attack_A_Fast_Additive",
-            "/Game/ParagonSerath/Characters/Heroes/Serath/Animations/Primary_Attack_A_Medium.Primary_Attack_A_Medium"
+            "/Game/ParagonSerath/Characters/Heroes/Serath/Animations/Primary_Attack_A_Medium.Primary_Attack_A_Medium",
+            "/Game/ParagonSerath/Characters/Heroes/Serath/Animations/Primary_Attack_B_Medium.Primary_Attack_B_Medium",
+            "/Game/ParagonSerath/Characters/Heroes/Serath/Animations/Primary_Attack_D_Medium.Primary_Attack_D_Medium"
           ]
         },
         "heal": {
           "release": [
-            "/Game/ParagonSerath/Characters/Heroes/Serath/Animations/Cast.Cast"
+            "/Game/ParagonSerath/Characters/Heroes/Serath/Animations/E_Ability_Wing_Flap_Holy.E_Ability_Wing_Flap_Holy"
+          ]
+        },
+        "heavy": {
+          "release": [
+            "/Game/ParagonSerath/Characters/Heroes/Serath/Animations/Q_Ability_Attack_C.Q_Ability_Attack_C"
+          ]
+        },
+        "bolt": {
+          "release": [
+            "/Game/ParagonSerath/Characters/Heroes/Serath/Animations/Q_Ability_Attack_B.Q_Ability_Attack_B"
+          ]
+        },
+        "area": {
+          "intro": "/Game/ParagonSerath/Characters/Heroes/Serath/Animations/Q_Ability_Targeting_Intro.Q_Ability_Targeting_Intro",
+          "windup": "/Game/ParagonSerath/Characters/Heroes/Serath/Animations/Q_Ability_Targeting_Loop.Q_Ability_Targeting_Loop",
+          "release": [
+            "/Game/ParagonSerath/Characters/Heroes/Serath/Animations/Q_Ability_Attack_A.Q_Ability_Attack_A"
+          ]
+        },
+        "dash": {
+          "release": [
+            "/Game/ParagonSerath/Characters/Heroes/Serath/Animations/RMB_Dive.RMB_Dive"
+          ]
+        },
+        "buff": {
+          "release": [
+            "/Game/ParagonSerath/Characters/Heroes/Serath/Animations/E_Ability_Wing_Flap_Holy.E_Ability_Wing_Flap_Holy"
+          ]
+        },
+        "channel": {
+          "intro": "/Game/ParagonSerath/Characters/Heroes/Serath/Animations/R_Ability_Intro.R_Ability_Intro",
+          "release": [
+            "/Game/ParagonSerath/Characters/Heroes/Serath/Animations/R_Ability_Loop.R_Ability_Loop"
           ]
         }
       },
       "walkSpeed": 360,
-      "runSpeed": 600
+      "runSpeed": 600,
+      "stunned": "/Game/ParagonSerath/Characters/Heroes/Serath/Animations/Stun_Idle.Stun_Idle",
+      "hit": [
+        "/Game/ParagonSerath/Characters/Heroes/Serath/Animations/Knockback_Fwd.Knockback_Fwd",
+        "/Game/ParagonSerath/Characters/Heroes/Serath/Animations/Knockback_Bwd.Knockback_Bwd"
+      ]
     },
     "sevarog": {
       "idle": "/Game/ParagonSevarog/Characters/Heroes/Sevarog/Animations/Idle.Idle",
@@ -952,12 +1172,14 @@
       "deathBack": "/Game/ParagonSevarog/Characters/Heroes/Sevarog/Animations/Death_front.Death_front",
       "stunned": "/Game/ParagonSevarog/Characters/Heroes/Sevarog/Animations/Stun_Loop.Stun_Loop",
       "victory": [
-        "/Game/ParagonSevarog/Characters/Heroes/Sevarog/Animations/Emote_Boogie.Emote_Boogie",
+        "/Game/ParagonSevarog/Characters/Heroes/Sevarog/Animations/Victory_Emote.Victory_Emote",
         "/Game/ParagonSevarog/Characters/Heroes/Sevarog/Animations/Emote_Clap_T1.Emote_Clap_T1",
         "/Game/ParagonSevarog/Characters/Heroes/Sevarog/Animations/Emote_Pointing_MC_T3.Emote_Pointing_MC_T3"
       ],
       "motions": {
         "heavy": {
+          "intro": "/Game/ParagonSevarog/Characters/Heroes/Sevarog/Animations/Ultimate_Targeting.Ultimate_Targeting",
+          "windup": "/Game/ParagonSevarog/Characters/Heroes/Sevarog/Animations/Ultimate_Targeting_Loop.Ultimate_Targeting_Loop",
           "release": [
             "/Game/ParagonSevarog/Characters/Heroes/Sevarog/Animations/Ultimate_Swing_120fps.Ultimate_Swing_120fps"
           ]
@@ -966,10 +1188,48 @@
           "release": [
             "/Game/ParagonSevarog/Characters/Heroes/Sevarog/Animations/Cast.Cast"
           ]
+        },
+        "melee": {
+          "release": [
+            "/Game/ParagonSevarog/Characters/Heroes/Sevarog/Animations/Swing1_Medium.Swing1_Medium",
+            "/Game/ParagonSevarog/Characters/Heroes/Sevarog/Animations/Swing2_Medium.Swing2_Medium",
+            "/Game/ParagonSevarog/Characters/Heroes/Sevarog/Animations/Swing3_Medium.Swing3_Medium"
+          ]
+        },
+        "area": {
+          "release": [
+            "/Game/ParagonSevarog/Characters/Heroes/Sevarog/Animations/Subjugation.Subjugation"
+          ]
+        },
+        "bolt": {
+          "release": [
+            "/Game/ParagonSevarog/Characters/Heroes/Sevarog/Animations/Soul_Siphon.Soul_Siphon"
+          ]
+        },
+        "channel": {
+          "intro": "/Game/ParagonSevarog/Characters/Heroes/Sevarog/Animations/Soul_Siphon_Targeting.Soul_Siphon_Targeting",
+          "windup": "/Game/ParagonSevarog/Characters/Heroes/Sevarog/Animations/Soul_Siphon_Targeting_Loop.Soul_Siphon_Targeting_Loop",
+          "release": [
+            "/Game/ParagonSevarog/Characters/Heroes/Sevarog/Animations/Soul_Siphon.Soul_Siphon"
+          ]
+        },
+        "dash": {
+          "release": [
+            "/Game/ParagonSevarog/Characters/Heroes/Sevarog/Animations/Speedburst.Speedburst"
+          ]
+        },
+        "buff": {
+          "release": [
+            "/Game/ParagonSevarog/Characters/Heroes/Sevarog/Animations/Cast.Cast"
+          ]
         }
       },
       "walkSpeed": 360,
-      "runSpeed": 600
+      "runSpeed": 600,
+      "hit": [
+        "/Game/ParagonSevarog/Characters/Heroes/Sevarog/Animations/Knock_back.Knock_back",
+        "/Game/ParagonSevarog/Characters/Heroes/Sevarog/Animations/Knock_back_bwd.Knock_back_bwd"
+      ]
     },
     "shinbi": {
       "idle": "/Game/ParagonShinbi/Characters/Heroes/Shinbi/Shinbi_Wolf/Animations/Idle.Idle",
@@ -982,9 +1242,9 @@
       "rise": "/Game/ParagonShinbi/Characters/Heroes/Shinbi/Animations/Respawn.Respawn",
       "stunned": "/Game/ParagonShinbi/Characters/Heroes/Shinbi/Animations/Stunned_Loop.Stunned_Loop",
       "victory": [
-        "/Game/ParagonShinbi/Characters/Heroes/Shinbi/Animations/Emote_BlowKiss.Emote_BlowKiss",
-        "/Game/ParagonShinbi/Characters/Heroes/Shinbi/Animations/Emote_BooYah_M1.Emote_BooYah_M1",
-        "/Game/ParagonShinbi/Characters/Heroes/Shinbi/Animations/Emote_HappyClap.Emote_HappyClap"
+        "/Game/ParagonShinbi/Characters/Heroes/Shinbi/Animations/Emote_Peace.Emote_Peace",
+        "/Game/ParagonShinbi/Characters/Heroes/Shinbi/Animations/Emote_HappyClap.Emote_HappyClap",
+        "/Game/ParagonShinbi/Characters/Heroes/Shinbi/Animations/Emote_BooYah_M1.Emote_BooYah_M1"
       ],
       "motions": {
         "heavy": {
@@ -993,23 +1253,111 @@
           ]
         },
         "bolt": {
+          "intro": "/Game/ParagonShinbi/Characters/Heroes/Shinbi/Animations/Ability_AttackWolves_StartTarget.Ability_AttackWolves_StartTarget",
+          "windup": "/Game/ParagonShinbi/Characters/Heroes/Shinbi/Animations/Ability_AttackWolves_Target.Ability_AttackWolves_Target",
           "release": [
-            "/Game/ParagonShinbi/Characters/Heroes/Shinbi/Animations/Ability_Q_Target_BWD.Ability_Q_Target_BWD"
+            "/Game/ParagonShinbi/Characters/Heroes/Shinbi/Animations/Ability_AttackWolves_Cast_L.Ability_AttackWolves_Cast_L",
+            "/Game/ParagonShinbi/Characters/Heroes/Shinbi/Animations/Ability_AttackWolves_Cast_R.Ability_AttackWolves_Cast_R"
           ]
         },
         "area": {
           "release": [
-            "/Game/ParagonShinbi/Characters/Heroes/Shinbi/Animations/Ability_E_Jog_Bwd.Ability_E_Jog_Bwd"
+            "/Game/ParagonShinbi/Characters/Heroes/Shinbi/Animations/Ability_CirclingWolves.Ability_CirclingWolves"
           ]
         },
         "heal": {
           "release": [
             "/Game/ParagonShinbi/Characters/Heroes/Shinbi/Animations/Cast.Cast"
           ]
+        },
+        "melee": {
+          "release": [
+            "/Game/ParagonShinbi/Characters/Heroes/Shinbi/Animations/PrimaryMelee_B_Slow.PrimaryMelee_B_Slow",
+            "/Game/ParagonShinbi/Characters/Heroes/Shinbi/Animations/PrimaryMelee_C_Slow.PrimaryMelee_C_Slow",
+            "/Game/ParagonShinbi/Characters/Heroes/Shinbi/Animations/PrimaryMelee_D_Slow.PrimaryMelee_D_Slow"
+          ]
+        },
+        "dash": {
+          "release": [
+            "/Game/ParagonShinbi/Characters/Heroes/Shinbi/Animations/Ability_Dash.Ability_Dash"
+          ]
+        },
+        "buff": {
+          "release": [
+            "/Game/ParagonShinbi/Characters/Heroes/Shinbi/Animations/Cast.Cast"
+          ]
         }
       },
       "walkSpeed": 360,
-      "runSpeed": 600
+      "runSpeed": 600,
+      "hit": [
+        "/Game/ParagonShinbi/Characters/Heroes/Shinbi/Animations/Knockback_Front.Knockback_Front",
+        "/Game/ParagonShinbi/Characters/Heroes/Shinbi/Animations/Knockback_Rear.Knockback_Rear"
+      ]
+    },
+    "howitzer": {
+      "idle": "/Game/ParagonHowitzer/Characters/Heroes/Howitzer/Animations/Idle.Idle",
+      "run": "/Game/ParagonHowitzer/Characters/Heroes/Howitzer/Animations/Sprint_Fwd.Sprint_Fwd",
+      "cast": "/Game/ParagonHowitzer/Characters/Heroes/Howitzer/Animations/Cast.Cast",
+      "rise": "/Game/ParagonHowitzer/Characters/Heroes/Howitzer/Animations/Respawn.Respawn",
+      "victory": [
+        "/Game/ParagonHowitzer/Characters/Heroes/Howitzer/Animations/Emote_ShakeFist_MC_T3.Emote_ShakeFist_MC_T3",
+        "/Game/ParagonHowitzer/Characters/Heroes/Howitzer/Animations/Emote_BootyShake_T3.Emote_BootyShake_T3"
+      ],
+      "motions": {
+        "heal": {
+          "release": [
+            "/Game/ParagonHowitzer/Characters/Heroes/Howitzer/Animations/Cast.Cast"
+          ]
+        },
+        "shoot": {
+          "release": [
+            "/Game/ParagonHowitzer/Characters/Heroes/Howitzer/Animations/Missile_Swarm_Fire.Missile_Swarm_Fire"
+          ]
+        },
+        "melee": {
+          "release": [
+            "/Game/ParagonHowitzer/Characters/Heroes/Howitzer/Animations/Missile_Swarm_Fire.Missile_Swarm_Fire"
+          ]
+        },
+        "bolt": {
+          "release": [
+            "/Game/ParagonHowitzer/Characters/Heroes/Howitzer/Animations/LRM_Fire_V2.LRM_Fire_V2"
+          ]
+        },
+        "area": {
+          "intro": "/Game/ParagonHowitzer/Characters/Heroes/Howitzer/Animations/Missile_Swarm_Start.Missile_Swarm_Start",
+          "windup": "/Game/ParagonHowitzer/Characters/Heroes/Howitzer/Animations/Missile_Swarm_Aim.Missile_Swarm_Aim",
+          "castRelease": "/Game/ParagonHowitzer/Characters/Heroes/Howitzer/Animations/Missile_Swarm_Fire.Missile_Swarm_Fire",
+          "release": [
+            "/Game/ParagonHowitzer/Characters/Heroes/Howitzer/Animations/Missile_Swarm_Fire.Missile_Swarm_Fire"
+          ]
+        },
+        "heavy": {
+          "intro": "/Game/ParagonHowitzer/Characters/Heroes/Howitzer/Animations/LRM_Ready_V2.LRM_Ready_V2",
+          "windup": "/Game/ParagonHowitzer/Characters/Heroes/Howitzer/Animations/LRM_Ready_Loop.LRM_Ready_Loop",
+          "castRelease": "/Game/ParagonHowitzer/Characters/Heroes/Howitzer/Animations/LRM_Fire_V2.LRM_Fire_V2",
+          "release": [
+            "/Game/ParagonHowitzer/Characters/Heroes/Howitzer/Animations/LRM_Fire_V2.LRM_Fire_V2"
+          ]
+        },
+        "buff": {
+          "release": [
+            "/Game/ParagonHowitzer/Characters/Heroes/Howitzer/Animations/Cast.Cast"
+          ]
+        }
+      },
+      "walkSpeed": 360,
+      "runSpeed": 600,
+      "walk": "/Game/ParagonHowitzer/Characters/Heroes/Howitzer/Animations/Run_Fwd.Run_Fwd",
+      "stunned": "/Game/ParagonHowitzer/Characters/Heroes/Howitzer/Animations/Stun.Stun",
+      "death": [
+        "/Game/ParagonHowitzer/Characters/Heroes/Howitzer/Animations/Death.Death"
+      ],
+      "hit": [
+        "/Game/ParagonHowitzer/Characters/Heroes/Howitzer/Animations/KnockBack_Bwd.KnockBack_Bwd",
+        "/Game/ParagonHowitzer/Characters/Heroes/Howitzer/Animations/Knock_Back.Knock_Back"
+      ]
     }
   },
   "heroPlan": {
@@ -1377,5 +1725,10 @@
     "archer": "sparrow",
     "black_mage": "gideon",
     "white_mage": "muriel"
+  },
+  "bodyScale": {
+    "sevarog": 0.7,
+    "grim": 0.7,
+    "howitzer": 0.8
   }
 }

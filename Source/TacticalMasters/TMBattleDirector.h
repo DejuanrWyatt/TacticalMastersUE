@@ -752,6 +752,8 @@ private:
 		const FTMAnimSet* Animations = nullptr;
 		/** The animation set's name; a skin is a body named "<set>_<skin>". */
 		FString SetName;
+		/** How big it is drawn: a hero built as a giant is brought nearer everyone else's size. */
+		float Scale = 1.0f;
 	};
 	/** The body's mesh, loaded now if it has not been yet. */
 	USkeletalMesh* MeshOf(const FTMBody& Body);
@@ -776,6 +778,11 @@ private:
 		float QueuedYaw = 0.0f;
 		/** Knocked out and lying down. */
 		bool bDown = false;
+		/**
+		 * How far over it has tipped, 0 to 1, when its body has no clip for a
+		 * fall (Muriel flies, and never needed one): it topples instead.
+		 */
+		float Tipped = 0.0f;
 		/** Its ability was charged before it went off, so the charged release plays. */
 		bool bWasCasting = false;
 		/** The release it last began, or will begin when its walk ends. */

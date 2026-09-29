@@ -200,6 +200,9 @@ bool ATMBattleDirector::LoadCharacterMap()
 		}
 	}
 
+	// "bodyScale": a size by body, or by animation set so a hero's skins share it.
+	const TSharedPtr<FJsonObject>* Scales = nullptr;
+	Root->TryGetObjectField(TEXT("bodyScale"), Scales);
 	const TSharedPtr<FJsonObject>* BodyList = nullptr;
 	if (Root->TryGetObjectField(TEXT("bodies"), BodyList))
 	{
@@ -217,6 +220,11 @@ bool ATMBattleDirector::LoadCharacterMap()
 			Out.Yaw = static_cast<float>(Yaw);
 			Body->TryGetStringField(TEXT("animations"), Out.SetName);
 			Out.Animations = AnimSets.Find(Out.SetName);
+			double Scale = 1.0;
+			if (Scales && ((*Scales)->TryGetNumberField(Entry.Key, Scale) || (*Scales)->TryGetNumberField(Out.SetName, Scale)) && Scale > 0.0)
+			{
+				Out.Scale = static_cast<float>(Scale);
+			}
 			// Only a body whose mesh is in the project counts; it is loaded
 			// when a unit first wears it.
 			if (!Out.MeshPath.IsEmpty() && FPackageName::DoesPackageExist(FSoftObjectPath(Out.MeshPath).GetLongPackageName()))
@@ -687,6 +695,12 @@ void ATMBattleDirector::AdvanceMotion(float DeltaSeconds)
 				Motion.JoltAge = -1.0f;
 			}
 		}
+		// Down with no fall to play: tip over backwards and settle, and back up
+		// as it is raised.
+		const bool bNoFall = Motion.bDown && !Motion.DeathClip && !(Set && Set->Death.Num() > 0);
+		Motion.Tipped = FMath::FInterpConstantTo(Motion.Tipped, bNoFall ? 1.0f : 0.0f, DeltaSeconds, 2.5f);
+		const float Tip = FMath::InterpEaseIn(0.0f, 1.0f, Motion.Tipped, 2.0f);
+		Offset.Z -= 20.0f * Tip;
 		float Sway = 0.0f;
 		if (Unit.IsAlive() && Unit.HasStatus("fly"))
 		{
@@ -700,7 +714,11 @@ void ATMBattleDirector::AdvanceMotion(float DeltaSeconds)
 		if (UnitVisuals[i])
 		{
 			UnitVisuals[i]->SetRelativeLocation(Motion.Shown + Offset);
-			UnitVisuals[i]->SetRelativeRotation(FRotator(0.0f, Motion.Yaw + Sway + (Motion.Body ? Motion.Body->Yaw : 180.0f), 0.0f));
+			const FQuat Standing = FRotator(0.0f, Motion.Yaw + Sway + (Motion.Body ? Motion.Body->Yaw : 180.0f), 0.0f).Quaternion();
+			// The tip leans it away from the way it faces: over onto its back.
+			const FVector Facing = FRotator(0.0f, Motion.Yaw, 0.0f).Vector();
+			const FQuat Over(FVector::CrossProduct(FVector::UpVector, Facing).GetSafeNormal(), -FMath::DegreesToRadians(85.0f * Tip));
+			UnitVisuals[i]->SetRelativeRotation(Over * Standing);
 		}
 		if (Plates.IsValidIndex(i) && Plates[i])
 		{

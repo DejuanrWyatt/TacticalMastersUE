@@ -422,6 +422,7 @@ void ATMBattleDirector::BuildBattle()
 		if (Body && MeshOf(*Body))
 		{
 			Visual->SetSkeletalMeshAsset(Body->Mesh);
+			Visual->SetRelativeScale3D(FVector(Body->Scale));
 		}
 		else if (Mesh)
 		{

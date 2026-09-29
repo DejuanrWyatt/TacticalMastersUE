@@ -166,7 +166,7 @@ void ATMAnimStudio::Begin(const ATMBattleDirector* InDirector)
 		}
 		for (UAnimSequence* Clip : Clips)
 		{
-			Jobs.Add({ Name, Body.Mesh, Body.Yaw, Clip });
+			Jobs.Add({ Name, Body.Mesh, Body.Yaw, Clip, Body.Scale });
 		}
 	}
 	bDone = false;
@@ -238,6 +238,7 @@ void ATMAnimStudio::Tick(float DeltaSeconds)
 		{
 			Actor->SetSkeletalMeshAsset(Job.Mesh);
 			Actor->SetWorldRotation(FRotator(0.0f, Job.Yaw, 0.0f));
+			Actor->SetWorldScale3D(FVector(Job.Scale));
 #if WITH_EDITOR
 			// A mesh's materials may still be compiling; filmed now, it would be
 			// the grey checkerboard.
