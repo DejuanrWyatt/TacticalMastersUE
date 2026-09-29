@@ -196,3 +196,16 @@ Agents write step-by-step instructions instead of attempting these:
 Agents live in `.claude/agents/`. The main session orchestrates with `/plan-milestone`, `/port <slice>`,
 `/feature <id>` and `/playtest` (see `.claude/commands/`). Subagents cannot call each other, so every
 hand-off goes through the main session.
+## Working alongside other sessions
+Several Claude sessions may work in this folder at once, and they often can't message each other.
+**`Docs/worklog.md` is how they stay aware of each other.** Every session:
+1. **Before starting**, reads `Docs/worklog.md`, `git status` and `git log -10`, and doesn't touch files
+   another session has claimed there. A change in the tree nobody claimed is still someone's: ask the
+   human rather than revert, reformat or commit it.
+2. **On starting**, adds its own block under *Active*: what it is doing and the files it is changing.
+3. **As it goes**, keeps that block current, and commits only its own files (`git add <paths>`, never
+   `git add -A`).
+4. **On committing or stopping**, adds a dated line under *Log* (with the commit) and removes its block.
+Before a build others will use (packaging, online tests), check the log for half-done work in the tree.
+If another session is reachable (`ListAgents`), tell it directly as well.
+
