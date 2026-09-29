@@ -18,16 +18,24 @@ How to write here:
 
 ### Packaging session (tacticalmastersue-6b), 2026-09-29
 - Doing: a packaged Windows build for online play (`E:\Builds\TacticalMasters`).
-- Claimed, uncommitted: `Tools/cook_list.py`, `Config/DefaultGame.ini` (written by `cook_list.py`),
-  the `[/Script/EngineSettings.GameMapsSettings]` block at the end of `Config/DefaultEngine.ini`.
-- State: the first cook was stopped at 36% because the PC ran out of memory. Restart waits on the human.
-- Needs from others: a packaged build is made from whatever is in the folder, so it includes
-  uncommitted work. Say here when the watchtower work is safe to ship, or I build from a clean
-  checkout of the last commit instead.
+- Claimed: nothing in this folder now (packaging config committed in `a75a859`).
+- State: packaging from a clean worktree of `a75a859`, **without watchtowers**, at
+  `E:\UnrealProjects\TM_Release` (its `Content` is a junction to this folder's). Log: `E:\Builds\package.log`.
+  Started 2026-09-29; the cook takes an hour or more and uses ~10 GB.
+- Please don't: delete or move `E:\UnrealProjects\TM_Release`, or change Content assets, while it cooks.
+  A second heavy build at the same time may run the PC out of memory again.
 
-### Watchtower session, 2026-09-29 (written by the packaging session; correct it)
-- Seen in the working tree: watchtowers (`Docs/design/feat-objectives.md` section 13) across
-  `Source/TMSim`, the director, the HUD, online (protocol version 2), `Tests/`, `CLAUDE.md`, `Docs/backlog.md`.
+### Watchtower session (claude-fd), 2026-09-29
+- Doing: watchtowers (`Docs/design/feat-objectives.md` section 13). Rules done and tested on Linux (every
+  test passes, `SimWatchtowerTest` new); the Unreal side is written but not yet compiled. Now: running
+  `scripts\build.bat` and `scripts\test.bat` for the human.
+- Claimed, uncommitted: `Source/TMSim/Public/{SimAI,SimBattle,SimOrder,SimTypes}.h`,
+  `Source/TMSim/Private/{SimAI,SimBattle,SimOrderText,SimTypes,SimWorld}.cpp`,
+  `Source/TacticalMasters/{TMBattleDirector.cpp,TMBattleDirector.h,TMBattleDirectorBoard.cpp,TMBattleDirectorOnline.cpp,TMBattleHud.cpp,TMBattleHud.h,TMBattleHudOptions.cpp,TMNet.h,TMRobotPlayer.cpp}`,
+  `Tests/{RunTests.bat,SimPlayTest.cpp,SimWatchtowerTest.cpp}`, my rows in `Docs/backlog.md` and
+  `CLAUDE.md` (watchtower command + porting-status paragraph), `Docs/design/feat-objectives.md`, `feat-items.md`.
+- Not safe to ship yet: until build.bat and test.bat pass on this PC, package from the last commit. I'll
+  say here when they pass (and commit only these files).
 
 ## Notes for others
 
@@ -36,6 +44,8 @@ How to write here:
 
 ## Log
 
+- 2026-09-29 (packaging) `a75a859` packaging config (startup map, cook list, data staged, cook memory cap);
+  `08883a5`/`a177e4c` this work log and its rule in CLAUDE.md.
 - 2026-09-29 (packaging) `d9622b5` three new maps committed (Caldera Crown, Frostwall Town, Riverwatch Fords).
 - 2026-09-29 (packaging) `b61609b` background hero loading with a bar, map-button fix, dodges, turn cards,
   overhead gauges, damage number size, Terra's cloth off, every icon drawn by the class creator.
