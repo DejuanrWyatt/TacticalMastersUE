@@ -19,6 +19,18 @@ Run it without opening the editor (Tools\\AddHero.bat wraps this):
     look ...       the looks that should wear it (knight, squire, monk, archer,
                    black_mage, white_mage)
     --write        write the map; without it, only says what it would write
+    --replace      write a new animation set even if the body has one (a set
+                   already in the map is kept otherwise: it may have been
+                   corrected by hand after watching the film)
+
+Or bring in every Paragon hero in the project at once, each named after
+itself (Greystone -> greystone, TheFey -> fey):
+
+    -script="Tools/add_hero.py --all [--write]"
+
+Every skin the hero ships (Skins/<skin>/Meshes) becomes a body of its own,
+"<body>_<skin>", on the hero's clips. Then Tools/assign_bodies.py hands the
+classes their heroes and skins from the plan in the map.
 
 Then film it (Tools\\AnimCatalog.bat) and watch the strips in the class
 creator: a guess by name can be wrong, and the map is plain JSON to correct.
@@ -72,7 +84,51 @@ def pick_mesh(meshes, hero):
     def score(a):
         name = str(a.asset_name).lower()
         return (name != hero.lower(), "skin" in name or "_" in name, len(name))
+    meshes = [a for a in meshes if "/Skins/" not in str(a.package_name)] or meshes
     return object_path(sorted(meshes, key=score)[0]) if meshes else None
+
+
+def skeleton_of(path):
+    mesh = unreal.load_asset(path)
+    return mesh.get_editor_property("skeleton") if mesh else None
+
+
+def find_skins(meshes, main_mesh):
+    """Each skin's mesh, by skin name -- only those on the hero's own skeleton,
+    since only they can play its clips."""
+    skeleton = skeleton_of(main_mesh)
+    by_skin = {}
+    for a in meshes:
+        parts = str(a.package_name).split("/")
+        if "Skins" not in parts or parts.index("Skins") + 1 >= len(parts):
+            continue
+        by_skin.setdefault(parts[parts.index("Skins") + 1], []).append(a)
+    skins = {}
+    for skin, found in sorted(by_skin.items()):
+        path = object_path(sorted(found, key=lambda a: len(str(a.asset_name)))[0])
+        if skeleton is not None and skeleton_of(path) == skeleton:
+            skins[skin] = path
+        else:
+            say("  skin %s left out: not on the hero's skeleton" % skin)
+    return skins
+
+
+def body_name(hero):
+    name = hero.lower()
+    return name[3:] if name.startswith("the") and len(name) > 3 else name
+
+
+def installed_heroes():
+    """Every Paragon hero folder in the project: /Game/Paragon*/Characters/Heroes/<Hero>."""
+    registry = unreal.AssetRegistryHelpers.get_asset_registry()
+    registry.scan_paths_synchronous(["/Game"], True)
+    heroes = []
+    for pack in sorted(registry.get_sub_paths("/Game", False)):
+        if not str(pack).split("/")[-1].startswith("Paragon"):
+            continue
+        for folder in sorted(registry.get_sub_paths(str(pack) + "/Characters/Heroes", False)):
+            heroes.append(str(folder))
+    return heroes
 
 
 def first(clips, *patterns):
@@ -108,7 +164,12 @@ def build_set(clips):
     put("deathLeft", first(clips, r"Death_Right"))
     put("deathRight", first(clips, r"Death_Left"))
     put("stunned", first(clips, r"Stunned_Loop", r"Stun.*Loop"))
-    put("victory", every(clips, r"Emote_.*", 3) or None)
+    put("hitFront", first(clips, r"HitReact_Front", r"Hit_Front.*"))
+    put("hitBack", first(clips, r"HitReact_Back", r"Hit_Back.*"))
+    put("hitLeft", first(clips, r"HitReact_Left", r"Hit_Left.*"))
+    put("hitRight", first(clips, r"HitReact_Right", r"Hit_Right.*"))
+    # An emote's own clip, not the intro, loop and outro it is sometimes cut into.
+    put("victory", every(clips, r"Emote_(?!.*_(Intro|Loop|Outro)$).*", 3) or None)
 
     motions = {}
 
@@ -143,37 +204,96 @@ def build_set(clips):
     return s
 
 
-def main(args):
-    write = "--write" in args
-    args = [a for a in args if a != "--write"]
-    if len(args) < 2:
-        say("usage: add_hero.py <hero folder> <body name> [look ...] [--write]")
-        return 1
-    folder, body, looks = args[0].rstrip("/"), args[1], args[2:]
+HERO_CLIPS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "hero_clips.json")
+
+
+def corrected(anim_set, body, clips):
+    """The guesses with Tools/hero_clips.json's choices for this hero laid over them."""
+    try:
+        with open(HERO_CLIPS, encoding="utf-8") as f:
+            fixes = json.load(f).get(body, {})
+    except (OSError, ValueError):
+        fixes = {}
+    by_name = {name.lower(): path for name, path in clips.items()}
+
+    def path_of(value):
+        if isinstance(value, list):
+            return [p for p in (path_of(v) for v in value) if p]
+        found = by_name.get(str(value).lower())
+        if not found:
+            say("  hero_clips.json names %s for %s, which is not one of its clips that can play alone" % (value, body))
+        return found
+
+    for role, value in fixes.items():
+        if role == "motions":
+            motions = anim_set.setdefault("motions", {})
+            for motion, parts in value.items():
+                motions[motion] = {part: path_of(v) for part, v in parts.items()}
+        else:
+            anim_set[role] = path_of(value)
+    if fixes:
+        say("  %d roles set from hero_clips.json" % len(fixes))
+    return anim_set
+
+
+def add_one(the_map, folder, body, looks, replace):
     hero = folder.split("/")[-1]
     meshes, clips, skipped = find(folder)
     mesh = pick_mesh(meshes, hero)
     if not mesh:
         say("no skeletal mesh under " + folder + ": is the hero installed from Fab?")
-        return 1
-    anim_set = build_set(clips)
+        return False
     say("%s: mesh %s, %d clips that can play alone, %d additive left out" % (hero, mesh, len(clips), len(skipped)))
-    # A line a role, since the log keeps only the first line of a message.
-    for role, clips_for in anim_set.items():
-        say("  %s: %s" % (role, json.dumps(clips_for)))
+    sets = the_map.setdefault("animations", {})
+    if body in sets and not replace:
+        say("  keeping the animation set already in the map for %s (--replace writes a new one)" % body)
+    else:
+        anim_set = corrected(build_set(clips), body, clips)
+        # A line a role, since the log keeps only the first line of a message.
+        for role, clips_for in anim_set.items():
+            say("  %s: %s" % (role, json.dumps(clips_for)))
+        sets[body] = anim_set
+    # Paragon meshes face along +Y, a quarter turn from the board's +X.
+    bodies = the_map.setdefault("bodies", {})
+    bodies[body] = {"mesh": mesh, "yaw": -90, "animations": body}
+    for skin, path in find_skins(meshes, mesh).items():
+        bodies[body + "_" + skin.lower()] = {"mesh": path, "yaw": -90, "animations": body}
+        say("  skin %s: %s" % (skin, path))
+    for look in looks:
+        the_map.setdefault("looks", {})[look] = body
+    return True
+
+
+def main(args):
+    write = "--write" in args
+    replace = "--replace" in args
+    every_hero = "--all" in args
+    args = [a for a in args if a not in ("--write", "--replace", "--all")]
+    if not every_hero and len(args) < 2:
+        say("usage: add_hero.py <hero folder> <body name> [look ...] [--write] [--replace], or add_hero.py --all [--write]")
+        return 1
 
     with open(MAP_FILE, encoding="utf-8") as f:
         the_map = json.load(f)
-    the_map.setdefault("animations", {})[body] = anim_set
-    # Paragon meshes face along +Y, a quarter turn from the board's +X.
-    the_map.setdefault("bodies", {})[body] = {"mesh": mesh, "yaw": -90, "animations": body}
-    for look in looks:
-        the_map.setdefault("looks", {})[look] = body
+    if every_hero:
+        folders = installed_heroes()
+        say("%d Paragon heroes in the project: %s" % (len(folders), ", ".join(f.split("/")[-1] for f in folders)))
+        for folder in folders:
+            add_one(the_map, folder, body_name(folder.split("/")[-1]), [], replace)
+    elif not add_one(the_map, args[0].rstrip("/"), args[1], args[2:], replace):
+        return 1
+
+    # The classes' bodies, from the plan in the map, now that there are more to choose from.
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    import assign_bodies
+    for line in assign_bodies.assign(the_map):
+        say(line)
+
     if write:
         with open(MAP_FILE, "w", encoding="utf-8") as f:
             json.dump(the_map, f, indent=2)
             f.write("\n")
-        say("written to " + MAP_FILE + (" for " + ", ".join(looks) if looks else ""))
+        say("written to " + MAP_FILE)
     else:
         say("not written: add --write to write it")
     return 0

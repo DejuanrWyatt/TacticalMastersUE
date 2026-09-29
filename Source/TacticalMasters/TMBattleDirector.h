@@ -741,10 +741,20 @@ private:
 	/** A body: a mesh, which way it faces, and the set it animates with. */
 	struct FTMBody
 	{
-		USkeletalMesh* Mesh = nullptr;
+		/**
+		 * Loaded the first time a unit wears it (MeshOf), not when the map is
+		 * read: with every hero's skins in the map, most bodies go unworn in
+		 * any one battle, and a hero's mesh brings its textures with it.
+		 */
+		mutable USkeletalMesh* Mesh = nullptr;
+		FString MeshPath;
 		float Yaw = 0.0f;
 		const FTMAnimSet* Animations = nullptr;
+		/** The animation set's name; a skin is a body named "<set>_<skin>". */
+		FString SetName;
 	};
+	/** The body's mesh, loaded now if it has not been yet. */
+	USkeletalMesh* MeshOf(const FTMBody& Body);
 
 	/** What one unit is doing on screen. */
 	struct FTMMotion

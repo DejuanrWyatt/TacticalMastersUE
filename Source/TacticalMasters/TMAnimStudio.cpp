@@ -137,7 +137,9 @@ void ATMAnimStudio::Begin(const ATMBattleDirector* InDirector)
 	{
 		const ATMBattleDirector::FTMBody& Body = Director->Bodies[Name];
 		const ATMBattleDirector::FTMAnimSet* Set = Body.Animations;
-		if (!Set)
+		// A hero's skins play the hero's own clips: filming the hero once is enough.
+		// (Loading a mesh only fills the director's cache, hence the const_cast.)
+		if (!Set || Name.StartsWith(Body.SetName + TEXT("_")) || !const_cast<ATMBattleDirector*>(&*Director)->MeshOf(Body))
 		{
 			continue;
 		}

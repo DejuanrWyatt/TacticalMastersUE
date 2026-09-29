@@ -419,7 +419,7 @@ void ATMBattleDirector::BuildBattle()
 		Visual->SetupAttachment(RootComponent);
 		Visual->RegisterComponent();
 		const FTMBody* Body = BodyFor(Battle.Units[i]);
-		if (Body && Body->Mesh)
+		if (Body && MeshOf(*Body))
 		{
 			Visual->SetSkeletalMeshAsset(Body->Mesh);
 		}

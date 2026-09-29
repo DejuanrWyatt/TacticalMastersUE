@@ -1,0 +1,22 @@
+{
+  "about": "Corrections to Tools/add_hero.py's guesses, by hero body name. Paragon names most clips after the hero's own abilities (Gideon's Cosmic_Rift, Burden...), which no guess by name can place, so each hero's are chosen here from its Animations folder and checked on film (Tools\\AnimCatalog.bat). Clip names are the asset names in the hero's folder. A role given here replaces the guess; a motion given here replaces that motion only.",
+  "gideon": {
+    "idle": "Idle",
+    "run": "Run_Fwd",
+    "cast": "Cast",
+    "hitFront": "HitReact_Front",
+    "hitBack": "HitReact_Back",
+    "hitLeft": "HitReact_Left",
+    "hitRight": "HitReact_Right",
+    "victory": ["Emote_Bravo", "Emote_Taunt_PraiseMe_T1", "Emote_Master_Levitate_T3"],
+    "motions": {
+      "bolt": { "release": ["Primary_Attack_A_Medium", "Primary_Attack_B_Medium", "Primary_Attack_C_Medium"] },
+      "melee": { "release": ["Primary_Attack_A_Medium", "Primary_Attack_B_Medium", "Primary_Attack_C_Medium"] },
+      "area": { "intro": "Cosmic_Rift_Intro", "windup": "Cosmic_Rift_Targeting", "castRelease": "CosmicRift_Execute", "release": ["CosmicRift"] },
+      "heavy": { "release": ["portal_blast_medium"] },
+      "channel": { "intro": "Blackhole_Start", "release": ["BlackHole_Loop"] },
+      "heal": { "release": ["Cast"] },
+      "buff": { "release": ["Cast"] }
+    }
+  }
+}

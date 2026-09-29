@@ -21,6 +21,7 @@
 #include "Dom/JsonObject.h"
 #include "Engine/SkeletalMesh.h"
 #include "Misc/FileHelper.h"
+#include "Misc/PackageName.h"
 #include "Misc/Paths.h"
 #include "Serialization/JsonReader.h"
 #include "Serialization/JsonSerializer.h"
@@ -210,18 +211,21 @@ bool ATMBattleDirector::LoadCharacterMap()
 				continue;
 			}
 			FTMBody Out;
-			FString Mesh;
-			Body->TryGetStringField(TEXT("mesh"), Mesh);
-			Out.Mesh = LoadNamed<USkeletalMesh>(Mesh, CharacterAssets);
+			Body->TryGetStringField(TEXT("mesh"), Out.MeshPath);
 			double Yaw = 0.0;
 			Body->TryGetNumberField(TEXT("yaw"), Yaw);
 			Out.Yaw = static_cast<float>(Yaw);
-			FString Set;
-			Body->TryGetStringField(TEXT("animations"), Set);
-			Out.Animations = AnimSets.Find(Set);
-			if (Out.Mesh)
+			Body->TryGetStringField(TEXT("animations"), Out.SetName);
+			Out.Animations = AnimSets.Find(Out.SetName);
+			// Only a body whose mesh is in the project counts; it is loaded
+			// when a unit first wears it.
+			if (!Out.MeshPath.IsEmpty() && FPackageName::DoesPackageExist(FSoftObjectPath(Out.MeshPath).GetLongPackageName()))
 			{
 				Bodies.Add(Entry.Key, Out);
+			}
+			else
+			{
+				UE_LOG(LogTemp, Warning, TEXT("character map: body %s has no mesh at %s"), *Entry.Key, *Out.MeshPath);
 			}
 		}
 	}
@@ -241,6 +245,15 @@ bool ATMBattleDirector::LoadCharacterMap()
 	Root->TryGetStringField(TEXT("default"), DefaultBody);
 	UE_LOG(LogTemp, Log, TEXT("character map: %d bodies, %d animation sets"), Bodies.Num(), AnimSets.Num());
 	return Bodies.Num() > 0;
+}
+
+USkeletalMesh* ATMBattleDirector::MeshOf(const FTMBody& Body)
+{
+	if (!Body.Mesh)
+	{
+		Body.Mesh = LoadNamed<USkeletalMesh>(Body.MeshPath, CharacterAssets);
+	}
+	return Body.Mesh;
 }
 
 const ATMBattleDirector::FTMBody* ATMBattleDirector::BodyFor(const TMSim::FUnit& Unit) const
