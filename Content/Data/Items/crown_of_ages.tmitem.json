@@ -1,0 +1,15 @@
+{
+  "format": "tactical-masters-item",
+  "version": 1,
+  "id": "crown_of_ages",
+  "name": "Crown of Ages",
+  "desc": "Time bends for its wearer: the gauge fills 20% faster.",
+  "icon": "crown",
+  "tier": "epic",
+  "stats": {
+    "patience": 3
+  },
+  "bonus": {
+    "tg_percent": 20
+  }
+}

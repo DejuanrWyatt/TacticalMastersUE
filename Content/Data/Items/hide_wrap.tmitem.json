@@ -1,0 +1,13 @@
+{
+  "format": "tactical-masters-item",
+  "version": 1,
+  "id": "hide_wrap",
+  "name": "Hide Wrap",
+  "desc": "Tough hide: a little more health and armour.",
+  "icon": "hide",
+  "tier": "common",
+  "stats": {
+    "hp": 10,
+    "attdef": 1
+  }
+}

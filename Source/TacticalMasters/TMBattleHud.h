@@ -26,6 +26,7 @@ class UFont;
 namespace TMSim
 {
 	struct FUnit;
+	struct FItemDef;
 	struct FVec2;
 	struct FAbility;
 }
@@ -117,6 +118,38 @@ enum class ETMHudAction : uint8
 	LayoutResize,
 	LayoutGrid,
 	LayoutGridSize,
+
+	// Watchtowers (not Godot's): the setup screen's count, and spending a turn taking one.
+	SetupTowers,
+	Capture,
+
+	// Neutral camps (Docs/design/feat-neutral-camps.md): the setup screen's camps and boss rows;
+	// TakeOpen opens the picker for the cache in reach; Take's value is the item's place in it;
+	// Drop's the gear slot.
+	SetupCamps,
+	SetupBoss,
+	SetupElements,
+	TakeOpen,
+	Take,
+	Drop,
+
+	// The Unit Guide's list and class page. GuideStep's and GuideScroll's values are -1 or +1
+	// (a class, a page); GuideRole's the role's index (-1 for all); GuideTurn's which way to turn the hero.
+	GuideBack,
+	GuideStep,
+	GuideRole,
+	GuideScroll,
+	GuideTurn,
+
+	// Items (Docs/design/feat-neutral-camps.md). SetupItem's value is team * 12 + slot * 3 + item slot;
+	// ItemChoose's the item's index in TMSim::AllItems() (-1 empties the slot); ItemTier's the tier (-1 all);
+	// GuideTab's 0 for classes, 1 for items, 2-7 the Codex's other pages (TMBattleHudCodex.cpp).
+	SetupItem,
+	SetupItemBudget,
+	ItemChoose,
+	ItemTier,
+	ItemClose,
+	GuideTab,
 };
 
 /** Words shown when the pointer rests on part of the HUD: how a number is worked out. */
@@ -170,6 +203,14 @@ private:
 	void DrawField(ATMBattleDirector& Director);
 	void DrawInspectCard(ATMBattleDirector& Director);
 	void DrawGuide(ATMBattleDirector& Director);
+	/** Every class, a row each, filtered by role and scrolled; a row opens its page. */
+	void DrawGuideList(ATMBattleDirector& Director, float PX, float PY, float PW, float PH);
+	/** One class's page: its hero turning, its stats, and every ability in full. Scrolls. */
+	void DrawGuideDetail(ATMBattleDirector& Director, float PX, float PY, float PW, float PH);
+	/** A thin scroll bar: where the view is in the whole. */
+	void ScrollBar(float X, float Y, float H, float Shown, float Whole, float At);
+	/** Words broken into lines no wider than Width. */
+	TArray<FString> Wrap(const FString& What, UFont* Font, float Scale, float Width);
 	void DrawOptions(ATMBattleDirector& Director);
 	/** Options or Developer Tools, if open, over everything else. */
 	void DrawOverlays(ATMBattleDirector& Director);
@@ -185,6 +226,25 @@ private:
 	/** A slider with its track, fill and knob, answering the pointer over all of it. */
 	void Slider(float X, float Y, float W, float H, int32 Id, double Value, double Low, double High);
 	void DrawClassPicker(ATMBattleDirector& Director);
+	/** Every item that can go in one setup slot, by tier, with its cost and what it does. */
+	void DrawItemPicker(ATMBattleDirector& Director);
+	/** The items panel over the action bar: the cache in reach to take from, and the unit's own to leave. */
+	void DrawTakePicker(ATMBattleDirector& Director);
+	/** The Unit Guide's Items page: every item by tier, scrolled like the class list. */
+	void DrawGuideItems(ATMBattleDirector& Director, float PX, float PY, float PW, float PH, float Top);
+	/** The Codex's other pages (TMBattleHudCodex.cpp): how to play, keywords, statuses, ground, objectives, controls. */
+	void DrawCodexPage(ATMBattleDirector& Director, float PX, float PY, float PW, float PH, float Top);
+	/** An item as its icon (Content/Data/Icons/items), framed in its tier's colour; an empty slot as a dim +. Adds its tooltip. */
+	void ItemBadge(const TMSim::FItemDef* Item, float X, float Y, float Size, bool bTip = true);
+	/** An item's own icon, or none (then its initials are drawn). */
+	class UTexture2D* ItemIcon(const TMSim::FItemDef& Item);
+	/** What a unit carries, as small icons in a row from X: the width used. */
+	float GearRow(const TMSim::FUnit& Unit, float X, float Y, float Size);
+	/** The words in the world -- numbers that fly off a blow, camp names, what lies in a cache -- drawn white-ish with a dark outline. */
+	void DrawWorldWords(ATMBattleDirector& Director);
+	/** What an item does, in one line: "+12 max HP, +10% ability damage". */
+	static FString ItemSummary(const TMSim::FItemDef& Item);
+	static FLinearColor TierColour(int32 Tier);
 	void DrawTooltip();
 	/** A bar while heroes, shaders or graphics pipelines are still loading. */
 	void DrawLoading(ATMBattleDirector& Director);
@@ -203,6 +263,8 @@ private:
 	float StatusChips(const TMSim::FUnit& Unit, float X, float Y, float Size, bool bLeftward, bool bTips);
 	/** An ability's icon tile: coloured when it can be used, grey with the turns left when it cannot. */
 	void AbilityTile(ATMBattleDirector& Director, const TMSim::FUnit& Unit, int32 Slot, float X, float Y, float Size, bool bButton);
+	/** An aura that is on: two lights chasing each other round the tile's edge, in its colour (the human's choice "B", 2026-09-30). */
+	void AuraTrail(float X, float Y, float W, float H, const FLinearColor& Colour);
 	/** A slanted bar, the shape Atlas Reactor's are. */
 	void Slant(float X, float Y, float W, float H, const FLinearColor& Colour, float Skew);
 	/** A small picture of an ability's shape (TMSim::ShapeOf) in a Size-wide badge: a crosshair, a disc, a cone... */
@@ -228,12 +290,16 @@ private:
 	/** A button on a menu: a label, an optional second line, and a highlight under the pointer. */
 	void MenuButton(float X, float Y, float W, float H, const FString& Label, ETMHudAction Action, int32 Value = -1,
 		bool bPrimary = false, const FString& Detail = FString());
+	/** MenuButton, or the same greyed and not pressable when bEnabled is false. */
+	void ChoiceButton(float X, float Y, float W, float H, const FString& Label, ETMHudAction Action, int32 Value, bool bEnabled);
 	/** Where the pointer is, or off the screen. */
 	FVector2D MousePoint() const;
 
 	// Drawing helpers, in pixels already scaled.
 	void Panel(float X, float Y, float W, float H, const FLinearColor& Fill, const FLinearColor& Edge = FLinearColor::Transparent, float Thickness = 1.0f);
 	void Text(const FString& What, float X, float Y, const FLinearColor& Colour, UFont* Font, float Scale = 1.0f, bool bShadow = true);
+	/** Text with a dark outline Edge pixels thick all round, so it reads over anything. */
+	void OutlinedText(const FString& What, float X, float Y, const FLinearColor& Colour, UFont* Font, float Scale, float Edge);
 	FVector2D TextSize(const FString& What, UFont* Font, float Scale = 1.0f);
 	void Gauge(float X, float Y, float W, float H, float Fraction, const FLinearColor& Fill, const FString& Label);
 	void AddButton(float X, float Y, float W, float H, ETMHudAction Action, int32 Value = -1);

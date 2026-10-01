@@ -1,0 +1,12 @@
+{
+  "format": "tactical-masters-item",
+  "version": 1,
+  "id": "thornmail",
+  "name": "Thornmail",
+  "desc": "Melee attackers take 6 damage back.",
+  "icon": "thorns",
+  "tier": "uncommon",
+  "effects": {
+    "thorns": 6
+  }
+}

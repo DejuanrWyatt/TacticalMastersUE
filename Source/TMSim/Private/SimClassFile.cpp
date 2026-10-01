@@ -28,9 +28,15 @@ namespace TMSim
 		const int StatLow[StatCount] = { 10, 0, 0, 0, 0, 0, 1, 1, 0, 3 };
 		const int StatHigh[StatCount] = { 300, 30, 30, 60, 60, 60, 20, 15, 15, 25 };
 
-		const char* const ClassKeys[] = { "format", "version", "id", "name", "color", "look", "icon", "roles", "stats", "abilities", "creator" };
+		const char* const ClassKeys[] = { "format", "version", "id", "name", "color", "look", "icon", "roles", "stats", "abilities", "creator", "monster" };
 		const char* const AbilityKeys[] = { "id", "name", "desc", "kind", "effect", "scale", "target", "shape", "power", "min_range",
-			"max_range", "aoe", "angle", "channel", "cooldown", "cast", "tg", "status", "buffs", "fx", "vfx", "anim" };
+			"max_range", "aoe", "angle", "channel", "cooldown", "cast", "tg", "status", "buffs", "fx", "vfx", "anim", "special", "element" };
+		const char* const Specials[] = { "blink", "swap", "tame", "summon", "rewind" };
+		const char* const Elements[] = { "fire", "ice", "lightning", "water", "none" };
+		const char* const MonsterKeys[] = { "tier", "temperament", "traits", "ring", "leash", "phases" };
+		const char* const Tiers[] = { "easy", "medium", "hard", "epic" };
+		const char* const Temperaments[] = { "docile", "skittish", "provoked", "territorial", "aggressive", "guard_place", "guard_unit", "patrol" };
+		const char* const TraitNames[] = { "ambush", "pack_hunter", "scavenger", "lookout", "unstoppable", "stagger", "enrage" };
 		const char* const VfxKeys[] = { "system", "at", "scale" };
 		const char* const VfxPlaces[] = { "user", "point", "targets" };
 		const char* const Looks[] = { "squire", "knight", "archer", "monk", "black_mage", "white_mage" };
@@ -161,6 +167,16 @@ namespace TMSim
 			Out.Name = StringOf(Json, "name", Where, Problems, true);
 			Out.Desc = StringOf(Json, "desc", Where, Problems, false);
 			Out.Fx = StringOf(Json, "fx", Where, Problems, false);
+			Out.Special = StringOf(Json, "special", Where, Problems, false);
+			if (!Out.Special.empty() && !OneOf(Out.Special, Specials))
+			{
+				Problems.Say(Where, "unknown special \"" + Out.Special + "\"");
+			}
+			Out.Element = StringOf(Json, "element", Where, Problems, false);
+			if (!Out.Element.empty() && !OneOf(Out.Element, Elements))
+			{
+				Problems.Say(Where, "unknown element \"" + Out.Element + "\"");
+			}
 			Out.Anim = StringOf(Json, "anim", Where, Problems, false);
 			if (!Out.Anim.empty() && std::find(AnimMotions().begin(), AnimMotions().end(), Out.Anim) == AnimMotions().end())
 			{
@@ -319,6 +335,149 @@ namespace TMSim
 		}
 	}
 
+	std::string ReadAbilityObject(const FJson& Json, const std::string& Where, FAbility& Out)
+	{
+		FProblems Problems;
+		ReadAbility(Json, 0, Out, Problems);
+		std::string Text = Problems.Text;
+		// Said as "abilities[0]" by the reader; the caller names where it really is.
+		for (size_t At = Text.find("abilities[0]"); At != std::string::npos; At = Text.find("abilities[0]", At + Where.size()))
+		{
+			Text.replace(At, 12, Where);
+		}
+		if (!Text.empty())
+		{
+			Text.pop_back();
+		}
+		return Text;
+	}
+
+	namespace
+	{
+		/** A class file's "monster": what makes it a neutral monster, and a boss's later phases. */
+		void ReadMonster(const FJson& Json, FJobDef& OutJob, std::vector<FAbility>& OutAbilities, FProblems& Problems)
+		{
+			FMonsterInfo& Info = OutJob.Monster;
+			Info.bMonster = true;
+			if (!Json.IsObject())
+			{
+				Problems.Say("monster", "should be an object");
+				return;
+			}
+			for (const std::pair<std::string, FJson>& Member : Json.Object)
+			{
+				if (!OneOf(Member.first, MonsterKeys))
+				{
+					Problems.Say("monster", "unknown key \"" + Member.first + "\"");
+				}
+			}
+			const std::string Tier = StringOf(Json, "tier", "monster", Problems, true);
+			Info.Tier = -1;
+			for (int i = 0; i < 4; ++i)
+			{
+				Info.Tier = Tier == Tiers[i] ? i : Info.Tier;
+			}
+			if (Info.Tier < 0)
+			{
+				Problems.Say("monster", "\"tier\" should be easy, medium, hard or epic");
+				Info.Tier = 0;
+			}
+			const std::string Temperament = StringOf(Json, "temperament", "monster", Problems, true);
+			bool bKnown = false;
+			for (int i = 0; i < 8; ++i)
+			{
+				if (Temperament == Temperaments[i])
+				{
+					Info.Temperament = static_cast<ETemperament>(i);
+					bKnown = true;
+				}
+			}
+			if (!bKnown)
+			{
+				Problems.Say("monster", "\"temperament\" should be one of docile, skittish, provoked, territorial, aggressive, guard_place, guard_unit, patrol");
+			}
+			if (const FJson* Traits = Json.Find("traits"))
+			{
+				if (!Traits->IsArray())
+				{
+					Problems.Say("monster", "\"traits\" should be a list");
+				}
+				for (const FJson& Trait : Traits->Array)
+				{
+					bool bFound = false;
+					for (int i = 0; i < 7; ++i)
+					{
+						if (Trait.IsString() && Trait.String == TraitNames[i])
+						{
+							Info.Traits |= 1u << i;
+							bFound = true;
+						}
+					}
+					if (!bFound)
+					{
+						Problems.Say("monster", "unknown trait (ambush, pack_hunter, scavenger, lookout, unstoppable, stagger, enrage)");
+					}
+				}
+			}
+			auto Metres = [&](const char* Key, float& Into)
+			{
+				if (const FJson* Value = Json.Find(Key))
+				{
+					if (!Value->IsNumber() || Value->Number < 1.0 || Value->Number > 20.0)
+					{
+						Problems.Say("monster", std::string("\"") + Key + "\" should be 1 to 20 metres");
+						return;
+					}
+					Into = static_cast<float>(Value->Number);
+				}
+			};
+			Metres("ring", Info.Ring);
+			Metres("leash", Info.Leash);
+			if (const FJson* Phases = Json.Find("phases"))
+			{
+				if (!Phases->IsArray() || Phases->Array.size() > 3)
+				{
+					Problems.Say("monster", "\"phases\" should be a list of at most 3");
+					return;
+				}
+				int Last = 100;
+				for (size_t p = 0; p < Phases->Array.size(); ++p)
+				{
+					const FJson& Phase = Phases->Array[p];
+					const std::string Where = "monster.phases[" + std::to_string(p) + "]";
+					const FJson* Below = Phase.IsObject() ? Phase.Find("below") : nullptr;
+					const FJson* List = Phase.IsObject() ? Phase.Find("abilities") : nullptr;
+					if (!Below || !Below->IsNumber() || !IsWhole(Below->Number) || Below->Number < 1 || Below->Number >= Last)
+					{
+						Problems.Say(Where, "\"below\" should be a whole percent under the last phase's");
+						continue;
+					}
+					if (!List || !List->IsArray() || List->Array.size() != 4)
+					{
+						Problems.Say(Where, "\"abilities\": exactly four");
+						continue;
+					}
+					FMonsterPhase Next;
+					Next.BelowPercent = static_cast<int>(Below->Number);
+					Last = Next.BelowPercent;
+					for (int Slot = 0; Slot < 4; ++Slot)
+					{
+						FAbility Ability;
+						FProblems Inner;
+						ReadAbility(List->Array[Slot], Slot, Ability, Inner);
+						if (!Inner.Text.empty())
+						{
+							Problems.Text += Where + "." + Inner.Text;
+						}
+						Next.AbilityIds[Slot] = Ability.Id;
+						OutAbilities.push_back(Ability);
+					}
+					Info.Phases.push_back(Next);
+				}
+			}
+		}
+	}
+
 	std::string ReadClassFile(const std::string& Text, FJobDef& OutJob, std::vector<FAbility>& OutAbilities)
 	{
 		FJson Json;
@@ -438,6 +597,20 @@ namespace TMSim
 					{
 						Problems.Say("abilities", "two share the id \"" + OutAbilities[A].Id + "\"");
 					}
+				}
+			}
+		}
+		if (const FJson* Monster = Json.Find("monster"))
+		{
+			ReadMonster(*Monster, OutJob, OutAbilities, Problems);
+		}
+		for (size_t A = 0; A < OutAbilities.size(); ++A)
+		{
+			for (size_t B = A + 1; B < OutAbilities.size(); ++B)
+			{
+				if (A >= 4 && !OutAbilities[A].Id.empty() && OutAbilities[A].Id == OutAbilities[B].Id)
+				{
+					Problems.Say("monster", "two phase abilities share the id \"" + OutAbilities[A].Id + "\"");
 				}
 			}
 		}

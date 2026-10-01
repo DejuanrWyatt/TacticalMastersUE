@@ -1,0 +1,14 @@
+{
+  "format": "tactical-masters-item",
+  "version": 1,
+  "id": "aegis_of_dawn",
+  "name": "Aegis of Dawn",
+  "desc": "A shield that has never broken.",
+  "icon": "shield",
+  "tier": "epic",
+  "stats": {
+    "hp": 60,
+    "attdef": 5,
+    "magdef": 5
+  }
+}

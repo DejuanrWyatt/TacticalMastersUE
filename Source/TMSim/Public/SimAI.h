@@ -111,6 +111,13 @@ namespace TMSim
 
 		/** Where it would rather stand, given what it can see. */
 		FVec2 ApproachSpot(FBattle& Battle, const FUnit& Unit, bool bSprint);
+		/**
+		 * Where to walk to take a watchtower: with no enemy in sight, the
+		 * reachable spot nearest a tower its side does not hold. Where it stands
+		 * if there is no such tower, or something better to think about.
+		 */
+		FVec2 TowerSpot(FBattle& Battle, const FUnit& Unit,
+			const std::vector<std::pair<FNode, double>>& Reach) const;
 		/** The reachable spot furthest from the enemies it can see. */
 		FVec2 RetreatSpot(FBattle& Battle, const FUnit& Unit, bool bSprint);
 		/** What standing on this ground is worth: embers hurt, springs help. */
@@ -132,5 +139,33 @@ namespace TMSim
 		FSkill Level;
 		/** Only the careful settings sprint or back off when badly hurt. */
 		bool IsCareful() const { return Level.Mistakes < 0.4; }
+	};
+
+	/**
+	 * The neutral monsters' player (Docs/design/feat-neutral-camps.md 14). Like
+	 * FAIPlayer it only reads the battle and hands back one order, which is
+	 * validated and applied like anybody's; the rules decide a monster's mood
+	 * (FBattle::MonsterTurnStarts), and this decides what it does about it:
+	 * walk its route, fight inside its leash, go home, or run. It throws no
+	 * dice, so every machine and a replay give the same orders.
+	 */
+	class TMSIM_API FNeutralPlayer
+	{
+	public:
+		FNeutralPlayer();
+
+		/** The next single order for a wild monster (team 2) whose turn it is. */
+		FOrder NextCommand(FBattle& Battle, const FUnit& Unit);
+
+		/** Who it goes for first, of the quarry it may fight: -1 for nobody. */
+		int PickQuarry(FBattle& Battle, const FUnit& Unit) const;
+
+	private:
+		/** The reachable spot best for a goal: nearest to it by walking, or nearest Desired metres off. */
+		FVec2 SpotToward(FBattle& Battle, const FUnit& Unit, const std::vector<std::pair<FNode, double>>& Reach,
+			const FVec2& Goal, double Desired) const;
+
+		/** Its fighting, done by the computer player's own weighing of options. */
+		FAIPlayer Fighter;
 	};
 }

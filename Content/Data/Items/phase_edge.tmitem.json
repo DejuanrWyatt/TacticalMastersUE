@@ -1,0 +1,29 @@
+{
+  "format": "tactical-masters-item",
+  "version": 1,
+  "id": "phase_edge",
+  "name": "Phase Edge",
+  "desc": "+10% ability damage. Phase: teleport up to 6 m.",
+  "icon": "blade",
+  "tier": "epic",
+  "bonus": {
+    "damage_percent": 10
+  },
+  "ability": {
+    "id": "item_phase",
+    "name": "Phase",
+    "desc": "Teleports to a spot the side can see, up to 6 m away.",
+    "kind": "active",
+    "effect": "support",
+    "scale": "mag",
+    "target": "ally",
+    "shape": "point",
+    "power": 0,
+    "min_range": 0,
+    "max_range": 6,
+    "aoe": 0,
+    "cooldown": 2,
+    "cast": 0,
+    "special": "blink"
+  }
+}

@@ -1,0 +1,103 @@
+{
+  "format": "tactical-masters-class",
+  "version": 1,
+  "id": "molten_beetle",
+  "name": "Molten Beetle",
+  "color": "#d9531e",
+  "look": "knight",
+  "icon": "molten_beetle",
+  "roles": [
+    "tank",
+    "damage"
+  ],
+  "stats": {
+    "hp": 110,
+    "attdef": 10,
+    "magdef": 6,
+    "aeva": 2,
+    "meva": 2,
+    "crit": 5,
+    "speed": 8,
+    "move": 4,
+    "patience": 5,
+    "sight": 8
+  },
+  "abilities": [
+    {
+      "id": "molten_beetle_mandible",
+      "name": "Mandible",
+      "desc": "Strikes an enemy within arm's reach (power 32).",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "att",
+      "target": "enemy",
+      "shape": "unit",
+      "power": 32,
+      "min_range": 0,
+      "max_range": 1.8,
+      "aoe": 0,
+      "cooldown": 0,
+      "cast": 0
+    },
+    {
+      "id": "molten_beetle_ember_spray",
+      "name": "Ember Spray",
+      "desc": "Sprays embers in a 60\u00b0 arc up to 3 m: power 16 and Burn for 2 turns.",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "mag",
+      "target": "enemy",
+      "shape": "cone",
+      "power": 16,
+      "min_range": 0,
+      "max_range": 3,
+      "aoe": 0,
+      "cooldown": 3,
+      "cast": 0,
+      "angle": 60,
+      "status": {
+        "id": "burn",
+        "turns": 2
+      }
+    },
+    {
+      "id": "molten_beetle_idle1",
+      "name": "Molten Shell",
+      "desc": "Always on: nothing to use.",
+      "kind": "passive",
+      "effect": "support",
+      "scale": "mag",
+      "target": "ally",
+      "shape": "self",
+      "power": 0,
+      "min_range": 0,
+      "max_range": 0,
+      "aoe": 0,
+      "cooldown": 0,
+      "cast": 0
+    },
+    {
+      "id": "molten_beetle_idle2",
+      "name": "Enrage",
+      "desc": "Always on: nothing to use.",
+      "kind": "passive",
+      "effect": "support",
+      "scale": "mag",
+      "target": "ally",
+      "shape": "self",
+      "power": 0,
+      "min_range": 0,
+      "max_range": 0,
+      "aoe": 0,
+      "cooldown": 0,
+      "cast": 0
+    }
+  ],
+  "monster": {
+    "tier": "hard",
+    "temperament": "provoked",
+    "traits": [
+      "enrage"
+    ]
+  }
+}

@@ -1,0 +1,102 @@
+{
+  "format": "tactical-masters-class",
+  "version": 1,
+  "id": "tar_skink",
+  "name": "Tar Skink",
+  "color": "#3d3530",
+  "look": "monk",
+  "icon": "tar_skink",
+  "roles": [
+    "damage"
+  ],
+  "stats": {
+    "hp": 34,
+    "attdef": 3,
+    "magdef": 4,
+    "aeva": 8,
+    "meva": 4,
+    "crit": 5,
+    "speed": 9,
+    "move": 4,
+    "patience": 4,
+    "sight": 7
+  },
+  "abilities": [
+    {
+      "id": "tar_skink_bite",
+      "name": "Bite",
+      "desc": "Strikes an enemy within arm's reach (power 16).",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "att",
+      "target": "enemy",
+      "shape": "unit",
+      "power": 16,
+      "min_range": 0,
+      "max_range": 1.8,
+      "aoe": 0,
+      "cooldown": 0,
+      "cast": 0
+    },
+    {
+      "id": "tar_skink_tar_spit",
+      "name": "Tar Spit",
+      "desc": "Spits sticky tar: the target is Oiled for 3 turns (fire hits it 50% harder and ignites it).",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "mag",
+      "target": "enemy",
+      "shape": "unit",
+      "power": 10,
+      "min_range": 0,
+      "max_range": 4,
+      "aoe": 0,
+      "cooldown": 2,
+      "cast": 0,
+      "status": {
+        "id": "oiled",
+        "turns": 3
+      }
+    },
+    {
+      "id": "tar_skink_idle1",
+      "name": "Burrowed",
+      "desc": "Always on: nothing to use.",
+      "kind": "passive",
+      "effect": "support",
+      "scale": "mag",
+      "target": "ally",
+      "shape": "self",
+      "power": 0,
+      "min_range": 0,
+      "max_range": 0,
+      "aoe": 0,
+      "cooldown": 0,
+      "cast": 0
+    },
+    {
+      "id": "tar_skink_idle2",
+      "name": "Tar Hide",
+      "desc": "Always on: nothing to use.",
+      "kind": "passive",
+      "effect": "support",
+      "scale": "mag",
+      "target": "ally",
+      "shape": "self",
+      "power": 0,
+      "min_range": 0,
+      "max_range": 0,
+      "aoe": 0,
+      "cooldown": 0,
+      "cast": 0
+    }
+  ],
+  "monster": {
+    "tier": "easy",
+    "temperament": "territorial",
+    "ring": 3,
+    "traits": [
+      "ambush"
+    ]
+  }
+}

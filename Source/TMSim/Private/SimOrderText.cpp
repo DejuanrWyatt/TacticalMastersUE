@@ -169,6 +169,17 @@ namespace TMSim
 		case EOrderType::Ready:
 			Out << "ready " << Order.Team;
 			break;
+		case EOrderType::Capture:
+			Out << "capture " << Order.UnitId << ' ' << Order.Serial << ' ' << Order.Tower;
+			break;
+		case EOrderType::Take:
+			// An item id is lowercase letters, digits and _ (SimItem.cpp), so it is one word.
+			Out << "take " << Order.UnitId << ' ' << Order.Serial << ' ' << Order.Cache << ' '
+				<< (Order.ItemId.empty() ? std::string("-") : Order.ItemId) << ' ' << Order.GearSlot;
+			break;
+		case EOrderType::Drop:
+			Out << "drop " << Order.UnitId << ' ' << Order.Serial << ' ' << Order.GearSlot;
+			break;
 		case EOrderType::Tune:
 			Out << "tune " << Order.TuneValues.size();
 			for (const std::pair<int, double>& Value : Order.TuneValues)
@@ -209,7 +220,7 @@ namespace TMSim
 			Order.Type = EOrderType::UseAbility;
 			Order.UnitId = Read.Int("unit", 0, MaxId);
 			Order.Serial = Read.Int("serial", 0, MaxSerial);
-			Order.Slot = Read.Int("slot", 0, 3);
+			Order.Slot = Read.Int("slot", 0, AbilitySlots - 1);
 			Order.Target.X = Read.Float("x");
 			Order.Target.Y = Read.Float("y");
 			Order.Follow = Read.Int("follow", -1, MaxId);
@@ -232,6 +243,42 @@ namespace TMSim
 		{
 			Order.Type = EOrderType::Ready;
 			Order.Team = Read.Int("team", 0, 1);
+		}
+		else if (Kind == "capture")
+		{
+			Order.Type = EOrderType::Capture;
+			Order.UnitId = Read.Int("unit", 0, MaxId);
+			Order.Serial = Read.Int("serial", 0, MaxSerial);
+			// The rules judge whether there is such a tower; this only keeps it sane.
+			Order.Tower = Read.Int("tower", 0, 64);
+		}
+		else if (Kind == "take")
+		{
+			Order.Type = EOrderType::Take;
+			Order.UnitId = Read.Int("unit", 0, MaxId);
+			Order.Serial = Read.Int("serial", 0, MaxSerial);
+			Order.Cache = Read.Int("cache", 0, 100000);
+			if (const std::string* Item = Read.Take("item"))
+			{
+				bool bWord = !Item->empty() && Item->size() <= 31;
+				for (const char C : *Item)
+				{
+					bWord = bWord && ((C >= 'a' && C <= 'z') || (C >= '0' && C <= '9') || C == '_');
+				}
+				if (!bWord)
+				{
+					Read.Error = "bad item: " + Item->substr(0, 32);
+				}
+				Order.ItemId = *Item;
+			}
+			Order.GearSlot = Read.Int("slot", -1, 2);
+		}
+		else if (Kind == "drop")
+		{
+			Order.Type = EOrderType::Drop;
+			Order.UnitId = Read.Int("unit", 0, MaxId);
+			Order.Serial = Read.Int("serial", 0, MaxSerial);
+			Order.GearSlot = Read.Int("slot", 0, 2);
 		}
 		else if (Kind == "tune")
 		{

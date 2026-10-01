@@ -1,0 +1,13 @@
+{
+  "format": "tactical-masters-item",
+  "version": 1,
+  "id": "deserters_boots",
+  "name": "Deserter's Boots",
+  "desc": "Made for running: +1 Move, harder to hit.",
+  "icon": "boots",
+  "tier": "uncommon",
+  "stats": {
+    "move": 1,
+    "aeva": 3
+  }
+}

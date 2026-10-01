@@ -1,0 +1,16 @@
+{
+  "format": "tactical-masters-item",
+  "version": 1,
+  "id": "colossus_heart",
+  "name": "Colossus Heart",
+  "desc": "+50 health, and nothing knocks you down.",
+  "icon": "heart",
+  "tier": "epic",
+  "stats": {
+    "hp": 50
+  },
+  "effects": {
+    "steady": true
+  },
+  "boss": "magma_colossus"
+}

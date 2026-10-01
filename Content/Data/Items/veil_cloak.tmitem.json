@@ -1,0 +1,29 @@
+{
+  "format": "tactical-masters-item",
+  "version": 1,
+  "id": "veil_cloak",
+  "name": "Veil Cloak",
+  "desc": "Vanish for 2 turns; striking or being struck shows you.",
+  "icon": "cloak",
+  "tier": "rare",
+  "ability": {
+    "id": "item_vanish",
+    "name": "Vanish",
+    "desc": "Unseen by the other side for 2 turns, until it deals or takes damage.",
+    "kind": "active",
+    "effect": "support",
+    "scale": "mag",
+    "target": "ally",
+    "shape": "self",
+    "power": 0,
+    "min_range": 0,
+    "max_range": 0,
+    "aoe": 0,
+    "cooldown": 5,
+    "cast": 0,
+    "status": {
+      "id": "veil",
+      "turns": 2
+    }
+  }
+}

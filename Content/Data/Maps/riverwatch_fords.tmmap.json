@@ -5,6 +5,7 @@
   "name": "Riverwatch Fords",
   "desc": "A river splits the field. Two wide fords on the flanks, a narrow raised bridge in the middle, and each side has a hill that looks down on the bridge and one ford. A spring waits on the open bank.",
   "theme": "meadow",
+  "boss": "helix_prime",
   "top": [
     "33322211111112222221111111222333",
     "22222211111112222221111111222222",

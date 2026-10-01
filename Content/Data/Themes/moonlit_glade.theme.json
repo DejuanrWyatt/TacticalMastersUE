@@ -1,0 +1,117 @@
+{
+  "format": "tactical-masters-theme",
+  "name": "Moonlit Glade",
+  "ground": {
+    "tops": [
+      "#2e4a2a",
+      "#355233",
+      "#3e5a3b",
+      "#4a6444",
+      "#566d4e"
+    ],
+    "side": "#3a3328",
+    "jitter": 0.05
+  },
+  "rock": {
+    "colour": "#6d7280",
+    "style": "boulders"
+  },
+  "water": {
+    "colour": "#2a5a8a",
+    "opacity": 0.8,
+    "glows": false
+  },
+  "embers": {
+    "colour": "#3b2418",
+    "glow": "#ff7a2a"
+  },
+  "spring": {
+    "colour": "#3fa6c0",
+    "glow": "#8fe8ff"
+  },
+  "around": {
+    "ground": "#243a22",
+    "trees": "pine",
+    "treeCount": 60,
+    "leaves": "#1f3a26",
+    "trunk": "#3a2a1e",
+    "rockCount": 20
+  },
+  "sun": {
+    "pitch": -38,
+    "yaw": 120,
+    "intensity": 1.6,
+    "colour": "#9fb4ff"
+  },
+  "sky": {
+    "intensity": 0.8
+  },
+  "fog": {
+    "density": 0.03,
+    "colour": "#2c3a5a"
+  },
+  "light": {
+    "night": true,
+    "drift": 0.8,
+    "torches": 7000,
+    "torchColour": "#ff9a45",
+    "exposure": 0.0,
+    "volumetric": true
+  },
+  "foliage": {
+    "grass": {
+      "density": 1.2,
+      "height": 0.35
+    },
+    "flowers": {
+      "density": 0.12,
+      "colours": [
+        "#bfd4ff",
+        "#e8e8ff"
+      ]
+    },
+    "bushes": {
+      "density": 0.35,
+      "colour": "#1c3320"
+    },
+    "forest": 0.04,
+    "kit": {
+      "grass": [
+        "/Game/KiteDemo/Environments/Foliage/Grass/FieldGrass/SM_FieldGrass_01.SM_FieldGrass_01"
+      ],
+      "flower": [
+        "/Game/KiteDemo/Environments/Foliage/Flowers/Heather/SM_Heather_Mesh_Clumps2.SM_Heather_Mesh_Clumps2"
+      ],
+      "bush": [
+        "/Game/KiteDemo/Environments/Foliage/Ferns/SM_Fern_01.SM_Fern_01",
+        "/Game/KiteDemo/Environments/Foliage/Ferns/SM_Fern_02.SM_Fern_02",
+        "/Game/KiteDemo/Environments/Foliage/Ferns/SM_Fern_03.SM_Fern_03",
+        "/Game/KiteDemo/Environments/Foliage/BogMyrtleBush_01/BogMyrtleBush_01.BogMyrtleBush_01",
+        "/Game/KiteDemo/Environments/Foliage/BogMyrtleBush_02/BogMyrtleBush_02.BogMyrtleBush_02"
+      ],
+      "grassHeight": 0.4,
+      "flowerHeight": 0.3,
+      "bushHeight": 1.0
+    }
+  },
+  "kit": {
+    "rock": [
+      "/Game/KiteDemo/Environments/Rocks/Medium_Boulder_001/Medium_Boulder_001.Medium_Boulder_001",
+      "/Game/KiteDemo/Environments/Rocks/Medium_Boulder_002/Medium_Boulder_LowPoly.Medium_Boulder_LowPoly",
+      "/Game/KiteDemo/Environments/Rocks/River_Rock_01/SM_River_Rock_01.SM_River_Rock_01"
+    ],
+    "tree": [
+      "/Game/KiteDemo/Environments/Trees/ScotsPine_01/ScotsPine_01.ScotsPine_01",
+      "/Game/KiteDemo/Environments/Trees/ScotsPineTall_01/ScotsPineTall_01.ScotsPineTall_01"
+    ],
+    "boulder": [
+      "/Game/KiteDemo/Environments/Rocks/Medium_Boulder_001/Medium_Boulder_001.Medium_Boulder_001",
+      "/Game/KiteDemo/Environments/Rocks/Medium_Boulder_002/Medium_Boulder_LowPoly.Medium_Boulder_LowPoly",
+      "/Game/KiteDemo/Environments/Trees/Tree_Stump_01/Tree_Stump_01.Tree_Stump_01",
+      "/Game/KiteDemo/Environments/Rocks/River_Rock_01/SM_River_Rock_01.SM_River_Rock_01"
+    ],
+    "rockFill": 0.95,
+    "treeHeight": 13,
+    "boulderSize": 2.2
+  }
+}

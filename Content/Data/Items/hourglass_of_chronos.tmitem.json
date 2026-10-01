@@ -1,0 +1,30 @@
+{
+  "format": "tactical-masters-item",
+  "version": 1,
+  "id": "hourglass_of_chronos",
+  "name": "Hourglass of Chronos",
+  "desc": "Turn Gauge fills 10% faster. Rewind: once a battle, undo the last hit you took.",
+  "icon": "hourglass",
+  "tier": "epic",
+  "bonus": {
+    "tg_percent": 10
+  },
+  "ability": {
+    "id": "item_rewind",
+    "name": "Rewind",
+    "desc": "Gives back the health the last hit took, once a battle.",
+    "kind": "active",
+    "effect": "support",
+    "scale": "mag",
+    "target": "ally",
+    "shape": "self",
+    "power": 0,
+    "min_range": 0,
+    "max_range": 0,
+    "aoe": 0,
+    "cooldown": 10,
+    "cast": 0,
+    "special": "rewind"
+  },
+  "boss": "chronos"
+}

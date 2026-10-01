@@ -1,0 +1,13 @@
+{
+  "format": "tactical-masters-item",
+  "version": 1,
+  "id": "hunters_eye",
+  "name": "Hunter's Eye",
+  "desc": "Sees further and finds the gaps.",
+  "icon": "eye",
+  "tier": "uncommon",
+  "stats": {
+    "sight": 4,
+    "crit": 4
+  }
+}

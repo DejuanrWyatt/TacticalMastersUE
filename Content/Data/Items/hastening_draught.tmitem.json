@@ -1,0 +1,29 @@
+{
+  "format": "tactical-masters-item",
+  "version": 1,
+  "id": "hastening_draught",
+  "name": "Hastening Draught",
+  "desc": "Haste an ally: its Turn Gauge fills 50% faster for 2 turns.",
+  "icon": "potion",
+  "tier": "rare",
+  "ability": {
+    "id": "item_haste",
+    "name": "Haste",
+    "desc": "An ally up to 4 m away (or itself) is Hasted for 2 turns: its Turn Gauge fills 50% faster. Slow cancels it.",
+    "kind": "active",
+    "effect": "support",
+    "scale": "mag",
+    "target": "ally",
+    "shape": "unit",
+    "power": 0,
+    "min_range": 0,
+    "max_range": 4,
+    "aoe": 0,
+    "cooldown": 5,
+    "cast": 0,
+    "status": {
+      "id": "haste",
+      "turns": 2
+    }
+  }
+}

@@ -144,7 +144,7 @@ void ATMBattleHud::DrawDevTools(ATMBattleDirector& From)
 	const bool bLive = From.Screen == ATMBattleDirector::EScreen::Battle && From.Battle.Winner == -1;
 	Text(bLive
 			? TEXT("Kept for the next battle, and applied to this one at once: each change goes to the rules as a recorded order, so a replay has it too.")
-			: TEXT("Kept for the next battle. Rest the pointer on a name for what it does. Victory, the time limit and planning time are on the battle setup screen."),
+			: TEXT("Kept for the next battle. Rest the pointer on a name for what it does. Victory, the time limit, planning time and how many watchtowers are on the battle setup screen."),
 		PX, Y, Dim, Font, 0.55f * S);
 	Y += 34.0f * S;
 

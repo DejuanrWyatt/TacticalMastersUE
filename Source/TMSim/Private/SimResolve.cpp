@@ -70,6 +70,13 @@ namespace TMSim
 		}
 		Target.Hp = std::max(0, Target.Hp - Amount);
 		Target.UnharmedTurns = 0;
+		Target.LastHurt = Amount;
+		// Phoenix Feather: once a battle, a blow that would knock it out leaves it standing.
+		if (Target.Hp == 0 && Target.HasItems() && !Target.bPhoenixUsed && GearHas(Target, &FItemDef::bPhoenix))
+		{
+			Target.bPhoenixUsed = true;
+			Target.Hp = 1;
+		}
 
 		std::vector<FStatus> Kept;
 		Kept.reserve(Target.Statuses.size());
@@ -82,6 +89,21 @@ namespace TMSim
 			}
 		}
 		Target.Statuses.swap(Kept);
+		// Charmed: any damage brings it to its senses. Suppressed: hurting the
+		// suppressor frees whoever it had pinned (Docs/design/feat-status-effects.md).
+		if (Target.CharmedFrom >= 0)
+		{
+			RemoveStatus(Target, "charmed");
+			ReleaseCharm(Target, nullptr);
+		}
+		for (FUnit& Other : Units)
+		{
+			if (!Other.Statuses.empty())
+			{
+				Other.Statuses.erase(std::remove_if(Other.Statuses.begin(), Other.Statuses.end(),
+					[&Target](const FStatus& Status) { return Status.Id == "suppressed" && Status.By == Target.Id; }), Other.Statuses.end());
+			}
+		}
 		return Amount;
 	}
 
@@ -89,6 +111,28 @@ namespace TMSim
 	{
 		const FStatusDef* Incoming = FindStatus(StatusId);
 		if (!Incoming)
+		{
+			return;
+		}
+		// A boss shrugs off what would stop it, and wears slows and burns half as
+		// long; Colossus Heart keeps its holder on its feet. Neither is Godot's.
+		if (Target.bMonster)
+		{
+			const FMonsterInfo* Info = Target.MonsterInfo();
+			if (Info && Info->Has(MonsterTrait::Unstoppable))
+			{
+				if ((Incoming->bNoOrders && StatusId != "staggered") || Incoming->bInterrupt || Incoming->bOneAction || StatusId == "freeze"
+					|| StatusId == "stop" || StatusId == "charmed" || StatusId == "terrified")
+				{
+					return;
+				}
+				if (Incoming->bHarmful)
+				{
+					Turns = std::max(1, (Turns + 1) / 2);
+				}
+			}
+		}
+		if (Incoming->bOneAction && Target.HasItems() && GearHas(Target, &FItemDef::bSteady))
 		{
 			return;
 		}
@@ -110,6 +154,68 @@ namespace TMSim
 				}
 			}
 			Target.Statuses.swap(Clean);
+			ReleaseCharm(Target, nullptr);
+		}
+		// The second set (Docs/design/feat-status-effects.md): how they meet
+		// what is already there. None of these statuses is ever on a unit in a
+		// Godot battle, so none of this changes one.
+		if (StatusId == "charmed")
+		{
+			// A side's own units only (monsters are tamed instead), and to the charmer's side.
+			const FUnit* Charmer = FindUnit(By);
+			if (Target.bMonster || !Charmer || Charmer->Team == Target.Team || (Target.Team != 0 && Target.Team != 1)
+				|| (Charmer->Team != 0 && Charmer->Team != 1))
+			{
+				return;
+			}
+		}
+		if ((StatusId == "haste" && RemoveStatus(Target, "slow")) || (StatusId == "slow" && RemoveStatus(Target, "haste")))
+		{
+			return;  // the two cancel out
+		}
+		if (StatusId == "burn")
+		{
+			if (RemoveStatus(Target, "wet"))
+			{
+				Turns = std::max(1, Turns / 2);
+			}
+			if (RemoveStatus(Target, "oiled"))
+			{
+				Turns *= 2;
+			}
+		}
+		if (StatusId == "wet")
+		{
+			RemoveStatus(Target, "burn");
+		}
+		if (StatusId == "stop")
+		{
+			// Counted in ticks: two seconds a turn, since it has no turns while it lasts.
+			Amount = Turns * 2 * Pace::TicksPerSecond;
+			Turns = (Amount + Pace::TicksPerSecond - 1) / Pace::TicksPerSecond;
+			for (FStatus& Status : Target.Statuses)
+			{
+				if (Status.Id == "stop")
+				{
+					Status.Amount = std::max(Status.Amount, Amount);
+					Status.Turns = std::max(Status.Turns, Turns);
+					return;
+				}
+			}
+		}
+		if (StatusId == "chilled")
+		{
+			Amount = std::max(1, Amount);
+			for (FStatus& Status : Target.Statuses)
+			{
+				if (Status.Id == "chilled" && Status.Amount + Amount >= 3)
+				{
+					// Three layers of cold: it freezes solid.
+					RemoveStatus(Target, "chilled");
+					AddStatus(Target, "freeze", 1);
+					return;
+				}
+			}
 		}
 		for (FStatus& Status : Target.Statuses)
 		{
@@ -136,18 +242,37 @@ namespace TMSim
 		Status.Turns = Turns;
 		Status.Amount = Amount;
 		Status.By = By;
+		if (StatusId == "charmed")
+		{
+			// Over to the charmer's side. Caught mid-turn, this turn is its charmed one.
+			Target.CharmedFrom = Target.Team;
+			Target.Team = FindUnit(By)->Team;
+			Status.Amount = Target.bReady ? 1 : 0;
+		}
 		Target.Statuses.push_back(Status);
 	}
 
 	void FBattle::KnockOut(FUnit& Target, FTickReport& Report)
 	{
 		Target.Hp = 0;
-		Target.KoTicks = RoundToInt(Tuning.KoSeconds * Pace::TicksPerSecond);
+		// A monster that falls is gone at once: nothing raises it.
+		Target.KoTicks = Target.bMonster ? 0 : RoundToInt(Tuning.KoSeconds * Pace::TicksPerSecond);
 		Target.bReady = false;
 		Target.Clock = 0;
 		Target.bMoved = false;
 		Target.bActed = false;
+		// Reraise: it stands again a few seconds later, so it lies there until then.
+		const bool bReraise = !Target.bMonster && Target.HasStatus("reraise");
 		Target.Statuses.clear();
+		if (Target.CharmedFrom >= 0)
+		{
+			ReleaseCharm(Target, &Report);
+		}
+		if (bReraise)
+		{
+			Target.ReraiseTicks = FBattle::ReraiseSeconds * Pace::TicksPerSecond;
+			Target.KoTicks = std::max(Target.KoTicks, Target.ReraiseTicks + 1);
+		}
 		if (Target.IsCasting())
 		{
 			// Whatever it was part-way through is lost with it. Death is the only
@@ -164,6 +289,7 @@ namespace TMSim
 		if (Target.KoTicks <= 0)
 		{
 			Report.Say(EEventKind::Gone, Target.Id);
+			OnGone(Target, Report);
 		}
 	}
 
@@ -182,11 +308,24 @@ namespace TMSim
 
 	void FBattle::CheckWinner()
 	{
+		// Only a side's own units count: a monster it has tamed doesn't keep it
+		// in the battle.
+		auto Standing = [this](int Team)
+		{
+			for (const FUnit& Unit : Units)
+			{
+				if (Unit.IsAlive() && Unit.HomeTeam() == Team && !Unit.bMonster)
+				{
+					return true;
+				}
+			}
+			return false;
+		};
 		for (int Team = 0; Team < 2; ++Team)
 		{
-			if (TeamUnits(Team).empty())
+			if (!Standing(Team))
 			{
-				Winner = TeamUnits(1 - Team).empty() ? Draw : 1 - Team;
+				Winner = !Standing(1 - Team) ? Draw : 1 - Team;
 				return;
 			}
 		}
@@ -199,7 +338,7 @@ namespace TMSim
 
 	void FBattle::UseAbility(FUnit& User, int Slot, const FVec2& Target, int Follow, FTickReport& Report)
 	{
-		const FAbility* Ability = JobAbility(User.Job, Slot);
+		const FAbility* Ability = User.Ability(Slot);
 		if (!Ability)
 		{
 			return;
@@ -237,7 +376,7 @@ namespace TMSim
 		// each of this unit's own turns -- including the next one.
 		User.Cooldowns[Slot] = Ability->Cooldown > 0 ? Ability->Cooldown + 1 : 0;
 		User.bActed = true;
-		if (Target.DistanceTo(User.Pos) > 0.01f)
+		if (Target.DistanceTo(User.Pos) > 0.01f && !User.HasStatus("offbalance"))
 		{
 			User.Facing = (Target - User.Pos).Normalized();
 		}
@@ -284,7 +423,7 @@ namespace TMSim
 
 	void FBattle::ResolveAbility(FUnit& User, int Slot, const FVec2& Target, FTickReport& Report)
 	{
-		const FAbility* Ability = JobAbility(User.Job, Slot);
+		const FAbility* Ability = User.Ability(Slot);
 		if (!Ability)
 		{
 			return;
@@ -305,6 +444,13 @@ namespace TMSim
 			}
 		}
 
+		// Vanished: striking out shows where it is.
+		if (Ability->Effect == EEffect::Damage && User.HasStatus("veil"))
+		{
+			User.Statuses.erase(std::remove_if(User.Statuses.begin(), User.Statuses.end(),
+				[](const FStatus& Status) { return Status.Id == "veil"; }), User.Statuses.end());
+		}
+
 		FEvent Cast;
 		Cast.Kind = EEventKind::Resolved;
 		Cast.Unit = User.Id;
@@ -321,6 +467,8 @@ namespace TMSim
 				continue;
 			}
 			int Amount = Hit.Amount;
+			// Reflect and Guarded send it elsewhere, before the dice (SimStatuses.cpp).
+			Redirect(User, *Ability, Struck, Amount, Report);
 
 			// The dice, and the only place in the rules they are thrown.
 			bool bEvaded = false;
@@ -328,7 +476,14 @@ namespace TMSim
 			if (Ability->Effect == EEffect::Damage)
 			{
 				bEvaded = static_cast<int>(Rng.RandiRange(1, 100)) <= EvadeChance(*Struck, *Ability, &User);
-				if (!bEvaded)
+				// First Strike Gauntlet: its first hit that lands is critical, without a roll.
+				if (!bEvaded && User.HasItems() && !User.bFirstStrikeUsed && GearHas(User, &FItemDef::bFirstStrike))
+				{
+					User.bFirstStrikeUsed = true;
+					bCritical = true;
+					Amount = std::max(1, RoundToInt(Amount * Tuning.CritMultiplier));
+				}
+				else if (!bEvaded)
 				{
 					bCritical = static_cast<int>(Rng.RandiRange(1, 100)) <= CritChance(User);
 					if (bCritical)
@@ -368,6 +523,49 @@ namespace TMSim
 			{
 				Amount = TakeFromShield(*Struck, Amount, Report);
 				Amount = Hurt(*Struck, Amount);
+				if (Amount > 0 && !Struck->Statuses.empty())
+				{
+					// Marked and Off-Balance pay out on the hit that lands, and are gone.
+					RemoveStatus(*Struck, "marked");
+					RemoveStatus(*Struck, "offbalance");
+				}
+				if (Amount > 0 && Struck->HasStatus("veil"))
+				{
+					Struck->Statuses.erase(std::remove_if(Struck->Statuses.begin(), Struck->Statuses.end(),
+						[](const FStatus& Status) { return Status.Id == "veil"; }), Struck->Statuses.end());
+				}
+				// Items that answer a hit, and a monster's temper (neither is Godot's).
+				if (User.HasItems() && Amount > 0 && Struck->Id != User.Id)
+				{
+					const int Steal = GearSum(User, &FItemDef::LifestealPercent);
+					if (Steal > 0 && User.IsAlive())
+					{
+						User.Hp = std::min(User.MaxHp(), User.Hp + std::max(1, RoundToInt(Amount * Steal / 100.0)));
+					}
+				}
+				if (Struck->HasItems() && Struck->Id != User.Id && Ability->MaxRange <= Ground::MeleeRange && User.IsAlive())
+				{
+					const int Thorns = GearSum(*Struck, &FItemDef::Thorns);
+					if (Thorns > 0 && Hurt(User, Thorns) > 0)
+					{
+						FEvent Back;
+						Back.Kind = EEventKind::Hit;
+						Back.Unit = User.Id;
+						Back.By = Struck->Id;
+						Back.Amount = Thorns;
+						Back.Where = User.Pos;
+						Back.Id = "thorns";
+						Report.Events.push_back(Back);
+						if (!User.IsAlive())
+						{
+							KnockOut(User, Report);
+						}
+					}
+				}
+				if (Struck->bMonster)
+				{
+					MonsterHurt(*Struck, User, Hit.Flank, Report);
+				}
 				// Taking a beating earns a comeback, and it is what got through
 				// that counts: a hit a shield ate entirely earns nothing.
 				if (Struck->MaxHp() > 0)
@@ -378,11 +576,27 @@ namespace TMSim
 				break;
 			}
 			case EEffect::Heal:
+				if (Struck->HasStatus("decay"))
+				{
+					// Decay: healing rots it instead.
+					const int Taken = Hurt(*Struck, Amount);
+					FEvent Rot;
+					Rot.Kind = EEventKind::Hit;
+					Rot.Unit = Struck->Id;
+					Rot.By = User.Id;
+					Rot.Amount = Taken;
+					Rot.Where = Struck->Pos;
+					Rot.Id = "decay";
+					Report.Events.push_back(Rot);
+					Amount = 0;
+					break;
+				}
 				Struck->Hp += Amount;
 				break;
 			case EEffect::Revive:
 				Struck->Hp = Amount;
 				Struck->KoTicks = 0;
+				Struck->ReraiseTicks = 0;
 				Struck->Tg = 0;
 				Struck->bReady = false;
 				Report.Say(EEventKind::Revived, Struck->Id);
@@ -403,11 +617,26 @@ namespace TMSim
 
 			if (!Struck->IsAlive())
 			{
-				if (!Struck->IsKo())
+				if (!Struck->IsKo() && !Struck->bOffBoard)
 				{
 					KnockOut(*Struck, Report);
+					if (User.HasItems())
+					{
+						User.KillTgPercent += GearSum(User, &FItemDef::KillTgPercent);
+					}
 				}
 				continue;  // nothing follows a killing blow
+			}
+
+			if (!Ability->Special.empty())
+			{
+				ApplySpecial(User, *Ability, Target, Struck, Report);
+			}
+
+			ElementReactions(User, *Ability, *Struck, Report);
+			if (!Struck->IsAlive())
+			{
+				continue;
 			}
 
 			if (Ability->HasStatus())
@@ -416,7 +645,7 @@ namespace TMSim
 				// A Shield is worth the ability's own power, and a Taunt has to
 				// remember who is owed the attention.
 				const int Soak = (Def && Def->bAbsorbs) ? std::max(1, RoundToInt(Ability->Power)) : 0;
-				const int By = (Def && Def->bTaunt) ? User.Id : -1;
+				const int By = (Def && (Def->bTaunt || Def->bSourced)) ? User.Id : -1;
 				AddStatus(*Struck, Ability->StatusId, Ability->StatusTurns, Soak, By);
 
 				FEvent Event;
@@ -453,6 +682,11 @@ namespace TMSim
 			{
 				Struck->Buffs.push_back(Buff);
 			}
+		}
+
+		if (Ability->Special == "blink" && User.IsAlive())
+		{
+			ApplySpecial(User, *Ability, Target, nullptr, Report);
 		}
 
 		CheckWinner();

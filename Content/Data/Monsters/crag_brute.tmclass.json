@@ -1,0 +1,104 @@
+{
+  "format": "tactical-masters-class",
+  "version": 1,
+  "id": "crag_brute",
+  "name": "Crag Brute",
+  "color": "#9a5a3a",
+  "look": "monk",
+  "icon": "crag_brute",
+  "roles": [
+    "tank",
+    "damage"
+  ],
+  "stats": {
+    "hp": 120,
+    "attdef": 9,
+    "magdef": 5,
+    "aeva": 2,
+    "meva": 2,
+    "crit": 5,
+    "speed": 8,
+    "move": 4,
+    "patience": 5,
+    "sight": 8
+  },
+  "abilities": [
+    {
+      "id": "crag_brute_punch",
+      "name": "Punch",
+      "desc": "Strikes an enemy within arm's reach (power 34).",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "att",
+      "target": "enemy",
+      "shape": "unit",
+      "power": 34,
+      "min_range": 0,
+      "max_range": 1.8,
+      "aoe": 0,
+      "cooldown": 0,
+      "cast": 0
+    },
+    {
+      "id": "crag_brute_big_smash",
+      "name": "Big Smash",
+      "desc": "Smashes the ground: every enemy within 2.5 m takes power 26 and is knocked down.",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "att",
+      "target": "enemy",
+      "shape": "self",
+      "power": 26,
+      "min_range": 0,
+      "max_range": 0,
+      "aoe": 2.5,
+      "cooldown": 3,
+      "cast": 0,
+      "status": {
+        "id": "knockdown",
+        "turns": 1
+      }
+    },
+    {
+      "id": "crag_brute_idle1",
+      "name": "Shrine Keeper",
+      "desc": "Always on: nothing to use.",
+      "kind": "passive",
+      "effect": "support",
+      "scale": "mag",
+      "target": "ally",
+      "shape": "self",
+      "power": 0,
+      "min_range": 0,
+      "max_range": 0,
+      "aoe": 0,
+      "cooldown": 0,
+      "cast": 0
+    },
+    {
+      "id": "crag_brute_roar",
+      "name": "Roar",
+      "desc": "A roar that shakes the ground: enemies within 3 m are Terrified for a turn.",
+      "kind": "active",
+      "effect": "support",
+      "scale": "mag",
+      "target": "enemy",
+      "shape": "circle",
+      "power": 0,
+      "min_range": 0,
+      "max_range": 0,
+      "aoe": 3,
+      "cooldown": 4,
+      "cast": 0,
+      "status": {
+        "id": "terrified",
+        "turns": 1
+      }
+    }
+  ],
+  "monster": {
+    "tier": "hard",
+    "temperament": "guard_place",
+    "ring": 5
+  }
+}

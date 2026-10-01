@@ -1,0 +1,12 @@
+{
+  "format": "tactical-masters-item",
+  "version": 1,
+  "id": "first_strike_gauntlet",
+  "name": "First Strike Gauntlet",
+  "desc": "Your first hit of the battle that lands is a critical.",
+  "icon": "gauntlet",
+  "tier": "rare",
+  "effects": {
+    "first_strike": true
+  }
+}

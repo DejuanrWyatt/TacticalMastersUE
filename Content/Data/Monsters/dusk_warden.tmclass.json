@@ -1,0 +1,102 @@
+{
+  "format": "tactical-masters-class",
+  "version": 1,
+  "id": "dusk_warden",
+  "name": "Dusk Warden",
+  "color": "#4a3d6a",
+  "look": "knight",
+  "icon": "dusk_warden",
+  "roles": [
+    "tank"
+  ],
+  "stats": {
+    "hp": 100,
+    "attdef": 9,
+    "magdef": 7,
+    "aeva": 3,
+    "meva": 3,
+    "crit": 5,
+    "speed": 8,
+    "move": 4,
+    "patience": 6,
+    "sight": 9
+  },
+  "abilities": [
+    {
+      "id": "dusk_warden_slam",
+      "name": "Slam",
+      "desc": "Slams an enemy within arm's reach (power 30), knocking it down.",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "att",
+      "target": "enemy",
+      "shape": "unit",
+      "power": 30,
+      "min_range": 0,
+      "max_range": 1.8,
+      "aoe": 0,
+      "cooldown": 0,
+      "cast": 0,
+      "status": {
+        "id": "knockdown",
+        "turns": 1
+      }
+    },
+    {
+      "id": "dusk_warden_guard",
+      "name": "Guard",
+      "desc": "Shields an ally up to 4 m away for 20.",
+      "kind": "active",
+      "effect": "support",
+      "scale": "mag",
+      "target": "ally",
+      "shape": "unit",
+      "power": 20,
+      "min_range": 0,
+      "max_range": 4,
+      "aoe": 0,
+      "cooldown": 2,
+      "cast": 0,
+      "status": {
+        "id": "shield",
+        "turns": 2
+      }
+    },
+    {
+      "id": "dusk_warden_idle1",
+      "name": "Escort",
+      "desc": "Always on: nothing to use.",
+      "kind": "passive",
+      "effect": "support",
+      "scale": "mag",
+      "target": "ally",
+      "shape": "self",
+      "power": 0,
+      "min_range": 0,
+      "max_range": 0,
+      "aoe": 0,
+      "cooldown": 0,
+      "cast": 0
+    },
+    {
+      "id": "dusk_warden_idle2",
+      "name": "Bulwark",
+      "desc": "Always on: nothing to use.",
+      "kind": "passive",
+      "effect": "support",
+      "scale": "mag",
+      "target": "ally",
+      "shape": "self",
+      "power": 0,
+      "min_range": 0,
+      "max_range": 0,
+      "aoe": 0,
+      "cooldown": 0,
+      "cast": 0
+    }
+  ],
+  "monster": {
+    "tier": "hard",
+    "temperament": "guard_unit"
+  }
+}

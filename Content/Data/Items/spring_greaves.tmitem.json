@@ -1,0 +1,12 @@
+{
+  "format": "tactical-masters-item",
+  "version": 1,
+  "id": "spring_greaves",
+  "name": "Spring Greaves",
+  "desc": "Climbs one more level in a single step.",
+  "icon": "greaves",
+  "tier": "uncommon",
+  "stats": {
+    "jump": 1
+  }
+}

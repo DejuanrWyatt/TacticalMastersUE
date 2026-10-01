@@ -1,0 +1,29 @@
+{
+  "format": "tactical-masters-item",
+  "version": 1,
+  "id": "rebirth_charm",
+  "name": "Rebirth Charm",
+  "desc": "Reraise an ally: knocked out, it stands up again with a quarter of its health.",
+  "icon": "charm",
+  "tier": "rare",
+  "ability": {
+    "id": "item_reraise",
+    "name": "Reraise",
+    "desc": "An ally up to 4 m away has Reraise for 3 turns: knocked out, it stands up again 3 seconds later with a quarter of its health. Once.",
+    "kind": "active",
+    "effect": "support",
+    "scale": "mag",
+    "target": "ally",
+    "shape": "unit",
+    "power": 0,
+    "min_range": 0,
+    "max_range": 4,
+    "aoe": 0,
+    "cooldown": 8,
+    "cast": 0,
+    "status": {
+      "id": "reraise",
+      "turns": 3
+    }
+  }
+}

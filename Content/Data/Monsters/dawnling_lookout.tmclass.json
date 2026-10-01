@@ -1,0 +1,97 @@
+{
+  "format": "tactical-masters-class",
+  "version": 1,
+  "id": "dawnling_lookout",
+  "name": "Dawnling Lookout",
+  "color": "#e8c56a",
+  "look": "archer",
+  "icon": "dawnling_lookout",
+  "roles": [
+    "special"
+  ],
+  "stats": {
+    "hp": 24,
+    "attdef": 2,
+    "magdef": 2,
+    "aeva": 8,
+    "meva": 6,
+    "crit": 5,
+    "speed": 11,
+    "move": 5,
+    "patience": 5,
+    "sight": 10
+  },
+  "abilities": [
+    {
+      "id": "dawnling_lookout_jab",
+      "name": "Jab",
+      "desc": "Strikes an enemy within arm's reach (power 12).",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "att",
+      "target": "enemy",
+      "shape": "unit",
+      "power": 12,
+      "min_range": 0,
+      "max_range": 1.8,
+      "aoe": 0,
+      "cooldown": 0,
+      "cast": 0
+    },
+    {
+      "id": "dawnling_lookout_idle1",
+      "name": "Watchful",
+      "desc": "Always on: nothing to use.",
+      "kind": "passive",
+      "effect": "support",
+      "scale": "mag",
+      "target": "ally",
+      "shape": "self",
+      "power": 0,
+      "min_range": 0,
+      "max_range": 0,
+      "aoe": 0,
+      "cooldown": 0,
+      "cast": 0
+    },
+    {
+      "id": "dawnling_lookout_idle2",
+      "name": "Horn Call",
+      "desc": "Always on: nothing to use.",
+      "kind": "passive",
+      "effect": "support",
+      "scale": "mag",
+      "target": "ally",
+      "shape": "self",
+      "power": 0,
+      "min_range": 0,
+      "max_range": 0,
+      "aoe": 0,
+      "cooldown": 0,
+      "cast": 0
+    },
+    {
+      "id": "dawnling_lookout_idle3",
+      "name": "Wild Instinct",
+      "desc": "Always on: nothing to use.",
+      "kind": "passive",
+      "effect": "support",
+      "scale": "mag",
+      "target": "ally",
+      "shape": "self",
+      "power": 0,
+      "min_range": 0,
+      "max_range": 0,
+      "aoe": 0,
+      "cooldown": 0,
+      "cast": 0
+    }
+  ],
+  "monster": {
+    "tier": "easy",
+    "temperament": "patrol",
+    "traits": [
+      "lookout"
+    ]
+  }
+}

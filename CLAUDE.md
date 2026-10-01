@@ -94,6 +94,7 @@ be hard to kill (`Stop-Process` and `taskkill` may both refuse; WMI `Terminate` 
 | Make a Fab environment pack into a theme built from its meshes | `Tools\AddKit.bat <pack folder> <theme id> [--base ruined_keep] [--name Name] [--write]` (reads the pack's meshes by name and shape, writes only a theme file; `Docs/Maps.md`) |
 | Sound: write what every ability, moment and hero voice sounds like (`Content/Data/Sounds/sounds.json`, view only) from the installed sound packs and each hero's voice | `python Tools/assign_sounds.py` (packs listed in its `SFX_PACKS`) |
 | Play a chosen map and theme | add `-tmmap=crown_keep -tmtheme=winter` to a game run (`Docs/Maps.md`) |
+| Play with watchtowers | add `-tmtowers=4` to a game run (0 is none, the default for a battle nobody set up; `Docs/design/feat-objectives.md` section 13) |
 | Watch chosen classes fight | add `-tmroster=a,b,c,d` to a game run: both sides field those four; `-tmhold=30` / `-tmtime=180` switch on the other ways to win, `-tmplan=30` planning time |
 | Online: two copies of the game play each other over 127.0.0.1, headless; same battle on both, and a split caught | `Tests\OnlineTest.bat` (close the editor first; about five minutes; `Docs/design/feat-online.md`) |
 | A whole battle in a real game world | `scriptsattle-test.bat` (no window, no rendering; ends itself) |
@@ -151,6 +152,12 @@ exactly as Godot settles them. Easy and medium make Godot's random mistakes with
 `RandiRange`, both measured against Godot (`SimRandomTest`): randf is two draws, and randi_range draws
 nothing for equal ends and rejects biased draws as PCG's bounded draw does.
 
+**Watchtowers** (not Godot's; `Docs/design/feat-objectives.md` section 13): placed at random in mirrored pairs from
+the seed by their own generator (the battle's dice untouched), taken by a Capture order that costs the unit's turn,
+`watchtower_turns` of them (a Developer Tools slider), seen from within `watchtower_sight`; the count is the setup
+screen's. A battle with none is Godot's battle exactly, which is why every parity test is unchanged
+(`SimWatchtowerTest` covers them). The computer player captures and walks to towers only when there are some: a
+divergence from Godot of the same kind as Root/Freeze/Taunt below. Online protocol version 2.
 Maps are files now (`Content/Data/Maps`, read and checked by `TMSim::ReadMapFile`; `SimMapTest`), with Highlands
 built in as Godot has it. The port's own large map, Crown Keep (20x16), and four view-only themes
 (`Content/Data/Themes`) are described in `Docs/Maps.md`.

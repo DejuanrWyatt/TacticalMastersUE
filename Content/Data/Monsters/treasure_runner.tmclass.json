@@ -1,0 +1,94 @@
+{
+  "format": "tactical-masters-class",
+  "version": 1,
+  "id": "treasure_runner",
+  "name": "Treasure Runner",
+  "color": "#f0c040",
+  "look": "squire",
+  "icon": "treasure_runner",
+  "roles": [
+    "special"
+  ],
+  "stats": {
+    "hp": 30,
+    "attdef": 2,
+    "magdef": 2,
+    "aeva": 20,
+    "meva": 10,
+    "crit": 0,
+    "speed": 13,
+    "move": 6,
+    "patience": 6,
+    "sight": 10
+  },
+  "abilities": [
+    {
+      "id": "treasure_runner_shove",
+      "name": "Shove",
+      "desc": "Strikes an enemy within arm's reach (power 6).",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "att",
+      "target": "enemy",
+      "shape": "unit",
+      "power": 6,
+      "min_range": 0,
+      "max_range": 1.8,
+      "aoe": 0,
+      "cooldown": 0,
+      "cast": 0
+    },
+    {
+      "id": "treasure_runner_idle1",
+      "name": "Loot Sack",
+      "desc": "Always on: nothing to use.",
+      "kind": "passive",
+      "effect": "support",
+      "scale": "mag",
+      "target": "ally",
+      "shape": "self",
+      "power": 0,
+      "min_range": 0,
+      "max_range": 0,
+      "aoe": 0,
+      "cooldown": 0,
+      "cast": 0
+    },
+    {
+      "id": "treasure_runner_idle2",
+      "name": "Fleet",
+      "desc": "Always on: nothing to use.",
+      "kind": "passive",
+      "effect": "support",
+      "scale": "mag",
+      "target": "ally",
+      "shape": "self",
+      "power": 0,
+      "min_range": 0,
+      "max_range": 0,
+      "aoe": 0,
+      "cooldown": 0,
+      "cast": 0
+    },
+    {
+      "id": "treasure_runner_idle3",
+      "name": "Skittish",
+      "desc": "Always on: nothing to use.",
+      "kind": "passive",
+      "effect": "support",
+      "scale": "mag",
+      "target": "ally",
+      "shape": "self",
+      "power": 0,
+      "min_range": 0,
+      "max_range": 0,
+      "aoe": 0,
+      "cooldown": 0,
+      "cast": 0
+    }
+  ],
+  "monster": {
+    "tier": "hard",
+    "temperament": "skittish"
+  }
+}

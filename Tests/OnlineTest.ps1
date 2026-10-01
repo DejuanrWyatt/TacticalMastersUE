@@ -6,6 +6,8 @@
 #      the same tick, and neither may stop.
 #   2. The joiner's game made to differ on purpose (-tmnetdesync): both must
 #      stop and say the games are out of sync.
+#   3. A match with every neutral camp (-tmcamps=3), the host playing the
+#      monsters, called on time at 4 minutes: the same battle on both, as in 1.
 #
 # No window and no rendering; each copy ends itself. Run by Tests\OnlineTest.bat.
 
@@ -28,11 +30,11 @@ function Stop-Copy($Process) {
 	}
 }
 
-function Run-Match([string]$Name, [int]$Port, [string[]]$JoinExtra, [int]$Seconds) {
+function Run-Match([string]$Name, [int]$Port, [string[]]$JoinExtra, [int]$Seconds, [string[]]$HostExtra = @()) {
 	$HostLog = "$Logs\online-$Name-host.log"
 	$JoinLog = "$Logs\online-$Name-join.log"
 	Remove-Item $HostLog, $JoinLog -ErrorAction SilentlyContinue
-	$HostArgs = @("`"$Project`"") + $Common + @("-tmhost=$Port", "-abslog=`"$HostLog`"")
+	$HostArgs = @("`"$Project`"") + $Common + @("-tmhost=$Port", "-abslog=`"$HostLog`"") + $HostExtra
 	$JoinArgs = @("`"$Project`"") + $Common + @("-tmjoin=127.0.0.1:$Port", "-abslog=`"$JoinLog`"") + $JoinExtra
 	$Hosting = Start-Process $Editor -ArgumentList $HostArgs -PassThru -WindowStyle Hidden
 	# Give the host a moment to start listening before the joiner knocks.
@@ -56,23 +58,29 @@ function Lines($Log, $Pattern) {
 	return ,@(Select-String -Path $Log -Pattern $Pattern | ForEach-Object { $_.Line })
 }
 
+function Check-Match($Match) {
+	$Bad = $false
+	$HostSum = Lines $Match.Host 'FINAL CHECKSUM'
+	$JoinSum = Lines $Match.Join 'FINAL CHECKSUM'
+	$Stopped = (Lines $Match.Host 'ONLINE STOPPED') + (Lines $Match.Join 'ONLINE STOPPED')
+	$HostEnd = if ($HostSum.Count) { $HostSum[0] -replace '.*FINAL CHECKSUM ', '' } else { '(none)' }
+	$JoinEnd = if ($JoinSum.Count) { $JoinSum[0] -replace '.*FINAL CHECKSUM ', '' } else { '(none)' }
+	Write-Host "  host:   $HostEnd"
+	Write-Host "  joiner: $JoinEnd"
+	foreach ($Line in (Lines $Match.Host 'BATTLE OVER') + (Lines $Match.Join 'BATTLE OVER')) { Write-Host ('  ' + ($Line -replace '.*LogTemp: ', '')) }
+	if ($Match.TimedOut) { Write-Host '  A COPY DID NOT FINISH IN TIME'; $Bad = $true }
+	if ($Stopped.Count) { $Stopped | ForEach-Object { Write-Host ('  ' + ($_ -replace '.*LogTemp: ', '')) }; $Bad = $true }
+	if ($HostSum.Count -eq 0 -or $JoinSum.Count -eq 0) { Write-Host '  A COPY NEVER FINISHED THE BATTLE'; $Bad = $true }
+	elseif ($HostEnd -ne $JoinEnd) { Write-Host '  THE TWO COPIES ENDED DIFFERENT BATTLES'; $Bad = $true }
+	else { Write-Host '  the same battle on both' }
+	return $Bad
+}
+
 $Failed = $false
 
 Write-Host '=== a match between two copies ==='
 $Match = Run-Match 'match' 7791 @() 600
-$HostSum = Lines $Match.Host 'FINAL CHECKSUM'
-$JoinSum = Lines $Match.Join 'FINAL CHECKSUM'
-$Stopped = (Lines $Match.Host 'ONLINE STOPPED') + (Lines $Match.Join 'ONLINE STOPPED')
-$HostEnd = if ($HostSum.Count) { $HostSum[0] -replace '.*FINAL CHECKSUM ', '' } else { '(none)' }
-$JoinEnd = if ($JoinSum.Count) { $JoinSum[0] -replace '.*FINAL CHECKSUM ', '' } else { '(none)' }
-Write-Host "  host:   $HostEnd"
-Write-Host "  joiner: $JoinEnd"
-foreach ($Line in (Lines $Match.Host 'BATTLE OVER') + (Lines $Match.Join 'BATTLE OVER')) { Write-Host ('  ' + ($Line -replace '.*LogTemp: ', '')) }
-if ($Match.TimedOut) { Write-Host '  A COPY DID NOT FINISH IN TIME'; $Failed = $true }
-if ($Stopped.Count) { $Stopped | ForEach-Object { Write-Host ('  ' + ($_ -replace '.*LogTemp: ', '')) }; $Failed = $true }
-if ($HostSum.Count -eq 0 -or $JoinSum.Count -eq 0) { Write-Host '  A COPY NEVER FINISHED THE BATTLE'; $Failed = $true }
-elseif ($HostEnd -ne $JoinEnd) { Write-Host '  THE TWO COPIES ENDED DIFFERENT BATTLES'; $Failed = $true }
-else { Write-Host '  the same battle on both' }
+if (Check-Match $Match) { $Failed = $true }
 
 Write-Host ''
 Write-Host '=== the joiner''s game made to differ ==='
@@ -82,6 +90,11 @@ $JoinSaw = Lines $Split.Join 'ONLINE STOPPED: Out of sync'
 foreach ($Line in $HostSaw + $JoinSaw) { Write-Host ('  ' + ($Line -replace '.*LogTemp: ', '')) }
 if ($HostSaw.Count -eq 0 -or $JoinSaw.Count -eq 0) { Write-Host '  THE SPLIT WAS NOT CAUGHT BY BOTH'; $Failed = $true }
 else { Write-Host '  caught by both' }
+
+Write-Host ''
+Write-Host '=== a match with neutral camps ==='
+$Camps = Run-Match 'camps' 7793 @() 900 @('-tmcamps=3', '-tmmap=riverwatch_fords', '-tmtime=240')
+if (Check-Match $Camps) { $Failed = $true }
 
 Write-Host ''
 if ($Failed) {

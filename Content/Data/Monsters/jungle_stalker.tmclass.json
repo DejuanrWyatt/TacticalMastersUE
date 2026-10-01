@@ -1,0 +1,106 @@
+{
+  "format": "tactical-masters-class",
+  "version": 1,
+  "id": "jungle_stalker",
+  "name": "Jungle Stalker",
+  "color": "#5d7a3a",
+  "look": "monk",
+  "icon": "jungle_stalker",
+  "roles": [
+    "damage"
+  ],
+  "stats": {
+    "hp": 40,
+    "attdef": 4,
+    "magdef": 4,
+    "aeva": 10,
+    "meva": 5,
+    "crit": 10,
+    "speed": 12,
+    "move": 6,
+    "patience": 5,
+    "sight": 9
+  },
+  "abilities": [
+    {
+      "id": "jungle_stalker_rend",
+      "name": "Rend",
+      "desc": "Tears an enemy within arm's reach (power 22), leaving it bleeding for 2 turns.",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "att",
+      "target": "enemy",
+      "shape": "unit",
+      "power": 22,
+      "min_range": 0,
+      "max_range": 1.8,
+      "aoe": 0,
+      "cooldown": 0,
+      "cast": 0,
+      "status": {
+        "id": "bleed",
+        "turns": 2
+      }
+    },
+    {
+      "id": "jungle_stalker_pounce",
+      "name": "Pounce",
+      "desc": "Leaps through an enemy up to 4 m away (power 16); the prey is Marked for 2 turns.",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "att",
+      "target": "enemy",
+      "shape": "vector",
+      "power": 16,
+      "min_range": 0,
+      "max_range": 4,
+      "aoe": 0,
+      "cooldown": 3,
+      "cast": 0,
+      "status": {
+        "id": "marked",
+        "turns": 2
+      }
+    },
+    {
+      "id": "jungle_stalker_idle1",
+      "name": "Prowl",
+      "desc": "Always on: nothing to use.",
+      "kind": "passive",
+      "effect": "support",
+      "scale": "mag",
+      "target": "ally",
+      "shape": "self",
+      "power": 0,
+      "min_range": 0,
+      "max_range": 0,
+      "aoe": 0,
+      "cooldown": 0,
+      "cast": 0
+    },
+    {
+      "id": "jungle_stalker_idle2",
+      "name": "Pack Sense",
+      "desc": "Always on: nothing to use.",
+      "kind": "passive",
+      "effect": "support",
+      "scale": "mag",
+      "target": "ally",
+      "shape": "self",
+      "power": 0,
+      "min_range": 0,
+      "max_range": 0,
+      "aoe": 0,
+      "cooldown": 0,
+      "cast": 0
+    }
+  ],
+  "monster": {
+    "tier": "medium",
+    "temperament": "aggressive",
+    "ring": 6,
+    "traits": [
+      "pack_hunter"
+    ]
+  }
+}

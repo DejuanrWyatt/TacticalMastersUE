@@ -26,13 +26,23 @@ namespace TMSim
 
 	double FBattle::MoveOf(const FUnit& Unit, bool bSprint) const
 	{
-		const double Metres = Unit.Stat(EStat::Move) * Tuning.MoveMultiplier * Unit.MoveFactor();
+		double Metres = Unit.Stat(EStat::Move) * Tuning.MoveMultiplier * Unit.MoveFactor();
+		// Lone Wolf Pelt: further while no ally is near. Nothing without the item.
+		if (Unit.HasItems())
+		{
+			const int Alone = GearSum(Unit, &FItemDef::AloneMove);
+			if (Alone > 0 && IsAlone(Unit, Unit.Pos))
+			{
+				Metres += Alone * Tuning.MoveMultiplier * Unit.MoveFactor();
+			}
+		}
 		return bSprint ? Metres * Tuning.SprintMultiplier : Metres;
 	}
 
 	int FBattle::JumpOf(const FUnit& Unit) const
 	{
-		return Unit.Flies() ? Ground::FlyJump : Ground::Jump;
+		// Items can add a level or two (Spring Greaves); flying needs none.
+		return Unit.Flies() ? Ground::FlyJump : Ground::Jump + Unit.ItemJump();
 	}
 
 	void FBattle::HeapSwap(int A, int B)
@@ -331,7 +341,8 @@ namespace TMSim
 		{
 			Step = Path[Path.size() - 1] - Path[Path.size() - 2];
 		}
-		if (Step.Length() > 0.001f)
+		// Off-Balance: it can't turn to face anything until it is hit.
+		if (Step.Length() > 0.001f && !Unit->HasStatus("offbalance"))
 		{
 			Unit->Facing = Step.Normalized();
 		}
@@ -343,6 +354,13 @@ namespace TMSim
 			Unit->bActed = true;  // a sprint is the unit's action as well
 		}
 		Report.Say(EEventKind::Moved, Unit->Id);
+		// Walking onto items picks them up (feat-neutral-camps.md, "Picking up").
+		PickUpAt(*Unit, Report);
+		// Suppressed: walking out from under it draws a blow (feat-status-effects.md).
+		if (!Unit->Statuses.empty() && Unit->HasStatus("suppressed"))
+		{
+			SuppressedMoved(*Unit, Report);
+		}
 		return true;
 	}
 }

@@ -1,0 +1,12 @@
+{
+  "format": "tactical-masters-item",
+  "version": 1,
+  "id": "focus_crystal",
+  "name": "Focus Crystal",
+  "desc": "Every ability hits a tenth harder.",
+  "icon": "crystal",
+  "tier": "uncommon",
+  "bonus": {
+    "damage_percent": 10
+  }
+}

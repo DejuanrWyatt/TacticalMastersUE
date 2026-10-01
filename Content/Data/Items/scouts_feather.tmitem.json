@@ -1,0 +1,12 @@
+{
+  "format": "tactical-masters-item",
+  "version": 1,
+  "id": "scouts_feather",
+  "name": "Scout's Feather",
+  "desc": "Sharper eyes, further off.",
+  "icon": "feather",
+  "tier": "common",
+  "stats": {
+    "sight": 3
+  }
+}

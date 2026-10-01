@@ -1,0 +1,29 @@
+{
+  "format": "tactical-masters-item",
+  "version": 1,
+  "id": "helix_core",
+  "name": "Helix Core",
+  "desc": "+10% ability damage. Refract: light bursts over a spot up to 6 m away.",
+  "icon": "core",
+  "tier": "epic",
+  "bonus": {
+    "damage_percent": 10
+  },
+  "ability": {
+    "id": "item_refract",
+    "name": "Refract",
+    "desc": "Power 24 to every enemy within 2 m of a spot up to 6 m away.",
+    "kind": "active",
+    "effect": "damage",
+    "scale": "mag",
+    "target": "enemy",
+    "shape": "circle",
+    "power": 24,
+    "min_range": 0,
+    "max_range": 6,
+    "aoe": 2,
+    "cooldown": 4,
+    "cast": 0
+  },
+  "boss": "helix_prime"
+}

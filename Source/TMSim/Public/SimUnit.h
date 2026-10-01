@@ -14,6 +14,24 @@
 
 namespace TMSim
 {
+	struct FItemDef;
+	struct FAbility;
+	struct FMonsterInfo;
+
+	/** What a neutral monster is doing (Docs/design/feat-neutral-camps.md 14). */
+	enum class EMind : uint8_t
+	{
+		/** At home, or walking its route. */
+		Resting,
+		/** Set off: it shows it, and fights from its next turn. */
+		Alert,
+		Fighting,
+		/** Nobody left to chase: walking home, where it mends. */
+		Returning,
+		/** Running: from anyone (skittish), or for a turn after being hit (docile). */
+		Fleeing,
+	};
+
 	/** A class's stats. Read from the class files; the six built-ins are code. */
 	struct FJobStats
 	{
@@ -115,15 +133,74 @@ namespace TMSim
 
 		std::vector<FStatus> Statuses;
 		std::vector<FBuff> Buffs;
-		int Cooldowns[4] = { 0, 0, 0, 0 };
+		/** Turns left on each slot: the class's four, then its items' (AbilitySlots). */
+		int Cooldowns[AbilitySlots] = { 0, 0, 0, 0, 0, 0, 0 };
 
 		/** A spell part-way out, or Slot -1 for none. */
 		FCast Casting;
 		/** A channelled ability in progress, or Slot -1 for none. */
 		FChannel Channeling;
 		/** Which toggles are switched on, and which were flipped this turn. */
-		bool Toggled[4] = { false, false, false, false };
-		bool ToggledTurn[4] = { false, false, false, false };
+		bool Toggled[AbilitySlots] = { false, false, false, false, false, false, false };
+		bool ToggledTurn[AbilitySlots] = { false, false, false, false, false, false, false };
+
+		/**
+		 * What it carries (SimItem.h): three open slots, each an item or null.
+		 * Set before the battle starts (the setup screen's loadout), and later
+		 * by picking items up. Points into the item registry, which outlives
+		 * every battle.
+		 */
+		const FItemDef* Gear[3] = { nullptr, nullptr, nullptr };
+
+		// ------------------------------------------ item effects (SimItem.h)
+
+		/** The last damage it took, which Rewind gives back. */
+		int LastHurt = 0;
+		/** Once-a-battle items already spent: Rewind, First Strike, Phoenix Feather. */
+		bool bRewindUsed = false;
+		bool bFirstStrikeUsed = false;
+		bool bPhoenixUsed = false;
+		/** It didn't walk on its last turn (Anchor Stone), and wasn't seen as its turn began (Nightcloak). */
+		bool bStillLastTurn = false;
+		bool bUnseenAtStart = false;
+		/** Gauge owed for kills this turn (Momentum Charm), in percent, paid when the turn ends. */
+		int KillTgPercent = 0;
+
+		// ------------------------- neutral monsters (Docs/design/feat-neutral-camps.md)
+		// All at rest for a side's own units.
+
+		/** A camp's monster: on team 2, enemy of both sides, never counted towards a win. */
+		bool bMonster = false;
+		/** Waiting off the board for its camp to wake, or gone until it does again. */
+		bool bOffBoard = false;
+		/** Its camp, by place in FBattle::Camps, or -1. */
+		int Camp = -1;
+		EMind Mind = EMind::Resting;
+		/** Where it rests and goes back to. */
+		FVec2 Home;
+		/** Who last hurt it, and for how many more of its turns it holds that against them. */
+		int Grudge = -1;
+		int GrudgeTurns = 0;
+		/** Turns more it runs (a docile one hit). */
+		int FleeTurns = 0;
+		/** Its next waypoint, walking a route. */
+		int RouteStep = 0;
+		/** A boss's phase: 0 its first abilities, then each FMonsterPhase in turn. Never goes back. */
+		int Phase = 0;
+		/** Hits from behind towards a stagger. */
+		int Stagger = 0;
+		/** Tamed: its own turns left on the side that tamed it, then back to team 2. */
+		int TamedTurns = 0;
+
+		// ------------------------------- the second set of statuses (feat-status-effects.md)
+
+		/** Charmed: the side it belongs to while it fights for the other one, or -1. */
+		int CharmedFrom = -1;
+		/** Reraise caught its fall: ticks until it stands again, or 0. */
+		int ReraiseTicks = 0;
+
+		/** The side it belongs to, whoever it fights for just now (Charmed). */
+		int HomeTeam() const { return CharmedFrom >= 0 ? CharmedFrom : Team; }
 
 		// ------------------------------------------------------------ state
 
@@ -131,10 +208,38 @@ namespace TMSim
 		bool IsChanneling() const { return Channeling.Slot >= 0; }
 
 		bool IsAlive() const { return Hp > 0; }
+
+		/**
+		 * The ability in a slot: the class's four (a boss's for its phase), then
+		 * one per item that gives one. Null for an empty slot.
+		 */
+		TMSIM_API const FAbility* Ability(int Slot) const;
+		/** Its class's monster rules, or null for a class a side fields. */
+		TMSIM_API const FMonsterInfo* MonsterInfo() const;
 		bool IsKo() const { return Hp <= 0 && KoTicks > 0; }
 		bool IsHustling() const { return bHustling; }
 
-		int MaxHp() const { return Stats ? Stats->Get(EStat::Hp) : 0; }
+		/** The class's HP and what its items add. */
+		int MaxHp() const { return Stats ? Stats->Get(EStat::Hp) + (HasItems() ? ItemStat(EStat::Hp) : 0) : 0; }
+
+		// ------------------------------------------------------------ items
+		// (SimItem.cpp). All zero for a unit carrying nothing, which is what
+		// keeps every number exactly what it was before items.
+
+		bool HasItems() const { return Gear[0] || Gear[1] || Gear[2]; }
+		/** What its items add to a stat, held to the caps (Items::ChanceCap, Items::StepCap). */
+		TMSIM_API int ItemStat(EStat Which) const;
+		/** Flat power and percent its items add to its damage abilities of this scale (true: AttDef-resisted). */
+		TMSIM_API int ItemDamageFlat(bool bAttScale) const;
+		TMSIM_API int ItemDamagePercent(bool bAttScale) const;
+		TMSIM_API int ItemHealFlat(bool bAttScale) const;
+		TMSIM_API int ItemHealPercent(bool bAttScale) const;
+		/** Percent faster its Turn Gauge fills. */
+		TMSIM_API int ItemTgPercent() const;
+		/** Extra levels it can climb in one step. */
+		TMSIM_API int ItemJump() const;
+		/** Whether it carries that item. */
+		TMSIM_API bool Carries(const std::string& ItemId) const;
 
 		/** A stat with its buffs, and the statuses that scale the defences. */
 		TMSIM_API int Stat(EStat Which) const;

@@ -192,12 +192,71 @@ void ATMBattleDirector::ApplyOutlines()
 		{
 			continue;
 		}
-		const int32 Stencil = IsFriend(Battle.Units[i]) ? 1 : 2;
+		// 3 is a unit under the pointer or in the aim: the outline material draws
+		// it thick, glowing red (Tools/make_outline_material.py).
+		const int32 Stencil = MarkedUnits.Contains(Battle.Units[i].Id) ? 3 : IsFriend(Battle.Units[i]) ? 1 : 2;
 		if (!Body->bRenderCustomDepth || Body->CustomDepthStencilValue != Stencil)
 		{
 			Body->SetRenderCustomDepth(true);
 			Body->SetCustomDepthStencilValue(Stencil);
 		}
+	}
+}
+
+void ATMBattleDirector::UpdateMarks()
+{
+	// Who is marked: the unit under the pointer, and, while an ability is being
+	// aimed, every unit it would touch from here -- whatever its shape: one
+	// target, a circle, a cone, a line.
+	TSet<int32> Now;
+	if (Screen == EScreen::Battle && Battle.Winner == -1)
+	{
+		if (const TMSim::FUnit* Hovered = Battle.FindUnit(HoverUnitId))
+		{
+			if (IsSeen(*Hovered))
+			{
+				Now.Add(Hovered->Id);
+			}
+		}
+		const TMSim::FUnit* Unit = SelectedUnit();
+		if (AimMode == EAimMode::Ability && PlayerCanOrder(Unit) && !Battle.IsPlanning())
+		{
+			const FAim Where = Aim();
+			if (Where.bHave)
+			{
+				for (const TMSim::FHit& Hit : Battle.Preview(*Unit, AimSlot, Unit->Pos, Where.Point))
+				{
+					const TMSim::FUnit* Touched = Battle.FindUnit(Hit.UnitId);
+					if (Touched && IsSeen(*Touched))
+					{
+						Now.Add(Hit.UnitId);
+					}
+				}
+			}
+		}
+	}
+	bool bSame = Now.Num() == MarkedUnits.Num();
+	for (const int32 Id : Now)
+	{
+		bSame = bSame && MarkedUnits.Contains(Id);
+	}
+	if (!bSame)
+	{
+		MarkedUnits = MoveTemp(Now);
+		// Red over an enemy, blue over a friend (the human's ask, 2026-09-30): an
+		// aim that touches any enemy marks all it touches red.
+		bool bEnemy = false;
+		for (const int32 Id : MarkedUnits)
+		{
+			const TMSim::FUnit* Marked = Battle.FindUnit(Id);
+			bEnemy = bEnemy || (Marked && !IsFriend(*Marked));
+		}
+		if (OutlineMid)
+		{
+			OutlineMid->SetVectorParameterValue(TEXT("HoverColour"),
+				bEnemy ? FLinearColor(1.0f, 0.08f, 0.05f, 1.0f) : FLinearColor(0.15f, 0.55f, 1.0f, 1.0f));
+		}
+		ApplyOutlines();
 	}
 }
 
@@ -217,6 +276,9 @@ void ATMBattleDirector::AddOutlineToCamera()
 	UMaterialInstanceDynamic* Mid = UMaterialInstanceDynamic::Create(Outline, this);
 	Mid->SetVectorParameterValue(TEXT("AllyColour"), SideColour(true));
 	Mid->SetVectorParameterValue(TEXT("EnemyColour"), SideColour(false));
+	// What is under the pointer or in the aim: red, as League of Legends marks it.
+	Mid->SetVectorParameterValue(TEXT("HoverColour"), FLinearColor(1.0f, 0.08f, 0.05f, 1.0f));
+	OutlineMid = Mid;
 	if (UCameraComponent* Lens = Watcher->GetCameraComponent())
 	{
 		Lens->PostProcessSettings.AddBlendable(Mid, 1.0f);

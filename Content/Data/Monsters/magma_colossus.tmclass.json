@@ -1,0 +1,187 @@
+{
+  "format": "tactical-masters-class",
+  "version": 1,
+  "id": "magma_colossus",
+  "name": "The Magma Colossus",
+  "color": "#ff6a2a",
+  "look": "knight",
+  "icon": "magma_colossus",
+  "roles": [
+    "tank",
+    "damage"
+  ],
+  "stats": {
+    "hp": 300,
+    "attdef": 12,
+    "magdef": 8,
+    "aeva": 0,
+    "meva": 2,
+    "crit": 5,
+    "speed": 7,
+    "move": 3,
+    "patience": 8,
+    "sight": 9
+  },
+  "abilities": [
+    {
+      "id": "magma_colossus_slam",
+      "name": "Slam",
+      "desc": "Slams an enemy within arm's reach (power 40), knocking it down.",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "att",
+      "target": "enemy",
+      "shape": "unit",
+      "power": 40,
+      "min_range": 0,
+      "max_range": 1.8,
+      "aoe": 0,
+      "cooldown": 0,
+      "cast": 0,
+      "status": {
+        "id": "knockdown",
+        "turns": 1
+      }
+    },
+    {
+      "id": "magma_colossus_hurl",
+      "name": "Hurl",
+      "desc": "Heaves a boulder at a spot 4 to 8 m away; it lands 8 seconds later: power 34 within 1 m.",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "att",
+      "target": "enemy",
+      "shape": "circle",
+      "power": 34,
+      "min_range": 4,
+      "max_range": 8,
+      "aoe": 1,
+      "cooldown": 2,
+      "cast": 8
+    },
+    {
+      "id": "magma_colossus_idle1",
+      "name": "Molten Core",
+      "desc": "Always on: nothing to use.",
+      "kind": "passive",
+      "effect": "support",
+      "scale": "mag",
+      "target": "ally",
+      "shape": "self",
+      "power": 0,
+      "min_range": 0,
+      "max_range": 0,
+      "aoe": 0,
+      "cooldown": 0,
+      "cast": 0
+    },
+    {
+      "id": "magma_colossus_quake",
+      "name": "Quake",
+      "desc": "Everyone within 3 m: power 28; those caught are Off-Balance.",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "att",
+      "target": "enemy",
+      "shape": "self",
+      "power": 28,
+      "min_range": 0,
+      "max_range": 0,
+      "aoe": 3,
+      "cooldown": 4,
+      "cast": 0,
+      "status": {
+        "id": "offbalance",
+        "turns": 1
+      }
+    }
+  ],
+  "monster": {
+    "tier": "epic",
+    "temperament": "territorial",
+    "ring": 5,
+    "traits": [
+      "unstoppable",
+      "stagger"
+    ],
+    "phases": [
+      {
+        "below": 60,
+        "abilities": [
+          {
+            "id": "magma_colossus_slam_2",
+            "name": "Slam",
+            "desc": "Slams an enemy within arm's reach (power 40), knocking it down.",
+            "kind": "active",
+            "effect": "damage",
+            "scale": "att",
+            "target": "enemy",
+            "shape": "unit",
+            "power": 40,
+            "min_range": 0,
+            "max_range": 1.8,
+            "aoe": 0,
+            "cooldown": 0,
+            "cast": 0,
+            "status": {
+              "id": "knockdown",
+              "turns": 1
+            }
+          },
+          {
+            "id": "magma_colossus_hurl_2",
+            "name": "Hurl",
+            "desc": "Heaves a boulder at a spot 4 to 8 m away; it lands 8 seconds later: power 34 within 1 m.",
+            "kind": "active",
+            "effect": "damage",
+            "scale": "att",
+            "target": "enemy",
+            "shape": "circle",
+            "power": 34,
+            "min_range": 4,
+            "max_range": 8,
+            "aoe": 1,
+            "cooldown": 2,
+            "cast": 8
+          },
+          {
+            "id": "magma_colossus_second_boulder_2",
+            "name": "Second Boulder",
+            "desc": "Heaves a boulder at a spot 4 to 8 m away; it lands 8 seconds later: power 34 within 1 m.",
+            "kind": "active",
+            "effect": "damage",
+            "scale": "att",
+            "target": "enemy",
+            "shape": "circle",
+            "power": 34,
+            "min_range": 4,
+            "max_range": 8,
+            "aoe": 1,
+            "cooldown": 2,
+            "cast": 8
+          },
+          {
+            "id": "magma_colossus_eruption",
+            "name": "Eruption",
+            "desc": "Always on: enemies within 3 m of it burn.",
+            "kind": "aura",
+            "effect": "support",
+            "scale": "mag",
+            "target": "enemy",
+            "shape": "self",
+            "power": 0,
+            "min_range": 0,
+            "max_range": 0,
+            "aoe": 3,
+            "cooldown": 0,
+            "cast": 0,
+            "status": {
+              "id": "burn",
+              "turns": 1
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -14,6 +14,7 @@ nothing a battle does.
   "name": "Crown Keep",
   "desc": "Shown on the setup screen.",
   "theme": "ruined_keep",
+  "boss": "helix_prime",
   "top": ["11111111111111111111", "..."],
   "spawns": [[2.75, 4.75], [0.75, 6.75], [4.75, 5.75], [2.75, 8.75]]
 }
@@ -29,6 +30,10 @@ nothing a battle does.
   spots turned about. The first is the side's spawn point: the planning area
   is 6 m around it, and a unit that sees nobody walks toward the enemy's.
 - **theme** is the look it is shown in unless the setup screen picks another.
+- **boss** is the monster class (`Content/Data/Monsters`) that wakes at the
+  map's boss camp in the middle when neutral camps are Standard or Wild, unless
+  the setup screen's Boss is Random. Optional; without it the boss camp is left
+  out. See `Docs/design/feat-neutral-camps.md`.
 
 The rules read the file (`TMSim::ReadMapFile`) and refuse, with the reason, a
 map with ground they don't know, uneven rows, spawns off the ground or on top
@@ -104,12 +109,37 @@ A theme can name a **kit**: meshes to build with instead of the basic shapes.
   and never shorter than 1.8 m, so it always reads as cover.
 - **tree**, **boulder**: what stands around the board, `treeHeight` and
   `boulderSize` metres.
+- **cliff**: rock faces for the tall steps (two heights or more) between tiles, stretched along the
+  edge and as tall as the drop; **structure**: ruins that stand on about one rock tile in five
+  instead of a rock, and larger ones in the land round the board. Without them, Paragon's Monolith
+  rocks and ruins are used (`TMBattleDirectorCliffs.cpp`).
+- Heights are drawn 1.8 times taller than the rules' 0.7 m a step (`ViewLevelScale`), so hills
+  read from the camera; only the look, the rules count steps. Foliage grows only from a kit:
+  with none named, nothing of that kind grows (no painted stand-in shapes).
 
 Each piece is fitted by the mesh's own size and stood on its own base,
 wherever its pivot is, and turned at random. A list gives variety: one is
 picked per piece. A mesh that is not in the project is said once in the log,
 and the basic shape stands in for it. The cliff faces and the land around stay
 painted in the theme's colours.
+
+What grows has a kit of its own, under `"foliage"`:
+
+```json
+"foliage": { ..., "kit": {
+  "grass": ["/Game/KiteDemo/Environments/Foliage/Grass/FieldGrass/SM_FieldGrass_01.SM_FieldGrass_01"],
+  "flower": ["..."], "bush": ["..."],
+  "grassHeight": 0.45, "flowerHeight": 0.4, "bushHeight": 1.1
+} }
+```
+
+Each is fitted to its height (metres) by its own bounds and stood on its base,
+like the pieces above, and drawn instanced, one draw per mesh. With a kit the
+theme's grass and flower colours are not used. Today the themes use the Kite
+Demo's nature meshes (`Content/KiteDemo`: field grass, buttercups, scabious,
+yarrow, heather, bog myrtle, ferns, hill trees, Scots pines, boulders) and the
+Free Stylized Lava Rock pack for Ashen Caldera. Winter Pass keeps its pale
+stand-in grass, since the Kite Demo's is summer green.
 
 **Your part: getting a pack.** Downloads are yours (editor work is human-only
 here). Good free starting points:

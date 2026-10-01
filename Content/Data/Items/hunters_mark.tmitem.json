@@ -1,0 +1,12 @@
+{
+  "format": "tactical-masters-item",
+  "version": 1,
+  "id": "hunters_mark",
+  "name": "Hunter's Mark",
+  "desc": "20% more damage to monsters.",
+  "icon": "mark",
+  "tier": "common",
+  "effects": {
+    "vs_monsters_percent": 20
+  }
+}

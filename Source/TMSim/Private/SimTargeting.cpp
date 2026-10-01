@@ -159,7 +159,7 @@ namespace TMSim
 	bool FBattle::InAbilityRange(const FUnit& Unit, int Slot, const FVec2& From,
 		const FVec2& Target) const
 	{
-		const FAbility* Ability = JobAbility(Unit.Job, Slot);
+		const FAbility* Ability = Unit.Ability(Slot);
 		if (!Ability)
 		{
 			return false;
@@ -180,7 +180,7 @@ namespace TMSim
 		const FVec2& Target) const
 	{
 		std::vector<FHit> Out;
-		const FAbility* Ability = JobAbility(Unit.Job, Slot);
+		const FAbility* Ability = Unit.Ability(Slot);
 		if (!Ability)
 		{
 			return Out;

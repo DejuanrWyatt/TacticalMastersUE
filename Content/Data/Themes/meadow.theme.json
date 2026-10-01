@@ -48,5 +48,68 @@
   "fog": {
     "density": 0.015,
     "colour": "#9fc3e6"
+  },
+  "light": {
+    "drift": 1.5,
+    "volumetric": true
+  },
+  "foliage": {
+    "grass": {
+      "density": 1.4,
+      "height": 0.35
+    },
+    "flowers": {
+      "density": 0.25,
+      "colours": [
+        "#f2d64b",
+        "#e05a8a",
+        "#f4f4f8",
+        "#9a7be8"
+      ]
+    },
+    "bushes": {
+      "density": 0.35,
+      "colour": "#2f5e24"
+    },
+    "forest": 0.035,
+    "kit": {
+      "grass": [
+        "/Game/KiteDemo/Environments/Foliage/Grass/FieldGrass/SM_FieldGrass_01.SM_FieldGrass_01"
+      ],
+      "flower": [
+        "/Game/KiteDemo/Environments/Foliage/Flowers/Buttercup/SM_Buttercup_Patch_01.SM_Buttercup_Patch_01",
+        "/Game/KiteDemo/Environments/Foliage/Flowers/FieldScabious/SM_FieldScabious_01.SM_FieldScabious_01",
+        "/Game/KiteDemo/Environments/Foliage/Flowers/Yarrow/SM_Yarrow.SM_Yarrow",
+        "/Game/KiteDemo/Environments/Foliage/Flowers/Yarrow/SM_Yarrow3.SM_Yarrow3"
+      ],
+      "bush": [
+        "/Game/KiteDemo/Environments/Foliage/BogMyrtleBush_01/BogMyrtleBush_01.BogMyrtleBush_01",
+        "/Game/KiteDemo/Environments/Foliage/BogMyrtleBush_02/BogMyrtleBush_02.BogMyrtleBush_02",
+        "/Game/KiteDemo/Environments/Foliage/Ferns/SM_Fern_01.SM_Fern_01",
+        "/Game/KiteDemo/Environments/Foliage/Ferns/SM_Fern_02.SM_Fern_02"
+      ],
+      "grassHeight": 0.45,
+      "flowerHeight": 0.4,
+      "bushHeight": 1.1
+    }
+  },
+  "kit": {
+    "rock": [
+      "/Game/KiteDemo/Environments/Rocks/Medium_Boulder_001/Medium_Boulder_001.Medium_Boulder_001",
+      "/Game/KiteDemo/Environments/Rocks/Medium_Boulder_002/Medium_Boulder_LowPoly.Medium_Boulder_LowPoly",
+      "/Game/KiteDemo/Environments/Rocks/River_Rock_01/SM_River_Rock_01.SM_River_Rock_01"
+    ],
+    "tree": [
+      "/Game/KiteDemo/Environments/Trees/HillTree_Tall_02/HillTree_Tall_02.HillTree_Tall_02"
+    ],
+    "boulder": [
+      "/Game/KiteDemo/Environments/Rocks/Medium_Boulder_001/Medium_Boulder_001.Medium_Boulder_001",
+      "/Game/KiteDemo/Environments/Rocks/Medium_Boulder_002/Medium_Boulder_LowPoly.Medium_Boulder_LowPoly",
+      "/Game/KiteDemo/Environments/Trees/Tree_Stump_01/Tree_Stump_01.Tree_Stump_01",
+      "/Game/KiteDemo/Environments/Rocks/GroundRevealRock001/SM_GroundRevealRock001.SM_GroundRevealRock001"
+    ],
+    "rockFill": 0.95,
+    "treeHeight": 11,
+    "boulderSize": 2.4
   }
 }

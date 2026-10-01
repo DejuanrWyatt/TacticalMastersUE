@@ -32,6 +32,101 @@ class UStaticMeshComponent;
 class UPointLightComponent;
 class UTextRenderComponent;
 class ACameraActor;
+struct FRandomStream;
+
+/**
+ * Times the block it stands in, and says in the log when that took longer
+ * than a frame can spare: "SLOW Fog: 23.4 ms". For finding what makes the
+ * battle lag (2026-09-30); costs a clock read each way.
+ */
+struct FTMSlow
+{
+	const TCHAR* What;
+	double Start;
+	double LimitMs;
+	explicit FTMSlow(const TCHAR* InWhat, double InLimitMs = 4.0)
+		: What(InWhat), Start(FPlatformTime::Seconds()), LimitMs(InLimitMs)
+	{
+	}
+	~FTMSlow()
+	{
+		const double Ms = (FPlatformTime::Seconds() - Start) * 1000.0;
+		if (Ms > LimitMs)
+		{
+			UE_LOG(LogTemp, Log, TEXT("SLOW %s: %.1f ms"), What, Ms);
+		}
+	}
+};
+#define TM_SLOW(Name) const FTMSlow ANONYMOUS_VARIABLE(Slow)(TEXT(Name))
+
+/** A cache's chest as it is drawn (TMBattleDirectorChest.cpp): what moves on it. */
+USTRUCT()
+struct FTMChest
+{
+	GENERATED_BODY()
+
+	UPROPERTY()
+	TObjectPtr<USceneComponent> Root = nullptr;
+
+	/** The crystal on its lid, which turns and bobs; none on a common chest. */
+	UPROPERTY()
+	TObjectPtr<USceneComponent> Crystal = nullptr;
+
+	UPROPERTY()
+	TObjectPtr<class UPointLightComponent> Light = nullptr;
+
+	/** The epic chest's rising sparks. */
+	UPROPERTY()
+	TArray<TObjectPtr<UStaticMeshComponent>> Sparks;
+
+	int32 Tier = 0;
+	float Phase = 0.0f;
+	float LightBase = 0.0f;
+};
+
+/** A watchtower as it is drawn (TMBattleDirectorTower.cpp): its fire, which takes the holder's colour. */
+USTRUCT()
+struct FTMTower
+{
+	GENERATED_BODY()
+
+	UPROPERTY()
+	TObjectPtr<USceneComponent> Root = nullptr;
+
+	/** The flames that rise from the bowl, over and over. */
+	UPROPERTY()
+	TArray<TObjectPtr<UStaticMeshComponent>> Flames;
+
+	UPROPERTY()
+	TObjectPtr<class UPointLightComponent> Light = nullptr;
+
+	/** The fire's colour, and its hot heart's. */
+	UPROPERTY()
+	TObjectPtr<class UMaterialInstanceDynamic> Fire = nullptr;
+	UPROPERTY()
+	TObjectPtr<class UMaterialInstanceDynamic> Core = nullptr;
+
+	/** Where the coals are, from its foot. */
+	FVector Bowl = FVector::ZeroVector;
+	/** Who it is painted for: 0, 1, -1 nobody, -2 not yet. */
+	int32 Holder = -2;
+	float Phase = 0.0f;
+	float LightBase = 0.0f;
+};
+
+/** A moving part of a hazard ground (TMBattleDirectorHazards.cpp): a flame, an ember, a wisp of steam, a mote. */
+struct FTMHazardPart
+{
+	/** In BoardProps too, which keeps it. */
+	TWeakObjectPtr<UStaticMeshComponent> Piece;
+	/** Where it rests, from the board's root, in centimetres. */
+	FVector Home = FVector::ZeroVector;
+	uint8 Kind = 0;
+	/** 0..1, so no two move together. */
+	float Phase = 0.0f;
+	/** Across, in metres. */
+	float Size = 0.0f;
+};
 
 /**
  * A number rising off a unit. It is a USTRUCT only so the component it holds is
@@ -197,6 +292,13 @@ private:
 
 	/** Metres in the rules to Unreal's centimetres. */
 	FVector WorldFromMetres(const TMSim::FVec2& Point, int Level) const;
+	/**
+	 * A height step as drawn, in centimetres: taller than the rules' 0.7 m
+	 * (ViewLevelScale), so hills and cliffs read from the camera's height. Only
+	 * the look: the rules count steps, never centimetres.
+	 */
+	static constexpr float ViewLevelScale = 1.8f;
+	float LevelCm() const { return TMSim::Ground::LevelHeight * ViewLevelScale * TileSize; }
 
 	UPROPERTY()
 	TArray<TObjectPtr<class UStaticMeshComponent>> TileVisuals;
@@ -401,6 +503,32 @@ private:
 		double BattleSeconds = 0.0;
 		/** Seconds before the fighting to place units in (battle_setup.gd:44); 0 is none. */
 		double PlanningSeconds = 0.0;
+		/**
+		 * How many watchtowers the battle starts with, placed at random in
+		 * mirrored pairs by the rules (Docs/design/feat-objectives.md). Not
+		 * Godot's; 0 is none, which is Godot's battle, and is what a battle
+		 * nobody set up gets. The setup screen offers 2 the first time it opens.
+		 */
+		int32 Watchtowers = 0;
+		/**
+		 * Points each side may spend on items, and what each unit carries
+		 * (item ids, "" for an empty slot), by side, unit and slot
+		 * (Docs/design/feat-neutral-camps.md). 0 points is none, Godot's battle;
+		 * the setup screen offers 6 the first time it opens. A side the computer
+		 * plays picks its own.
+		 */
+		int32 ItemBudget = 0;
+		std::string Items[2][4][3];
+		/**
+		 * Neutral camps (Docs/design/feat-neutral-camps.md): 0 off, 1 light,
+		 * 2 standard, 3 wild; and whether the boss is drawn at random rather
+		 * than the map's own. 0 is Godot's battle; the setup screen offers
+		 * standard the first time it opens.
+		 */
+		int32 CampLevel = 0;
+		bool bRandomBoss = false;
+		/** Element hits leave their mark (Docs/design/feat-status-effects.md): off in Godot's battle, offered on. */
+		bool bElements = false;
 		uint64 FixedSeed = 12345;
 		/** The map, by id (TMSim::FindMap), and the look it is dressed in: empty for the map's own. */
 		std::string MapId = "highlands";
@@ -408,6 +536,16 @@ private:
 	};
 
 	FMatchSetup Setup;
+	/** Whether the setup screen has offered its first watchtowers yet (OpenSetup). */
+	bool bOfferedTowers = false;
+	/** Likewise its first item points, and its first camps. */
+	bool bOfferedItems = false;
+	bool bOfferedCamps = false;
+	bool bOfferedElements = false;
+	/** Points a side has spent on items in the setup. */
+	int32 ItemPointsSpent(int32 Team) const;
+	/** Whether this side picks its own items: the computer does. */
+	bool PicksOwnItems(int32 Team) const;
 	/** Whether a person chose the setup. If not, ComputerSkill sets both difficulties, as it always has. */
 	bool bSetupChosen = false;
 	EScreen Screen = EScreen::Battle;
@@ -475,6 +613,15 @@ private:
 	int32 PickerSlot = -1;
 	/** The role the picker shows, as an index into tank, damage, support, special, or -1 for every class. */
 	int32 PickerRole = -1;
+	/** The item slot being filled (team * 12 + unit * 3 + slot), or -1; and the tier the item picker shows (-1 all). */
+	int32 ItemPickerSlot = -1;
+	int32 ItemPickerTier = -1;
+	/** Rows of the item picker's grid scrolled past (the mouse wheel); the HUD keeps it in range. */
+	int32 ItemPickerScroll = 0;
+	/** Puts an item in a setup slot, or says why not. */
+	void ChooseItem(int32 SlotCode, int32 ItemIndex);
+	/** The Unit Guide's page: 0 the classes, 1 the items. */
+	int32 GuideTab = 0;
 
 	/** A tank, two damage dealers and someone to keep them standing (class_list.gd:62-77). */
 	void RandomTeam(int32 Team);
@@ -518,9 +665,24 @@ private:
 
 	/** Keeps the selection honest as time runs: turns end, units fall. */
 	void MaintainSelection();
+	/** A unit of the player's used its turn: the camera goes to the next one ready, when there is one. */
+	bool bSnapToNext = false;
 
 	/** Works out what is under the mouse: a spot on the board, and a unit. */
 	void PickUnderCursor();
+
+	/**
+	 * While an ability is being aimed, keeps the aim inside what could legally
+	 * be ordered: within its range of where the unit stands, or of anywhere it
+	 * can still walk this turn (a walk into range). Pointing further away pulls
+	 * the aim back to the nearest legal spot, so the reticle cannot be dragged
+	 * across the board. Global abilities and those centred on the user are left
+	 * alone. Only the aim moves; the mouse pointer stays free for the HUD.
+	 */
+	void TetherAim();
+	/** Where the aimed ability could be used from, and the board it was worked out for. */
+	std::vector<TMSim::FVec2> TetherFrom;
+	FString TetherKey;
 
 	/** Where the chosen ability would land for where the mouse is, and whether it may. */
 	struct FAim
@@ -565,10 +727,46 @@ private:
 	/** Turns the picture on the board if a decal's axes come out otherwise. */
 	float IndicatorRoll = 0.0f;
 	FString IndicatorSignature;
+	/** The walk area's edge, in metres, as painted: the HUD draws it again over
+	 *  the scenery, which can stand over the ground and hide the decal. */
+	TArray<TPair<FVector2D, FVector2D>> MoveEdgeMetres;
 	UPROPERTY()
 	TObjectPtr<class UDecalComponent> IndicatorDecal = nullptr;
 	UPROPERTY()
 	TObjectPtr<class UTextureRenderTarget2D> IndicatorFilm = nullptr;
+
+	// ------------------------------------------------ fog of war on the ground
+	// (TMBattleDirectorFog.cpp): what this screen's side sees now is clear and
+	// edged with a line; ground it has seen before is greyed; ground it has
+	// never seen is dark, its shape still there but nothing on it shown.
+	void BuildFog();
+	void AdvanceFog();
+	/** The board's cells (FogCell metres across) this side can see now, and has ever seen. */
+	TArray<uint8> FogSeen;
+	TArray<uint8> FogExplored;
+	int32 FogCellsX = 0;
+	int32 FogCellsY = 0;
+	/** The side the explored cells belong to; a change of side starts them again. */
+	int32 FogViewer = -2;
+	FString FogSignature;
+	bool bFogDecal = false;
+	/** The fog drawn over everything by a post-process (M_FogOfWar), not the decal. */
+	bool bFogPost = false;
+	/** The board can be built before the camera is: the post-process is tried again once it is. */
+	bool bFogPostRetried = false;
+	UPROPERTY()
+	TObjectPtr<class UMaterialInstanceDynamic> FogPost = nullptr;
+	UPROPERTY()
+	TObjectPtr<class UDecalComponent> FogDecal = nullptr;
+	UPROPERTY()
+	TObjectPtr<class UTextureRenderTarget2D> FogFilm = nullptr;
+	/** Things on the board that stay hidden until their cell has been seen: rocks, hazards, towers. */
+	TArray<TWeakObjectPtr<class USceneComponent>> FogProps;
+	TArray<int32> FogPropCell;
+	/** Marks the board pieces made since BoardProps held From as hidden until the spot (in centimetres) is seen. */
+	void MarkFogged(int32 From, const FVector& Where);
+	/** The fog cell a spot on the board falls in, or -1 off it. */
+	int32 FogCellOf(const TMSim::FVec2& Point) const;
 
 	/** Works out the way to the spot under the pointer, only when that spot changes. */
 	void UpdateHoverPath();
@@ -586,6 +784,69 @@ private:
 
 	/** Something the person should read: why an order was refused, mostly. */
 	void Tell(const FString& What);
+
+	/**
+	 * The selected unit spends its turn at the nearest watchtower within reach,
+	 * or is told why it cannot. What the Capture button does.
+	 */
+	void CaptureTower();
+	/** The watchtower the selected unit could capture now, or -1; and why not, if not. */
+	int32 CapturableTower(const TMSim::FUnit& Unit, FString* WhyNot = nullptr) const;
+	/** The towers' roofs in the colour of whoever holds each. */
+	void RefreshTowers();
+
+	// ------------------------------------------------ neutral camps (TMBattleDirectorCamps.cpp)
+
+	/** Each camp's marker on the ground, its label, and each cache's chest. */
+	void BuildCamps();
+	/** Markers, countdowns, temperament signs and chests, as the rules and the fog have them. */
+	void RefreshCamps(float DeltaSeconds);
+	/** Which camps each side has seen the spot of: their tier shows only then. Bit per side. */
+	TArray<uint8> CampSeen;
+	UPROPERTY()
+	TArray<TObjectPtr<UStaticMeshComponent>> CampRings;
+	UPROPERTY()
+	TArray<TObjectPtr<class UTextRenderComponent>> CampLabels;
+	UPROPERTY()
+	TArray<TObjectPtr<USceneComponent>> CacheChests;
+	/** What moves on each chest; the chest itself is in CacheChests. */
+	UPROPERTY()
+	TArray<FTMChest> Chests;
+	float ChestClock = 0.0f;
+	/** A Runic Coffer at Foot, in the look of the tier of the best item it holds (TMBattleDirectorChest.cpp). */
+	USceneComponent* MakeChest(const FVector& Foot, int32 Tier, float Yaw, int32 Seed);
+	/** The chests' crystals turn, their lights breathe, the epic one's sparks rise. */
+	void AdvanceChests(float DeltaSeconds);
+	/** Each watchtower's beacon; and the clock its flames dance to. */
+	UPROPERTY()
+	TArray<FTMTower> Beacons;
+	float TowerClock = 0.0f;
+	/** Frames over the last ten seconds, for the log's FRAMES line: how many, how long the worst. */
+	float FrameWindow = 0.0f;
+	int32 FrameCount = 0;
+	float FrameWorst = 0.0f;
+	/** A Signal Beacon at Foot (TMBattleDirectorTower.cpp), its fire unlit until painted. */
+	void MakeTower(const FVector& Foot, int32 Seed);
+	/** The fire in the holder's colour, or embers for nobody. */
+	void PaintTower(int32 Index, int32 Holder);
+	/** The flames rise and sway, the light flickers. */
+	void AdvanceTowers(float DeltaSeconds);
+	/** An unlit colour, for what glows (the chests' runes and crystals). */
+	class UMaterialInstanceDynamic* GlowPaint(const FLinearColor& Colour);
+	/** The tier each camp's ring is painted, so it is painted only on a change (-2 unpainted). */
+	TArray<int32> CampRingTier;
+	/** The cache the selected unit could take from now, or -1; and why not, if not. */
+	int32 TakeableCache(const TMSim::FUnit& Unit, FString* WhyNot = nullptr) const;
+	/** Takes an item from the cache the items panel shows: Code is its place there x 4, plus 1 + the slot it goes over (0: the first empty one). */
+	void TakeItem(int32 Code);
+	/** Leaves the item in this slot on the ground. */
+	void DropItem(int32 GearSlot);
+	/** The items panel is open: the cache in reach it shows, -2 for none in reach, -1 closed. */
+	int32 TakePickerCache = -1;
+	/** A monster's name as the view says it, with what it is doing. */
+	FString MonsterLine(const TMSim::FUnit& Unit) const;
+	/** Units that moved without walking (a camp waking, a blink): shown there at once. */
+	TSet<int32> SnapUnits;
 
 	/** Metres on the board to a spot in the world, a little above the ground. */
 	FVector BoardPoint(const TMSim::FVec2& Point, float Lift = 4.0f) const;
@@ -662,6 +923,18 @@ private:
 	/** Opening the guide in a local battle pauses it, and closing it resumes (battle.gd:1039-1051). */
 	bool bPausedByGuide = false;
 	void ToggleGuide();
+	/** Showing one class's page rather than the list of every class. */
+	bool bGuideDetail = false;
+	/** The list's first row shown, how many rows fit (set by the HUD, for paging), and its role filter (-1: all). */
+	int32 GuideListScroll = 0;
+	int32 GuideListPage = 10;
+	int32 GuideRole = -1;
+	/** How far a class's page is scrolled down, in design pixels (the HUD clamps it). */
+	float GuideDetailScroll = 0.0f;
+	/** The classes the list shows, in order, with its role filter. */
+	TArray<int32> GuideShown() const;
+	/** Back to the list, or on to the next or previous class in it. */
+	void GuideStep(int32 By);
 
 	UPROPERTY()
 	TObjectPtr<ACameraActor> Watcher = nullptr;
@@ -718,6 +991,10 @@ private:
 	 * holding nothing the rules need.
 	 */
 	TMSim::FAIPlayer Computers[2];
+	/** The neutral monsters' player (team 2): on the host, or offline. */
+	TMSim::FNeutralPlayer Monsters;
+	/** Seconds the computer waits before a unit's first order and between its orders. */
+	float ThinkSeconds(int32 Team, bool bFirst) const;
 
 	/** Seconds still to wait before the computer gives its next order. */
 	float ThinkRemainder = 0.0f;
@@ -829,6 +1106,10 @@ private:
 	bool LoadBodiesInBackground();
 	/** What wearing these bodies would still have to read from disk. */
 	void UnreadPaths(const TArray<const FTMBody*>& Wanted, TArray<struct FSoftObjectPath>& Paths) const;
+	/** Every effect the battle may play: the look table's and each unit's abilities' own (TMBattleDirectorAbilityFx.cpp). */
+	void LookAssetPaths(TArray<struct FSoftObjectPath>& Paths) const;
+	/** Every sound the sound map names (Content/Data/Sounds/sounds.json). */
+	void SoundAssetPaths(TArray<struct FSoftObjectPath>& Paths) const;
 	/** Once they are in: every unit put into its own body. */
 	void DressUnits();
 	/** A random team rolled ahead of the click, its heroes loaded while the setup screen is read. */
@@ -837,6 +1118,33 @@ private:
 	bool LoadingProgress(FString& What, float& Fraction) const;
 	/** The bodies for the battle, while they load; the next random teams' heroes, likewise. */
 	TSharedPtr<struct FStreamableHandle> BodyLoad;
+
+	// The Unit Guide's turntable (TMBattleDirectorShowcase.cpp): a class's hero on
+	// its own, far above the board and seen only by its camera, turning slowly.
+public:
+	/** The hero filmed this frame, or null: bOutLoading while it is still being read. */
+	class UTextureRenderTarget2D* GuideModel(const std::string& JobId, bool& bOutLoading);
+	/** Turns the hero by hand, on top of its own slow turn. */
+	void GuideModelTurn(float Degrees);
+	/** Puts it away when the guide or its page closes. */
+	void HideGuideModel();
+private:
+	UPROPERTY()
+	TObjectPtr<USkeletalMeshComponent> ShowcaseBody = nullptr;
+	UPROPERTY()
+	TObjectPtr<class USceneCaptureComponent2D> ShowcaseCamera = nullptr;
+	UPROPERTY()
+	TObjectPtr<class UTextureRenderTarget2D> ShowcaseFilm = nullptr;
+	UPROPERTY()
+	TObjectPtr<class UPointLightComponent> ShowcaseLight = nullptr;
+	/** The class it is dressed as, and the hero being read for it. */
+	FString ShowcaseJob;
+	FString ShowcaseLoadFor;
+	TSharedPtr<struct FStreamableHandle> ShowcaseLoad;
+	/** How far round it has turned, how tall it stands, and when it was last filmed. */
+	float ShowcaseYaw = 0.0f;
+	float ShowcaseHeight = 190.0f;
+	double ShowcaseLastTime = -1.0;
 	TSharedPtr<struct FStreamableHandle> AheadLoad[2];
 	std::vector<std::string> NextRandom[2];
 	/** The most shaders seen waiting at once, so the bar can say how far along they are. */
@@ -905,6 +1213,8 @@ private:
 	{
 		TWeakObjectPtr<UStaticMeshComponent> Mesh;
 		TWeakObjectPtr<class UPointLightComponent> Glow;
+		/** The particle it flies as, when its look has one (TMBattleDirectorAbilityFx.cpp). */
+		TWeakObjectPtr<class UFXSystemComponent> Trail;
 		FVector From = FVector::ZeroVector;
 		FVector To = FVector::ZeroVector;
 		float Flight = 0.3f;
@@ -963,6 +1273,67 @@ private:
 	bool bCelebrated = false;
 	/** When the slow beat of an ultimate ends, in platform seconds; 0 when none. */
 	double SlowUntil = 0.0;
+
+	// ------------------------------------------------------ ability looks
+	// (TMBattleDirectorAbilityFx.cpp): what an ability is made of -- fire,
+	// frost, a blade -- read from its name, and the effects that show it: a
+	// flare as it is cast, what flies, the hit on each target, the burst on the
+	// ground, a flash of its colour and a jolt of the camera. Only the look.
+public:
+	struct FTMLook
+	{
+		/** Index into the look table; the last is plain steel. */
+		int32 Flavour = 0;
+		/** For plain steel: 0 blade, 1 blunt, 2 point, 3 thrown stone. */
+		uint8 Weapon = 0;
+		/** Thrown at its target from afar (a single target or a line). */
+		bool bRanged = false;
+		/** Lands on an area: a circle, a cone, a line, a burst round the user. */
+		bool bArea = false;
+		bool bMagic = false;
+	};
+	const FTMLook& LookOf(const TMSim::FAbility& Ability);
+	/** The look's name ("fire", "steel"...), for the log and tests. */
+	static const TCHAR* LookName(const FTMLook& Look);
+	static FLinearColor LookColour(const FTMLook& Look);
+	/** Units under the pointer or in the aim, outlined red (TMBattleDirectorLooks.cpp). */
+	TSet<int32> MarkedUnits;
+	void UpdateMarks();
+	/** The outline post-process, kept so the hover colour can follow who is marked. */
+	UPROPERTY()
+	TObjectPtr<class UMaterialInstanceDynamic> OutlineMid = nullptr;
+	/** What a thrown spell flies as, carried by Carrier; null when its look has none. */
+	class UFXSystemComponent* LookShot(const FTMLook& Look, class USceneComponent* Carrier);
+private:
+	TMap<FString, FTMLook> Looks;
+	/** Plays an effect so it is about WantCm across (SizeCm is how big it was filmed). */
+	class UFXSystemComponent* PlayFx(const TCHAR* Path, const FVector& Local, float WantCm, float SizeCm,
+		class USceneComponent* AttachTo = nullptr);
+	/** The swing begins: a flare of its colour in the user's hands, or an aura for a buff. */
+	void LookCast(const FTMBlow& Blow);
+	/** It lands: a burst on the ground it covers, a flash, the camera jolts. */
+	void LookLand(const FTMBlow& Blow);
+	/** On one unit it touched: the hit, the heal, the buff. */
+	void LookOn(const TMSim::FAbility& Ability, const TMSim::FEvent& Event, bool bCritical, bool bArea);
+	/** A light of the look's colour that flares and fades. */
+	void Pulse(const FVector& Local, const FLinearColor& Colour, float Brightness, float Radius, float Seconds);
+	/** The camera jolts: 1 is a heavy blow. */
+	void Jolt(float Strength);
+	void AdvanceLooks(float DeltaSeconds);
+	struct FTMPulse
+	{
+		TWeakObjectPtr<class UPointLightComponent> Light;
+		float Age = 0.0f;
+		float Life = 0.4f;
+		float Peak = 0.0f;
+	};
+	TArray<FTMPulse> Pulses;
+	float JoltLeft = 0.0f;
+	float JoltStrength = 0.0f;
+	float JoltClock = 0.0f;
+	FVector JoltOffset = FVector::ZeroVector;
+	/** With -tmcapture, a picture a moment after a blow lands, when its effects are up. */
+	float LookCaptureIn = -1.0f;
 
 	UPROPERTY()
 	TArray<TObjectPtr<class UPointLightComponent>> StatusLights;
@@ -1118,11 +1489,51 @@ private:
 		TArray<FString> KitRock;     // what stands on a rock tile
 		TArray<FString> KitTree;     // what grows around the board
 		TArray<FString> KitBoulder;  // rocks around the board
+		TArray<FString> KitCliff;    // rock faces on the tall steps between heights
+		TArray<FString> KitStructure; // ruins and towers: on some rock tiles, and round the board
 		/** How much of a tile a rock fills, how tall a tree stands, how big a boulder is, in metres. */
 		float KitRockFill = 0.9f;
 		float KitTreeHeight = 6.0f;
 		float KitBoulderSize = 2.0f;
+
+		// Light (theme "light"): how the board is lit, beyond sun, sky and fog.
+		/** Night: the sun is a pale moon, and torches burn round the board. */
+		bool bNight = false;
+		/** Degrees a minute the sun turns round the board, so shadows move through a battle; 0 holds it still. */
+		float SunDrift = 1.5f;
+		/** Torches round the board and on each watchtower, and how bright. 0 is none. */
+		float TorchIntensity = 0.0f;
+		FLinearColor TorchColour = FLinearColor(1.0f, 0.62f, 0.3f);
+		/** Exposure, in stops above the engine's own: dark themes stay dark instead of being brightened back. */
+		float Exposure = 0.0f;
+		/** Light shafts in the fog. */
+		bool bVolumetricFog = true;
+
+		// Foliage (theme "foliage", TMBattleDirectorFoliage.cpp): per square metre of
+		// ground it can grow on, and its colours. Kit lists name meshes from a pack
+		// (a Fab nature pack, say); empty, simple shapes stand in.
+		float GrassDensity = 1.2f;
+		TArray<FLinearColor> GrassColours;
+		float GrassHeight = 0.35f;
+		float FlowerDensity = 0.15f;
+		TArray<FLinearColor> FlowerColours;
+		float BushDensity = 0.25f;
+		FLinearColor BushColour = FLinearColor(0.16f, 0.33f, 0.14f);
+		/** Trees per square metre in the ring of land round the board. */
+		float ForestDensity = 0.03f;
+		TArray<FString> KitGrass;
+		TArray<FString> KitFlower;
+		TArray<FString> KitBush;
+		/** Metres tall, each kit mesh fitted by its own bounds. */
+		float KitGrassHeight = 0.4f;
+		float KitFlowerHeight = 0.35f;
+		float KitBushHeight = 1.0f;
 	};
+	/**
+	 * The ground as one smooth mesh from the tiles' heights (TMBattleDirectorGround.cpp):
+	 * no seams, rounded banks, colours blended. False if it could not be built.
+	 */
+	bool BuildSmoothGround(const FTMTheme& Theme);
 
 	/**
 	 * A mesh from a theme's kit, fitted by its own bounds: its footprint to
@@ -1130,6 +1541,13 @@ private:
 	 * Foot. Null if the mesh is not in the project (said once).
 	 */
 	UStaticMeshComponent* KitPiece(const FString& Path, const FVector& Foot, float Footprint, float Height, float Yaw, bool bStretch, float MinHeight = 0.0f);
+	/** Rock faces on the tall steps between heights, and structures round the board (TMBattleDirectorCliffs.cpp). */
+	void DressCliffs(const FTMTheme& Theme);
+	void DressStructures(const FTMTheme& Theme);
+	/** The theme's rocks, or Paragon's when it names none: never plain painted balls. */
+	static const TArray<FString>& RockKit(const FTMTheme& Theme);
+	/** A structure for this rock tile instead of a rock, now and then: null when not. */
+	UStaticMeshComponent* MaybeStructure(const FTMTheme& Theme, const FVector& Foot, float Tile, const FRandomStream& Dice);
 	UPROPERTY()
 	TMap<FString, TObjectPtr<UStaticMesh>> KitMeshes;
 
@@ -1142,8 +1560,16 @@ private:
 	TMap<FString, FTMTheme> Themes;
 	/** Sun, sky and fog, from the level's own lights, set to the theme. */
 	void ApplyThemeLighting();
-	/** Embers flicker and lava breathes. */
+	/** Embers flicker and lava breathes, torches gutter, and the sun moves. */
 	void AdvanceBoard(float DeltaSeconds);
+	/** Grass, flowers and bushes on the board and a forest round it, as the theme says. */
+	void BuildFoliage(const FTMTheme& Theme);
+	/** An instanced mesh for one kind of foliage: the kit's, or a simple shape of one colour. */
+	class UHierarchicalInstancedStaticMeshComponent* FoliageLayer(const FString& KitPath, const TCHAR* Shape, const FLinearColor& Colour, float CullMetres);
+	/** The sun as the theme set it, to turn from. */
+	TWeakObjectPtr<class ADirectionalLight> SunActor;
+	float SunBaseYaw = 0.0f;
+	float SunBasePitch = -45.0f;
 	/** A colour on the engine's basic shape material, made once per colour. */
 	class UMaterialInstanceDynamic* Paint(const FLinearColor& Colour);
 	/** A basic shape on the board: Cube, Sphere, Cylinder or Cone, in centimetres. */
@@ -1151,6 +1577,11 @@ private:
 
 	UPROPERTY()
 	TArray<TObjectPtr<USceneComponent>> BoardProps;
+	/** Each watchtower's roof and flag, which take the colour of the side holding it (in BoardProps too). */
+	UPROPERTY()
+	TArray<TObjectPtr<UStaticMeshComponent>> TowerRoofs;
+	/** Who held each tower when its roof was last painted, so it is painted only on a change. */
+	TArray<int32> TowerRoofOwner;
 	UPROPERTY()
 	TArray<TObjectPtr<class UPointLightComponent>> BoardLights;
 	TArray<float> BoardLightBase;
@@ -1159,6 +1590,16 @@ private:
 	UPROPERTY()
 	TObjectPtr<class UTextureRenderTarget2D> WhitePixels = nullptr;
 	bool bThemesRead = false;
+	/** A burning ground or a healing spring at Foot (the top of its tile), in the theme's look (TMBattleDirectorHazards.cpp). */
+	void BuildHazard(const FTMTheme& Theme, const FVector& Foot, int32 Hazard, int32 Seed);
+	/** The flames, embers, steam and motes of the hazards move. */
+	void AdvanceHazards(float DeltaSeconds);
+	/** An unlit colour shared by every piece that glows it, a little see-through below 1. */
+	class UMaterialInstanceDynamic* GlowShared(const FLinearColor& Colour, float Opacity = 1.0f);
+	TArray<FTMHazardPart> HazardParts;
+	float HazardClock = 0.0f;
+	UPROPERTY()
+	TMap<uint32, TObjectPtr<class UMaterialInstanceDynamic>> GlowShades;
 
 	// ------------------------------------------------ how units look to the player
 	// (TMBattleDirectorLooks.cpp): allies blue and enemies red, a ring under each

@@ -1,0 +1,15 @@
+{
+  "format": "tactical-masters-item",
+  "version": 1,
+  "id": "reckless_idol",
+  "name": "Reckless Idol",
+  "desc": "Turn Gauge fills 12% faster, but you take 10% more damage.",
+  "icon": "idol",
+  "tier": "rare",
+  "bonus": {
+    "tg_percent": 12
+  },
+  "effects": {
+    "damage_taken_percent": 10
+  }
+}

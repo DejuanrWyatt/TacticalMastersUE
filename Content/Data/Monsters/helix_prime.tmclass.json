@@ -1,0 +1,248 @@
+{
+  "format": "tactical-masters-class",
+  "version": 1,
+  "id": "helix_prime",
+  "name": "The Helix Prime",
+  "color": "#9ad8ff",
+  "look": "black_mage",
+  "icon": "helix_prime",
+  "roles": [
+    "damage",
+    "special"
+  ],
+  "stats": {
+    "hp": 260,
+    "attdef": 10,
+    "magdef": 12,
+    "aeva": 5,
+    "meva": 10,
+    "crit": 5,
+    "speed": 9,
+    "move": 4,
+    "patience": 8,
+    "sight": 12
+  },
+  "abilities": [
+    {
+      "id": "helix_prime_prism_beam",
+      "name": "Prism Beam",
+      "desc": "A beam 7 m long: power 34 to every enemy on it.",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "mag",
+      "target": "enemy",
+      "shape": "line",
+      "power": 34,
+      "min_range": 0,
+      "max_range": 7,
+      "aoe": 0.6,
+      "cooldown": 0,
+      "cast": 0
+    },
+    {
+      "id": "helix_prime_refract",
+      "name": "Refract",
+      "desc": "Splits light over a spot up to 7 m away: power 22 to everyone within 2 m.",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "mag",
+      "target": "enemy",
+      "shape": "circle",
+      "power": 22,
+      "min_range": 0,
+      "max_range": 7,
+      "aoe": 2,
+      "cooldown": 3,
+      "cast": 0
+    },
+    {
+      "id": "helix_prime_idle1",
+      "name": "Sentinel",
+      "desc": "Always on: nothing to use.",
+      "kind": "passive",
+      "effect": "support",
+      "scale": "mag",
+      "target": "ally",
+      "shape": "self",
+      "power": 0,
+      "min_range": 0,
+      "max_range": 0,
+      "aoe": 0,
+      "cooldown": 0,
+      "cast": 0
+    },
+    {
+      "id": "helix_prime_flare",
+      "name": "Flare",
+      "desc": "Everyone within 3 m: power 30.",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "mag",
+      "target": "enemy",
+      "shape": "self",
+      "power": 30,
+      "min_range": 0,
+      "max_range": 0,
+      "aoe": 3,
+      "cooldown": 4,
+      "cast": 0
+    }
+  ],
+  "monster": {
+    "tier": "epic",
+    "temperament": "guard_place",
+    "ring": 5,
+    "traits": [
+      "unstoppable"
+    ],
+    "phases": [
+      {
+        "below": 66,
+        "abilities": [
+          {
+            "id": "helix_prime_prism_beam_2",
+            "name": "Prism Beam",
+            "desc": "A beam 7 m long: power 34 to every enemy on it.",
+            "kind": "active",
+            "effect": "damage",
+            "scale": "mag",
+            "target": "enemy",
+            "shape": "line",
+            "power": 34,
+            "min_range": 0,
+            "max_range": 7,
+            "aoe": 0.6,
+            "cooldown": 0,
+            "cast": 0
+          },
+          {
+            "id": "helix_prime_refract_2",
+            "name": "Refract",
+            "desc": "Splits light over a spot up to 7 m away: power 22 to everyone within 2 m.",
+            "kind": "active",
+            "effect": "damage",
+            "scale": "mag",
+            "target": "enemy",
+            "shape": "circle",
+            "power": 22,
+            "min_range": 0,
+            "max_range": 7,
+            "aoe": 2,
+            "cooldown": 3,
+            "cast": 0
+          },
+          {
+            "id": "helix_prime_prism_shield_2",
+            "name": "Prism Shield",
+            "desc": "Shields itself for 30.",
+            "kind": "active",
+            "effect": "support",
+            "scale": "mag",
+            "target": "ally",
+            "shape": "self",
+            "power": 30,
+            "min_range": 0,
+            "max_range": 0,
+            "aoe": 0,
+            "cooldown": 2,
+            "cast": 0,
+            "status": {
+              "id": "shield",
+              "turns": 2
+            }
+          },
+          {
+            "id": "helix_prime_summon",
+            "name": "Summon",
+            "desc": "Calls the scrappers bound to it.",
+            "kind": "active",
+            "effect": "support",
+            "scale": "mag",
+            "target": "ally",
+            "shape": "self",
+            "power": 0,
+            "min_range": 0,
+            "max_range": 0,
+            "aoe": 0,
+            "cooldown": 10,
+            "cast": 0,
+            "special": "summon"
+          }
+        ]
+      },
+      {
+        "below": 33,
+        "abilities": [
+          {
+            "id": "helix_prime_prism_beam_3",
+            "name": "Prism Beam",
+            "desc": "A beam 7 m long: power 34 to every enemy on it.",
+            "kind": "active",
+            "effect": "damage",
+            "scale": "mag",
+            "target": "enemy",
+            "shape": "line",
+            "power": 34,
+            "min_range": 0,
+            "max_range": 7,
+            "aoe": 0.6,
+            "cooldown": 0,
+            "cast": 0
+          },
+          {
+            "id": "helix_prime_refract_3",
+            "name": "Refract",
+            "desc": "Splits light over a spot up to 7 m away: power 22 to everyone within 2 m.",
+            "kind": "active",
+            "effect": "damage",
+            "scale": "mag",
+            "target": "enemy",
+            "shape": "circle",
+            "power": 22,
+            "min_range": 0,
+            "max_range": 7,
+            "aoe": 2,
+            "cooldown": 3,
+            "cast": 0
+          },
+          {
+            "id": "helix_prime_prism_shield_3",
+            "name": "Prism Shield",
+            "desc": "Turns its prism outward: the next spell aimed at it bounces back (2 turns).",
+            "kind": "active",
+            "effect": "support",
+            "scale": "mag",
+            "target": "ally",
+            "shape": "self",
+            "power": 0,
+            "min_range": 0,
+            "max_range": 0,
+            "aoe": 0,
+            "cooldown": 2,
+            "cast": 0,
+            "status": {
+              "id": "reflect",
+              "turns": 2
+            }
+          },
+          {
+            "id": "helix_prime_overload",
+            "name": "Overload",
+            "desc": "Charges for 8 seconds, then bursts: power 44 to everyone within 4 m.",
+            "kind": "active",
+            "effect": "damage",
+            "scale": "mag",
+            "target": "enemy",
+            "shape": "self",
+            "power": 44,
+            "min_range": 0,
+            "max_range": 0,
+            "aoe": 4,
+            "cooldown": 3,
+            "cast": 8
+          }
+        ]
+      }
+    ]
+  }
+}

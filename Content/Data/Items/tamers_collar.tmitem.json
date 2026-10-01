@@ -1,0 +1,26 @@
+{
+  "format": "tactical-masters-item",
+  "version": 1,
+  "id": "tamers_collar",
+  "name": "Tamer's Collar",
+  "desc": "A hurt easy or medium monster joins your side for 3 turns.",
+  "icon": "collar",
+  "tier": "rare",
+  "ability": {
+    "id": "item_tame",
+    "name": "Tame",
+    "desc": "A wild easy or medium monster under half health, up to 4 m away, fights for your side for 3 turns.",
+    "kind": "active",
+    "effect": "support",
+    "scale": "mag",
+    "target": "enemy",
+    "shape": "unit",
+    "power": 0,
+    "min_range": 0,
+    "max_range": 4,
+    "aoe": 0,
+    "cooldown": 6,
+    "cast": 0,
+    "special": "tame"
+  }
+}

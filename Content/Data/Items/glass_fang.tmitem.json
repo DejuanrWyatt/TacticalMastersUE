@@ -1,0 +1,15 @@
+{
+  "format": "tactical-masters-item",
+  "version": 1,
+  "id": "glass_fang",
+  "name": "Glass Fang",
+  "desc": "Abilities hit 18% harder, but 15 less health.",
+  "icon": "fang",
+  "tier": "uncommon",
+  "stats": {
+    "hp": -15
+  },
+  "bonus": {
+    "damage_percent": 18
+  }
+}

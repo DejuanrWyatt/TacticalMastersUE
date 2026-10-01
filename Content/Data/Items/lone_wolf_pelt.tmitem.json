@@ -1,0 +1,13 @@
+{
+  "format": "tactical-masters-item",
+  "version": 1,
+  "id": "lone_wolf_pelt",
+  "name": "Lone Wolf Pelt",
+  "desc": "With no ally within 4 m: 12% more damage and +1 Move.",
+  "icon": "pelt",
+  "tier": "rare",
+  "effects": {
+    "alone_percent": 12,
+    "alone_move": 1
+  }
+}

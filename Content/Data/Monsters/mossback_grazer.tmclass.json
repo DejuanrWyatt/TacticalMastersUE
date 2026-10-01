@@ -1,0 +1,94 @@
+{
+  "format": "tactical-masters-class",
+  "version": 1,
+  "id": "mossback_grazer",
+  "name": "Mossback Grazer",
+  "color": "#7fa35a",
+  "look": "knight",
+  "icon": "mossback_grazer",
+  "roles": [
+    "tank"
+  ],
+  "stats": {
+    "hp": 36,
+    "attdef": 2,
+    "magdef": 2,
+    "aeva": 5,
+    "meva": 5,
+    "crit": 0,
+    "speed": 7,
+    "move": 3,
+    "patience": 4,
+    "sight": 7
+  },
+  "abilities": [
+    {
+      "id": "mossback_grazer_headbutt",
+      "name": "Headbutt",
+      "desc": "Strikes an enemy within arm's reach (power 10).",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "att",
+      "target": "enemy",
+      "shape": "unit",
+      "power": 10,
+      "min_range": 0,
+      "max_range": 1.8,
+      "aoe": 0,
+      "cooldown": 0,
+      "cast": 0
+    },
+    {
+      "id": "mossback_grazer_idle1",
+      "name": "Grazing",
+      "desc": "Always on: nothing to use.",
+      "kind": "passive",
+      "effect": "support",
+      "scale": "mag",
+      "target": "ally",
+      "shape": "self",
+      "power": 0,
+      "min_range": 0,
+      "max_range": 0,
+      "aoe": 0,
+      "cooldown": 0,
+      "cast": 0
+    },
+    {
+      "id": "mossback_grazer_idle2",
+      "name": "Moss Back",
+      "desc": "Always on: nothing to use.",
+      "kind": "passive",
+      "effect": "support",
+      "scale": "mag",
+      "target": "ally",
+      "shape": "self",
+      "power": 0,
+      "min_range": 0,
+      "max_range": 0,
+      "aoe": 0,
+      "cooldown": 0,
+      "cast": 0
+    },
+    {
+      "id": "mossback_grazer_idle3",
+      "name": "Herd",
+      "desc": "Always on: nothing to use.",
+      "kind": "passive",
+      "effect": "support",
+      "scale": "mag",
+      "target": "ally",
+      "shape": "self",
+      "power": 0,
+      "min_range": 0,
+      "max_range": 0,
+      "aoe": 0,
+      "cooldown": 0,
+      "cast": 0
+    }
+  ],
+  "monster": {
+    "tier": "easy",
+    "temperament": "docile"
+  }
+}

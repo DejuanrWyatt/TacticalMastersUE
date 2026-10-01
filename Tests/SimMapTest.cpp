@@ -169,7 +169,7 @@ int main(int ArgCount, char** Args)
 		{ "a good one", MapText(GoodTop, GoodSpawns), "" },
 		{ "not ground", MapText("[\"11111111111Q\", \"111111111111\", \"111111111111\"]", GoodSpawns), "is not ground" },
 		{ "uneven rows", MapText("[\"111111111111\", \"11111111111\", \"111111111111\"]", GoodSpawns), "not as wide" },
-		{ "too narrow", MapText("[\"1111111\", \"1111111\", \"1111111\"]", GoodSpawns), "8 to 40" },
+		{ "too narrow", MapText("[\"1111111\", \"1111111\", \"1111111\"]", GoodSpawns), "8 to 80" },
 		{ "three spawns", MapText(GoodTop, "[[2.75, 4.75], [0.75, 8.75], [4.75, 6.75]]"), "four" },
 		{ "a spawn in rock", MapText("[\"111111111111\", \"111111111111\", \"1#1111111111\", \"111111111111\", \"111111111111\", \"111111111111\"]", GoodSpawns), "not on ground" },
 		{ "a spawn off the map", MapText(GoodTop, "[[2.75, 4.75], [0.75, 8.75], [4.75, 6.75], [99.0, 1.0]]"), "not on ground" },

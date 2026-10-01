@@ -29,9 +29,9 @@ namespace
 	 * throws about can land on it. Only the effect is drawn (see BeginPlay), so the
 	 * board would not show even if it were in view.
 	 */
-	const FVector Stage(0.0, 0.0, 50000.0);
+	const FVector VfxStage(0.0, 0.0, 50000.0);
 
-	FString Escaped(const FString& Text)
+	FString VfxEscaped(const FString& Text)
 	{
 		return Text.Replace(TEXT("\\"), TEXT("\\\\")).Replace(TEXT("\""), TEXT("\\\""));
 	}
@@ -154,12 +154,12 @@ UFXSystemComponent* ATMVfxStudio::Play(UObject* System)
 	UFXSystemComponent* Component = nullptr;
 	if (UNiagaraSystem* Niagara = Cast<UNiagaraSystem>(System))
 	{
-		Component = UNiagaraFunctionLibrary::SpawnSystemAtLocation(this, Niagara, Stage,
+		Component = UNiagaraFunctionLibrary::SpawnSystemAtLocation(this, Niagara, VfxStage,
 			FRotator::ZeroRotator, FVector(1.0), false, true, ENCPoolMethod::None, false);
 	}
 	else if (UParticleSystem* Cascade = Cast<UParticleSystem>(System))
 	{
-		Component = UGameplayStatics::SpawnEmitterAtLocation(this, Cascade, Stage,
+		Component = UGameplayStatics::SpawnEmitterAtLocation(this, Cascade, VfxStage,
 			FRotator::ZeroRotator, FVector(1.0), false);
 	}
 	if (Component)
@@ -288,16 +288,16 @@ void ATMVfxStudio::AimAtReach()
 	bAimed = true;
 	// Held to a sensible range, in centimetres: an effect that had not started
 	// claims nothing, and one with a box nobody sized can claim kilometres.
-	Middle = Stage;
+	Middle = VfxStage;
 	float Radius = 150.0f;
 	if (Reach.IsValid)
 	{
 		Middle = Reach.GetCenter();
 		Radius = FMath::Clamp(static_cast<float>(Reach.GetExtent().Size()), 30.0f, 1500.0f);
 		// An effect that drifts far from where it began is framed on where it began.
-		if (FVector::Dist(Middle, Stage) > Radius)
+		if (FVector::Dist(Middle, VfxStage) > Radius)
 		{
-			Middle = Stage;
+			Middle = VfxStage;
 		}
 	}
 	Distance = Radius / FMath::Tan(FMath::DegreesToRadians(Fov * 0.5f)) * 1.15f;
@@ -465,8 +465,8 @@ void ATMVfxStudio::WriteCatalogue() const
 		Pack.Split(TEXT("/"), &Pack, nullptr);
 		Json += FString::Printf(
 			TEXT("%s\n    {\"path\": \"%s\", \"name\": \"%s\", \"pack\": \"%s\", \"kind\": \"%s\", \"sheet\": \"%s\", \"thumb\": \"%s\", \"radius\": %.0f, \"loops\": %s, \"visible\": %s}"),
-			i ? TEXT(",") : TEXT(""), *Escaped(Entry.Path), *Escaped(Entry.Name), *Escaped(Pack),
-			*Entry.Kind, *Escaped(Entry.Sheet), *Escaped(Entry.Thumb), Entry.Radius, Entry.bLoops ? TEXT("true") : TEXT("false"),
+			i ? TEXT(",") : TEXT(""), *VfxEscaped(Entry.Path), *VfxEscaped(Entry.Name), *VfxEscaped(Pack),
+			*Entry.Kind, *VfxEscaped(Entry.Sheet), *VfxEscaped(Entry.Thumb), Entry.Radius, Entry.bLoops ? TEXT("true") : TEXT("false"),
 			Entry.bVisible ? TEXT("true") : TEXT("false"));
 	}
 	Json += TEXT("\n  ]\n}\n");

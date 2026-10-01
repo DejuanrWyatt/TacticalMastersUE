@@ -69,6 +69,25 @@ namespace
 		Text.ReplaceInline(TEXT("\r"), TEXT(""));
 		return Text;
 	}
+
+	/**
+	 * One number for every file in a folder of Content/Data, by name and
+	 * content. The camps draw their loot from the whole item catalog and wake
+	 * the monster classes, so with camps on both games need the same of each.
+	 */
+	uint32 FolderPrint(const FString& Folder)
+	{
+		TArray<FString> Names;
+		IFileManager::Get().FindFiles(Names, *(FPaths::ProjectContentDir() / TEXT("Data") / Folder / TEXT("*.json")), true, false);
+		Names.Sort();
+		uint32 Print = 0;
+		for (const FString& Name : Names)
+		{
+			Print = FCrc::StrCrc32(*Name, Print);
+			Print = FCrc::StrCrc32(*LocalFile(Folder, Name), Print);
+		}
+		return Print;
+	}
 }
 
 // ---------------------------------------------------------------- the screens
@@ -525,6 +544,29 @@ void ATMBattleDirector::StartOnlineAsHost()
 		Message.SetStringField(TEXT("capture"), DoubleBits(Setup.CaptureSeconds));
 		Message.SetStringField(TEXT("limit"), DoubleBits(Setup.BattleSeconds));
 		Message.SetStringField(TEXT("planning"), DoubleBits(Setup.PlanningSeconds));
+		// How many watchtowers: with the seed, both games place the same ones.
+		Message.SetNumberField(TEXT("towers"), Setup.Watchtowers);
+		// Items: the points, and what every unit carries (the host chooses for
+		// both sides). The joiner must have the same item files.
+		Message.SetNumberField(TEXT("item_budget"), Setup.ItemBudget);
+		// Neutral camps (protocol 4): how many, which boss, and what both games must share for them.
+		Message.SetNumberField(TEXT("camps"), Setup.CampLevel);
+		Message.SetBoolField(TEXT("random_boss"), Setup.bRandomBoss);
+		// Element reactions (protocol 5).
+		Message.SetBoolField(TEXT("elements"), Setup.bElements);
+		Message.SetStringField(TEXT("camp_files"), FString::Printf(TEXT("%08x-%08x"), FolderPrint(TEXT("Monsters")), FolderPrint(TEXT("Items"))));
+		TArray<TSharedPtr<FJsonValue>> Carried;
+		for (int32 Team = 0; Team < 2; ++Team)
+		{
+			for (int32 Unit = 0; Unit < 4; ++Unit)
+			{
+				for (int32 Slot = 0; Slot < 3; ++Slot)
+				{
+					Carried.Add(MakeShared<FJsonValueString>(UTF8_TO_TCHAR(Setup.Items[Team][Unit][Slot].c_str())));
+				}
+			}
+		}
+		Message.SetArrayField(TEXT("items"), Carried);
 	});
 	UE_LOG(LogTemp, Log, TEXT("ONLINE: started as host, seed %llu"), BattleSeed);
 }
@@ -630,6 +672,45 @@ FString ATMBattleDirector::StartOnlineFrom(const FJsonObject& Start)
 	Next.CaptureSeconds = Start.TryGetStringField(TEXT("capture"), Bits) && FromBits(Bits, Seconds) ? Seconds : 0.0;
 	Next.BattleSeconds = Start.TryGetStringField(TEXT("limit"), Bits) && FromBits(Bits, Seconds) ? Seconds : 0.0;
 	Next.PlanningSeconds = Start.TryGetStringField(TEXT("planning"), Bits) && FromBits(Bits, Seconds) ? Seconds : 0.0;
+	// A host from before watchtowers sends none, and gets none.
+	int32 Towers = 0;
+	Next.Watchtowers = Start.TryGetNumberField(TEXT("towers"), Towers) ? FMath::Clamp(Towers, 0, 8) : 0;
+	// Items: a host from before items sends none, and its battle has none.
+	int32 ItemBudget = 0;
+	Next.ItemBudget = Start.TryGetNumberField(TEXT("item_budget"), ItemBudget) ? FMath::Clamp(ItemBudget, 0, 20) : 0;
+	// Camps: a host from before them sends none, and its battle has none.
+	int32 CampLevel = 0;
+	Next.CampLevel = Start.TryGetNumberField(TEXT("camps"), CampLevel) ? FMath::Clamp(CampLevel, 0, 3) : 0;
+	bool bRandomBoss = false;
+	Next.bRandomBoss = Start.TryGetBoolField(TEXT("random_boss"), bRandomBoss) && bRandomBoss;
+	bool bElements = false;
+	Next.bElements = Start.TryGetBoolField(TEXT("elements"), bElements) && bElements;
+	if (Next.CampLevel > 0)
+	{
+		FString Theirs;
+		const FString Ours = FString::Printf(TEXT("%08x-%08x"), FolderPrint(TEXT("Monsters")), FolderPrint(TEXT("Items")));
+		if (!Start.TryGetStringField(TEXT("camp_files"), Theirs) || Theirs != Ours)
+		{
+			return TEXT("The host's monsters or items are not the same as yours: with neutral camps on, both players need the same monster and item files.");
+		}
+	}
+	const TArray<TSharedPtr<FJsonValue>>* Carried = nullptr;
+	for (int32 Code = 0; Code < 24; ++Code)
+	{
+		Next.Items[Code / 12][(Code % 12) / 3][Code % 3].clear();
+	}
+	if (Start.TryGetArrayField(TEXT("items"), Carried) && Carried->Num() == 24)
+	{
+		for (int32 Code = 0; Code < 24; ++Code)
+		{
+			const std::string Id = TCHAR_TO_UTF8(*(*Carried)[Code]->AsString());
+			if (!Id.empty() && !TMSim::FindItem(Id))
+			{
+				return FString::Printf(TEXT("The host's item %hs isn't in this game: both players need the same item files."), Id.c_str());
+			}
+			Next.Items[Code / 12][(Code % 12) / 3][Code % 3] = Id;
+		}
+	}
 	Next.MapId = TCHAR_TO_UTF8(*MapId);
 	Start.TryGetStringField(TEXT("theme"), Next.ThemeId);
 	Next.Mode = TEXT("online");
@@ -673,8 +754,9 @@ FString ATMBattleDirector::RefereeCheck(const TMSim::FOrder& Order) const
 	{
 		return Order.Team == LocalTeam ? TEXT("That isn't your side.") : TEXT("");
 	}
+	// Only the opponent's own units: not the host's, and not the monsters, which the host plays.
 	const TMSim::FUnit* Unit = const_cast<TMSim::FBattle&>(Battle).FindUnit(Order.UnitId);
-	return !Unit || Unit->Team == LocalTeam ? TEXT("That isn't your unit.") : TEXT("");
+	return !Unit || Unit->Team != 1 - LocalTeam ? TEXT("That isn't your unit.") : TEXT("");
 }
 
 void ATMBattleDirector::AfterOnlineApply(const TMSim::FOrder& Order)

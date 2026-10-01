@@ -1,0 +1,29 @@
+{
+  "format": "tactical-masters-item",
+  "version": 1,
+  "id": "spellward_talisman",
+  "name": "Spellward Talisman",
+  "desc": "Shell an ally: magic damage it takes is cut by a third.",
+  "icon": "talisman",
+  "tier": "uncommon",
+  "ability": {
+    "id": "item_shell",
+    "name": "Shell",
+    "desc": "An ally up to 4 m away takes a third less magic (MagDef) damage for 3 turns.",
+    "kind": "active",
+    "effect": "support",
+    "scale": "mag",
+    "target": "ally",
+    "shape": "unit",
+    "power": 0,
+    "min_range": 0,
+    "max_range": 4,
+    "aoe": 0,
+    "cooldown": 4,
+    "cast": 0,
+    "status": {
+      "id": "shell",
+      "turns": 3
+    }
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "format": "tactical-masters-item",
+  "version": 1,
+  "id": "stalker_fang",
+  "name": "Stalker Fang",
+  "desc": "Abilities hit 8% harder, and crit more.",
+  "icon": "fang",
+  "tier": "uncommon",
+  "stats": {
+    "crit": 4
+  },
+  "bonus": {
+    "damage_percent": 8
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "format": "tactical-masters-item",
+  "version": 1,
+  "id": "worry_beads",
+  "name": "Worry Beads",
+  "desc": "More time to think before the moment passes.",
+  "icon": "beads",
+  "tier": "common",
+  "stats": {
+    "patience": 3
+  }
+}

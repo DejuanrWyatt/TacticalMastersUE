@@ -151,7 +151,7 @@ int main()
 		"move 1 2 41200000 40a00000 2", "move -1 2 41200000 40a00000 0", "move 1 2 7fc00000 40a00000 0",
 		"move 1 2 7f800000 40a00000 0", "move 1 2 141200000 40a00000 0", "move 1 2 4120000g 40a00000 0",
 		"move 1  2 41200000 40a00000 0", "move 1 2 41200000 40a00000 0 ", " move 1 2 41200000 40a00000 0",
-		"ability 1 2 4 0 0 -1", "ability 1 2 -1 0 0 -1", "ability 1 2 0 0 0 -2", "end 1", "end 1 2 3",
+		"ability 1 2 7 0 0 -1", "ability 1 2 -1 0 0 -1", "ability 1 2 0 0 0 -2", "end 1", "end 1 2 3",
 		"ready 2", "ready -1", "advance -5", "advance 1.5", "advance 0x10", "tune 1 0", "tune 2 0 3ff0000000000000",
 		"tune 1 999 3ff0000000000000", "tune 1 0 7ff0000000000000", "place 1 2 0", "end 99999999999999999999 1",
 		std::string(5000, 'a'),

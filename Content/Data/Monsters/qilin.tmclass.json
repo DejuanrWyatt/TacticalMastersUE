@@ -1,0 +1,99 @@
+{
+  "format": "tactical-masters-class",
+  "version": 1,
+  "id": "qilin",
+  "name": "Qilin",
+  "color": "#e0d0a0",
+  "look": "white_mage",
+  "icon": "qilin",
+  "roles": [
+    "support",
+    "tank"
+  ],
+  "stats": {
+    "hp": 80,
+    "attdef": 6,
+    "magdef": 8,
+    "aeva": 6,
+    "meva": 8,
+    "crit": 5,
+    "speed": 10,
+    "move": 5,
+    "patience": 6,
+    "sight": 10
+  },
+  "abilities": [
+    {
+      "id": "qilin_horn",
+      "name": "Horn",
+      "desc": "Strikes an enemy within arm's reach (power 28).",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "att",
+      "target": "enemy",
+      "shape": "unit",
+      "power": 28,
+      "min_range": 0,
+      "max_range": 1.8,
+      "aoe": 0,
+      "cooldown": 0,
+      "cast": 0
+    },
+    {
+      "id": "qilin_mend",
+      "name": "Mend",
+      "desc": "Heals an ally up to 5 m away.",
+      "kind": "active",
+      "effect": "heal",
+      "scale": "mag",
+      "target": "ally",
+      "shape": "unit",
+      "power": 17,
+      "min_range": 0,
+      "max_range": 5,
+      "aoe": 0,
+      "cooldown": 2,
+      "cast": 0
+    },
+    {
+      "id": "qilin_ward",
+      "name": "Ward",
+      "desc": "Wards an ally: physical damage it takes is cut by a third for 3 turns.",
+      "kind": "active",
+      "effect": "support",
+      "scale": "mag",
+      "target": "ally",
+      "shape": "unit",
+      "power": 0,
+      "min_range": 0,
+      "max_range": 5,
+      "aoe": 0,
+      "cooldown": 3,
+      "cast": 0,
+      "status": {
+        "id": "protect",
+        "turns": 3
+      }
+    },
+    {
+      "id": "qilin_idle1",
+      "name": "Herd Guardian",
+      "desc": "Always on: nothing to use.",
+      "kind": "passive",
+      "effect": "support",
+      "scale": "mag",
+      "target": "ally",
+      "shape": "self",
+      "power": 0,
+      "min_range": 0,
+      "max_range": 0,
+      "aoe": 0,
+      "cooldown": 0,
+      "cast": 0
+    }
+  ],
+  "monster": {
+    "tier": "hard",
+    "temperament": "guard_unit"
+  }
+}

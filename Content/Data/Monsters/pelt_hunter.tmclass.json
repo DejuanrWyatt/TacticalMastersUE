@@ -1,0 +1,102 @@
+{
+  "format": "tactical-masters-class",
+  "version": 1,
+  "id": "pelt_hunter",
+  "name": "Pelt Hunter",
+  "color": "#6a4a2a",
+  "look": "monk",
+  "icon": "pelt_hunter",
+  "roles": [
+    "damage"
+  ],
+  "stats": {
+    "hp": 90,
+    "attdef": 7,
+    "magdef": 6,
+    "aeva": 8,
+    "meva": 6,
+    "crit": 10,
+    "speed": 12,
+    "move": 6,
+    "patience": 5,
+    "sight": 11
+  },
+  "abilities": [
+    {
+      "id": "pelt_hunter_maul",
+      "name": "Maul",
+      "desc": "Strikes an enemy within arm's reach (power 32).",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "att",
+      "target": "enemy",
+      "shape": "unit",
+      "power": 32,
+      "min_range": 0,
+      "max_range": 1.8,
+      "aoe": 0,
+      "cooldown": 0,
+      "cast": 0
+    },
+    {
+      "id": "pelt_hunter_hamstring",
+      "name": "Hamstring",
+      "desc": "Cuts an enemy within arm's reach (power 18), crippling it for 2 turns.",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "att",
+      "target": "enemy",
+      "shape": "unit",
+      "power": 18,
+      "min_range": 0,
+      "max_range": 1.8,
+      "aoe": 0,
+      "cooldown": 3,
+      "cast": 0,
+      "status": {
+        "id": "crippled",
+        "turns": 2
+      }
+    },
+    {
+      "id": "pelt_hunter_idle1",
+      "name": "Trophy Pelt",
+      "desc": "Always on: nothing to use.",
+      "kind": "passive",
+      "effect": "support",
+      "scale": "mag",
+      "target": "ally",
+      "shape": "self",
+      "power": 0,
+      "min_range": 0,
+      "max_range": 0,
+      "aoe": 0,
+      "cooldown": 0,
+      "cast": 0
+    },
+    {
+      "id": "pelt_hunter_idle2",
+      "name": "Scavenger",
+      "desc": "Always on: nothing to use.",
+      "kind": "passive",
+      "effect": "support",
+      "scale": "mag",
+      "target": "ally",
+      "shape": "self",
+      "power": 0,
+      "min_range": 0,
+      "max_range": 0,
+      "aoe": 0,
+      "cooldown": 0,
+      "cast": 0
+    }
+  ],
+  "monster": {
+    "tier": "hard",
+    "temperament": "aggressive",
+    "ring": 7,
+    "traits": [
+      "scavenger"
+    ]
+  }
+}

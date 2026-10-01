@@ -1,13 +1,95 @@
 {
   "format": "tactical-masters-theme",
   "name": "Winter Pass",
-  "ground": {"tops": ["#e6ecf2", "#eef2f6", "#f4f7fa", "#f8fafc", "#ffffff"], "side": "#7d8590", "jitter": 0.03},
-  "rock": {"colour": "#8f9aa8", "style": "boulders"},
-  "water": {"colour": "#9fd6ea", "opacity": 0.85},
-  "embers": {"colour": "#2f2220", "glow": "#ff8a3a"},
-  "spring": {"colour": "#5fd0d8", "glow": "#9ffcff"},
-  "around": {"ground": "#dfe7ee", "trees": "pine", "treeCount": 80, "leaves": "#2f4a3a", "trunk": "#3d2e25", "rockCount": 25},
-  "sun": {"pitch": -30, "yaw": -20, "intensity": 6, "colour": "#e6efff"},
-  "sky": {"intensity": 5},
-  "fog": {"density": 0.035, "colour": "#cfdcea"}
+  "ground": {
+    "tops": [
+      "#e6ecf2",
+      "#eef2f6",
+      "#f4f7fa",
+      "#f8fafc",
+      "#ffffff"
+    ],
+    "side": "#7d8590",
+    "jitter": 0.03
+  },
+  "rock": {
+    "colour": "#8f9aa8",
+    "style": "boulders"
+  },
+  "water": {
+    "colour": "#9fd6ea",
+    "opacity": 0.85
+  },
+  "embers": {
+    "colour": "#2f2220",
+    "glow": "#ff8a3a"
+  },
+  "spring": {
+    "colour": "#5fd0d8",
+    "glow": "#9ffcff"
+  },
+  "around": {
+    "ground": "#dfe7ee",
+    "trees": "pine",
+    "treeCount": 80,
+    "leaves": "#2f4a3a",
+    "trunk": "#3d2e25",
+    "rockCount": 25
+  },
+  "sun": {
+    "pitch": -30,
+    "yaw": -20,
+    "intensity": 6,
+    "colour": "#e6efff"
+  },
+  "sky": {
+    "intensity": 5
+  },
+  "fog": {
+    "density": 0.035,
+    "colour": "#cfdcea"
+  },
+  "light": {
+    "drift": 1.0,
+    "volumetric": true
+  },
+  "foliage": {
+    "grass": {
+      "density": 0.4,
+      "height": 0.3,
+      "colours": [
+        "#c9d6dc",
+        "#9fb3a8",
+        "#7d9384"
+      ]
+    },
+    "flowers": {
+      "density": 0.0
+    },
+    "bushes": {
+      "density": 0.2,
+      "colour": "#3d5a4a"
+    },
+    "forest": 0.03
+  },
+  "kit": {
+    "rock": [
+      "/Game/KiteDemo/Environments/Rocks/Medium_Boulder_001/Medium_Boulder_001.Medium_Boulder_001",
+      "/Game/KiteDemo/Environments/Rocks/Medium_Boulder_002/Medium_Boulder_LowPoly.Medium_Boulder_LowPoly"
+    ],
+    "tree": [
+      "/Game/KiteDemo/Environments/Trees/ScotsPine_01/ScotsPine_01.ScotsPine_01",
+      "/Game/KiteDemo/Environments/Trees/ScotsPineTall_01/ScotsPineTall_01.ScotsPineTall_01"
+    ],
+    "boulder": [
+      "/Game/KiteDemo/Environments/Rocks/Medium_Boulder_001/Medium_Boulder_001.Medium_Boulder_001",
+      "/Game/KiteDemo/Environments/Rocks/Medium_Boulder_002/Medium_Boulder_LowPoly.Medium_Boulder_LowPoly",
+      "/Game/KiteDemo/Environments/Rocks/Mountain_RockFace_002/SM_MountainRock.SM_MountainRock",
+      "/Game/KiteDemo/Environments/Rocks/Mountain_RockFace_002/SM_MountainRock_Closed.SM_MountainRock_Closed",
+      "/Game/KiteDemo/Environments/Rocks/GroundRevealRock001/SM_GroundRevealRock001.SM_GroundRevealRock001"
+    ],
+    "rockFill": 0.95,
+    "treeHeight": 13,
+    "boulderSize": 3.0
+  }
 }

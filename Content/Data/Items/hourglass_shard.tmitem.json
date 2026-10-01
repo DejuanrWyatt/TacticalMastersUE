@@ -1,0 +1,29 @@
+{
+  "format": "tactical-masters-item",
+  "version": 1,
+  "id": "hourglass_shard",
+  "name": "Hourglass Shard",
+  "desc": "Stop an enemy's clock for 4 seconds.",
+  "icon": "hourglass",
+  "tier": "rare",
+  "ability": {
+    "id": "item_stop",
+    "name": "Stop",
+    "desc": "An enemy up to 5 m away is Stopped: its Turn Gauge doesn't fill for 4 seconds. A turn it already has isn't taken.",
+    "kind": "active",
+    "effect": "support",
+    "scale": "mag",
+    "target": "enemy",
+    "shape": "unit",
+    "power": 0,
+    "min_range": 0,
+    "max_range": 5,
+    "aoe": 0,
+    "cooldown": 6,
+    "cast": 0,
+    "status": {
+      "id": "stop",
+      "turns": 2
+    }
+  }
+}

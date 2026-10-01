@@ -452,7 +452,7 @@ UAnimSequence* ATMBattleDirector::StandingClip(int32 Index) const
 	int32 Slot = Unit.IsCasting() ? Unit.Casting.Slot : (Unit.IsChanneling() ? Unit.Channeling.Slot : -1);
 	if (Slot >= 0)
 	{
-		if (const TMSim::FAbility* Ability = TMSim::JobAbility(Unit.Job, Slot))
+		if (const TMSim::FAbility* Ability = Unit.Ability(Slot))
 		{
 			const FTMMotionClips* Clips = FindMotion(*Set, UTF8_TO_TCHAR(TMSim::MotionOf(*Ability, Slot).c_str()));
 			if (Clips && Clips->Windup)
@@ -463,7 +463,7 @@ UAnimSequence* ATMBattleDirector::StandingClip(int32 Index) const
 	}
 	// A stance that suits the class: its first ability's motion says whether it
 	// is a fighter, an archer or a caster.
-	if (const TMSim::FAbility* First = TMSim::JobAbility(Unit.Job, 0))
+	if (const TMSim::FAbility* First = Unit.Ability(0))
 	{
 		if (UAnimSequence* Own = Set->Extra(*(TEXT("idle:") + FString(UTF8_TO_TCHAR(TMSim::MotionOf(*First, 0).c_str())))))
 		{
@@ -618,6 +618,18 @@ void ATMBattleDirector::AdvanceMotion(float DeltaSeconds)
 		// The rules moved it: walk there along the way it went. The walk is
 		// found again here, on a copy with the unit back where it started, since
 		// the rules keep only where it ended up.
+		// A monster off the board (not yet woken, or gone) comes back where the
+		// rules put it, and so does anyone who blinked: shown there, not walked.
+		if (Unit.bMonster && !Unit.IsAlive() && !Unit.IsKo())
+		{
+			SnapUnits.Add(Unit.Id);
+		}
+		if (Unit.IsAlive() && SnapUnits.Remove(Unit.Id) > 0)
+		{
+			Motion.SimPos = Unit.Pos;
+			Motion.Shown = WorldFromMetres(Unit.Pos, Battle.Map.NodeLevel(TMSim::FMap::NodeOf(Unit.Pos)));
+			Motion.Path.Reset();
+		}
 		if (!(Unit.Pos == Motion.SimPos))
 		{
 			const TMSim::FVec2 From = Motion.SimPos;

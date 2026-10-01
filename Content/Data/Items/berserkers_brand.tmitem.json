@@ -1,0 +1,15 @@
+{
+  "format": "tactical-masters-item",
+  "version": 1,
+  "id": "berserkers_brand",
+  "name": "Berserker's Brand",
+  "desc": "Abilities hit 20% harder, but allies' heals do half.",
+  "icon": "brand",
+  "tier": "rare",
+  "bonus": {
+    "damage_percent": 20
+  },
+  "effects": {
+    "heal_taken_percent": -50
+  }
+}

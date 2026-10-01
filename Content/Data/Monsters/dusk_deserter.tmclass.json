@@ -1,0 +1,95 @@
+{
+  "format": "tactical-masters-class",
+  "version": 1,
+  "id": "dusk_deserter",
+  "name": "Dusk Deserter",
+  "color": "#6d5a8a",
+  "look": "knight",
+  "icon": "dusk_deserter",
+  "roles": [
+    "damage"
+  ],
+  "stats": {
+    "hp": 34,
+    "attdef": 4,
+    "magdef": 3,
+    "aeva": 5,
+    "meva": 4,
+    "crit": 5,
+    "speed": 10,
+    "move": 5,
+    "patience": 5,
+    "sight": 9
+  },
+  "abilities": [
+    {
+      "id": "dusk_deserter_cleave",
+      "name": "Cleave",
+      "desc": "Swings through every enemy in a 90\u00b0 arc up to 2.5 m away (power 20).",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "att",
+      "target": "enemy",
+      "shape": "cone",
+      "power": 20,
+      "min_range": 0,
+      "max_range": 2.5,
+      "aoe": 0,
+      "cooldown": 0,
+      "cast": 0,
+      "angle": 90
+    },
+    {
+      "id": "dusk_deserter_idle1",
+      "name": "Wild Instinct",
+      "desc": "Always on: nothing to use.",
+      "kind": "passive",
+      "effect": "support",
+      "scale": "mag",
+      "target": "ally",
+      "shape": "self",
+      "power": 0,
+      "min_range": 0,
+      "max_range": 0,
+      "aoe": 0,
+      "cooldown": 0,
+      "cast": 0
+    },
+    {
+      "id": "dusk_deserter_idle2",
+      "name": "Wild Instinct",
+      "desc": "Always on: nothing to use.",
+      "kind": "passive",
+      "effect": "support",
+      "scale": "mag",
+      "target": "ally",
+      "shape": "self",
+      "power": 0,
+      "min_range": 0,
+      "max_range": 0,
+      "aoe": 0,
+      "cooldown": 0,
+      "cast": 0
+    },
+    {
+      "id": "dusk_deserter_idle3",
+      "name": "Wild Instinct",
+      "desc": "Always on: nothing to use.",
+      "kind": "passive",
+      "effect": "support",
+      "scale": "mag",
+      "target": "ally",
+      "shape": "self",
+      "power": 0,
+      "min_range": 0,
+      "max_range": 0,
+      "aoe": 0,
+      "cooldown": 0,
+      "cast": 0
+    }
+  ],
+  "monster": {
+    "tier": "medium",
+    "temperament": "patrol"
+  }
+}

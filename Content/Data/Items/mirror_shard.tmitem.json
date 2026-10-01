@@ -1,0 +1,26 @@
+{
+  "format": "tactical-masters-item",
+  "version": 1,
+  "id": "mirror_shard",
+  "name": "Mirror Shard",
+  "desc": "Swap places with an ally in sight up to 6 m away.",
+  "icon": "mirror",
+  "tier": "rare",
+  "ability": {
+    "id": "item_swap",
+    "name": "Swap",
+    "desc": "Trades places with an ally up to 6 m away.",
+    "kind": "active",
+    "effect": "support",
+    "scale": "mag",
+    "target": "ally",
+    "shape": "unit",
+    "power": 0,
+    "min_range": 1,
+    "max_range": 6,
+    "aoe": 0,
+    "cooldown": 4,
+    "cast": 0,
+    "special": "swap"
+  }
+}

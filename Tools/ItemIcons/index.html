@@ -1,0 +1,22 @@
+<!doctype html><html><body style="background:#1b1d22;margin:0"><div id="sheet" style="display:grid;grid-template-columns:repeat(10,96px);gap:10px;padding:14px;width:1100px"></div>
+<script type="module">
+import {iconSvg, GLYPHS, DEFAULT_DESIGN} from './icons.mjs';
+import {ITEM_GLYPHS, ITEM_GLYPH} from './item_glyphs.mjs';
+Object.assign(GLYPHS, ITEM_GLYPHS);
+const TIER = {common: '#bfc3cc', uncommon: '#5fd46c', rare: '#6f9fff', epic: '#ffb33f'};
+const items = await (await fetch('items.json')).json();
+const out = {}; const missing = [];
+for (const it of items) {
+  const glyph = ITEM_GLYPHS[it.icon] ? it.icon : ITEM_GLYPH[it.icon];
+  if (!glyph || !GLYPHS[glyph]) missing.push(it.icon);
+  const design = {...DEFAULT_DESIGN, backing: 'square', glyph: glyph || 'question', colour: TIER[it.tier] || TIER.common, style: 'light', finish: 'lit'};
+  const svg = iconSvg(design, 128);
+  const img = new Image(); img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg); await img.decode();
+  const cv = document.createElement('canvas'); cv.width = cv.height = 128; cv.getContext('2d').drawImage(img, 0, 0, 128, 128);
+  out[it.id] = cv.toDataURL('image/png').split(',')[1];
+  const cell = document.createElement('div'); cell.style.cssText = 'color:#ddd;font:11px sans-serif;text-align:center';
+  const shown = new Image(); shown.src = cv.toDataURL(); shown.width = 96; cell.append(shown, document.createElement('br'), it.name);
+  document.getElementById('sheet').append(cell);
+}
+window.ICONS = out; window.MISSING = missing; document.title = 'done';
+</script></body></html>

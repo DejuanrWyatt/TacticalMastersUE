@@ -1,0 +1,12 @@
+{
+  "format": "tactical-masters-item",
+  "version": 1,
+  "id": "iron_charm",
+  "name": "Iron Charm",
+  "desc": "A lump of iron on a cord. Hard to explain, harder to kill.",
+  "icon": "charm",
+  "tier": "common",
+  "stats": {
+    "hp": 12
+  }
+}

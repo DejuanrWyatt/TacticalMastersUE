@@ -1,0 +1,29 @@
+{
+  "format": "tactical-masters-item",
+  "version": 1,
+  "id": "oil_flask",
+  "name": "Oil Flask",
+  "desc": "Splash oil over a spot: fire hits the Oiled 50% harder and sets them burning.",
+  "icon": "flask",
+  "tier": "uncommon",
+  "ability": {
+    "id": "item_oil",
+    "name": "Oil Flask",
+    "desc": "Oils every enemy within 1.5 m of a spot up to 5 m away for 3 turns: fire hits them 50% harder and ignites them.",
+    "kind": "active",
+    "effect": "support",
+    "scale": "mag",
+    "target": "enemy",
+    "shape": "circle",
+    "power": 0,
+    "min_range": 0,
+    "max_range": 5,
+    "aoe": 1.5,
+    "cooldown": 4,
+    "cast": 0,
+    "status": {
+      "id": "oiled",
+      "turns": 3
+    }
+  }
+}

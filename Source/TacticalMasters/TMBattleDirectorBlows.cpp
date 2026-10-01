@@ -23,6 +23,7 @@
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Materials/MaterialInterface.h"
 #include "Misc/App.h"
+#include "Particles/ParticleSystemComponent.h"
 
 #include "SimAbility.h"
 #include "SimTypes.h"
@@ -132,11 +133,17 @@ namespace
 	const FStatusLook GLooks[] =
 	{
 		{ "freeze",    FLinearColor(0.55f, 0.85f, 1.0f), 0.0f, false, 0.0f },
+		{ "stop",      FLinearColor(0.7f, 0.65f, 1.0f),  0.0f, false, 0.0f },
+		{ "charmed",   FLinearColor(1.0f, 0.5f, 0.76f),  1.5f, false, 1.0f },
+		{ "terrified", FLinearColor(0.65f, 0.5f, 0.85f), 3.0f, false, 1.3f },
 		{ "stun",      FLinearColor(1.0f, 0.95f, 0.4f),  2.5f, false, 0.6f },
 		{ "sleep",     FLinearColor(0.5f, 0.5f, 1.0f),   0.4f, false, 0.3f },
 		{ "doom",      FLinearColor(0.6f, 0.1f, 0.8f),   1.2f, false, 1.0f },
 		{ "burn",      FLinearColor(1.0f, 0.45f, 0.1f),  0.0f, true,  1.0f },
 		{ "bleed",     FLinearColor(0.8f, 0.05f, 0.05f), 1.0f, false, 1.0f },
+		{ "marked",    FLinearColor(1.0f, 0.3f, 0.3f),   2.0f, false, 1.0f },
+		{ "decay",     FLinearColor(0.56f, 0.68f, 0.28f), 0.8f, false, 1.0f },
+		{ "reflect",   FLinearColor(0.85f, 0.94f, 1.0f), 0.0f, false, 1.0f },
 		{ "invuln",    FLinearColor(1.0f, 0.85f, 0.3f),  0.0f, false, 1.0f },
 		{ "shield",    FLinearColor(0.5f, 0.75f, 1.0f),  0.0f, false, 1.0f },
 		{ "barrier",   FLinearColor(0.5f, 0.75f, 1.0f),  0.0f, false, 1.0f },
@@ -148,6 +155,10 @@ namespace
 		{ "immunity",  FLinearColor(1.0f, 1.0f, 1.0f),   0.0f, false, 1.0f },
 		{ "relentless", FLinearColor(1.0f, 0.5f, 0.2f),  1.0f, false, 1.0f },
 		{ "stride",    FLinearColor(0.45f, 1.0f, 0.55f), 0.0f, false, 1.2f },
+		{ "haste",     FLinearColor(1.0f, 0.87f, 0.35f), 0.0f, false, 1.4f },
+		{ "chilled",   FLinearColor(0.65f, 0.88f, 1.0f), 0.0f, false, 0.8f },
+		{ "protect",   FLinearColor(0.9f, 0.76f, 0.45f), 0.0f, false, 1.0f },
+		{ "shell",     FLinearColor(0.7f, 0.55f, 1.0f),  0.0f, false, 1.0f },
 	};
 
 	/** The brightness of a status glow, well under the ready light's. */
@@ -176,6 +187,11 @@ bool ATMBattleDirector::Harms(const TMSim::FEvent& Event)
 	// From an ability, it harms if the ability does damage: a heal carries its
 	// healer too, so who is behind it says nothing. From nobody, it is a status
 	// ticking -- a burn harms, regen heals -- or the ground.
+	// Decay rotting a heal, and a Suppressed unit's free blow, always hurt.
+	if (Event.Id == "decay" || Event.Id == "suppressed")
+	{
+		return true;
+	}
 	if (Event.By >= 0)
 	{
 		const TMSim::FAbility* Ability = TMSim::FindAbility(Event.Id);
@@ -288,6 +304,7 @@ void ATMBattleDirector::AdvanceBlows(float DeltaSeconds)
 			// The swing begins (after any walk there): heard now, landing later.
 			Blow.bSounded = true;
 			SoundBlowStarts(Blow, Blow.Slot);
+			LookCast(Blow);
 		}
 		if (Blow.bStarted && !bLanded)
 		{
@@ -306,6 +323,10 @@ void ATMBattleDirector::AdvanceBlows(float DeltaSeconds)
 					const float Part = Shot.Age / Shot.Flight;
 					if (Part >= 1.0f || !Shot.Mesh.IsValid())
 					{
+						if (Shot.Trail.IsValid())
+						{
+							Shot.Trail->DestroyComponent();
+						}
 						if (Shot.Mesh.IsValid())
 						{
 							Shot.Mesh->DestroyComponent();
@@ -342,7 +363,14 @@ void ATMBattleDirector::LaunchShots(FTMBlow& Blow)
 	{
 		return;
 	}
-	const EShot Shot = ShotOf(*Blow.Ability, Blow.Motion);
+	const FTMLook& Look = LookOf(*Blow.Ability);
+	EShot Shot = ShotOf(*Blow.Ability, Blow.Motion);
+	// A spell thrown from afar flies there, whatever the motion that throws it;
+	// earth throws a stone.
+	if (Shot == EShot::None && Look.bMagic && Look.bRanged && Blow.Ability->Effect != TMSim::EEffect::Revive)
+	{
+		Shot = FString(LookName(Look)) == TEXT("earth") ? EShot::Stone : EShot::Orb;
+	}
 	const int32 Caster = IndexOfUnit(Battle, Blow.Caster);
 	if (Shot == EShot::None || !Motions.IsValidIndex(Caster))
 	{
@@ -392,7 +420,7 @@ void ATMBattleDirector::LaunchShots(FTMBlow& Blow)
 		Seen.Add(IsSeen(User));
 	}
 
-	const FLinearColor Colour = ShotColour(*Blow.Ability, Shot);
+	const FLinearColor Colour = Look.bMagic && Shot == EShot::Orb ? LookColour(Look) : ShotColour(*Blow.Ability, Shot);
 	const float Speed = Shot == EShot::Arrow ? 2600.0f : (Shot == EShot::Orb ? 1500.0f : 1100.0f);
 	for (int32 k = 0; k < Ends.Num(); ++k)
 	{
@@ -423,6 +451,16 @@ void ATMBattleDirector::LaunchShots(FTMBlow& Blow)
 			Paint->SetVectorParameterValue(TEXT("Color"), Colour);
 			Body->SetMaterial(0, Paint);
 		}
+		if (Shot == EShot::Orb && Look.bMagic)
+		{
+			// What it is made of, flying: a fireball, a spark, a shard of ice.
+			// The plain ball stays only when the look has nothing to fly as.
+			Flying.Trail = LookShot(Look, Body);
+			if (Flying.Trail.IsValid())
+			{
+				Body->SetVisibility(false);
+			}
+		}
 		if (Shot == EShot::Orb)
 		{
 			// Magic gives off its own light, which is most of what makes it read.
@@ -442,8 +480,13 @@ void ATMBattleDirector::LaunchShots(FTMBlow& Blow)
 void ATMBattleDirector::LandBlow(FTMBlow& Blow)
 {
 	SoundBlowLands(Blow);
+	LookLand(Blow);
 	for (FTMShot& Shot : Blow.Shots)
 	{
+		if (Shot.Trail.IsValid())
+		{
+			Shot.Trail->DestroyComponent();
+		}
 		if (Shot.Mesh.IsValid())
 		{
 			Shot.Mesh->DestroyComponent();
@@ -478,6 +521,10 @@ void ATMBattleDirector::ClearBlows()
 	{
 		for (FTMShot& Shot : Blow.Shots)
 		{
+			if (Shot.Trail.IsValid())
+			{
+				Shot.Trail->DestroyComponent();
+			}
 			if (Shot.Mesh.IsValid())
 			{
 				Shot.Mesh->DestroyComponent();
@@ -622,6 +669,8 @@ void ATMBattleDirector::AddFloater(int32 UnitId, const FString& What, const FCol
 	Text->SetWorldSize(Size);
 	Text->SetHorizontalAlignment(EHTA_Center);
 	Text->SetRelativeLocation(Where);
+	// In a game the HUD draws it, outlined (ATMBattleHud::DrawWorldWords); this says where and what.
+	Text->SetHiddenInGame(GetWorld() && GetWorld()->IsGameWorld());
 	// Facing the camera is a per-frame job; billboarded in AdvanceFloaters.
 	Floaters.Add({ Text, UnitId, 0.0f });
 	if (bCount)
@@ -780,7 +829,7 @@ void ATMBattleDirector::ShowStatuses(int32 Index, float DeltaSeconds)
 		{
 			if (Each.Rate != 1.0f && Unit.HasStatus(Each.Id))
 			{
-				Rate = FCStringAnsi::Strcmp(Each.Id, "stride") == 0 ? FMath::Max(Rate, Each.Rate) : FMath::Min(Rate, Each.Rate);
+				Rate = Each.Rate > 1.0f ? FMath::Max(Rate, Each.Rate) : FMath::Min(Rate, Each.Rate);
 			}
 		}
 	}

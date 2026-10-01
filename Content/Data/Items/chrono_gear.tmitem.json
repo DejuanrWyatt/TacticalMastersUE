@@ -1,0 +1,12 @@
+{
+  "format": "tactical-masters-item",
+  "version": 1,
+  "id": "chrono_gear",
+  "name": "Chrono Gear",
+  "desc": "The Turn Gauge fills about 15% faster.",
+  "icon": "gear",
+  "tier": "rare",
+  "bonus": {
+    "tg_percent": 15
+  }
+}

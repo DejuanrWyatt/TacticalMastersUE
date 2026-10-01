@@ -1,0 +1,13 @@
+{
+  "format": "tactical-masters-item",
+  "version": 1,
+  "id": "mirror_cloak",
+  "name": "Mirror Cloak",
+  "desc": "Spells glance off a silvered weave.",
+  "icon": "cloak",
+  "tier": "uncommon",
+  "stats": {
+    "magdef": 2,
+    "meva": 6
+  }
+}

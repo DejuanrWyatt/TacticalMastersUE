@@ -1,0 +1,29 @@
+{
+  "format": "tactical-masters-item",
+  "version": 1,
+  "id": "scent_lure",
+  "name": "Scent Lure",
+  "desc": "Mark an enemy: monsters nearby go for it first.",
+  "icon": "lure",
+  "tier": "uncommon",
+  "ability": {
+    "id": "item_lure",
+    "name": "Lure",
+    "desc": "Marks an enemy up to 6 m away for 2 turns: monsters go for it first.",
+    "kind": "active",
+    "effect": "support",
+    "scale": "mag",
+    "target": "enemy",
+    "shape": "unit",
+    "power": 0,
+    "min_range": 0,
+    "max_range": 6,
+    "aoe": 0,
+    "cooldown": 5,
+    "cast": 0,
+    "status": {
+      "id": "lured",
+      "turns": 2
+    }
+  }
+}

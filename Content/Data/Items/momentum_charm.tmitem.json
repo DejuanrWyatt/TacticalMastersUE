@@ -1,0 +1,12 @@
+{
+  "format": "tactical-masters-item",
+  "version": 1,
+  "id": "momentum_charm",
+  "name": "Momentum Charm",
+  "desc": "Each knock-out refills a quarter of your Turn Gauge.",
+  "icon": "charm",
+  "tier": "rare",
+  "effects": {
+    "kill_tg_percent": 25
+  }
+}

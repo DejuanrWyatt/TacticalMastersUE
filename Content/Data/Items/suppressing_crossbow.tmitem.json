@@ -1,0 +1,29 @@
+{
+  "format": "tactical-masters-item",
+  "version": 1,
+  "id": "suppressing_crossbow",
+  "name": "Suppressing Crossbow",
+  "desc": "Pin an enemy down: if it walks, you get a free shot.",
+  "icon": "crossbow",
+  "tier": "uncommon",
+  "ability": {
+    "id": "item_suppress",
+    "name": "Pin Down",
+    "desc": "Power 6 to an enemy up to 7 m away, and Suppressed for 2 turns: if it walks, this unit hits it for free; its own attacks miss 30% more.",
+    "kind": "active",
+    "effect": "damage",
+    "scale": "att",
+    "target": "enemy",
+    "shape": "unit",
+    "power": 6,
+    "min_range": 0,
+    "max_range": 7,
+    "aoe": 0,
+    "cooldown": 3,
+    "cast": 0,
+    "status": {
+      "id": "suppressed",
+      "turns": 2
+    }
+  }
+}

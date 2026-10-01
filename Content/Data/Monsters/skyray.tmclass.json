@@ -1,0 +1,95 @@
+{
+  "format": "tactical-masters-class",
+  "version": 1,
+  "id": "skyray",
+  "name": "Skyray",
+  "color": "#4fa3d9",
+  "look": "black_mage",
+  "icon": "skyray",
+  "roles": [
+    "damage"
+  ],
+  "stats": {
+    "hp": 48,
+    "attdef": 3,
+    "magdef": 5,
+    "aeva": 10,
+    "meva": 8,
+    "crit": 5,
+    "speed": 11,
+    "move": 6,
+    "patience": 5,
+    "sight": 10
+  },
+  "abilities": [
+    {
+      "id": "skyray_fire",
+      "name": "Fire",
+      "desc": "Fires on an enemy up to 5 m away (power 22).",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "mag",
+      "target": "enemy",
+      "shape": "unit",
+      "power": 22,
+      "min_range": 0,
+      "max_range": 5,
+      "aoe": 0,
+      "cooldown": 0,
+      "cast": 0
+    },
+    {
+      "id": "skyray_dive",
+      "name": "Dive",
+      "desc": "Dives through an enemy up to 4 m away, landing beyond (power 18).",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "att",
+      "target": "enemy",
+      "shape": "vector",
+      "power": 18,
+      "min_range": 0,
+      "max_range": 4,
+      "aoe": 0,
+      "cooldown": 3,
+      "cast": 0
+    },
+    {
+      "id": "skyray_idle1",
+      "name": "Glide",
+      "desc": "Always on: nothing to use.",
+      "kind": "passive",
+      "effect": "support",
+      "scale": "mag",
+      "target": "ally",
+      "shape": "self",
+      "power": 0,
+      "min_range": 0,
+      "max_range": 0,
+      "aoe": 0,
+      "cooldown": 0,
+      "cast": 0
+    },
+    {
+      "id": "skyray_idle2",
+      "name": "Skyborne",
+      "desc": "Always on: nothing to use.",
+      "kind": "passive",
+      "effect": "support",
+      "scale": "mag",
+      "target": "ally",
+      "shape": "self",
+      "power": 0,
+      "min_range": 0,
+      "max_range": 0,
+      "aoe": 0,
+      "cooldown": 0,
+      "cast": 0
+    }
+  ],
+  "monster": {
+    "tier": "medium",
+    "temperament": "territorial",
+    "ring": 5
+  }
+}

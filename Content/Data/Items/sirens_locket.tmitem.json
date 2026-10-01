@@ -1,0 +1,29 @@
+{
+  "format": "tactical-masters-item",
+  "version": 1,
+  "id": "sirens_locket",
+  "name": "Siren's Locket",
+  "desc": "Charm an enemy: it fights for your side for one turn.",
+  "icon": "locket",
+  "tier": "epic",
+  "ability": {
+    "id": "item_charm",
+    "name": "Charm",
+    "desc": "An enemy up to 4 m away fights for this side on its next turn. Any damage brings it back to its senses.",
+    "kind": "active",
+    "effect": "support",
+    "scale": "mag",
+    "target": "enemy",
+    "shape": "unit",
+    "power": 0,
+    "min_range": 0,
+    "max_range": 4,
+    "aoe": 0,
+    "cooldown": 7,
+    "cast": 0,
+    "status": {
+      "id": "charmed",
+      "turns": 1
+    }
+  }
+}

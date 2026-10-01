@@ -1,0 +1,12 @@
+{
+  "format": "tactical-masters-item",
+  "version": 1,
+  "id": "shrine_key",
+  "name": "Shrine Key",
+  "desc": "Use a shrine without waiting for it to rest.",
+  "icon": "key",
+  "tier": "rare",
+  "effects": {
+    "shrine_key": true
+  }
+}

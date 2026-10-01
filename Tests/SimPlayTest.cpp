@@ -384,7 +384,15 @@ int main()
 		Notices("whether blue is done placing", [](FBattle& B) { B.PlanningDone[0] = !B.PlanningDone[0]; });
 		Notices("whether red is done placing", [](FBattle& B) { B.PlanningDone[1] = !B.PlanningDone[1]; });
 		Notices("a rule number", [](FBattle& B) { B.Tuning.SpeedMultiplier += 0.05; });
-		std::printf("the checksum notices %d kinds of change\n", 37 - Blind);
+		// The watchtowers (not Godot's): that there is one, where, who holds it,
+		// and who is how far into taking it.
+		auto OneTower = [](FBattle& B) { B.Watchtowers.push_back(FWatchtower()); };
+		Notices("a watchtower", OneTower);
+		Notices("where a watchtower stands", [](FBattle& B) { B.Watchtowers[0].Pos.X += 2.0f; }, OneTower);
+		Notices("who holds a watchtower", [](FBattle& B) { B.Watchtowers[0].Owner = 1; }, OneTower);
+		Notices("who is taking a watchtower", [](FBattle& B) { B.Watchtowers[0].Capturer = 0; }, OneTower);
+		Notices("how far into taking it", [](FBattle& B) { B.Watchtowers[0].Progress = 1; }, OneTower);
+		std::printf("the checksum notices %d kinds of change\n", 42 - Blind);
 	}
 
 	// How a battle is won besides by wiping out the other side: the time limit
@@ -475,9 +483,15 @@ int main()
 			if (std::string(TuningKeys()[i].Key) == "speed_multiplier") { Speed = static_cast<int>(i); }
 			if (std::string(TuningKeys()[i].Key) == "ko_seconds") { KoSeconds = static_cast<int>(i); }
 		}
-		if (TuningKeys().size() != 28 || Speed < 0 || KoSeconds < 0)
+		// Godot's 28, in Godot's order, then the watchtowers' three, the item
+		// budget and the camps' two after them (not Godot's), so every older rule
+		// keeps its index.
+		if (TuningKeys().size() != 35 || Speed < 0 || KoSeconds < 0
+			|| std::string(TuningKeys()[27].Key) != "battle_seconds"
+			|| std::string(TuningKeys()[28].Key) != "watchtower_count"
+			|| std::string(TuningKeys()[32].Key) != "camps")
 		{
-			Fail("the tuning table should have Godot's 28 rule numbers");
+			Fail("the tuning table should have Godot's 28 rule numbers, then the watchtowers' three, the item budget and the camps' two");
 		}
 		const FOrder Tune = FOrder::MakeTune({ { Speed, 1.5 }, { KoSeconds, 999.0 } });
 		if (!Tuned.Validate(Tune).empty())

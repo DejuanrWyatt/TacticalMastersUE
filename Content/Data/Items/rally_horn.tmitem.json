@@ -1,0 +1,26 @@
+{
+  "format": "tactical-masters-item",
+  "version": 1,
+  "id": "rally_horn",
+  "name": "Rally Horn",
+  "desc": "Allies within 4 m fill 15% of their Turn Gauge.",
+  "icon": "horn",
+  "tier": "rare",
+  "ability": {
+    "id": "item_rally",
+    "name": "Rally",
+    "desc": "Allies within 4 m gain 15% of their Turn Gauge.",
+    "kind": "active",
+    "effect": "support",
+    "scale": "mag",
+    "target": "ally",
+    "shape": "self",
+    "power": 0,
+    "min_range": 0,
+    "max_range": 0,
+    "aoe": 4,
+    "cooldown": 5,
+    "cast": 0,
+    "tg": 15
+  }
+}

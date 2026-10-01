@@ -8,6 +8,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdlib>
 #include <cstring>
 #include <limits>
 
@@ -128,14 +129,22 @@ namespace TMSim
 
 	bool FBattle::HasLineOfSight(const FVec2& A, const FVec2& B) const
 	{
+		return HasLineOfSightFrom(A, EyeHeight, B);
+	}
+
+	bool FBattle::HasLineOfSightFrom(const FVec2& A, float EyeAboveGround, const FVec2& B) const
+	{
 		const float Distance = A.DistanceTo(B);
 		if (Distance <= LosStep * 2.0f)
 		{
 			return true;
 		}
 		// A line from eye height over there to chest height over here: a hill in
-		// between blocks the view only if it rises above that line.
-		const float FromH = static_cast<float>(GroundHeight(A)) + EyeHeight;
+		// between blocks the view only if it rises above that line. A unit's eyes
+		// are EyeHeight up; a watchtower looks out from much higher, which is the
+		// point of holding one. The sum is the same float sum either way, so a
+		// unit's sight is exactly what it was before towers existed.
+		const float FromH = static_cast<float>(GroundHeight(A)) + EyeAboveGround;
 		const float ToH = static_cast<float>(GroundHeight(B)) + TargetHeight;
 		const int Steps = static_cast<int>(Distance / LosStep);
 		for (int i = 1; i < Steps; ++i)
@@ -165,7 +174,102 @@ namespace TMSim
 				return true;
 			}
 		}
+		// A watchtower this side holds sees for it too. None exist unless the
+		// battle asked for them, so without them this is Godot's sight exactly.
+		for (const FWatchtower& Tower : Watchtowers)
+		{
+			if (Tower.Owner == Team && TowerSees(Tower, Point))
+			{
+				return true;
+			}
+		}
 		return false;
+	}
+
+	bool FBattle::TowerSees(const FWatchtower& Tower, const FVec2& Point) const
+	{
+		// Everything within its sight, nothing in the way: from the top of the
+		// tower nothing on the ground blocks the view (the human's ask, 2026-09-30;
+		// online protocol 7). It used to be line of sight from its eye height.
+		return static_cast<double>(Tower.Pos.DistanceTo(Point)) <= Tuning.WatchtowerSight;
+	}
+
+	int FBattle::CaptureTurnsNeeded() const
+	{
+		return std::max(1, RoundToInt(Tuning.WatchtowerTurns));
+	}
+
+	int FBattle::TowerNear(const FVec2& Point) const
+	{
+		int Best = -1;
+		double BestDistance = Watchtower::Reach;
+		for (int i = 0; i < static_cast<int>(Watchtowers.size()); ++i)
+		{
+			const double Distance = Watchtowers[static_cast<size_t>(i)].Pos.DistanceTo(Point);
+			// Strictly nearer, so of two at the same distance the first listed wins.
+			if (Distance <= BestDistance && (Best == -1 || Distance < BestDistance))
+			{
+				Best = i;
+				BestDistance = Distance;
+			}
+		}
+		return Best;
+	}
+
+	std::string FBattle::ValidateCapture(int UnitId, int Tower) const
+	{
+		// Checked in full, like ValidateAbility: the HUD asks it before offering
+		// the button, and Validate asks it about an order off the network.
+		const FUnit* Unit = nullptr;
+		for (const FUnit& Each : Units)
+		{
+			Unit = Each.Id == UnitId ? &Each : Unit;
+		}
+		if (!Unit || !Unit->IsAlive())
+		{
+			return "No such unit.";
+		}
+		if (Tower < 0 || Tower >= static_cast<int>(Watchtowers.size()))
+		{
+			return "No such watchtower.";
+		}
+		if (!Unit->bReady)
+		{
+			return "It isn't ready.";
+		}
+		if (Unit->IsStunned())
+		{
+			return "It can't act.";
+		}
+		// Capturing is the turn's action and then the end of the turn, so a unit
+		// that has already acted has nothing left to spend on it. It may walk
+		// there first: walk, then capture, is one turn.
+		if (Unit->bActed || Unit->IsCasting())
+		{
+			return "Already used its action this turn.";
+		}
+		const FWatchtower& Held = Watchtowers[static_cast<size_t>(Tower)];
+		if (Held.Owner == Unit->Team)
+		{
+			return "Your side already holds this watchtower.";
+		}
+		// Next to it, and on ground a unit could step up or down to from the
+		// tower's own: not at the foot of a cliff it stands on top of.
+		if (static_cast<double>(Unit->Pos.DistanceTo(Held.Pos)) > Watchtower::Reach
+			|| std::abs(LevelAt(Unit->Pos) - LevelAt(Held.Pos)) > Ground::Jump)
+		{
+			return "Too far from the watchtower: stand next to it.";
+		}
+		// Contested: nobody takes a tower out from under an enemy standing at it.
+		for (const FUnit& Other : Units)
+		{
+			if (Other.IsAlive() && Other.Team != Unit->Team
+				&& static_cast<double>(Other.Pos.DistanceTo(Held.Pos)) <= Watchtower::Reach)
+			{
+				return "An enemy is standing at the watchtower.";
+			}
+		}
+		return std::string();
 	}
 
 	const FUnit* FBattle::UnitNear(const FVec2& Point, float Radius) const
@@ -273,6 +377,18 @@ namespace TMSim
 		Mix(static_cast<uint64_t>(PlanningDone[1] ? 1 : 0));
 		Mix(static_cast<uint64_t>(CaptureTicks[0]));
 		Mix(static_cast<uint64_t>(CaptureTicks[1]));
+		// Where the watchtowers stand, who holds each and who is part-way to
+		// taking it. Two machines that disagree about one would see different
+		// ground through the fog from then on.
+		Mix(static_cast<uint64_t>(Watchtowers.size()));
+		for (const FWatchtower& Tower : Watchtowers)
+		{
+			MixFloat(Tower.Pos.X);
+			MixFloat(Tower.Pos.Y);
+			Mix(static_cast<uint64_t>(Tower.Owner + 1));
+			Mix(static_cast<uint64_t>(Tower.Capturer + 1));
+			Mix(static_cast<uint64_t>(Tower.Progress));
+		}
 		// The dice themselves. Two machines that have drawn a different number of
 		// times still agree about the board for a while, and then disagree about
 		// the very next thing anyone rolls for -- so the generator's own position
@@ -323,7 +439,7 @@ namespace TMSim
 				}
 				Mix(0xA0);
 			}
-			for (int Slot = 0; Slot < 4; ++Slot)
+			for (int Slot = 0; Slot < AbilitySlots; ++Slot)
 			{
 				Mix(static_cast<uint64_t>(Unit.Cooldowns[Slot]));
 				Mix(static_cast<uint64_t>(Unit.Toggled[Slot] ? 1 : 0));
@@ -344,13 +460,131 @@ namespace TMSim
 			MixFloat(Unit.Channeling.Target.X);
 			MixFloat(Unit.Channeling.Target.Y);
 			Mix(static_cast<uint64_t>(Unit.Channeling.Turns));
+
+			// What it carries, by id: the items' numbers come from files every
+			// machine loads, as classes' do.
+			for (const FItemDef* Item : Unit.Gear)
+			{
+				Mix(0x17u);
+				if (Item)
+				{
+					for (const char C : Item->Id)
+					{
+						Mix(static_cast<uint64_t>(static_cast<unsigned char>(C)));
+					}
+				}
+			}
+			// The items' own memory, and a monster's mind. All at rest outside camps.
+			Mix(static_cast<uint64_t>(Unit.LastHurt));
+			Mix(static_cast<uint64_t>((Unit.bRewindUsed ? 1 : 0) | (Unit.bFirstStrikeUsed ? 2 : 0) | (Unit.bPhoenixUsed ? 4 : 0)
+				| (Unit.bStillLastTurn ? 8 : 0) | (Unit.bUnseenAtStart ? 16 : 0) | (Unit.bMonster ? 32 : 0) | (Unit.bOffBoard ? 64 : 0)));
+			Mix(static_cast<uint64_t>(Unit.KillTgPercent));
+			Mix(static_cast<uint64_t>(Unit.Team));
+			Mix(static_cast<uint64_t>(Unit.CharmedFrom + 1));
+			Mix(static_cast<uint64_t>(Unit.ReraiseTicks));
+			if (Unit.bMonster)
+			{
+				Mix(static_cast<uint64_t>(Unit.Camp + 1));
+				Mix(static_cast<uint64_t>(Unit.Mind));
+				MixFloat(Unit.Home.X);
+				MixFloat(Unit.Home.Y);
+				Mix(static_cast<uint64_t>(Unit.Grudge + 1));
+				Mix(static_cast<uint64_t>(Unit.GrudgeTurns));
+				Mix(static_cast<uint64_t>(Unit.FleeTurns));
+				Mix(static_cast<uint64_t>(Unit.RouteStep));
+				Mix(static_cast<uint64_t>(Unit.Phase));
+				Mix(static_cast<uint64_t>(Unit.Stagger));
+				Mix(static_cast<uint64_t>(Unit.TamedTurns));
+			}
+		}
+		// The camps, the items on the ground, and the two generators that place
+		// and fill them.
+		Mix(static_cast<uint64_t>(Camps.size()));
+		for (const FCamp& Held : Camps)
+		{
+			Mix(static_cast<uint64_t>(Held.Kind + 1));
+			MixFloat(Held.Spot.X);
+			MixFloat(Held.Spot.Y);
+			Mix(static_cast<uint64_t>(Held.State));
+			Mix(static_cast<uint64_t>(Held.Timer));
+			Mix(static_cast<uint64_t>(Held.ShrineRest));
+			Mix(static_cast<uint64_t>(Held.Wakes));
+			Mix(static_cast<uint64_t>(Held.Route.size()));
+		}
+		Mix(static_cast<uint64_t>(Caches.size()));
+		for (const FCache& Cache : Caches)
+		{
+			MixFloat(Cache.Pos.X);
+			MixFloat(Cache.Pos.Y);
+			for (size_t i = 0; i < Cache.Items.size(); ++i)
+			{
+				Mix(0x2Bu);
+				for (const char C : Cache.Items[i]->Id)
+				{
+					Mix(static_cast<uint64_t>(static_cast<unsigned char>(C)));
+				}
+				Mix(static_cast<uint64_t>(i < Cache.Cooldowns.size() ? Cache.Cooldowns[i] : 0));
+			}
+		}
+		if (!Camps.empty())
+		{
+			Mix(CampRng.GetState());
+			Mix(LootRng.GetState());
 		}
 		return Hash;
 	}
 
+	std::string FBattle::LoadoutProblem() const
+	{
+		// Checked before a battle starts (the setup screen, and the host of an
+		// online match for the joiner's side): three open slots, no item twice
+		// on one unit, only items the game knows, and each side within its points.
+		int Spent[2] = { 0, 0 };
+		for (const FUnit& Unit : Units)
+		{
+			for (int i = 0; i < Items::Slots; ++i)
+			{
+				const FItemDef* Item = Unit.Gear[i];
+				if (!Item)
+				{
+					continue;
+				}
+				if (FindItem(Item->Id) != Item)
+				{
+					return "An item that is not in the game.";
+				}
+				for (int j = 0; j < i; ++j)
+				{
+					if (Unit.Gear[j] == Item)
+					{
+						return "A unit can't carry two " + Item->Name + "s.";
+					}
+				}
+				if (Item->Cost <= 0)
+				{
+					return Item->Name + " can't be bought; it has to be found.";
+				}
+				if (Unit.Team == 0 || Unit.Team == 1)
+				{
+					Spent[Unit.Team] += Item->Cost;
+				}
+			}
+		}
+		const int Budget = RoundToInt(Tuning.ItemBudget);
+		for (int Team = 0; Team < 2; ++Team)
+		{
+			if (Spent[Team] > Budget)
+			{
+				return std::string(Team == 0 ? "Blue" : "Red") + "'s items cost " + std::to_string(Spent[Team])
+					+ " points, and each side has " + std::to_string(Budget) + ".";
+			}
+		}
+		return std::string();
+	}
+
 	std::string FBattle::AbilityBlockedReason(const FUnit& Unit, int Slot) const
 	{
-		const FAbility* Ability = JobAbility(Unit.Job, Slot);
+		const FAbility* Ability = Unit.Ability(Slot);
 		if (!Ability)
 		{
 			return "There is nothing in that slot.";
@@ -477,6 +711,12 @@ namespace TMSim
 			return std::string();
 		case EOrderType::UseAbility:
 			return ValidateAbility(Order.UnitId, Order.Slot, Order.Target, Order.Follow);
+		case EOrderType::Capture:
+			return ValidateCapture(Order.UnitId, Order.Tower);
+		case EOrderType::Take:
+			return ValidateTake(Order.UnitId, Order.Cache, Order.ItemId, Order.GearSlot);
+		case EOrderType::Drop:
+			return ValidateDrop(Order.UnitId, Order.GearSlot);
 		default:
 			return "Unknown order.";
 		}
@@ -508,7 +748,7 @@ namespace TMSim
 		{
 			return Unit->Job + " is knocked down: it can walk or act this turn, not both.";
 		}
-		if (Slot < 0 || Slot > 3)
+		if (Slot < 0 || Slot >= AbilitySlots)
 		{
 			return "No such ability.";
 		}
@@ -526,7 +766,7 @@ namespace TMSim
 		{
 			return "You can't see that spot.";
 		}
-		const FAbility* Ability = JobAbility(Unit->Job, Slot);
+		const FAbility* Ability = Unit->Ability(Slot);
 		if (!Ability)
 		{
 			return "No such ability.";
@@ -558,7 +798,8 @@ namespace TMSim
 			const FUnit* Followed = FindUnit(Follow);
 			const bool bRightState = Followed
 				&& (Ability->Target == ETargetSide::KoAlly ? Followed->IsKo() : Followed->IsAlive());
-			if (!bRightState || Followed->Pos.DistanceTo(Target) > Ground::HitRadius)
+			if (!bRightState || Followed->Pos.DistanceTo(Target) > Ground::HitRadius
+				|| (Ability->Target != ETargetSide::KoAlly && !CanSeeUnit(Unit->Team, *Followed)))
 			{
 				return "Bad target.";
 			}
@@ -613,6 +854,30 @@ namespace TMSim
 				Tuning.*Key.Member = std::min(std::max(Value.second, Key.Low), Key.High);
 			}
 			return true;
+
+		case EOrderType::Capture:
+			if (FUnit* Unit = FindUnit(Order.UnitId))
+			{
+				ApplyCapture(*Unit, Order.Tower, Report);
+				return true;
+			}
+			return false;
+
+		case EOrderType::Take:
+			if (FUnit* Unit = FindUnit(Order.UnitId))
+			{
+				ApplyTake(*Unit, Order.Cache, Order.ItemId, Order.GearSlot, Report);
+				return true;
+			}
+			return false;
+
+		case EOrderType::Drop:
+			if (FUnit* Unit = FindUnit(Order.UnitId))
+			{
+				ApplyDrop(*Unit, Order.GearSlot, Report);
+				return true;
+			}
+			return false;
 
 		case EOrderType::Ready:
 			// Both sides done: the fighting starts before the time is up

@@ -1,0 +1,94 @@
+{
+  "format": "tactical-masters-class",
+  "version": 1,
+  "id": "camp_scrapper",
+  "name": "Camp Scrapper",
+  "color": "#b9a48a",
+  "look": "squire",
+  "icon": "camp_scrapper",
+  "roles": [
+    "damage"
+  ],
+  "stats": {
+    "hp": 18,
+    "attdef": 2,
+    "magdef": 2,
+    "aeva": 6,
+    "meva": 4,
+    "crit": 5,
+    "speed": 9,
+    "move": 4,
+    "patience": 4,
+    "sight": 7
+  },
+  "abilities": [
+    {
+      "id": "camp_scrapper_jab",
+      "name": "Jab",
+      "desc": "Strikes an enemy within arm's reach (power 14).",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "att",
+      "target": "enemy",
+      "shape": "unit",
+      "power": 14,
+      "min_range": 0,
+      "max_range": 1.8,
+      "aoe": 0,
+      "cooldown": 0,
+      "cast": 0
+    },
+    {
+      "id": "camp_scrapper_idle1",
+      "name": "Wild Instinct",
+      "desc": "Always on: nothing to use.",
+      "kind": "passive",
+      "effect": "support",
+      "scale": "mag",
+      "target": "ally",
+      "shape": "self",
+      "power": 0,
+      "min_range": 0,
+      "max_range": 0,
+      "aoe": 0,
+      "cooldown": 0,
+      "cast": 0
+    },
+    {
+      "id": "camp_scrapper_idle2",
+      "name": "Wild Instinct",
+      "desc": "Always on: nothing to use.",
+      "kind": "passive",
+      "effect": "support",
+      "scale": "mag",
+      "target": "ally",
+      "shape": "self",
+      "power": 0,
+      "min_range": 0,
+      "max_range": 0,
+      "aoe": 0,
+      "cooldown": 0,
+      "cast": 0
+    },
+    {
+      "id": "camp_scrapper_idle3",
+      "name": "Wild Instinct",
+      "desc": "Always on: nothing to use.",
+      "kind": "passive",
+      "effect": "support",
+      "scale": "mag",
+      "target": "ally",
+      "shape": "self",
+      "power": 0,
+      "min_range": 0,
+      "max_range": 0,
+      "aoe": 0,
+      "cooldown": 0,
+      "cast": 0
+    }
+  ],
+  "monster": {
+    "tier": "easy",
+    "temperament": "provoked"
+  }
+}

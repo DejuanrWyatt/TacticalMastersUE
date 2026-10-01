@@ -1,0 +1,12 @@
+{
+  "format": "tactical-masters-item",
+  "version": 1,
+  "id": "herders_whistle",
+  "name": "Herder's Whistle",
+  "desc": "Docile and provoked monsters take no notice of you.",
+  "icon": "whistle",
+  "tier": "common",
+  "effects": {
+    "calms_monsters": true
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "format": "tactical-masters-item",
+  "version": 1,
+  "id": "duelists_ribbon",
+  "name": "Duelist's Ribbon",
+  "desc": "Worn by those who'd rather not be hit.",
+  "icon": "ribbon",
+  "tier": "common",
+  "stats": {
+    "aeva": 4
+  }
+}

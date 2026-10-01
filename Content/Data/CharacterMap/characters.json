@@ -118,7 +118,25 @@
     "frost_brawler": "yin_cryptgoddess",
     "monk": "yin_windgauntlet",
     "null_monk": "yin",
-    "tide_brawler": "yin_cryptgoddess"
+    "tide_brawler": "yin_cryptgoddess",
+    "camp_scrapper": "monster_scrapper",
+    "dawnling_lookout": "monster_lookout",
+    "dusk_deserter": "monster_deserter",
+    "dusk_archer": "monster_archer",
+    "siege_crawler": "monster_siege",
+    "treasure_runner": "monster_runner",
+    "dusk_warden": "monster_warden",
+    "mossback_grazer": "monster_grazer",
+    "tar_skink": "monster_skink",
+    "skyray": "monster_skyray",
+    "jungle_stalker": "monster_stalker",
+    "crag_brute": "monster_brute",
+    "helix_prime": "monster_helix",
+    "molten_beetle": "grux_grux_beetle_molten",
+    "qilin": "grux_grux_qilin",
+    "pelt_hunter": "khaimera_gruxpelt",
+    "chronos": "sevarog_sevarog_chronos",
+    "magma_colossus": "rampage_elemental"
   },
   "bodies": {
     "manny": {
@@ -920,6 +938,71 @@
       "mesh": "/Game/ParagonZinx/Characters/Heroes/Zinx/Skins/StarQueen/Meshes/Zinx_StarQueen.Zinx_StarQueen",
       "yaw": -90,
       "animations": "zinx"
+    },
+    "monster_scrapper": {
+      "mesh": "/Game/ParagonMinions/Characters/Minions/Down_Minions/Meshes/Minion_Lane_Melee_Core_Dawn.Minion_Lane_Melee_Core_Dawn",
+      "yaw": -90,
+      "animations": "minion_melee"
+    },
+    "monster_lookout": {
+      "mesh": "/Game/ParagonMinions/Characters/Minions/Down_Minions/Meshes/Minion_Lane_Ranged_Core_Dawn.Minion_Lane_Ranged_Core_Dawn",
+      "yaw": -90,
+      "animations": "minion_ranged"
+    },
+    "monster_deserter": {
+      "mesh": "/Game/ParagonMinions/Characters/Minions/Dusk_Minions/Meshes/Minion_Lane_Melee_Dusk.Minion_Lane_Melee_Dusk",
+      "yaw": -90,
+      "animations": "minion_melee"
+    },
+    "monster_archer": {
+      "mesh": "/Game/ParagonMinions/Characters/Minions/Dusk_Minions/Meshes/Minion_Lane_Ranged_Dusk.Minion_Lane_Ranged_Dusk",
+      "yaw": -90,
+      "animations": "minion_ranged"
+    },
+    "monster_siege": {
+      "mesh": "/Game/ParagonMinions/Characters/Minions/Down_Minions/Meshes/Minion_Lane_Siege_Dawn.Minion_Lane_Siege_Dawn",
+      "yaw": -90,
+      "animations": "minion_siege"
+    },
+    "monster_runner": {
+      "mesh": "/Game/ParagonMinions/Characters/Minions/Dusk_Minions/Meshes/Minion_Lane_Ranged_Core_Dusk.Minion_Lane_Ranged_Core_Dusk",
+      "yaw": -90,
+      "animations": "minion_ranged"
+    },
+    "monster_warden": {
+      "mesh": "/Game/ParagonMinions/Characters/Minions/Dusk_Minions/Meshes/Minion_Lane_Super_Dusk.Minion_Lane_Super_Dusk",
+      "yaw": -90,
+      "animations": "minion_super"
+    },
+    "monster_grazer": {
+      "mesh": "/Game/ParagonMinions/Characters/Buff/Buff_Green/Meshes/Buff_Green.Buff_Green",
+      "yaw": -90,
+      "animations": "buff_green"
+    },
+    "monster_skink": {
+      "mesh": "/Game/ParagonMinions/Characters/Buff/Buff_Black/Meshes/Buff_Black.Buff_Black",
+      "yaw": -90,
+      "animations": "buff_black"
+    },
+    "monster_skyray": {
+      "mesh": "/Game/ParagonMinions/Characters/Buff/Buff_Blue/Meshes/Buff_Blue.Buff_Blue",
+      "yaw": -90,
+      "animations": "buff_blue"
+    },
+    "monster_stalker": {
+      "mesh": "/Game/ParagonMinions/Characters/Buff/Buff_White/Meshes/Buff_White.Buff_White",
+      "yaw": -90,
+      "animations": "buff_white"
+    },
+    "monster_brute": {
+      "mesh": "/Game/ParagonMinions/Characters/Buff/Buff_Red/Meshes/Buff_Red.Buff_Red",
+      "yaw": -90,
+      "animations": "buff_red"
+    },
+    "monster_helix": {
+      "mesh": "/Game/ParagonMinions/Characters/Minions/Prime_Helix/Meshes/Prime_Helix.Prime_Helix",
+      "yaw": -90,
+      "animations": "prime_helix"
     }
   },
   "animations": {
@@ -4496,6 +4579,390 @@
       "runSpeed": 600,
       "evadeLeft": "/Game/ParagonGideon/Characters/Heroes/Gideon/Animations/Jog_Left_Start.Jog_Left_Start",
       "evadeRight": "/Game/ParagonGideon/Characters/Heroes/Gideon/Animations/Jog_Right_Start.Jog_Right_Start"
+    },
+    "minion_melee": {
+      "idle": "/Game/ParagonMinions/Characters/Minions/Down_Minions/Animations/Melee/NonCombat_Idle.NonCombat_Idle",
+      "walk": "/Game/ParagonMinions/Characters/Minions/Down_Minions/Animations/Melee/NonCombat_JogFwd.NonCombat_JogFwd",
+      "run": "/Game/ParagonMinions/Characters/Minions/Down_Minions/Animations/Melee/Combat_JogFwd.Combat_JogFwd",
+      "attack": [
+        "/Game/ParagonMinions/Characters/Minions/Down_Minions/Animations/Melee/Attack_A.Attack_A",
+        "/Game/ParagonMinions/Characters/Minions/Down_Minions/Animations/Melee/Attack_B.Attack_B",
+        "/Game/ParagonMinions/Characters/Minions/Down_Minions/Animations/Melee/Attack_C.Attack_C"
+      ],
+      "cast": "/Game/ParagonMinions/Characters/Minions/Down_Minions/Animations/Melee/Attack_D.Attack_D",
+      "death": [
+        "/Game/ParagonMinions/Characters/Minions/Down_Minions/Animations/Melee/Death_A.Death_A",
+        "/Game/ParagonMinions/Characters/Minions/Down_Minions/Animations/Melee/Death_B.Death_B",
+        "/Game/ParagonMinions/Characters/Minions/Down_Minions/Animations/Melee/Death_C.Death_C",
+        "/Game/ParagonMinions/Characters/Minions/Down_Minions/Animations/Melee/Death_D.Death_D",
+        "/Game/ParagonMinions/Characters/Minions/Down_Minions/Animations/Melee/Death_E.Death_E"
+      ],
+      "hit": [
+        "/Game/ParagonMinions/Characters/Minions/Down_Minions/Animations/Melee/HitReact_Front.HitReact_Front"
+      ],
+      "hitFront": "/Game/ParagonMinions/Characters/Minions/Down_Minions/Animations/Melee/HitReact_Front.HitReact_Front",
+      "hitBack": "/Game/ParagonMinions/Characters/Minions/Down_Minions/Animations/Melee/HitReact_Back.HitReact_Back",
+      "hitLeft": "/Game/ParagonMinions/Characters/Minions/Down_Minions/Animations/Melee/HitReact_Left.HitReact_Left",
+      "hitRight": "/Game/ParagonMinions/Characters/Minions/Down_Minions/Animations/Melee/HitReact_Right.HitReact_Right",
+      "stunned": "/Game/ParagonMinions/Characters/Minions/Down_Minions/Animations/Melee/Stun.Stun",
+      "motions": {
+        "melee": {
+          "release": [
+            "/Game/ParagonMinions/Characters/Minions/Down_Minions/Animations/Melee/Attack_A.Attack_A",
+            "/Game/ParagonMinions/Characters/Minions/Down_Minions/Animations/Melee/Attack_B.Attack_B",
+            "/Game/ParagonMinions/Characters/Minions/Down_Minions/Animations/Melee/Attack_C.Attack_C"
+          ]
+        },
+        "heavy": {
+          "release": [
+            "/Game/ParagonMinions/Characters/Minions/Down_Minions/Animations/Melee/Attack_D.Attack_D",
+            "/Game/ParagonMinions/Characters/Minions/Down_Minions/Animations/Melee/Attack_E_SetA.Attack_E_SetA"
+          ]
+        }
+      }
+    },
+    "minion_ranged": {
+      "idle": "/Game/ParagonMinions/Characters/Minions/Down_Minions/Animations/Ranged/Idle_A.Idle_A",
+      "walk": "/Game/ParagonMinions/Characters/Minions/Down_Minions/Animations/Ranged/Walk_Fwd_Combat_A.Walk_Fwd_Combat_A",
+      "run": "/Game/ParagonMinions/Characters/Minions/Down_Minions/Animations/Ranged/Jog_Fwd_Combat_A.Jog_Fwd_Combat_A",
+      "attack": [
+        "/Game/ParagonMinions/Characters/Minions/Down_Minions/Animations/Ranged/Fire_A.Fire_A",
+        "/Game/ParagonMinions/Characters/Minions/Down_Minions/Animations/Ranged/Fire_B.Fire_B"
+      ],
+      "cast": "/Game/ParagonMinions/Characters/Minions/Down_Minions/Animations/Ranged/Fire_A_1.Fire_A_1",
+      "death": [
+        "/Game/ParagonMinions/Characters/Minions/Down_Minions/Animations/Ranged/Death_Front_A.Death_Front_A",
+        "/Game/ParagonMinions/Characters/Minions/Down_Minions/Animations/Ranged/Death_Back_A.Death_Back_A",
+        "/Game/ParagonMinions/Characters/Minions/Down_Minions/Animations/Ranged/Death_Front_B.Death_Front_B"
+      ],
+      "hit": [
+        "/Game/ParagonMinions/Characters/Minions/Down_Minions/Animations/Ranged/HitReact_FullBody_A.HitReact_FullBody_A"
+      ],
+      "deathFront": "/Game/ParagonMinions/Characters/Minions/Down_Minions/Animations/Ranged/Death_Front_A.Death_Front_A",
+      "deathBack": "/Game/ParagonMinions/Characters/Minions/Down_Minions/Animations/Ranged/Death_Back_A.Death_Back_A",
+      "deathLeft": "/Game/ParagonMinions/Characters/Minions/Down_Minions/Animations/Ranged/Death_Left_A.Death_Left_A",
+      "deathRight": "/Game/ParagonMinions/Characters/Minions/Down_Minions/Animations/Ranged/Death_Right_A.Death_Right_A",
+      "hitFront": "/Game/ParagonMinions/Characters/Minions/Down_Minions/Animations/Ranged/HitReact_Front_A.HitReact_Front_A",
+      "hitBack": "/Game/ParagonMinions/Characters/Minions/Down_Minions/Animations/Ranged/HitReact_Back_A.HitReact_Back_A",
+      "hitLeft": "/Game/ParagonMinions/Characters/Minions/Down_Minions/Animations/Ranged/HitReact_Left_A.HitReact_Left_A",
+      "hitRight": "/Game/ParagonMinions/Characters/Minions/Down_Minions/Animations/Ranged/HitReact_Right_A.HitReact_Right_A",
+      "stunned": "/Game/ParagonMinions/Characters/Minions/Down_Minions/Animations/Ranged/Stun.Stun",
+      "motions": {
+        "shoot": {
+          "release": [
+            "/Game/ParagonMinions/Characters/Minions/Down_Minions/Animations/Ranged/Fire_A.Fire_A",
+            "/Game/ParagonMinions/Characters/Minions/Down_Minions/Animations/Ranged/Fire_B.Fire_B"
+          ]
+        },
+        "bolt": {
+          "release": [
+            "/Game/ParagonMinions/Characters/Minions/Down_Minions/Animations/Ranged/Fire_A_2.Fire_A_2"
+          ]
+        },
+        "melee": {
+          "release": [
+            "/Game/ParagonMinions/Characters/Minions/Down_Minions/Animations/Ranged/Melee_Combo_A.Melee_Combo_A",
+            "/Game/ParagonMinions/Characters/Minions/Down_Minions/Animations/Ranged/Melee_Combo_B.Melee_Combo_B"
+          ]
+        }
+      }
+    },
+    "minion_siege": {
+      "idle": "/Game/ParagonMinions/Characters/Minions/Down_Minions/Animations/Siege/Idle.Idle",
+      "walk": "/Game/ParagonMinions/Characters/Minions/Down_Minions/Animations/Siege/Jog_Fwd_NonCombat.Jog_Fwd_NonCombat",
+      "run": "/Game/ParagonMinions/Characters/Minions/Down_Minions/Animations/Siege/Jog_Fwd_Combat.Jog_Fwd_Combat",
+      "attack": [
+        "/Game/ParagonMinions/Characters/Minions/Down_Minions/Animations/Siege/Fire_A.Fire_A",
+        "/Game/ParagonMinions/Characters/Minions/Down_Minions/Animations/Siege/Fire_B.Fire_B",
+        "/Game/ParagonMinions/Characters/Minions/Down_Minions/Animations/Siege/Fire_C.Fire_C"
+      ],
+      "cast": "/Game/ParagonMinions/Characters/Minions/Down_Minions/Animations/Siege/Fire_Planted.Fire_Planted",
+      "death": [
+        "/Game/ParagonMinions/Characters/Minions/Down_Minions/Animations/Siege/Death_A.Death_A",
+        "/Game/ParagonMinions/Characters/Minions/Down_Minions/Animations/Siege/Death_B.Death_B",
+        "/Game/ParagonMinions/Characters/Minions/Down_Minions/Animations/Siege/Death_C.Death_C",
+        "/Game/ParagonMinions/Characters/Minions/Down_Minions/Animations/Siege/Death_D.Death_D",
+        "/Game/ParagonMinions/Characters/Minions/Down_Minions/Animations/Siege/Death_E.Death_E",
+        "/Game/ParagonMinions/Characters/Minions/Down_Minions/Animations/Siege/Death_F.Death_F",
+        "/Game/ParagonMinions/Characters/Minions/Down_Minions/Animations/Siege/Death_G.Death_G",
+        "/Game/ParagonMinions/Characters/Minions/Down_Minions/Animations/Siege/Death_H.Death_H"
+      ],
+      "hit": [
+        "/Game/ParagonMinions/Characters/Minions/Down_Minions/Animations/Siege/HitReact_Front.HitReact_Front"
+      ],
+      "hitFront": "/Game/ParagonMinions/Characters/Minions/Down_Minions/Animations/Siege/HitReact_Front.HitReact_Front",
+      "hitBack": "/Game/ParagonMinions/Characters/Minions/Down_Minions/Animations/Siege/HitReact_Back.HitReact_Back",
+      "hitLeft": "/Game/ParagonMinions/Characters/Minions/Down_Minions/Animations/Siege/HitReact_Left.HitReact_Left",
+      "hitRight": "/Game/ParagonMinions/Characters/Minions/Down_Minions/Animations/Siege/HitReact_Right.HitReact_Right",
+      "stunned": "/Game/ParagonMinions/Characters/Minions/Down_Minions/Animations/Siege/Stun.Stun",
+      "motions": {
+        "area": {
+          "release": [
+            "/Game/ParagonMinions/Characters/Minions/Down_Minions/Animations/Siege/Fire_A.Fire_A",
+            "/Game/ParagonMinions/Characters/Minions/Down_Minions/Animations/Siege/Fire_B.Fire_B"
+          ]
+        },
+        "melee": {
+          "release": [
+            "/Game/ParagonMinions/Characters/Minions/Down_Minions/Animations/Siege/MeleeAttack_A.MeleeAttack_A"
+          ]
+        }
+      }
+    },
+    "minion_super": {
+      "idle": "/Game/ParagonMinions/Characters/Minions/Down_Minions/Animations/Super/Idle.Idle",
+      "walk": "/Game/ParagonMinions/Characters/Minions/Down_Minions/Animations/Super/NonCombat_Jog_Fwd.NonCombat_Jog_Fwd",
+      "run": "/Game/ParagonMinions/Characters/Minions/Down_Minions/Animations/Super/Combat_Jog_Fwd_Alt.Combat_Jog_Fwd_Alt",
+      "attack": [
+        "/Game/ParagonMinions/Characters/Minions/Down_Minions/Animations/Super/Attack_A_Dusk.Attack_A_Dusk",
+        "/Game/ParagonMinions/Characters/Minions/Down_Minions/Animations/Super/Attack_B_Dusk.Attack_B_Dusk",
+        "/Game/ParagonMinions/Characters/Minions/Down_Minions/Animations/Super/Attack_C_Dusk.Attack_C_Dusk"
+      ],
+      "cast": "/Game/ParagonMinions/Characters/Minions/Down_Minions/Animations/Super/Attack_D_Dusk.Attack_D_Dusk",
+      "death": [
+        "/Game/ParagonMinions/Characters/Minions/Down_Minions/Animations/Super/Death_Front.Death_Front",
+        "/Game/ParagonMinions/Characters/Minions/Down_Minions/Animations/Super/Death_Back.Death_Back",
+        "/Game/ParagonMinions/Characters/Minions/Down_Minions/Animations/Super/Death_Front_Left_Twist.Death_Front_Left_Twist"
+      ],
+      "hit": [
+        "/Game/ParagonMinions/Characters/Minions/Down_Minions/Animations/Super/Hit_React_Front.Hit_React_Front"
+      ],
+      "hitFront": "/Game/ParagonMinions/Characters/Minions/Down_Minions/Animations/Super/Hit_React_Front.Hit_React_Front",
+      "hitBack": "/Game/ParagonMinions/Characters/Minions/Down_Minions/Animations/Super/Hit_React_Back.Hit_React_Back",
+      "hitLeft": "/Game/ParagonMinions/Characters/Minions/Down_Minions/Animations/Super/Hit_React_Left.Hit_React_Left",
+      "hitRight": "/Game/ParagonMinions/Characters/Minions/Down_Minions/Animations/Super/Hit_React_Right.Hit_React_Right",
+      "stunned": "/Game/ParagonMinions/Characters/Minions/Down_Minions/Animations/Super/Stun.Stun",
+      "motions": {
+        "melee": {
+          "release": [
+            "/Game/ParagonMinions/Characters/Minions/Down_Minions/Animations/Super/Attack_A_Dusk.Attack_A_Dusk",
+            "/Game/ParagonMinions/Characters/Minions/Down_Minions/Animations/Super/Attack_B_Dusk.Attack_B_Dusk",
+            "/Game/ParagonMinions/Characters/Minions/Down_Minions/Animations/Super/Attack_C_Dusk.Attack_C_Dusk"
+          ]
+        },
+        "heavy": {
+          "release": [
+            "/Game/ParagonMinions/Characters/Minions/Down_Minions/Animations/Super/Attack_E_Dusk.Attack_E_Dusk",
+            "/Game/ParagonMinions/Characters/Minions/Down_Minions/Animations/Super/Attack_F_Dusk.Attack_F_Dusk"
+          ]
+        },
+        "buff": {
+          "release": [
+            "/Game/ParagonMinions/Characters/Minions/Down_Minions/Animations/Super/Attack_G_Dusk.Attack_G_Dusk"
+          ]
+        }
+      }
+    },
+    "buff_black": {
+      "idle": "/Game/ParagonMinions/Characters/Buff/Buff_Black/Animations/Idle.Idle",
+      "walk": "/Game/ParagonMinions/Characters/Buff/Buff_Black/Animations/Run_FWD.Run_FWD",
+      "run": "/Game/ParagonMinions/Characters/Buff/Buff_Black/Animations/Run_FWD.Run_FWD",
+      "attack": [
+        "/Game/ParagonMinions/Characters/Buff/Buff_Black/Animations/BiteAttack_A.BiteAttack_A",
+        "/Game/ParagonMinions/Characters/Buff/Buff_Black/Animations/BiteAttack_B.BiteAttack_B"
+      ],
+      "cast": "/Game/ParagonMinions/Characters/Buff/Buff_Black/Animations/Spit_Attack.Spit_Attack",
+      "death": [
+        "/Game/ParagonMinions/Characters/Buff/Buff_Black/Animations/Death_front.Death_front",
+        "/Game/ParagonMinions/Characters/Buff/Buff_Black/Animations/Death_back.Death_back"
+      ],
+      "hit": [
+        "/Game/ParagonMinions/Characters/Buff/Buff_Black/Animations/HitReaction_FWD.HitReaction_FWD"
+      ],
+      "deathFront": "/Game/ParagonMinions/Characters/Buff/Buff_Black/Animations/Death_front.Death_front",
+      "deathBack": "/Game/ParagonMinions/Characters/Buff/Buff_Black/Animations/Death_back.Death_back",
+      "hitFront": "/Game/ParagonMinions/Characters/Buff/Buff_Black/Animations/HitReaction_FWD.HitReaction_FWD",
+      "hitBack": "/Game/ParagonMinions/Characters/Buff/Buff_Black/Animations/HitReaction_BWD.HitReaction_BWD",
+      "hitLeft": "/Game/ParagonMinions/Characters/Buff/Buff_Black/Animations/HitReaction_Left.HitReaction_Left",
+      "hitRight": "/Game/ParagonMinions/Characters/Buff/Buff_Black/Animations/HitReaction_Right.HitReaction_Right",
+      "stunned": "/Game/ParagonMinions/Characters/Buff/Buff_Black/Animations/Stunned.Stunned",
+      "rise": "/Game/ParagonMinions/Characters/Buff/Buff_Black/Animations/Spawn.Spawn",
+      "motions": {
+        "melee": {
+          "release": [
+            "/Game/ParagonMinions/Characters/Buff/Buff_Black/Animations/BiteAttack_A.BiteAttack_A",
+            "/Game/ParagonMinions/Characters/Buff/Buff_Black/Animations/BiteAttack_B.BiteAttack_B",
+            "/Game/ParagonMinions/Characters/Buff/Buff_Black/Animations/BiteAttack_Fast.BiteAttack_Fast"
+          ]
+        },
+        "bolt": {
+          "release": [
+            "/Game/ParagonMinions/Characters/Buff/Buff_Black/Animations/Spit_Attack.Spit_Attack",
+            "/Game/ParagonMinions/Characters/Buff/Buff_Black/Animations/Spit_Attack_Fast_A.Spit_Attack_Fast_A"
+          ]
+        }
+      }
+    },
+    "buff_blue": {
+      "idle": "/Game/ParagonMinions/Characters/Buff/Buff_Blue/Animations/Idle_A.Idle_A",
+      "walk": "/Game/ParagonMinions/Characters/Buff/Buff_Blue/Animations/Fly_Fwd_MidSpeed.Fly_Fwd_MidSpeed",
+      "run": "/Game/ParagonMinions/Characters/Buff/Buff_Blue/Animations/Fly_Fwd_FullSpeed.Fly_Fwd_FullSpeed",
+      "attack": [
+        "/Game/ParagonMinions/Characters/Buff/Buff_Blue/Animations/Fire_A.Fire_A",
+        "/Game/ParagonMinions/Characters/Buff/Buff_Blue/Animations/Fire_B.Fire_B"
+      ],
+      "cast": "/Game/ParagonMinions/Characters/Buff/Buff_Blue/Animations/Fire.Fire",
+      "death": [
+        "/Game/ParagonMinions/Characters/Buff/Buff_Blue/Animations/Death_Fwd.Death_Fwd",
+        "/Game/ParagonMinions/Characters/Buff/Buff_Blue/Animations/Death_Bwd.Death_Bwd"
+      ],
+      "hit": [
+        "/Game/ParagonMinions/Characters/Buff/Buff_Blue/Animations/Hitreat_Fwd.Hitreat_Fwd"
+      ],
+      "hitFront": "/Game/ParagonMinions/Characters/Buff/Buff_Blue/Animations/Hitreat_Fwd.Hitreat_Fwd",
+      "hitBack": "/Game/ParagonMinions/Characters/Buff/Buff_Blue/Animations/Hitreat_Bwd.Hitreat_Bwd",
+      "hitLeft": "/Game/ParagonMinions/Characters/Buff/Buff_Blue/Animations/Hitreat_Left.Hitreat_Left",
+      "hitRight": "/Game/ParagonMinions/Characters/Buff/Buff_Blue/Animations/Hitreat_Right.Hitreat_Right",
+      "stunned": "/Game/ParagonMinions/Characters/Buff/Buff_Blue/Animations/Stunned.Stunned",
+      "rise": "/Game/ParagonMinions/Characters/Buff/Buff_Blue/Animations/Spawn.Spawn",
+      "motions": {
+        "bolt": {
+          "release": [
+            "/Game/ParagonMinions/Characters/Buff/Buff_Blue/Animations/Fire_A.Fire_A",
+            "/Game/ParagonMinions/Characters/Buff/Buff_Blue/Animations/Fire_B.Fire_B"
+          ]
+        },
+        "dash": {
+          "release": [
+            "/Game/ParagonMinions/Characters/Buff/Buff_Blue/Animations/Fire.Fire"
+          ]
+        }
+      }
+    },
+    "buff_green": {
+      "idle": "/Game/ParagonMinions/Characters/Buff/Buff_Green/Animations/Idle.Idle",
+      "walk": "/Game/ParagonMinions/Characters/Buff/Buff_Green/Animations/Run_Fwd.Run_Fwd",
+      "run": "/Game/ParagonMinions/Characters/Buff/Buff_Green/Animations/Run_Fwd.Run_Fwd",
+      "attack": [
+        "/Game/ParagonMinions/Characters/Buff/Buff_Green/Animations/Knock_Fwd.Knock_Fwd"
+      ],
+      "death": [
+        "/Game/ParagonMinions/Characters/Buff/Buff_Green/Animations/Knock_Bwd.Knock_Bwd"
+      ],
+      "hit": [
+        "/Game/ParagonMinions/Characters/Buff/Buff_Green/Animations/Hit_Front.Hit_Front"
+      ],
+      "hitFront": "/Game/ParagonMinions/Characters/Buff/Buff_Green/Animations/Hit_Front.Hit_Front",
+      "hitBack": "/Game/ParagonMinions/Characters/Buff/Buff_Green/Animations/Hit_Back.Hit_Back",
+      "hitLeft": "/Game/ParagonMinions/Characters/Buff/Buff_Green/Animations/Hit_Left.Hit_Left",
+      "hitRight": "/Game/ParagonMinions/Characters/Buff/Buff_Green/Animations/Hit_Right.Hit_Right",
+      "stunned": "/Game/ParagonMinions/Characters/Buff/Buff_Green/Animations/Stunned.Stunned"
+    },
+    "buff_red": {
+      "idle": "/Game/ParagonMinions/Characters/Buff/Buff_Red/Animations/Idle.Idle",
+      "walk": "/Game/ParagonMinions/Characters/Buff/Buff_Red/Animations/Run_Fwd.Run_Fwd",
+      "run": "/Game/ParagonMinions/Characters/Buff/Buff_Red/Animations/Run_Fwd.Run_Fwd",
+      "attack": [
+        "/Game/ParagonMinions/Characters/Buff/Buff_Red/Animations/Attack_Punch_01.Attack_Punch_01",
+        "/Game/ParagonMinions/Characters/Buff/Buff_Red/Animations/Attack_Punch_02.Attack_Punch_02",
+        "/Game/ParagonMinions/Characters/Buff/Buff_Red/Animations/Attack_SmallCombo.Attack_SmallCombo"
+      ],
+      "cast": "/Game/ParagonMinions/Characters/Buff/Buff_Red/Animations/Attack_BigSmash.Attack_BigSmash",
+      "death": [
+        "/Game/ParagonMinions/Characters/Buff/Buff_Red/Animations/Death_Fwd.Death_Fwd",
+        "/Game/ParagonMinions/Characters/Buff/Buff_Red/Animations/Death_Back.Death_Back"
+      ],
+      "hit": [
+        "/Game/ParagonMinions/Characters/Buff/Buff_Red/Animations/Hit_Front.Hit_Front"
+      ],
+      "hitFront": "/Game/ParagonMinions/Characters/Buff/Buff_Red/Animations/Hit_Front.Hit_Front",
+      "hitBack": "/Game/ParagonMinions/Characters/Buff/Buff_Red/Animations/Hit_Back.Hit_Back",
+      "hitLeft": "/Game/ParagonMinions/Characters/Buff/Buff_Red/Animations/Hit_Left.Hit_Left",
+      "hitRight": "/Game/ParagonMinions/Characters/Buff/Buff_Red/Animations/Hit_Right.Hit_Right",
+      "stunned": "/Game/ParagonMinions/Characters/Buff/Buff_Red/Animations/Stunned.Stunned",
+      "rise": "/Game/ParagonMinions/Characters/Buff/Buff_Red/Animations/Spawn.Spawn",
+      "motions": {
+        "melee": {
+          "release": [
+            "/Game/ParagonMinions/Characters/Buff/Buff_Red/Animations/Attack_Punch_01.Attack_Punch_01",
+            "/Game/ParagonMinions/Characters/Buff/Buff_Red/Animations/Attack_Punch_02.Attack_Punch_02",
+            "/Game/ParagonMinions/Characters/Buff/Buff_Red/Animations/Attack_Uppercut.Attack_Uppercut"
+          ]
+        },
+        "area": {
+          "release": [
+            "/Game/ParagonMinions/Characters/Buff/Buff_Red/Animations/Attack_BigSmash.Attack_BigSmash"
+          ]
+        }
+      }
+    },
+    "buff_white": {
+      "idle": "/Game/ParagonMinions/Characters/Buff/Buff_White/Animations/Melee_Idle_A.Melee_Idle_A",
+      "walk": "/Game/ParagonMinions/Characters/Buff/Buff_White/Animations/Melee_Run_Forward.Melee_Run_Forward",
+      "run": "/Game/ParagonMinions/Characters/Buff/Buff_White/Animations/Melee_Sprint_Forward.Melee_Sprint_Forward",
+      "attack": [
+        "/Game/ParagonMinions/Characters/Buff/Buff_White/Animations/Melee_Attack_01_A.Melee_Attack_01_A",
+        "/Game/ParagonMinions/Characters/Buff/Buff_White/Animations/Melee_Attack_02_A.Melee_Attack_02_A",
+        "/Game/ParagonMinions/Characters/Buff/Buff_White/Animations/Melee_Attack_03_A.Melee_Attack_03_A"
+      ],
+      "cast": "/Game/ParagonMinions/Characters/Buff/Buff_White/Animations/Melee_Attack_04_A.Melee_Attack_04_A",
+      "death": [
+        "/Game/ParagonMinions/Characters/Buff/Buff_White/Animations/Melee_Death_Fwd_01_A.Melee_Death_Fwd_01_A",
+        "/Game/ParagonMinions/Characters/Buff/Buff_White/Animations/Melee_Death_Bwd_01_A.Melee_Death_Bwd_01_A"
+      ],
+      "hit": [
+        "/Game/ParagonMinions/Characters/Buff/Buff_White/Animations/Melee_Hit_Front_05_A.Melee_Hit_Front_05_A"
+      ],
+      "hitFront": "/Game/ParagonMinions/Characters/Buff/Buff_White/Animations/Melee_Hit_Front_05_A.Melee_Hit_Front_05_A",
+      "hitBack": "/Game/ParagonMinions/Characters/Buff/Buff_White/Animations/Melee_Hit_Back_04_A.Melee_Hit_Back_04_A",
+      "hitLeft": "/Game/ParagonMinions/Characters/Buff/Buff_White/Animations/Melee_Hit_Left_02_A.Melee_Hit_Left_02_A",
+      "hitRight": "/Game/ParagonMinions/Characters/Buff/Buff_White/Animations/Melee_Hit_Right_02_A.Melee_Hit_Right_02_A",
+      "stunned": "/Game/ParagonMinions/Characters/Buff/Buff_White/Animations/Melee_Stun_01_B.Melee_Stun_01_B",
+      "rise": "/Game/ParagonMinions/Characters/Buff/Buff_White/Animations/JungleMelee_Spawn_A.JungleMelee_Spawn_A",
+      "motions": {
+        "melee": {
+          "release": [
+            "/Game/ParagonMinions/Characters/Buff/Buff_White/Animations/Melee_Attack_01_A.Melee_Attack_01_A",
+            "/Game/ParagonMinions/Characters/Buff/Buff_White/Animations/Melee_Attack_02_A.Melee_Attack_02_A",
+            "/Game/ParagonMinions/Characters/Buff/Buff_White/Animations/Melee_Attack_03_A.Melee_Attack_03_A"
+          ]
+        },
+        "dash": {
+          "release": [
+            "/Game/ParagonMinions/Characters/Buff/Buff_White/Animations/Melee_Attack_05_A.Melee_Attack_05_A",
+            "/Game/ParagonMinions/Characters/Buff/Buff_White/Animations/Melee_Attack_06_A.Melee_Attack_06_A"
+          ]
+        }
+      }
+    },
+    "prime_helix": {
+      "idle": "/Game/ParagonMinions/Characters/Minions/Prime_Helix/Animations/Idle.Idle",
+      "walk": "/Game/ParagonMinions/Characters/Minions/Prime_Helix/Animations/Idle.Idle",
+      "run": "/Game/ParagonMinions/Characters/Minions/Prime_Helix/Animations/Idle.Idle",
+      "attack": [
+        "/Game/ParagonMinions/Characters/Minions/Prime_Helix/Animations/Primary_Fire.Primary_Fire"
+      ],
+      "cast": "/Game/ParagonMinions/Characters/Minions/Prime_Helix/Animations/Attack_Special_1.Attack_Special_1",
+      "death": [
+        "/Game/ParagonMinions/Characters/Minions/Prime_Helix/Animations/Death.Death"
+      ],
+      "hit": [
+        "/Game/ParagonMinions/Characters/Minions/Prime_Helix/Animations/Hitreact_Fwd.Hitreact_Fwd"
+      ],
+      "hitFront": "/Game/ParagonMinions/Characters/Minions/Prime_Helix/Animations/Hitreact_Fwd.Hitreact_Fwd",
+      "hitBack": "/Game/ParagonMinions/Characters/Minions/Prime_Helix/Animations/Hitreact_Bwd.Hitreact_Bwd",
+      "hitLeft": "/Game/ParagonMinions/Characters/Minions/Prime_Helix/Animations/Hitreact_Left.Hitreact_Left",
+      "hitRight": "/Game/ParagonMinions/Characters/Minions/Prime_Helix/Animations/Hitreact_Right.Hitreact_Right",
+      "stunned": "/Game/ParagonMinions/Characters/Minions/Prime_Helix/Animations/Stun_Loop.Stun_Loop",
+      "rise": "/Game/ParagonMinions/Characters/Minions/Prime_Helix/Animations/Spawn.Spawn",
+      "motions": {
+        "bolt": {
+          "release": [
+            "/Game/ParagonMinions/Characters/Minions/Prime_Helix/Animations/Primary_Fire.Primary_Fire"
+          ]
+        },
+        "area": {
+          "release": [
+            "/Game/ParagonMinions/Characters/Minions/Prime_Helix/Animations/Attack_Special_2.Attack_Special_2",
+            "/Game/ParagonMinions/Characters/Minions/Prime_Helix/Animations/Attack_Special_3.Attack_Special_3"
+          ]
+        },
+        "buff": {
+          "release": [
+            "/Game/ParagonMinions/Characters/Minions/Prime_Helix/Animations/Attack_Special_1.Attack_Special_1"
+          ]
+        }
+      }
     }
   },
   "heroPlan": {
@@ -4853,6 +5320,17 @@
     "revenant": 0.85,
     "terra": 0.85,
     "narbash": 0.9,
-    "khaimera": 0.9
+    "khaimera": 0.9,
+    "monster_scrapper": 0.75,
+    "monster_lookout": 0.8,
+    "monster_runner": 0.85,
+    "monster_grazer": 0.9,
+    "monster_skink": 0.9,
+    "monster_helix": 1.0,
+    "grux_grux_beetle_molten": 1.1,
+    "grux_grux_qilin": 1.0,
+    "khaimera_gruxpelt": 1.0,
+    "sevarog_sevarog_chronos": 1.1,
+    "rampage_elemental": 1.25
   }
 }

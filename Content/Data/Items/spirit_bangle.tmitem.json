@@ -1,0 +1,12 @@
+{
+  "format": "tactical-masters-item",
+  "version": 1,
+  "id": "spirit_bangle",
+  "name": "Spirit Bangle",
+  "desc": "Spells slide off it, now and then.",
+  "icon": "bangle",
+  "tier": "common",
+  "stats": {
+    "meva": 4
+  }
+}

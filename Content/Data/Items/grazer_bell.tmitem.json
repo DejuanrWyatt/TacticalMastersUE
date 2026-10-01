@@ -1,0 +1,13 @@
+{
+  "format": "tactical-masters-item",
+  "version": 1,
+  "id": "grazer_bell",
+  "name": "Grazer Bell",
+  "desc": "Calm and watchful: more patience and sight.",
+  "icon": "bell",
+  "tier": "common",
+  "stats": {
+    "patience": 2,
+    "sight": 2
+  }
+}

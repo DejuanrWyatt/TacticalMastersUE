@@ -1,0 +1,181 @@
+{
+  "format": "tactical-masters-class",
+  "version": 1,
+  "id": "chronos",
+  "name": "Chronos, Warden of Hours",
+  "color": "#c9a0ff",
+  "look": "black_mage",
+  "icon": "chronos",
+  "roles": [
+    "damage",
+    "special"
+  ],
+  "stats": {
+    "hp": 240,
+    "attdef": 10,
+    "magdef": 10,
+    "aeva": 5,
+    "meva": 5,
+    "crit": 5,
+    "speed": 8,
+    "move": 4,
+    "patience": 8,
+    "sight": 10
+  },
+  "abilities": [
+    {
+      "id": "chronos_reap",
+      "name": "Reap",
+      "desc": "Strikes an enemy within arm's reach (power 36).",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "att",
+      "target": "enemy",
+      "shape": "unit",
+      "power": 36,
+      "min_range": 0,
+      "max_range": 1.8,
+      "aoe": 0,
+      "cooldown": 0,
+      "cast": 0
+    },
+    {
+      "id": "chronos_sweep",
+      "name": "Sweep",
+      "desc": "Winds the clock hand for 6 seconds, then sweeps a 90\u00b0 arc 5 m long (power 30).",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "att",
+      "target": "enemy",
+      "shape": "cone",
+      "power": 30,
+      "min_range": 0,
+      "max_range": 5,
+      "aoe": 0,
+      "cooldown": 2,
+      "cast": 6,
+      "angle": 90
+    },
+    {
+      "id": "chronos_idle1",
+      "name": "Clockwork",
+      "desc": "Always on: nothing to use.",
+      "kind": "passive",
+      "effect": "support",
+      "scale": "mag",
+      "target": "ally",
+      "shape": "self",
+      "power": 0,
+      "min_range": 0,
+      "max_range": 0,
+      "aoe": 0,
+      "cooldown": 0,
+      "cast": 0
+    },
+    {
+      "id": "chronos_time_shield",
+      "name": "Time Shield",
+      "desc": "Shields itself for 25.",
+      "kind": "active",
+      "effect": "support",
+      "scale": "mag",
+      "target": "ally",
+      "shape": "self",
+      "power": 25,
+      "min_range": 0,
+      "max_range": 0,
+      "aoe": 0,
+      "cooldown": 3,
+      "cast": 0,
+      "status": {
+        "id": "shield",
+        "turns": 2
+      }
+    }
+  ],
+  "monster": {
+    "tier": "epic",
+    "temperament": "territorial",
+    "ring": 3,
+    "traits": [
+      "unstoppable"
+    ],
+    "phases": [
+      {
+        "below": 50,
+        "abilities": [
+          {
+            "id": "chronos_reap_2",
+            "name": "Reap",
+            "desc": "Strikes an enemy within arm's reach (power 36).",
+            "kind": "active",
+            "effect": "damage",
+            "scale": "att",
+            "target": "enemy",
+            "shape": "unit",
+            "power": 36,
+            "min_range": 0,
+            "max_range": 1.8,
+            "aoe": 0,
+            "cooldown": 0,
+            "cast": 0
+          },
+          {
+            "id": "chronos_sweep_2",
+            "name": "Sweep",
+            "desc": "Winds the clock hand for 6 seconds, then sweeps a 90\u00b0 arc 5 m long (power 30).",
+            "kind": "active",
+            "effect": "damage",
+            "scale": "att",
+            "target": "enemy",
+            "shape": "cone",
+            "power": 30,
+            "min_range": 0,
+            "max_range": 5,
+            "aoe": 0,
+            "cooldown": 2,
+            "cast": 6,
+            "angle": 90
+          },
+          {
+            "id": "chronos_stasis",
+            "name": "Stasis",
+            "desc": "Freezes time within 3 m of a spot up to 6 m away: power 10, and half the gauge lost, and Stops them for 2 seconds.",
+            "kind": "active",
+            "effect": "damage",
+            "scale": "mag",
+            "target": "enemy",
+            "shape": "circle",
+            "power": 10,
+            "min_range": 0,
+            "max_range": 6,
+            "aoe": 3,
+            "cooldown": 3,
+            "cast": 0,
+            "tg": -50,
+            "status": {
+              "id": "stop",
+              "turns": 1
+            }
+          },
+          {
+            "id": "chronos_rewind",
+            "name": "Rewind",
+            "desc": "Winds its own wounds back: heals a fifth of its health, once.",
+            "kind": "active",
+            "effect": "heal",
+            "scale": "mag",
+            "target": "ally",
+            "shape": "self",
+            "power": 32,
+            "min_range": 0,
+            "max_range": 0,
+            "aoe": 0,
+            "cooldown": 10,
+            "cast": 0
+          }
+        ]
+      }
+    ]
+  }
+}

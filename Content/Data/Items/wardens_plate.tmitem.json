@@ -1,0 +1,14 @@
+{
+  "format": "tactical-masters-item",
+  "version": 1,
+  "id": "wardens_plate",
+  "name": "Warden's Plate",
+  "desc": "Heavy plate: health and both defences.",
+  "icon": "plate",
+  "tier": "rare",
+  "stats": {
+    "hp": 40,
+    "attdef": 4,
+    "magdef": 4
+  }
+}

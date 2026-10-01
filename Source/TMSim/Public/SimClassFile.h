@@ -32,6 +32,14 @@ namespace TMSim
 	 */
 	TMSIM_API std::string ReadClassFile(const std::string& Text, FJobDef& OutJob, std::vector<FAbility>& OutAbilities);
 
+	struct FJson;
+
+	/**
+	 * Reads one ability written as a class file writes one (an item's, say).
+	 * "" on success; otherwise every reason, one per line, each starting Where.
+	 */
+	TMSIM_API std::string ReadAbilityObject(const FJson& Json, const std::string& Where, FAbility& Out);
+
 	/** Reads a class file and registers it. "" if the class is now in the game. */
 	TMSIM_API std::string LoadClassFile(const std::string& Text);
 }

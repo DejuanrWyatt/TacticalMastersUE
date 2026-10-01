@@ -1,0 +1,13 @@
+{
+  "format": "tactical-masters-item",
+  "version": 1,
+  "id": "chain_vest",
+  "name": "Chain Vest",
+  "desc": "Rings of steel over padding.",
+  "icon": "armour",
+  "tier": "uncommon",
+  "stats": {
+    "hp": 20,
+    "attdef": 2
+  }
+}

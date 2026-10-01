@@ -61,6 +61,13 @@ namespace TMSim
 
 	inline constexpr int StatCount = static_cast<int>(EStat::Count);
 
+	/**
+	 * A unit's ability slots: its class's four (the fourth the ultimate), then
+	 * one for each item it carries that gives an ability (SimItem.h).
+	 */
+	inline constexpr int AbilitySlots = 7;
+	inline constexpr int ClassSlots = 4;
+
 	/** The name a class file uses for a stat, for reading data and for messages. */
 	TMSIM_API const char* StatName(EStat Stat);
 
@@ -111,6 +118,15 @@ namespace TMSim
 		bool bCleanse = false;
 		bool bWakesOnDamage = false;
 		bool bDoom = false;         /** Falls when the count runs out. */
+		// Not Godot's (Docs/design/feat-neutral-camps.md); last, so Godot's rows need no change.
+		/** Added to the percent its holder's abilities do (Surge). */
+		int DamagePercent = 0;
+		/** Unseen by the other sides until it deals or takes damage (Vanish). */
+		bool bHidden = false;
+		/** Monsters go for it first (Scent Lure). */
+		bool bLured = false;
+		/** Remembers who put it there (FStatus::By): the suppressor, guardian, charmer, or what it fears. */
+		bool bSourced = false;
 	};
 
 	/** Every status, in the order the Godot table lists them. */
@@ -210,6 +226,37 @@ namespace TMSim
 		 * own spawn area; 0 is none. The Godot setup offers 30, 60 and 90.
 		 */
 		double PlanningSeconds = 0.0;
+
+		// Watchtowers (Docs/design/feat-objectives.md). Not in Godot: a battle
+		// with none is exactly Godot's, which is why the count defaults to 0.
+
+		/**
+		 * How many watchtowers the battle starts with, placed at random in
+		 * mirrored pairs (an odd one stands in the middle). Chosen on the setup
+		 * screen; read only when the battle starts.
+		 */
+		double WatchtowerCount = 0.0;
+		/** Turns a side must spend at a watchtower to take it. */
+		double WatchtowerTurns = 2.0;
+		/** Metres a held watchtower lets its side see, from the top of the tower. */
+		double WatchtowerSight = 14.0;
+
+		/**
+		 * Points each side may spend on items on the setup screen
+		 * (Docs/design/feat-neutral-camps.md); 0 is none. Not in Godot, which
+		 * has no items: a battle nobody spends on is exactly Godot's.
+		 */
+		double ItemBudget = 0.0;
+
+		/**
+		 * Neutral camps (Docs/design/feat-neutral-camps.md): 0 off, 1 light,
+		 * 2 standard, 3 wild. Off by default, so a battle is Godot's unless asked.
+		 */
+		double CampLevel = 0.0;
+		/** 1: the boss camp holds a boss drawn at random instead of the map's own. */
+		double RandomBoss = 0.0;
+		/** 1: element hits leave their mark (water makes a unit Wet, ice Chills it). 0 in a Godot battle. */
+		double Elements = 0.0;
 	};
 
 	/**

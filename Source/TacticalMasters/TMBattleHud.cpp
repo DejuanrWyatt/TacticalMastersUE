@@ -3,6 +3,7 @@
 #include "Engine/Canvas.h"
 #include "Engine/Engine.h"
 #include "Engine/Font.h"
+#include "Misc/ScopeExit.h"
 #include "EngineUtils.h"
 #include "GameFramework/PlayerController.h"
 
@@ -184,6 +185,19 @@ void ATMBattleHud::Text(const FString& What, float X, float Y, const FLinearColo
 	DrawText(What, Colour, X, Y, Font, Scale * FontBoost);
 }
 
+void ATMBattleHud::OutlinedText(const FString& What, float X, float Y, const FLinearColor& Colour, UFont* Font, float Scale, float Edge)
+{
+	// Eight dark copies round it, then the text: an outline that holds on snow and on night alike.
+	const FLinearColor Ink(0.02f, 0.02f, 0.04f, Colour.A);
+	const float E = FMath::Max(1.0f, Edge);
+	for (int32 k = 0; k < 8; ++k)
+	{
+		const float A = k * PI / 4.0f;
+		DrawText(What, Ink, X + FMath::Cos(A) * E, Y + FMath::Sin(A) * E, Font, Scale * FontBoost);
+	}
+	DrawText(What, Colour, X, Y, Font, Scale * FontBoost);
+}
+
 FVector2D ATMBattleHud::TextSize(const FString& What, UFont* Font, float Scale)
 {
 	float W = 0.0f;
@@ -314,6 +328,12 @@ void ATMBattleHud::DrawHUD()
 				Tips.Reset();
 				DrawClassPicker(*Found);
 			}
+			else if (Found->ItemPickerSlot >= 0)
+			{
+				Buttons.Reset();
+				Tips.Reset();
+				DrawItemPicker(*Found);
+			}
 		}
 		// The Unit Guide can be opened from the title too, over everything.
 		if (Found->bGuideOpen)
@@ -329,8 +349,10 @@ void ATMBattleHud::DrawHUD()
 	}
 
 	// Under everything else, since it is drawn onto the board.
-	DrawBoardAids(*Found);
-	DrawOverheads(*Found);
+	{ TM_SLOW("Hud BoardAids"); DrawBoardAids(*Found); }
+	{ TM_SLOW("Hud Overheads"); DrawOverheads(*Found); }
+	{ TM_SLOW("Hud WorldWords"); DrawWorldWords(*Found); }
+	TM_SLOW("Hud rest");
 	if (FTMSettings::Get().bTurnSquares)
 	{
 		DrawTurnSquares(*Found);
@@ -342,6 +364,7 @@ void ATMBattleHud::DrawHUD()
 	DrawLog(*Found);
 	DrawUnitCard(*Found);
 	DrawActionBar(*Found);
+	DrawTakePicker(*Found);
 	DrawField(*Found);
 	DrawInspectCard(*Found);
 	DrawCornerButtons(*Found);
@@ -424,7 +447,39 @@ void ATMBattleHud::DrawBoardAids(ATMBattleDirector& From)
 		const FLinearColor Ring = (Standing[0] > 0) == (Standing[1] > 0)
 			? FLinearColor(0.85f, 0.85f, 0.9f, 0.7f)
 			: TeamColour(Standing[0] > 0 ? 0 : 1);
-		BoardRing(From, Middle, static_cast<float>(TMSim::FBattle::CaptureRadius), Ring, 3.0f);
+		// Painted on the ground itself when it can be (TMBattleDirectorIndicators.cpp).
+		if (!From.bIndicatorDecal)
+		{
+			BoardRing(From, Middle, static_cast<float>(TMSim::FBattle::CaptureRadius), Ring, 3.0f);
+		}
+	}
+
+	// The watchtowers: the ring a unit must stand in to take one, in the colour
+	// of whoever holds it (grey for nobody), and over it how far a side is into
+	// taking it. Always shown: a tower is part of the ground, not a unit.
+	{
+		UFont* TowerFont = GEngine->GetMediumFont();
+		const int32 Needed = From.Battle.CaptureTurnsNeeded();
+		for (const TMSim::FWatchtower& Tower : From.Battle.Watchtowers)
+		{
+			const FLinearColor Ring = Tower.Owner >= 0 ? TeamColour(Tower.Owner) : FLinearColor(0.85f, 0.85f, 0.9f, 0.7f);
+			if (!From.bIndicatorDecal)
+			{
+				BoardRing(From, Tower.Pos, static_cast<float>(TMSim::Watchtower::Reach), Ring, 2.5f);
+			}
+			if (Tower.Capturer >= 0 && Tower.Progress > 0)
+			{
+				FVector2D At;
+				if (ToScreen(From, Tower.Pos, 9.6f * From.TileSize, At))
+				{
+					const FString Line = FString::Printf(TEXT("%s %d/%d"), Tower.Capturer == 0 ? TEXT("Blue") : TEXT("Red"),
+						Tower.Progress, Needed);
+					const FVector2D Size = TextSize(Line, TowerFont, 0.6f * S);
+					Panel(At.X - Size.X * 0.5f - 6.0f * S, At.Y - 3.0f * S, Size.X + 12.0f * S, Size.Y + 6.0f * S, FLinearColor(0.0f, 0.0f, 0.0f, 0.6f));
+					Text(Line, At.X - Size.X * 0.5f, At.Y, TeamColour(Tower.Capturer), TowerFont, 0.6f * S);
+				}
+			}
+		}
 	}
 
 	// What an inspected enemy could do next: the ground it can walk to, and the
@@ -449,18 +504,35 @@ void ATMBattleHud::DrawBoardAids(ATMBattleDirector& From)
 		}
 	}
 
+	// Under the pointer or in the aim: a red ring at its feet, under the red
+	// outline the body wears (UpdateMarks).
+	for (const int32 Id : From.MarkedUnits)
+	{
+		if (const TMSim::FUnit* Marked = From.Battle.FindUnit(Id))
+		{
+			BoardRing(From, Marked->Pos, 0.55f, FLinearColor(1.0f, 0.1f, 0.06f, 0.95f), 3.0f);
+			BoardRing(From, Marked->Pos, 0.62f, FLinearColor(1.0f, 0.1f, 0.06f, 0.35f), 5.0f);
+		}
+	}
+
 	const TMSim::FUnit* Unit = From.SelectedUnit();
 	if (!From.PlayerCanOrder(Unit))
 	{
 		return;
 	}
 
-	// Whose orders these are.
-	BoardRing(From, Unit->Pos, 0.45f, FLinearColor(0.35f, 0.86f, 1.0f), 3.0f);
+	// Whose orders these are (its turn ring says so when the ground is painted).
+	if (!From.bIndicatorDecal)
+	{
+		BoardRing(From, Unit->Pos, 0.45f, FLinearColor(0.35f, 0.86f, 1.0f), 3.0f);
+	}
 
+	// The walk area, its edge and the way are painted on the ground, and the
+	// grass, rocks and cliffs over it take the paint too, so nothing is drawn
+	// again here (the flat lines floated over the land: 2026-09-30).
 	if (From.AimMode == ATMBattleDirector::EAimMode::Move && From.bIndicatorDecal)
 	{
-		return;  // the walk area and the way are on the ground (TMBattleDirectorIndicators.cpp)
+		return;
 	}
 	if (From.AimMode == ATMBattleDirector::EAimMode::Move)
 	{
@@ -469,7 +541,7 @@ void ATMBattleHud::DrawBoardAids(ATMBattleDirector& From)
 		// faces ground it cannot reach is a piece of the line; the gaps other
 		// units leave (nobody may stand on them) are not edges, so a unit
 		// standing in the middle of the ground is not boxed in.
-		const FLinearColor Edge = From.bSprinting ? FLinearColor(1.0f, 0.67f, 0.24f, 0.95f) : FLinearColor(0.31f, 0.63f, 1.0f, 0.95f);
+		const FLinearColor Edge = From.bSprinting ? FLinearColor(1.0f, 0.67f, 0.24f, 1.0f) : FLinearColor(0.31f, 0.63f, 1.0f, 1.0f);
 		const TMSim::FMap& Map = From.Battle.Map;
 		TSet<int32> Inside;
 		for (const std::pair<TMSim::FNode, double>& Entry : From.Reachable)
@@ -489,7 +561,7 @@ void ATMBattleHud::DrawBoardAids(ATMBattleDirector& From)
 			return false;
 		};
 		const float Half = TMSim::Ground::NavStep * 0.5f * From.TileSize;
-		const float Thick = FMath::Max(2.0f, 3.0f * S);
+		const float Thick = FMath::Max(1.0f, 1.5f * S);
 		const int Steps[4][2] = { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } };
 		for (const std::pair<TMSim::FNode, double>& Entry : From.Reachable)
 		{
@@ -542,13 +614,14 @@ void ATMBattleHud::DrawBoardAids(ATMBattleDirector& From)
 			DrawLine(A.X, A.Y, B.X, B.Y, FLinearColor(1.0f, 0.9f, 0.35f), 4.0f);
 		}
 	}
-	const TMSim::FAbility* Ability = TMSim::JobAbility(Unit->Job, From.AimSlot);
+	const TMSim::FAbility* Ability = Unit->Ability(From.AimSlot);
 	if (!Ability)
 	{
 		return;
 	}
 	// How far it reaches, and the ring it cannot be used inside (on the ground
 	// instead, when the indicator decal is up).
+	// Its reach is drawn here even with the decal up, so scenery can't hide it.
 	if (Ability->MaxRange > 0.0f && !From.bIndicatorDecal)
 	{
 		BoardRing(From, Unit->Pos, Ability->MaxRange, FLinearColor(0.8f, 0.8f, 0.86f, 0.9f), 2.0f);
@@ -650,7 +723,18 @@ void ATMBattleHud::DrawActionBar(ATMBattleDirector& From)
 	const float Tile = 100.0f * S;
 	const float Small = 64.0f * S;
 	const float Gap = 10.0f * S;
-	const float Total = 3.0f * Small + 4.0f * Tile + 6.0f * Gap + 20.0f * S;
+	// A fourth small tile, Capture, when the battle has watchtowers; and ITEMS
+	// with the neutral camps, or when anything lies on the ground or is carried;
+	// and one tile for each ability an item gives.
+	const bool bTowers = !From.Battle.Watchtowers.empty();
+	const bool bItems = !From.Battle.Camps.empty() || !From.Battle.Caches.empty() || Unit->HasItems();
+	int32 ItemAbilities = 0;
+	for (int32 Slot = TMSim::ClassSlots; Slot < TMSim::AbilitySlots; ++Slot)
+	{
+		ItemAbilities += Unit->Ability(Slot) ? 1 : 0;
+	}
+	const float Smalls = 3.0f + (bTowers ? 1.0f : 0.0f) + (bItems ? 1.0f : 0.0f) + ItemAbilities;
+	const float Total = Smalls * Small + 4.0f * Tile + (Smalls + 3.0f) * Gap + 20.0f * S;
 	float X = (Canvas->ClipX - Total) * 0.5f + Nudge(TEXT("action_bar")).X;
 	const float Y = Canvas->ClipY - Tile - 22.0f * S + Nudge(TEXT("action_bar")).Y;
 	ActionBarTop = Y - 8.0f * S;
@@ -687,7 +771,39 @@ void ATMBattleHud::DrawActionBar(ATMBattleDirector& From)
 		AbilityTile(From, *Unit, Slot, X, Y, Tile, true);
 		X += Tile + Gap;
 	}
+	// The items' abilities: smaller tiles, keys 5 to 7.
+	for (int32 Slot = TMSim::ClassSlots; Slot < TMSim::AbilitySlots; ++Slot)
+	{
+		if (Unit->Ability(Slot))
+		{
+			AbilityTile(From, *Unit, Slot, X, Y + Tile - Small, Small, true);
+			X += Small + Gap;
+		}
+	}
 	X += 10.0f * S;
+	if (bItems)
+	{
+		FString WhyNot;
+		const int32 Near = From.TakeableCache(*Unit, &WhyNot);
+		const float TileX = X;
+		WordTile(TEXT("ITEMS"), Near >= 0 ? FString(TEXT("take")) : FString::Printf(TEXT("%d/3"), (Unit->Gear[0] ? 1 : 0) + (Unit->Gear[1] ? 1 : 0) + (Unit->Gear[2] ? 1 : 0)),
+			bControllable, From.TakePickerCache != -1, ETMHudAction::TakeOpen);
+		AddTip(TileX, Y + Tile - Small, Small, Small, Near >= 0
+			? FString(TEXT("Items lie within reach: take one with this unit's action, or leave one of its own."))
+			: FString(TEXT("What this unit carries, to leave on the ground for an ally. Stand next to items to take them.")));
+	}
+	if (bTowers)
+	{
+		// Lit when the rules would take it now; otherwise the tip says why not.
+		FString WhyNot;
+		const bool bCan = bControllable && From.CapturableTower(*Unit, &WhyNot) >= 0;
+		const float TileX = X;
+		WordTile(TEXT("CAPTURE"), FString::Printf(TEXT("%d turn%s"), From.Battle.CaptureTurnsNeeded(),
+			From.Battle.CaptureTurnsNeeded() == 1 ? TEXT("") : TEXT("s")), bCan, false, ETMHudAction::Capture);
+		AddTip(TileX, Y + Tile - Small, Small, Small, bCan
+			? FString(TEXT("Spend this unit's whole turn taking the watchtower it stands next to."))
+			: WhyNot);
+	}
 	WordTile(TEXT("END"), FTMSettings::Get().KeyName(ETMAction::EndTurn), bControllable, false, ETMHudAction::EndTurn);
 }
 
@@ -781,7 +897,7 @@ void ATMBattleHud::DrawBanners(ATMBattleDirector& From)
 	if (Unit && ButtonAt(Mouse, Over) && Over.Action == ETMHudAction::Ability)
 	{
 		// The mouse is over an ability: say what it is, whether or not it can be used.
-		if (const TMSim::FAbility* Ability = TMSim::JobAbility(Unit->Job, Over.Value))
+		if (const TMSim::FAbility* Ability = Unit->Ability(Over.Value))
 		{
 			const std::string Blocked = From.Battle.AbilityBlockedReason(*Unit, Over.Value);
 			const FString Reach = Ability->MaxRange == 0.0f
@@ -816,7 +932,7 @@ void ATMBattleHud::DrawBanners(ATMBattleDirector& From)
 		const ATMBattleDirector::FAim Where = From.Aim();
 		TMSim::FVec2 Spot;
 		double Walk = 0.0;
-		const TMSim::FAbility* Aimed = TMSim::JobAbility(Unit->Job, From.AimSlot);
+		const TMSim::FAbility* Aimed = Unit->Ability(From.AimSlot);
 		if (!Where.bOk && Where.Why == UTF8_TO_TCHAR(ATMBattleDirector::OutOfRange) && !Unit->bMoved && Aimed)
 		{
 			// It can be used from somewhere it can walk to: say so, rather than
@@ -841,7 +957,7 @@ void ATMBattleHud::DrawBanners(ATMBattleDirector& From)
 		}
 		else
 		{
-			const TMSim::FAbility* Ability = TMSim::JobAbility(Unit->Job, From.AimSlot);
+			const TMSim::FAbility* Ability = Unit->Ability(From.AimSlot);
 			const int32 Hits = static_cast<int32>(From.Battle.Preview(*Unit, From.AimSlot, Unit->Pos, Where.Point).size());
 			Preview = FString::Printf(TEXT("%hs: click to use. Reaches %d."), Ability ? Ability->Name.c_str() : "", Hits);
 			PreviewColour = FLinearColor(0.55f, 1.0f, 0.6f);
@@ -1069,7 +1185,7 @@ void ATMBattleHud::DrawTitle(ATMBattleDirector& From)
 	Y += H + Gap;
 	MenuButton(X, Y, W, H, TEXT("Play Online"), ETMHudAction::TitleOnline, -1, false, TEXT("host a battle, or join one"));
 	Y += H + Gap * 3.0f;
-	MenuButton(X, Y, W, 44.0f * S, FString::Printf(TEXT("Unit Guide  (%s)"), *FTMSettings::Get().KeyName(ETMAction::UnitGuide)), ETMHudAction::ToggleGuide);
+	MenuButton(X, Y, W, 44.0f * S, FString::Printf(TEXT("Codex  (%s)"), *FTMSettings::Get().KeyName(ETMAction::UnitGuide)), ETMHudAction::ToggleGuide);
 	Y += 44.0f * S + Gap;
 	MenuButton(X, Y, W, 44.0f * S, TEXT("Options"), ETMHudAction::OpenOptions);
 	Y += 44.0f * S + Gap;
@@ -1092,14 +1208,23 @@ void ATMBattleHud::DrawSetup(ATMBattleDirector& From)
 	UFont* Font = GEngine->GetMediumFont();
 	UFont* Big = GEngine->GetLargeFont();
 	const ATMBattleDirector::FMatchSetup& Setup = From.Setup;
+	// The whole screen always fits, whatever the UI scale: shrunk to the
+	// window if it would run off it, so Start is never out of reach.
+	const float WasS = S;
+	S = FMath::Min(S, FMath::Min((Canvas->ClipY - 16.0f) / 940.0f, (Canvas->ClipX - 16.0f) / 1180.0f));
+	ON_SCOPE_EXIT
+	{
+		S = WasS;
+	};
 	const bool bVsComputer = Setup.Mode == TEXT("ai");
 	const bool bWatch = Setup.Mode == TEXT("cpu");
 	const bool bHosting = Setup.Mode == TEXT("online");
 
 	const float PW = 1180.0f * S;
-	const float PH = 720.0f * S;
+	// Tall enough for the right column's seven rules and the notes under them.
+	const float PH = 940.0f * S;
 	const float PX = (Canvas->ClipX - PW) * 0.5f;
-	const float PY = (Canvas->ClipY - PH) * 0.5f;
+	const float PY = FMath::Max(8.0f * S, (Canvas->ClipY - PH) * 0.5f);
 	Panel(PX, PY, PW, PH, FLinearColor(0.05f, 0.06f, 0.1f, 0.94f), FLinearColor(0.4f, 0.45f, 0.55f, 0.8f), 1.5f);
 
 	const FString Heading = bVsComputer ? TEXT("Battle Setup: Play vs Computer")
@@ -1120,6 +1245,14 @@ void ATMBattleHud::DrawSetup(ATMBattleDirector& From)
 			: bVsComputer ? FString(TEXT("You")) : FString::Printf(TEXT("Player %d"), Team + 1);
 		Text(FString::Printf(TEXT("%s   %s"), Team == 0 ? TEXT("Blue") : TEXT("Red"), *Who),
 			CX, ColumnTop, TeamColour(Team), Font, 0.8f * S);
+		// Its item points, on the right of its heading.
+		if (Setup.ItemBudget > 0)
+		{
+			const FString Points = From.PicksOwnItems(Team) ? FString(TEXT("picks its own items"))
+				: FString::Printf(TEXT("Items %d / %d points"), From.ItemPointsSpent(Team), Setup.ItemBudget);
+			const FVector2D PointsSize = TextSize(Points, Font, 0.5f * S);
+			Text(Points, CX + ColumnW - PointsSize.X, ColumnTop + 6.0f * S, Dim, Font, 0.5f * S);
+		}
 
 		float Y = ColumnTop + 36.0f * S;
 		for (int32 Slot = 0; Slot < 4; ++Slot)
@@ -1134,8 +1267,30 @@ void ATMBattleHud::DrawSetup(ATMBattleDirector& From)
 					Roles += (Roles.IsEmpty() ? TEXT("") : TEXT(", ")) + FString(UTF8_TO_TCHAR(JobRole.c_str()));
 				}
 			}
-			MenuButton(CX, Y, ColumnW, 56.0f * S, Name, ETMHudAction::SetupClass, Team * 4 + Slot, false,
+			// The class, and beside it the unit's three item slots when there are points to spend.
+			const float Box = 44.0f * S;
+			const float ItemsW = Setup.ItemBudget > 0 ? 3.0f * (Box + 6.0f * S) : 0.0f;
+			MenuButton(CX, Y, ColumnW - ItemsW, 56.0f * S, Name, ETMHudAction::SetupClass, Team * 4 + Slot, false,
 				Roles.IsEmpty() ? FString(TEXT("click to choose")) : Roles + TEXT("   (click to choose)"));
+			for (int32 Item = 0; Item < 3 && Setup.ItemBudget > 0; ++Item)
+			{
+				const float BX = CX + ColumnW - ItemsW + 6.0f * S + Item * (Box + 6.0f * S);
+				const float BY = Y + 6.0f * S;
+				if (From.PicksOwnItems(Team))
+				{
+					Panel(BX, BY, Box, Box, FLinearColor(0.03f, 0.04f, 0.07f, 0.8f), FLinearColor(0.3f, 0.33f, 0.4f, 0.5f), 1.0f);
+					Text(TEXT("?"), BX + Box * 0.4f, BY + Box * 0.25f, Dim, Font, 0.6f * S);
+					AddTip(BX, BY, Box, Box, TEXT("The computer picks this unit's items when the battle starts."));
+					continue;
+				}
+				const TMSim::FItemDef* Carried = TMSim::FindItem(Setup.Items[Team][Slot][Item]);
+				ItemBadge(Carried, BX, BY, Box, Carried != nullptr);
+				if (!Carried)
+				{
+					AddTip(BX, BY, Box, Box, TEXT("An empty item slot: click to choose an item."));
+				}
+				AddButton(BX, BY, Box, Box, ETMHudAction::SetupItem, Team * 12 + Slot * 3 + Item);
+			}
 			Y += 64.0f * S;
 		}
 		const float Half = (ColumnW - 10.0f * S) * 0.5f;
@@ -1212,12 +1367,35 @@ void ATMBattleHud::DrawSetup(ATMBattleDirector& From)
 			: FString(TEXT("No planning")), ETMHudAction::SetupPlanning, -1);
 		AddTip(RowX, Y - 46.0f * S, LabelW + ValueW, 38.0f * S,
 			TEXT("Time before the fighting to put your units where you want them in your own spawn area. It ends early once both sides are ready; the computer never says it is, so against it the time runs out."));
+		Row(TEXT("Watchtowers"), Setup.Watchtowers > 0 ? FString::Printf(TEXT("%d, placed at random"), Setup.Watchtowers)
+			: FString(TEXT("None")), ETMHudAction::SetupTowers, -1);
+		const float TowerRowY = Y - 46.0f * S;
+		Row(TEXT("Item points"), Setup.ItemBudget > 0 ? FString::Printf(TEXT("%d per side"), Setup.ItemBudget)
+			: FString(TEXT("No items")), ETMHudAction::SetupItemBudget, -1);
+		AddTip(RowX, Y - 46.0f * S, LabelW + ValueW, 38.0f * S,
+			TEXT("Points each side spends on items before the battle: common items cost 1, uncommon 2, rare 3. Epic items can't be bought. Each unit carries up to three. Click a unit's empty slot to choose; the computer picks its own."));
+		AddTip(RowX, TowerRowY, LabelW + ValueW, 38.0f * S,
+			FString::Printf(TEXT("Towers placed somewhere new each battle, in mirrored pairs so neither side has a nearer one (an odd one stands in the middle; a small map may have room for fewer). Stand next to one and press Capture: it takes that unit's whole turn, and %d such turns take the tower (Developer Tools: Watchtower capture). A side that holds a tower sees %.0f m around it."),
+				FMath::Max(1, TMSim::RoundToInt(From.Battle.Tuning.WatchtowerTurns)), From.Battle.Tuning.WatchtowerSight));
+		static const TCHAR* CampWords[] = { TEXT("Off"), TEXT("Light"), TEXT("Standard"), TEXT("Wild") };
+		Row(TEXT("Neutral camps"), CampWords[FMath::Clamp(Setup.CampLevel, 0, 3)], ETMHudAction::SetupCamps, -1);
+		AddTip(RowX, Y - 46.0f * S, LabelW + ValueW, 38.0f * S,
+			TEXT("Monster camps in mirrored pairs, waking over time: easy ones at once, harder ones later, and the map's boss in the middle (Standard and Wild). Their temperament shows over the camp. Beaten camps leave items on the ground to take, and come back a while later. Monsters never fight each other."));
+		const TMSim::FMapDef& BossMap = TMSim::FindMap(Setup.MapId);
+		const TMSim::FJobDef* Boss = TMSim::FindJob(BossMap.Boss);
+		Row(TEXT("Boss"), Setup.bRandomBoss ? FString(TEXT("Random each battle"))
+			: FString::Printf(TEXT("%hs (the map's own)"), Boss ? Boss->Name.c_str() : "none"), ETMHudAction::SetupBoss, -1);
+		AddTip(RowX, Y - 46.0f * S, LabelW + ValueW, 38.0f * S,
+			TEXT("Which boss wakes at the boss camp, when camps are Standard or Wild: the one that belongs to the map, or any of them, chosen by the battle's seed."));
+		Row(TEXT("Elements"), Setup.bElements ? FString(TEXT("Reactions on")) : FString(TEXT("Off")), ETMHudAction::SetupElements, -1);
+		AddTip(RowX, Y - 46.0f * S, LabelW + ValueW, 38.0f * S,
+			TEXT("Water abilities leave their target Wet and ice abilities Chill it. Lightning then stuns the Wet (and the Wet near them), ice freezes them, and fire sets the Oiled burning. Off, only abilities that say so apply Wet or Chilled; the reactions still happen."));
 		RowX = LeftRowX;
 		Y = LeftY;
 	}
 
 	// What the Godot setup offers that is not here yet, said where it would be.
-	float NoteY = ColumnTop + 36.0f * S + 4.0f * 64.0f * S + 64.0f * S + 3.0f * 46.0f * S + 10.0f * S;
+	float NoteY = ColumnTop + 36.0f * S + 4.0f * 64.0f * S + 64.0f * S + 8.0f * 46.0f * S + 10.0f * S;
 	const TCHAR* Notes[] =
 	{
 		TEXT("Not ported yet:"),

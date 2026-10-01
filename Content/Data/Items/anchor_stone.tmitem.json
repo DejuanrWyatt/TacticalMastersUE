@@ -1,0 +1,12 @@
+{
+  "format": "tactical-masters-item",
+  "version": 1,
+  "id": "anchor_stone",
+  "name": "Anchor Stone",
+  "desc": "+4 to both defences if you didn't move on your last turn.",
+  "icon": "anchor",
+  "tier": "uncommon",
+  "effects": {
+    "still_defence": 4
+  }
+}

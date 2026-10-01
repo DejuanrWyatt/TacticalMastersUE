@@ -1,0 +1,29 @@
+{
+  "format": "tactical-masters-item",
+  "version": 1,
+  "id": "guardians_oath",
+  "name": "Guardian's Oath",
+  "desc": "Swear to guard an ally: single-target hits on it land on you instead.",
+  "icon": "oath",
+  "tier": "rare",
+  "ability": {
+    "id": "item_guard",
+    "name": "Guard",
+    "desc": "An ally up to 2 m away is Guarded for 2 turns: single-target hits on it land on this unit while it stays within 3 m.",
+    "kind": "active",
+    "effect": "support",
+    "scale": "mag",
+    "target": "ally",
+    "shape": "unit",
+    "power": 0,
+    "min_range": 0.5,
+    "max_range": 2,
+    "aoe": 0,
+    "cooldown": 4,
+    "cast": 0,
+    "status": {
+      "id": "guarded",
+      "turns": 2
+    }
+  }
+}

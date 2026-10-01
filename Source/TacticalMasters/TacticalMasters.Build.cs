@@ -16,7 +16,9 @@ public class TacticalMasters : ModuleRules
 		// class creator by ATMVfxStudio.
 		PrivateDependencyModuleNames.AddRange(new string[]
 		{
-			"Niagara", "AssetRegistry", "ImageCore", "Json", "RenderCore", "RHI"
+			"Niagara", "AssetRegistry", "ImageCore", "Json", "RenderCore", "RHI",
+			// The board's ground as one smooth mesh (TMBattleDirectorGround.cpp).
+			"ProceduralMeshComponent"
 		});
 
 		// Online play (Docs/tech/feat-online.md): one TCP connection between two

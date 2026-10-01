@@ -1,0 +1,29 @@
+{
+  "format": "tactical-masters-item",
+  "version": 1,
+  "id": "rot_censer",
+  "name": "Rot Censer",
+  "desc": "Decay: healing on an enemy hurts it instead.",
+  "icon": "censer",
+  "tier": "rare",
+  "ability": {
+    "id": "item_rot",
+    "name": "Rot",
+    "desc": "An enemy up to 5 m away Decays for 2 turns: healing on it deals damage instead, and Regen and springs hurt it.",
+    "kind": "active",
+    "effect": "support",
+    "scale": "mag",
+    "target": "enemy",
+    "shape": "unit",
+    "power": 0,
+    "min_range": 0,
+    "max_range": 5,
+    "aoe": 0,
+    "cooldown": 4,
+    "cast": 0,
+    "status": {
+      "id": "decay",
+      "turns": 2
+    }
+  }
+}

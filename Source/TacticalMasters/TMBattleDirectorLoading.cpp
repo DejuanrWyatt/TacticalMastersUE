@@ -19,6 +19,9 @@
 
 #include "Components/SkeletalMeshComponent.h"
 #include "Dom/JsonObject.h"
+#include "Misc/FileHelper.h"
+#include "Misc/Paths.h"
+#include "Serialization/JsonSerializer.h"
 #include "Engine/AssetManager.h"
 #include "Engine/StreamableManager.h"
 #include "PipelineStateCache.h"
@@ -97,6 +100,17 @@ void ATMBattleDirector::UnreadPaths(const TArray<const FTMBody*>& Wanted, TArray
 	Paths.RemoveAll([](const FSoftObjectPath& Path) { return !Path.IsValid() || Path.ResolveObject() != nullptr; });
 }
 
+void ATMBattleDirector::SoundAssetPaths(TArray<FSoftObjectPath>& Paths) const
+{
+	FString Text;
+	TSharedPtr<FJsonObject> Root;
+	const FString File = FPaths::ProjectContentDir() / TEXT("Data/Sounds/sounds.json");
+	if (FFileHelper::LoadFileToString(Text, *File) && FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(Text), Root) && Root.IsValid())
+	{
+		PathsIn(MakeShared<FJsonValueObject>(Root), Paths);
+	}
+}
+
 bool ATMBattleDirector::LoadBodiesInBackground()
 {
 	if (!LoadsInBackground(GetWorld()))
@@ -110,12 +124,16 @@ bool ATMBattleDirector::LoadBodiesInBackground()
 	}
 	TArray<FSoftObjectPath> Paths;
 	UnreadPaths(Wanted, Paths);
+	// The effects and sounds too, so nothing is read from disk mid-battle.
+	LookAssetPaths(Paths);
+	SoundAssetPaths(Paths);
+	Paths.RemoveAll([](const FSoftObjectPath& Path) { return !Path.IsValid() || Path.ResolveObject() != nullptr; });
 	bool bAnyUnworn = false;
 	for (const FTMBody* Body : Wanted)
 	{
 		bAnyUnworn |= Body && !IsBodyLoaded(*Body);
 	}
-	if (!bAnyUnworn)
+	if (!bAnyUnworn && Paths.Num() == 0)
 	{
 		return false;
 	}

@@ -1,0 +1,32 @@
+{
+  "format": "tactical-masters-item",
+  "version": 1,
+  "id": "wings_of_the_roc",
+  "name": "Wings of the Roc",
+  "desc": "+1 Move. Take Flight: fly for 2 turns.",
+  "icon": "wings",
+  "tier": "epic",
+  "stats": {
+    "move": 1
+  },
+  "ability": {
+    "id": "item_take_flight",
+    "name": "Take Flight",
+    "desc": "Flies for 2 turns: climbs any height, and blades can't reach it.",
+    "kind": "active",
+    "effect": "support",
+    "scale": "mag",
+    "target": "ally",
+    "shape": "self",
+    "power": 0,
+    "min_range": 0,
+    "max_range": 0,
+    "aoe": 0,
+    "cooldown": 5,
+    "cast": 0,
+    "status": {
+      "id": "fly",
+      "turns": 2
+    }
+  }
+}

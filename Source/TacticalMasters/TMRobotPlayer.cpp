@@ -541,7 +541,9 @@ void ATMRobotPlayer::PlanTurn(const TMSim::FUnit& Unit)
 		? FString::Printf(TEXT("%s to %.2f,%.2f"), Intent.bSprint ? TEXT("sprint") : TEXT("walk"), Intent.To.X, Intent.To.Y)
 		: Intent.Type == TMSim::EOrderType::UseAbility
 			? FString::Printf(TEXT("ability %d at %.2f,%.2f (follow %d)"), Intent.Slot + 1, Intent.Target.X, Intent.Target.Y, Intent.Follow)
-			: FString(TEXT("end turn"));
+			: Intent.Type == TMSim::EOrderType::Capture
+				? FString::Printf(TEXT("capture watchtower %d"), Intent.Tower)
+				: FString(TEXT("end turn"));
 	const int32 Serial = Unit.Serial;
 	PlannedSerial.Add(Id, Serial);
 	const int32 OrdersBefore = Director->OrdersApplied;
@@ -585,7 +587,7 @@ void ATMRobotPlayer::PlanTurn(const TMSim::FUnit& Unit)
 	}
 	case TMSim::EOrderType::UseAbility:
 	{
-		const TMSim::FAbility* Ability = TMSim::JobAbility(Unit.Job, Intent.Slot);
+		const TMSim::FAbility* Ability = Unit.Ability(Intent.Slot);
 		const FString Name = Ability ? FString(UTF8_TO_TCHAR(Ability->Name.c_str())) : FString(TEXT("?"));
 		Tally.FindOrAdd(TEXT("ability")).Y += 1;
 		CurrentSlot = Intent.Slot;
@@ -611,6 +613,23 @@ void ATMRobotPlayer::PlanTurn(const TMSim::FUnit& Unit)
 				}
 				return bDone;
 			}, FString::Printf(TEXT("aiming %s at its target and clicking should use it"), *Name), 3.0f);
+		break;
+	}
+	case TMSim::EOrderType::Capture:
+	{
+		// The Capture button, as a person takes a watchtower.
+		Tally.FindOrAdd(TEXT("capture")).Y += 1;
+		Button(ETMHudAction::Capture);
+		Check([this, Id, Serial]()
+			{
+				const TMSim::FUnit* U = Director->Battle.FindUnit(Id);
+				const bool bDone = !U || !U->bReady || U->Serial != Serial;
+				if (bDone)
+				{
+					Tally.FindOrAdd(TEXT("capture")).X += 1;
+				}
+				return bDone;
+			}, TEXT("Capture next to a watchtower should spend the turn taking it"));
 		break;
 	}
 	default:

@@ -23,7 +23,7 @@ class FTMNet
 {
 public:
 	/** Bumped whenever the rules or the messages change: two builds that differ can't play each other. */
-	static constexpr int32 ProtocolVersion = 1;
+	static constexpr int32 ProtocolVersion = 7;  // 2: watchtowers (the capture order, three rule numbers); 3: items (loadouts, the item budget); 4: neutral camps (take and drop orders, seven ability slots); 5: the second set of statuses (element reactions); 6: walking onto items picks them up; 7: towers see their whole radius, nothing blocking
 	static constexpr int32 DefaultPort = 7777;
 	/** A message longer than this closes the connection: nothing the game sends comes near it. */
 	static constexpr int32 MaxMessageBytes = 4 * 1024 * 1024;

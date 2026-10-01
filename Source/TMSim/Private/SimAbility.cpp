@@ -1,5 +1,8 @@
 #include "SimAbility.h"
 
+#include <algorithm>
+#include <string>
+
 #include <map>
 
 namespace TMSim
@@ -184,18 +187,25 @@ namespace TMSim
 			return List;
 		}
 
-		/** The listing, built-ins first so the classes everybody knows lead. */
+		std::vector<const FJobDef*>& MonsterList()
+		{
+			static std::vector<const FJobDef*> List;
+			return List;
+		}
+
+		/** The listing, built-ins first so the classes everybody knows lead. Monsters are listed apart. */
 		void RebuildJobList()
 		{
 			std::vector<const FJobDef*>& List = JobList();
 			List.clear();
+			MonsterList().clear();
 			for (int Pass = 0; Pass < 2; ++Pass)
 			{
 				for (const auto& Pair : Jobs())
 				{
 					if (Pair.second.bFromFile == (Pass == 1))
 					{
-						List.push_back(&Pair.second);
+						(Pair.second.Monster.bMonster ? MonsterList() : List).push_back(&Pair.second);
 					}
 				}
 			}
@@ -250,13 +260,23 @@ namespace TMSim
 		return JobList();
 	}
 
+	const std::vector<const FJobDef*>& AllMonsters()
+	{
+		if (JobList().empty())
+		{
+			RebuildJobList();
+		}
+		return MonsterList();
+	}
+
 	std::string RegisterJob(const FJobDef& Job, const std::vector<FAbility>& JobAbilities)
 	{
 		if (Jobs().count(Job.Id))
 		{
 			return "there is already a class called '" + Job.Id + "'";
 		}
-		if (JobAbilities.size() != 4)
+		// Four, and four more for each of a boss's later phases.
+		if (JobAbilities.size() != 4 + 4 * Job.Monster.Phases.size())
 		{
 			return "a class has four abilities";
 		}
@@ -266,7 +286,9 @@ namespace TMSim
 			{
 				return "there is already an ability called '" + JobAbilities[Slot].Id + "'";
 			}
-			if (JobAbilities[Slot].Id != Job.AbilityIds[Slot])
+			const std::string& Expected = Slot < 4 ? Job.AbilityIds[Slot]
+				: Job.Monster.Phases[(Slot - 4) / 4].AbilityIds[(Slot - 4) % 4];
+			if (JobAbilities[Slot].Id != Expected)
 			{
 				return "slot " + std::to_string(Slot + 1) + " does not hold ability '" + JobAbilities[Slot].Id + "'";
 			}
@@ -282,6 +304,21 @@ namespace TMSim
 		return std::string();
 	}
 
+	std::string RegisterAbility(const FAbility& Ability)
+	{
+		if (Ability.Id.empty() || Abilities().count(Ability.Id))
+		{
+			return "there is already an ability called '" + Ability.Id + "'";
+		}
+		Abilities()[Ability.Id] = Ability;
+		return std::string();
+	}
+
+	void ForgetAbility(const std::string& AbilityId)
+	{
+		Abilities().erase(AbilityId);
+	}
+
 	void ForgetLoadedJobs()
 	{
 		for (auto It = Jobs().begin(); It != Jobs().end();)
@@ -292,6 +329,13 @@ namespace TMSim
 				{
 					Abilities().erase(AbilityId);
 				}
+				for (const FMonsterPhase& Phase : It->second.Monster.Phases)
+				{
+					for (const std::string& AbilityId : Phase.AbilityIds)
+					{
+						Abilities().erase(AbilityId);
+					}
+				}
 				It = Jobs().erase(It);
 			}
 			else
@@ -300,5 +344,54 @@ namespace TMSim
 			}
 		}
 		RebuildJobList();
+	}
+}
+
+namespace TMSim
+{
+	const std::string& ElementOf(const FAbility& Ability)
+	{
+		static const std::string Fire = "fire", Ice = "ice", Lightning = "lightning", Water = "water", None;
+		if (!Ability.Element.empty())
+		{
+			return Ability.Element == "none" ? None : Ability.Element;
+		}
+		// The words the classes are named with (the class creator's elements), as
+		// whole words of the id or their starts: "glacial" is ice, "prime" is not rime.
+		struct FWord { const char* Stem; bool bWhole; const std::string* Element; };
+		static const FWord Words[] =
+		{
+			{ "flame", false, &Fire }, { "fire", false, &Fire }, { "blaze", false, &Fire }, { "ember", true, &Fire },
+			{ "magma", false, &Fire }, { "lava", true, &Fire }, { "inferno", false, &Fire }, { "cinder", false, &Fire },
+			{ "salamander", false, &Fire }, { "ifrit", true, &Fire }, { "pyro", false, &Fire },
+			{ "frost", false, &Ice }, { "ice", true, &Ice }, { "glaci", false, &Ice }, { "blizzard", false, &Ice },
+			{ "hail", false, &Ice }, { "rime", true, &Ice }, { "freez", false, &Ice }, { "snow", false, &Ice },
+			{ "cryo", false, &Ice },
+			{ "thunder", false, &Lightning }, { "lightning", false, &Lightning }, { "shock", false, &Lightning },
+			{ "spark", false, &Lightning }, { "storm", false, &Lightning }, { "tempest", true, &Lightning },
+			{ "volt", false, &Lightning }, { "arc", true, &Lightning },
+			{ "tide", false, &Water }, { "water", false, &Water }, { "wave", true, &Water }, { "aqua", false, &Water },
+			{ "reef", true, &Water }, { "sea", true, &Water }, { "siren", true, &Water }, { "leviathan", true, &Water },
+			{ "douse", true, &Water },
+		};
+		size_t Start = 0;
+		while (Start <= Ability.Id.size())
+		{
+			const size_t End = std::min(Ability.Id.find('_', Start), Ability.Id.size());
+			const std::string Token = Ability.Id.substr(Start, End - Start);
+			for (const FWord& Each : Words)
+			{
+				const size_t Length = std::char_traits<char>::length(Each.Stem);
+				if (Each.bWhole ? Token == Each.Stem : Token.compare(0, Length, Each.Stem) == 0)
+				{
+					return *Each.Element;
+				}
+			}
+			Start = End + 1;
+		}
+		if (Ability.StatusId == "burn") { return Fire; }
+		if (Ability.StatusId == "freeze" || Ability.StatusId == "chilled") { return Ice; }
+		if (Ability.StatusId == "wet") { return Water; }
+		return None;
 	}
 }

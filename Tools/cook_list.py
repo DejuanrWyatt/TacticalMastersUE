@@ -5,8 +5,14 @@ The game finds most of its assets by name at run time -- a class's hero, its
 clips, an ability's effect, a sound, a theme's meshes -- from the data files
 under Content/Data. The cooker only cooks what a level refers to, so without
 this none of those would be in a packaged game. This reads every data file,
-takes every /Game path in it, and lists them for the asset manager to cook
+takes every /Game path in it, and has the folders holding them always cooked
 (with everything they use: materials, textures, skeletons).
+
+Folders, not the assets one by one: listed as primary assets they were named
+by their short names, and packs reuse those (every Paragon hero has an
+"Ability_Q"), so the editor warned "Duplicate Asset ID" for each at startup
+and the cook failed on them. A folder cooks a little more than was named
+(a hero's other animations, say), which is the price of no clashes.
 
 Only the bodies a class, a look or the default wears are listed from the
 character map, not every skin in it: a skin nobody wears would only make the
@@ -36,7 +42,18 @@ END = "; ---- end of Tools/cook_list.py ----"
 IN_CODE = [
     "/Game/UI/M_GroundIndicator.M_GroundIndicator",
     "/Game/UI/M_TeamOutline.M_TeamOutline",
+    "/Game/UI/M_GroundVertex.M_GroundVertex",
 ]
+
+
+def folders(paths):
+    """The folders holding these assets, leaving out any inside another listed (a folder cooks all below it)."""
+    dirs = sorted({p.split(".")[0].rsplit("/", 1)[0] for p in paths})
+    kept = []
+    for d in dirs:
+        if not any(d == k or d.startswith(k + "/") for k in kept):
+            kept.append(d)
+    return kept
 
 
 def game_paths(value, into):
@@ -86,20 +103,21 @@ def main():
     for path in missing:
         print("not in the project, left out: " + path)
     wanted = sorted(p for p in wanted if asset_exists(p))
+    write_ini(wanted)
+    print("%d assets named (%d bodies worn, %d animation sets)" % (len(wanted), len(worn), len(sets)))
+    return 0
 
+
+def write_ini(wanted):
+    cook = folders(wanted)
     lines = [BEGIN,
              "[/Script/UnrealEd.ProjectPackagingSettings]",
              "; The game reads these as files: classes, maps, themes, icons, the character and sound maps.",
              "+DirectoriesToAlwaysStageAsNonUFS=(Path=\"Data\")",
              "+MapsToCook=(FilePath=\"/Game/Maps/Showcase\")",
-             "",
-             "[/Script/Engine.AssetManagerSettings]",
-             "; %d assets the data files name, cooked with everything they use." % len(wanted),
-             "+PrimaryAssetTypesToScan=(PrimaryAssetType=\"TMDataNamed\",AssetBaseClass=\"/Script/CoreUObject.Object\","
-             "bHasBlueprintClasses=False,bIsEditorOnly=False,Directories=,SpecificAssets=("
-             + ",".join('"%s"' % p for p in wanted)
-             + "),Rules=(Priority=-1,ChunkId=-1,bApplyRecursively=True,CookRule=AlwaysCook))",
-             END]
+             "; %d folders holding the %d assets the data files name, cooked with everything they use." % (len(cook), len(wanted))]
+    lines += ["+DirectoriesToAlwaysCook=(Path=\"%s\")" % d for d in cook]
+    lines += [END]
     text = open(INI, encoding="utf-8").read() if os.path.exists(INI) else ""
     if BEGIN in text:
         text = re.sub(re.escape(BEGIN) + r".*?" + re.escape(END), lambda _: "\n".join(lines), text, flags=re.S)
@@ -107,9 +125,7 @@ def main():
         text = (text.rstrip() + "\n\n" if text.strip() else "") + "\n".join(lines) + "\n"
     with open(INI, "w", encoding="utf-8", newline="\n") as f:
         f.write(text)
-    print("%d assets listed for cooking (%d bodies worn, %d animation sets) -> %s"
-          % (len(wanted), len(worn), len(sets), os.path.relpath(INI, ROOT)))
-    return 0
+    print("%d folders always cooked -> %s" % (len(cook), os.path.relpath(INI, ROOT)))
 
 
 if __name__ == "__main__":

@@ -16,6 +16,7 @@
 
 #include "SimTypes.h"
 
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -38,6 +39,20 @@ namespace TMSim
 		 * replays with the change at the same moment (game_state.gd:1043, 1164).
 		 */
 		Tune,
+		/**
+		 * Spends the unit's turn at a watchtower, towards its side taking it
+		 * (Docs/design/feat-objectives.md). Not Godot's: last, so every older
+		 * order keeps its number.
+		 */
+		Capture,
+		/**
+		 * Takes an item from a loot cache (Docs/design/feat-neutral-camps.md 3.4):
+		 * the turn's action. Into GearSlot, or the first empty slot for -1; an
+		 * item already there is left in the cache in its place.
+		 */
+		Take,
+		/** Leaves the item in GearSlot on the ground at the unit's feet. Free. */
+		Drop,
 	};
 
 	struct FOrder
@@ -72,6 +87,37 @@ namespace TMSim
 
 		/** Advance: how many ticks. */
 		int Ticks = 0;
+
+		/** Capture: which watchtower, by its place in FBattle::Watchtowers. */
+		int Tower = -1;
+
+		/** Take: which cache, by its place in FBattle::Caches, and which of its items, by id. */
+		int Cache = -1;
+		std::string ItemId;
+		/** Take and Drop: which of the unit's three item slots, or -1 (Take: the first empty one). */
+		int GearSlot = -1;
+
+		static FOrder MakeTake(int InUnitId, int InSerial, int InCache, const std::string& InItemId, int InGearSlot = -1)
+		{
+			FOrder Order;
+			Order.Type = EOrderType::Take;
+			Order.UnitId = InUnitId;
+			Order.Serial = InSerial;
+			Order.Cache = InCache;
+			Order.ItemId = InItemId;
+			Order.GearSlot = InGearSlot;
+			return Order;
+		}
+
+		static FOrder MakeDrop(int InUnitId, int InSerial, int InGearSlot)
+		{
+			FOrder Order;
+			Order.Type = EOrderType::Drop;
+			Order.UnitId = InUnitId;
+			Order.Serial = InSerial;
+			Order.GearSlot = InGearSlot;
+			return Order;
+		}
 
 		static FOrder MakeMove(int InUnitId, int InSerial, const FVec2& InTo, bool bInSprint = false)
 		{
@@ -129,6 +175,16 @@ namespace TMSim
 			FOrder Order;
 			Order.Type = EOrderType::Ready;
 			Order.Team = InTeam;
+			return Order;
+		}
+
+		static FOrder MakeCapture(int InUnitId, int InSerial, int InTower)
+		{
+			FOrder Order;
+			Order.Type = EOrderType::Capture;
+			Order.UnitId = InUnitId;
+			Order.Serial = InSerial;
+			Order.Tower = InTower;
 			return Order;
 		}
 

@@ -5,6 +5,7 @@
 #include "SimAbility.h"
 #include "SimMap.h"
 #include "SimBattle.h"
+#include "SimItem.h"
 
 #include <algorithm>
 #include <cmath>
@@ -79,9 +80,9 @@ namespace TMSim
 		// have the unit hang back at ultimate range for the first half of the
 		// battle waiting for something it cannot cast.
 		double AttackRange = 0.0;
-		for (int Slot = 0; Slot < 4; ++Slot)
+		for (int Slot = 0; Slot < AbilitySlots; ++Slot)
 		{
-			if (const FAbility* Ability = JobAbility(Unit.Job, Slot))
+			if (const FAbility* Ability = Unit.Ability(Slot))
 			{
 				if (Ability->Effect == EEffect::Damage
 					&& Battle.AbilityBlockedReason(Unit, Slot).empty())
@@ -92,8 +93,8 @@ namespace TMSim
 		}
 		if (AttackRange <= 0.0)
 		{
-			const FAbility* First = JobAbility(Unit.Job, 0);
-			const FAbility* Second = JobAbility(Unit.Job, 1);
+			const FAbility* First = Unit.Ability(0);
+			const FAbility* Second = Unit.Ability(1);
 			AttackRange = std::max(First ? First->MaxRange : 0.0f, Second ? Second->MaxRange : 0.0f);
 		}
 		// Just inside its own reach, so it can shoot without being walked over.
@@ -114,6 +115,55 @@ namespace TMSim
 			{
 				BestValue = Value;
 				Best = Spot;
+			}
+		}
+		return Best;
+	}
+
+	FVec2 FAIPlayer::TowerSpot(FBattle& Battle, const FUnit& Unit,
+		const std::vector<std::pair<FNode, double>>& Reach) const
+	{
+		// Only with nobody to fight: a unit that can see an enemy goes on
+		// thinking about the enemy.
+		for (const FUnit* Enemy : Battle.TeamUnits(1 - Unit.Team))
+		{
+			if (Battle.CanSee(Unit.Team, Enemy->Pos))
+			{
+				return Unit.Pos;
+			}
+		}
+		// Every tower its side does not hold yet.
+		std::vector<FVec2> Goals;
+		for (const FWatchtower& Tower : Battle.Watchtowers)
+		{
+			if (Tower.Owner != Unit.Team)
+			{
+				Goals.push_back(Tower.Pos);
+			}
+		}
+		if (Goals.empty())
+		{
+			return Unit.Pos;
+		}
+		// Already standing at one it can take: stay (it had no action to spend,
+		// or the tower is contested, and walking off would waste the ground).
+		for (const FVec2& Goal : Goals)
+		{
+			if (static_cast<double>(Unit.Pos.DistanceTo(Goal)) <= Watchtower::Reach)
+			{
+				return Unit.Pos;
+			}
+		}
+		// The reachable spot that walks nearest to one; the first found on a tie.
+		FVec2 Best = Unit.Pos;
+		double BestDistance = Battle.DistanceToNearest(Goals, FMap::NodeOf(Unit.Pos));
+		for (const auto& Pair : Reach)
+		{
+			const double Distance = Battle.DistanceToNearest(Goals, Pair.first);
+			if (Distance < BestDistance)
+			{
+				BestDistance = Distance;
+				Best = FMap::NodePos(Pair.first);
 			}
 		}
 		return Best;
@@ -227,7 +277,8 @@ namespace TMSim
 				}
 				break;
 			case EEffect::Heal:
-				Total += Amount * 1.2;
+				// Decay turns a heal into harm (feat-status-effects.md).
+				Total += Target->HasStatus("decay") ? -Amount * 1.5 : Amount * 1.2;
 				break;
 			case EEffect::Revive:
 				Total += 70.0 + Amount;
@@ -259,6 +310,9 @@ namespace TMSim
 				else if (Ability.StatusId == "root") { Worth = 12.0; }
 				else if (Ability.StatusId == "stun") { Worth = 12.0; }
 				else if (Ability.StatusId == "taunt") { Worth = 10.0; }
+				else if (Ability.StatusId == "stop" || Ability.StatusId == "charmed") { Worth = 16.0; }
+				else if (Ability.StatusId == "reraise") { Worth = 14.0; }
+				else if (Ability.StatusId == "haste" || Ability.StatusId == "marked") { Worth = 12.0; }
 				if (bSmart)
 				{
 					const bool bMidTurn = Target->bReady || Target->IsCasting();
@@ -363,7 +417,7 @@ namespace TMSim
 	double FAIPlayer::ValueOfOption(FBattle& Battle, const FUnit& Unit, int Slot,
 		const FVec2& Spot, const FVec2& Target) const
 	{
-		const FAbility* Ability = JobAbility(Unit.Job, Slot);
+		const FAbility* Ability = Unit.Ability(Slot);
 		if (!Ability)
 		{
 			return 0.0;
@@ -397,13 +451,13 @@ namespace TMSim
 			Taunter = nullptr;
 		}
 
-		for (int Slot = 0; Slot < 4; ++Slot)
+		for (int Slot = 0; Slot < AbilitySlots; ++Slot)
 		{
 			if (!Battle.AbilityBlockedReason(Unit, Slot).empty())
 			{
 				continue;
 			}
-			const FAbility* Ability = JobAbility(Unit.Job, Slot);
+			const FAbility* Ability = Unit.Ability(Slot);
 			if (!Ability)
 			{
 				continue;
@@ -421,7 +475,8 @@ namespace TMSim
 					? (Other.IsKo() && Other.Team == Unit.Team)
 					: (Other.IsAlive()
 						&& (Other.Team != Unit.Team) == (Ability->Target == ETargetSide::Enemy));
-				if (!bFits)
+				// Vanished, or lying in ambush: not something it knows to aim at.
+				if (!bFits || Battle.Hidden(Unit.Team, Other))
 				{
 					continue;
 				}
@@ -556,7 +611,7 @@ namespace TMSim
 
 		if (Best.Slot >= 0)
 		{
-			const FAbility* Ability = JobAbility(Unit.Job, Best.Slot);
+			const FAbility* Ability = Unit.Ability(Best.Slot);
 			Best.Follow = Ability ? UnitAt(Battle, Best.Target, Unit, Best.Spot, *Ability) : -1;
 		}
 		return Best;
@@ -606,6 +661,120 @@ namespace TMSim
 					return FOrder::MakeMove(Unit.Id, Unit.Serial, Best.Spot);
 				}
 				return FOrder::MakeUseAbility(Unit.Id, Unit.Serial, Best.Slot, Best.Target, Best.Follow);
+			}
+		}
+
+		// Watchtowers (not Godot's; Docs/design/feat-objectives.md). With none in
+		// the battle nothing here runs, so every choice above and below is still
+		// Godot's. Nothing worth hitting: spend the turn taking a tower if it is
+		// standing at one; and with no enemy in sight, walk to one rather than
+		// towards where the other side started.
+		if (!Battle.Watchtowers.empty())
+		{
+			if (bCanAct)
+			{
+				for (int Tower = 0; Tower < static_cast<int>(Battle.Watchtowers.size()); ++Tower)
+				{
+					if (Battle.ValidateCapture(Unit.Id, Tower).empty())
+					{
+						return FOrder::MakeCapture(Unit.Id, Unit.Serial, Tower);
+					}
+				}
+			}
+			if (bCanWalk && bCanAct)
+			{
+				const FVec2 Tower = TowerSpot(Battle, Unit, Reach);
+				if (Tower != Unit.Pos)
+				{
+					// Walked, not sprinted: a sprint spends the action the capture needs.
+					return FOrder::MakeMove(Unit.Id, Unit.Serial, Tower);
+				}
+			}
+		}
+
+		// Neutral camps (not Godot's; Docs/design/feat-neutral-camps.md 12.6).
+		// With none in the battle nothing here runs. Loot within reach is taken
+		// with a spare action; with no enemy in sight it walks to loot it can see,
+		// or to a camp it can see awake -- the boss only while its side is ahead.
+		if (!Battle.Camps.empty() || !Battle.Caches.empty())
+		{
+			if (bCanAct && (Unit.Team == 0 || Unit.Team == 1))
+			{
+				const int Cache = Battle.CacheNear(Unit.Pos);
+				if (Cache >= 0)
+				{
+					// The best tier it can take; into an empty slot, or over its cheapest item if the new one is better.
+					const FItemDef* Best = nullptr;
+					for (const FItemDef* Item : Battle.Caches[static_cast<size_t>(Cache)].Items)
+					{
+						if (!Unit.Carries(Item->Id) && (!Best || Item->Tier > Best->Tier))
+						{
+							Best = Item;
+						}
+					}
+					int Slot = -1;
+					if (Best && Unit.Gear[0] && Unit.Gear[1] && Unit.Gear[2])
+					{
+						for (int i = 0; i < Items::Slots; ++i)
+						{
+							if (Unit.Gear[i]->Tier < Best->Tier && (Slot < 0 || Unit.Gear[i]->Tier < Unit.Gear[Slot]->Tier))
+							{
+								Slot = i;
+							}
+						}
+						Best = Slot >= 0 ? Best : nullptr;
+					}
+					if (Best && Battle.ValidateTake(Unit.Id, Cache, Best->Id, Slot).empty())
+					{
+						return FOrder::MakeTake(Unit.Id, Unit.Serial, Cache, Best->Id, Slot);
+					}
+				}
+			}
+			bool bEnemySeen = false;
+			for (const FUnit* Enemy : Battle.TeamUnits(1 - Unit.Team))
+			{
+				bEnemySeen = bEnemySeen || Battle.CanSeeUnit(Unit.Team, *Enemy);
+			}
+			if (bCanWalk && !bEnemySeen && (Unit.Team == 0 || Unit.Team == 1))
+			{
+				std::vector<FVec2> Goals;
+				for (const FCache& Cache : Battle.Caches)
+				{
+					if (!Cache.Items.empty() && Battle.CanSee(Unit.Team, Cache.Pos))
+					{
+						Goals.push_back(Cache.Pos);
+					}
+				}
+				const bool bAhead = Battle.HealthShare(Unit.Team) > Battle.HealthShare(1 - Unit.Team) + 0.1;
+				for (const FUnit& Monster : Battle.Units)
+				{
+					if (Monster.bMonster && Monster.Team == 2 && Monster.IsAlive() && Battle.CanSeeUnit(Unit.Team, Monster))
+					{
+						const FMonsterInfo* Info = Monster.MonsterInfo();
+						if (Info && (Info->Tier < 3 || bAhead) && Info->Temperament != ETemperament::Skittish)
+						{
+							Goals.push_back(Monster.Pos);
+						}
+					}
+				}
+				if (!Goals.empty())
+				{
+					FVec2 Best = Unit.Pos;
+					double BestDistance = Battle.DistanceToNearest(Goals, FMap::NodeOf(Unit.Pos));
+					for (const auto& Pair : Reach)
+					{
+						const double Distance = Battle.DistanceToNearest(Goals, Pair.first);
+						if (Distance < BestDistance && Distance >= 1.0)
+						{
+							BestDistance = Distance;
+							Best = FMap::NodePos(Pair.first);
+						}
+					}
+					if (Best != Unit.Pos && BestDistance < 40.0)
+					{
+						return FOrder::MakeMove(Unit.Id, Unit.Serial, Best);
+					}
+				}
 			}
 		}
 

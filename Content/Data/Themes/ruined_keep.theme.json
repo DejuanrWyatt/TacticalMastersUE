@@ -48,5 +48,64 @@
   "fog": {
     "density": 0.008,
     "colour": "#d8b894"
+  },
+  "light": {
+    "drift": 1.0,
+    "torches": 4000,
+    "torchColour": "#ffa24a",
+    "volumetric": true
+  },
+  "foliage": {
+    "grass": {
+      "density": 1.0,
+      "height": 0.4,
+      "colours": [
+        "#8a7a36",
+        "#9b8a42",
+        "#6f6a2c"
+      ]
+    },
+    "flowers": {
+      "density": 0.08,
+      "colours": [
+        "#d9892e",
+        "#b8402c"
+      ]
+    },
+    "bushes": {
+      "density": 0.3,
+      "colour": "#6e4f24"
+    },
+    "forest": 0.025,
+    "kit": {
+      "grass": [
+        "/Game/KiteDemo/Environments/Foliage/Grass/FieldGrass/SM_FieldGrass_01.SM_FieldGrass_01"
+      ],
+      "flower": [
+        "/Game/KiteDemo/Environments/Foliage/Flowers/Yarrow/SM_Yarrow.SM_Yarrow",
+        "/Game/KiteDemo/Environments/Foliage/Flowers/Yarrow/SM_Yarrow3.SM_Yarrow3"
+      ],
+      "bush": [
+        "/Game/KiteDemo/Environments/Foliage/BogMyrtle_01/BogMyrtle_01.BogMyrtle_01",
+        "/Game/KiteDemo/Environments/Foliage/Ferns/SM_Fern_03.SM_Fern_03",
+        "/Game/KiteDemo/Environments/Foliage/Leaves/SM_DeadLeaves.SM_DeadLeaves"
+      ],
+      "grassHeight": 0.5,
+      "flowerHeight": 0.4,
+      "bushHeight": 0.9
+    }
+  },
+  "kit": {
+    "tree": [
+      "/Game/KiteDemo/Environments/Trees/HillTree_Tall_02/HillTree_Tall_02.HillTree_Tall_02"
+    ],
+    "boulder": [
+      "/Game/KiteDemo/Environments/Rocks/Medium_Boulder_001/Medium_Boulder_001.Medium_Boulder_001",
+      "/Game/KiteDemo/Environments/Rocks/Medium_Boulder_002/Medium_Boulder_LowPoly.Medium_Boulder_LowPoly",
+      "/Game/KiteDemo/Environments/Trees/Tree_Stump_01/Tree_Stump_01.Tree_Stump_01",
+      "/Game/KiteDemo/Environments/Trees/Vegetation_Debris_002/SM_Vegetation_Debris_002.SM_Vegetation_Debris_002"
+    ],
+    "treeHeight": 10,
+    "boulderSize": 2.2
   }
 }

@@ -1,0 +1,15 @@
+{
+  "format": "tactical-masters-item",
+  "version": 1,
+  "id": "saints_chalice",
+  "name": "Saint's Chalice",
+  "desc": "Healing goes a quarter further, and so do you.",
+  "icon": "chalice",
+  "tier": "rare",
+  "stats": {
+    "hp": 20
+  },
+  "bonus": {
+    "heal_percent": 25
+  }
+}

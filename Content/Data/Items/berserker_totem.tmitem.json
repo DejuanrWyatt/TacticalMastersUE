@@ -1,0 +1,29 @@
+{
+  "format": "tactical-masters-item",
+  "version": 1,
+  "id": "berserker_totem",
+  "name": "Berserker Totem",
+  "desc": "Surge: abilities hit 35% harder for 2 turns.",
+  "icon": "totem",
+  "tier": "rare",
+  "ability": {
+    "id": "item_surge",
+    "name": "Surge",
+    "desc": "Its abilities do 35% more damage for 2 turns.",
+    "kind": "active",
+    "effect": "support",
+    "scale": "mag",
+    "target": "ally",
+    "shape": "self",
+    "power": 0,
+    "min_range": 0,
+    "max_range": 0,
+    "aoe": 0,
+    "cooldown": 4,
+    "cast": 0,
+    "status": {
+      "id": "surge",
+      "turns": 2
+    }
+  }
+}

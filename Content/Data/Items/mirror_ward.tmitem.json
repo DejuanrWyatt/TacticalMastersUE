@@ -1,0 +1,29 @@
+{
+  "format": "tactical-masters-item",
+  "version": 1,
+  "id": "mirror_ward",
+  "name": "Mirror Ward",
+  "desc": "Reflect: the next single-target spell aimed at an ally bounces back.",
+  "icon": "mirror",
+  "tier": "rare",
+  "ability": {
+    "id": "item_reflect",
+    "name": "Reflect",
+    "desc": "An ally up to 4 m away has Reflect for 3 turns: the next single-target spell the other side aims at it bounces back to the caster.",
+    "kind": "active",
+    "effect": "support",
+    "scale": "mag",
+    "target": "ally",
+    "shape": "unit",
+    "power": 0,
+    "min_range": 0,
+    "max_range": 4,
+    "aoe": 0,
+    "cooldown": 5,
+    "cast": 0,
+    "status": {
+      "id": "reflect",
+      "turns": 3
+    }
+  }
+}

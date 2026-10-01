@@ -1,0 +1,12 @@
+{
+  "format": "tactical-masters-item",
+  "version": 1,
+  "id": "high_ground_sash",
+  "name": "High Ground Sash",
+  "desc": "10% more ability damage while above the target.",
+  "icon": "sash",
+  "tier": "uncommon",
+  "effects": {
+    "high_ground_percent": 10
+  }
+}

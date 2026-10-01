@@ -1,0 +1,12 @@
+{
+  "format": "tactical-masters-item",
+  "version": 1,
+  "id": "phoenix_feather",
+  "name": "Phoenix Feather",
+  "desc": "Once a battle, a blow that would knock you out leaves you at 1 health.",
+  "icon": "feather",
+  "tier": "epic",
+  "effects": {
+    "phoenix": true
+  }
+}

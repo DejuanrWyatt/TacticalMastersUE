@@ -22,6 +22,10 @@ namespace TMSim
 			SpawnPoints[1] = FVec2(Size.X - 2.75f, Size.Y - 4.75f);
 		}
 		Rng.Seed(InSeed);
+		// Before anybody moves, and from the same seed, so a match's two machines
+		// and a replay put the towers in the same places. Their own generator:
+		// the battle's dice are exactly as they were without them.
+		PlaceWatchtowers(InSeed);
 		TickCount = 0;
 		Winner = -1;
 		// Time to place units first, if the battle has any (game_state.gd:292-293).
@@ -61,6 +65,9 @@ namespace TMSim
 			Unit.bHustling = false;
 			Unit.UnharmedTurns = 0;
 		}
+		// The camps and their monsters, waiting off the board, after both sides'
+		// units so every id is fixed before anybody moves. Their own generators.
+		PlaceCamps(InSeed);
 	}
 
 	int FBattle::BaseTgGain(const FUnit& Unit) const
@@ -75,7 +82,10 @@ namespace TMSim
 
 	int FBattle::TgGain(const FUnit& Unit) const
 	{
-		return RoundToInt(BaseTgGain(Unit) * Unit.TgFactor() * HustleFactor(Unit));
+		// Items can make the gauge fill faster; with none the last factor is
+		// exactly 1.0 and this is the old number bit for bit.
+		const double ItemFactor = Unit.HasItems() ? 1.0 + Unit.ItemTgPercent() * 0.01 : 1.0;
+		return RoundToInt(BaseTgGain(Unit) * Unit.TgFactor() * HustleFactor(Unit) * ItemFactor);
 	}
 
 	int FBattle::ClockTicks(const FUnit& Unit) const
@@ -145,21 +155,45 @@ namespace TMSim
 		{
 			return;
 		}
+		if (!Camps.empty())
+		{
+			TickCamps(Report);
+		}
 
 		for (FUnit& Unit : Units)
 		{
 			if (Unit.IsKo())
 			{
+				// Reraise: back on its feet with a quarter of its health (feat-status-effects.md).
+				if (Unit.ReraiseTicks > 0 && --Unit.ReraiseTicks == 0)
+				{
+					Unit.Hp = std::max(1, Unit.MaxHp() / 4);
+					Unit.KoTicks = 0;
+					Unit.Tg = 0;
+					Unit.bReady = false;
+					FEvent Event;
+					Event.Kind = EEventKind::Revived;
+					Event.Unit = Unit.Id;
+					Event.Where = Unit.Pos;
+					Event.Id = "reraise";
+					Report.Events.push_back(Event);
+					continue;
+				}
 				--Unit.KoTicks;
 				if (Unit.KoTicks <= 0)
 				{
 					Report.Say(EEventKind::Gone, Unit.Id);
+					OnGone(Unit, Report);
 				}
 				continue;
 			}
 			if (!Unit.IsAlive())
 			{
 				continue;
+			}
+			if (!Unit.Statuses.empty())
+			{
+				TickStops(Unit);
 			}
 
 			// A spell part-way out. Three things follow from doing this here, before
@@ -246,6 +280,11 @@ namespace TMSim
 		{
 			return 1.0;
 		}
+		// Off-Balance: whichever way the blow comes, it lands as if from behind.
+		if (!Target.Statuses.empty() && Target.HasStatus("offbalance"))
+		{
+			return Tuning.BackBonus;
+		}
 		// Which way the target is looking, against where the blow comes from.
 		const float Facing = Target.Facing.Dot(ToAttacker.Normalized());
 		if (Facing < -0.5f)
@@ -262,10 +301,45 @@ namespace TMSim
 	int FBattle::CalcAmount(const FUnit& User, const FAbility& Ability, FVec2 From,
 		const FUnit& Target, FVec2 TargetPos, int FromLevel, int TargetLevel) const
 	{
-		(void)User;  // nothing of the user's is added: the ability is the whole of it
-
-		// What an ability does is its own power, and nothing else.
-		const double Power = Ability.Power;
+		// What an ability does is its own power, and nothing else of its user's
+		// -- except what its items add: a flat amount, then a percent of the
+		// total (Docs/design/feat-items.md 3.4). With no items both are 0 and
+		// (Power + 0) x 1.0 is exactly Power, so every number is the old one.
+		const bool bAtt = Ability.Scale == EScale::Att;
+		const bool bItems = User.HasItems();
+		const bool bHeal = Ability.Effect == EEffect::Heal;
+		const double Flat = !bItems ? 0.0 : bHeal ? User.ItemHealFlat(bAtt) : User.ItemDamageFlat(bAtt);
+		double Percent = !bItems ? 0.0 : bHeal ? User.ItemHealPercent(bAtt) : User.ItemDamagePercent(bAtt);
+		// What only counts sometimes (Docs/design/feat-neutral-camps.md 14): Surge,
+		// a monster's rage, and the situational items. All 0 in a Godot battle.
+		int Extra = 0;
+		if (Ability.Effect == EEffect::Damage)
+		{
+			for (const FStatus& Status : User.Statuses)
+			{
+				const FStatusDef* Def = FindStatus(Status.Id);
+				Extra += Def ? Def->DamagePercent : 0;
+			}
+			if (User.bMonster && User.Hp * 2 < User.MaxHp())
+			{
+				const FMonsterInfo* Info = User.MonsterInfo();
+				Extra += Info && Info->Has(MonsterTrait::Enrage) ? 25 : 0;
+			}
+			if (bItems)
+			{
+				Extra += Target.bMonster ? GearSum(User, &FItemDef::VsMonstersPercent) : 0;
+				Extra += FromLevel > TargetLevel ? GearSum(User, &FItemDef::HighGroundPercent) : 0;
+				Extra += User.Hp > 0 && User.Hp < User.MaxHp() * Items::LowHealthShare ? GearSum(User, &FItemDef::LowHealthPercent) : 0;
+				const int Alone = GearSum(User, &FItemDef::AlonePercent);
+				Extra += Alone > 0 && IsAlone(User, From) ? Alone : 0;
+			}
+		}
+		if (Extra != 0)
+		{
+			Percent = std::min<double>(Items::DamagePercentCap, Percent + Extra);
+		}
+		const double Power = (bItems || Extra != 0) && (bHeal || Ability.Effect == EEffect::Damage)
+			? (Ability.Power + Flat) * (1.0 + Percent / 100.0) : Ability.Power;
 
 		switch (Ability.Effect)
 		{
@@ -278,12 +352,34 @@ namespace TMSim
 			const double Height = 1.0 + Tuning.HeightBonus * Levels;
 			const double Flank = FlankBonus(Target, TargetPos, From);
 
-			const int Raw = RoundToInt(Power * Combat::DamageScale * Height * Flank);
+			int Raw = RoundToInt(Power * Combat::DamageScale * Height * Flank);
+			// Reckless Idol: its holder takes more.
+			if (Target.HasItems())
+			{
+				const int More = GearSum(Target, &FItemDef::DamageTakenPercent);
+				Raw = More > 0 ? RoundToInt(Raw * (1.0 + More / 100.0)) : Raw;
+			}
+			// Marked, Oiled against fire, Protect and Shell (feat-status-effects.md).
+			if (!Target.Statuses.empty())
+			{
+				double Scale = 1.0;
+				Scale *= Target.HasStatus("marked") ? 1.3 : 1.0;
+				Scale *= Target.HasStatus("oiled") && ElementOf(Ability) == "fire" ? 1.5 : 1.0;
+				Scale *= Ability.Scale == EScale::Att && Target.HasStatus("protect") ? 0.67 : 1.0;
+				Scale *= Ability.Scale == EScale::Mag && Target.HasStatus("shell") ? 0.67 : 1.0;
+				Raw = Scale != 1.0 ? RoundToInt(Raw * Scale) : Raw;
+			}
 			return std::max(Combat::MinimumDamage, RoundToInt((Raw - Defence) * Tuning.DamageMultiplier));
 		}
 		case EEffect::Heal:
 		{
-			const int Full = RoundToInt(Power * Combat::HealScale * Tuning.HealMultiplier);
+			int Full = RoundToInt(Power * Combat::HealScale * Tuning.HealMultiplier);
+			// Berserker's Brand: healing from others lands weaker on its holder.
+			if (Target.HasItems() && Target.Id != User.Id)
+			{
+				const int Change = GearSum(Target, &FItemDef::HealTakenPercent);
+				Full = Change != 0 ? std::max(0, RoundToInt(Full * (1.0 + Change / 100.0))) : Full;
+			}
 			// Never more than it is short of: overhealing is not a thing here.
 			const int Missing = Target.MaxHp() - Target.Hp;
 			return std::min(Full, Missing);
@@ -296,6 +392,19 @@ namespace TMSim
 		default:
 			return 0;
 		}
+	}
+
+	bool FBattle::IsAlone(const FUnit& Unit, const FVec2& At) const
+	{
+		for (const FUnit& Other : Units)
+		{
+			if (Other.Id != Unit.Id && Other.IsAlive() && Other.Team == Unit.Team
+				&& Other.Pos.DistanceTo(At) <= Items::AloneReach)
+			{
+				return false;
+			}
+		}
+		return true;
 	}
 
 	int FBattle::EvadeChance(const FUnit& Target, const FAbility& Ability, const FUnit* Attacker) const
@@ -368,6 +477,24 @@ namespace TMSim
 						}
 					}
 				}
+				else if (Unit.HasStatus("decay"))
+				{
+					// Decay: what would mend it rots it.
+					const int Taken = Hurt(Unit, Amount);
+					FEvent Event;
+					Event.Kind = EEventKind::Hit;
+					Event.Unit = Unit.Id;
+					Event.Amount = Taken;
+					Event.Where = Unit.Pos;
+					Event.Id = "decay";
+					Report.Events.push_back(Event);
+					if (!Unit.IsAlive())
+					{
+						KnockOut(Unit, Report);
+						CheckWinner();
+						return;
+					}
+				}
 				else
 				{
 					const int Healed = std::min(Amount, Unit.MaxHp() - Unit.Hp);
@@ -385,6 +512,13 @@ namespace TMSim
 				}
 			}
 
+			// Charmed ends with the turn it fights for the other side, and Stop
+			// counts in ticks (TickStops): neither counts down here.
+			if (Status.Id == "charmed" || Status.Id == "stop")
+			{
+				Kept.push_back(Status);
+				continue;
+			}
 			--Status.Turns;
 			if (Status.Turns > 0)
 			{
@@ -403,18 +537,33 @@ namespace TMSim
 			}
 		}
 		Unit.Statuses.swap(Kept);
+		// Brought to its senses part-way through (a burn tick): the copy walked above still had it.
+		if (Unit.CharmedFrom < 0 && Unit.HasStatus("charmed"))
+		{
+			RemoveStatus(Unit, "charmed");
+		}
 	}
 
 	void FBattle::GroundEffect(FUnit& Unit, FTickReport& Report)
 	{
 		// Burning ground hurts and a spring heals, and either happens when the
 		// unit's turn comes round rather than when it walks on.
-		const int Kind = HazardAt(Unit.Pos);
+		int Kind = HazardAt(Unit.Pos);
 		if (Kind == 0)
 		{
 			return;
 		}
 		const int Amount = std::max(1, RoundToInt(Unit.MaxHp() * Tuning.HazardPercent * 0.01));
+		if (Kind < 0 && !Unit.Statuses.empty())
+		{
+			// Embers dry the Wet and thaw the Chilled.
+			RemoveStatus(Unit, "wet");
+			RemoveStatus(Unit, "chilled");
+		}
+		if (Kind > 0 && Unit.HasStatus("decay"))
+		{
+			Kind = -1;  // a spring only rots what Decay holds
+		}
 		if (Kind < 0)
 		{
 			const int Taken = Hurt(Unit, Amount);
@@ -455,7 +604,7 @@ namespace TMSim
 		// Anything that hurt it since its last turn puts the count back to nothing,
 		// so the room has to be given rather than merely waited for.
 		++Unit.UnharmedTurns;
-		if (Tuning.RegenPercent <= 0.0
+		if (Tuning.RegenPercent <= 0.0 || (!Unit.Statuses.empty() && Unit.HasStatus("decay"))
 			|| Unit.UnharmedTurns < std::max(1, RoundToInt(Tuning.RegenAfterTurns)))
 		{
 			return;
@@ -487,6 +636,12 @@ namespace TMSim
 		// Read before the statuses count down, because the status taking its orders
 		// away costs it this turn and then wears off in the same breath.
 		const std::string BlockedBy = Unit.NoOrdersStatus();
+		// Terrified runs this turn even if the fear wears off as it begins.
+		int FearOf = -1;
+		for (const FStatus& Status : Unit.Statuses)
+		{
+			FearOf = Status.Id == "terrified" ? Status.By : FearOf;
+		}
 
 		TickStatuses(Unit, Report);
 		if (!Unit.IsAlive())
@@ -499,6 +654,15 @@ namespace TMSim
 			return;
 		}
 		UndamagedRegen(Unit, Report);
+		// Seen or not as its turn begins (Nightcloak), and a shrine underfoot.
+		if (Unit.HasItems())
+		{
+			Unit.bUnseenAtStart = (Unit.Team == 0 || Unit.Team == 1) && !CanSeeUnit(1 - Unit.Team, Unit);
+		}
+		if (!Camps.empty())
+		{
+			UseShrine(Unit, Report);
+		}
 
 		Unit.bReady = true;
 		Unit.Tg = Pace::TgMax;
@@ -507,7 +671,7 @@ namespace TMSim
 		Unit.bMoved = false;
 		Unit.bActed = false;
 		Unit.bHustling = false;
-		for (int Slot = 0; Slot < 4; ++Slot)
+		for (int Slot = 0; Slot < AbilitySlots; ++Slot)
 		{
 			Unit.ToggledTurn[Slot] = false;
 			Unit.Cooldowns[Slot] = std::max(0, Unit.Cooldowns[Slot] - 1);
@@ -556,7 +720,23 @@ namespace TMSim
 			return;
 		}
 
+		// Charmed: this is the turn it fights for the other side.
+		for (FStatus& Status : Unit.Statuses)
+		{
+			Status.Amount = Status.Id == "charmed" ? 1 : Status.Amount;
+		}
+
+		// A monster's mood, which may spend the turn (the warning it gives when set off).
+		if (Unit.bMonster && MonsterTurnStarts(Unit, Report))
+		{
+			return;
+		}
+
 		Report.Say(EEventKind::BecameReady, Unit.Id);
+		if (FearOf >= 0)
+		{
+			Flee(Unit, FearOf, Report);
+		}
 	}
 
 	FVec2 FBattle::CapturePoint() const
@@ -571,7 +751,7 @@ namespace TMSim
 		double Total = 0.0;
 		for (const FUnit& Unit : Units)
 		{
-			if (Unit.Team == Team)
+			if (Unit.HomeTeam() == Team && !Unit.bMonster)
 			{
 				Total += Unit.MaxHp();
 				Alive += std::max(0, Unit.Hp);
@@ -593,7 +773,8 @@ namespace TMSim
 		for (const FUnit& Unit : Units)
 		{
 			// Godot measures in float and compares with the radius as a double.
-			if (Unit.IsAlive() && static_cast<double>(Unit.Pos.DistanceTo(Middle)) <= CaptureRadius)
+			if (Unit.IsAlive() && !Unit.bMonster && (Unit.Team == 0 || Unit.Team == 1)
+				&& static_cast<double>(Unit.Pos.DistanceTo(Middle)) <= CaptureRadius)
 			{
 				++Standing[Unit.Team];
 			}
@@ -617,6 +798,154 @@ namespace TMSim
 				return;
 			}
 		}
+	}
+
+	void FBattle::PlaceWatchtowers(uint64_t InSeed)
+	{
+		// Not Godot's (Docs/design/feat-objectives.md). Somewhere new every battle,
+		// but fair: each tower on blue's half has its twin on red's, turned about
+		// the middle as the ground itself is, so neither side has a nearer one.
+		Watchtowers.clear();
+		const int Count = std::max(0, std::min(8, RoundToInt(Tuning.WatchtowerCount)));
+		if (Count == 0 || Map.TilesX == 0)
+		{
+			return;
+		}
+		FSimRandom Placer(InSeed ^ Watchtower::Salt);
+		const FVec2 Size = Map.SizeMeters();
+		auto Twin = [&Size](const FVec2& Point) { return FVec2(Size.X - Point.X, Size.Y - Point.Y); };
+
+		// Only ground both sides can walk to. Copied, because asking for another
+		// distance field may clear the cache this one lives in.
+		const std::vector<double> Walk = DistanceFrom(SpawnPoints[0]);
+		auto Usable = [&](const FVec2& Point)
+		{
+			const FNode Node = FMap::NodeOf(Point);
+			const int Index = Map.NodeIndex(Node);
+			if (!InBounds(Point) || !Map.NodeWalkable(Node) || HazardAt(Point) != 0 || IsCover(Point)
+				|| Index < 0 || Index >= static_cast<int>(Walk.size()) || !std::isfinite(Walk[static_cast<size_t>(Index)]))
+			{
+				return false;
+			}
+			// Out in the field, not where anybody starts: a tower taken on the
+			// first turn without a fight is no choice at all.
+			for (int Team = 0; Team < 2; ++Team)
+			{
+				if (static_cast<double>(Point.DistanceTo(SpawnPoints[Team])) < Watchtower::AwayFromStart)
+				{
+					return false;
+				}
+			}
+			for (const FUnit& Unit : Units)
+			{
+				if (static_cast<double>(Point.DistanceTo(Unit.Pos)) < Watchtower::AwayFromStart)
+				{
+					return false;
+				}
+			}
+			for (const FWatchtower& Other : Watchtowers)
+			{
+				if (static_cast<double>(Point.DistanceTo(Other.Pos)) < Watchtower::Apart)
+				{
+					return false;
+				}
+			}
+			return true;
+		};
+
+		// An odd one stands in the middle, where it is its own twin, if the ground
+		// there will have it; otherwise the battle has one fewer.
+		if (Count % 2 == 1)
+		{
+			const FVec2 Middle = CapturePoint();
+			if (Usable(Middle))
+			{
+				FWatchtower Tower;
+				Tower.Pos = Middle;
+				Watchtowers.push_back(Tower);
+			}
+		}
+
+		// The pairs: every tile of blue's half, shuffled, and the first that fit.
+		// Tiles in row order before the shuffle, so the same seed always picks the
+		// same ones.
+		std::vector<FVec2> Tiles;
+		for (int Y = 0; Y < Map.TilesY / 2; ++Y)
+		{
+			for (int X = 0; X < Map.TilesX; ++X)
+			{
+				Tiles.emplace_back((static_cast<float>(X) + 0.5f) * Ground::TileSize, (static_cast<float>(Y) + 0.5f) * Ground::TileSize);
+			}
+		}
+		for (int i = static_cast<int>(Tiles.size()) - 1; i > 0; --i)
+		{
+			const int j = static_cast<int>(Placer.RandiRange(0, i));
+			std::swap(Tiles[static_cast<size_t>(i)], Tiles[static_cast<size_t>(j)]);
+		}
+		const int Pairs = Count / 2;
+		int Placed = 0;
+		for (const FVec2& Point : Tiles)
+		{
+			if (Placed >= Pairs)
+			{
+				break;
+			}
+			// A pair's two not side by side across the middle either. Everything
+			// else about the twin follows from the ground being turned about too.
+			if (!Usable(Point) || static_cast<double>(Point.DistanceTo(Twin(Point))) < Watchtower::Apart)
+			{
+				continue;
+			}
+			FWatchtower Blue;
+			Blue.Pos = Point;
+			FWatchtower Red;
+			Red.Pos = Twin(Point);
+			Watchtowers.push_back(Blue);
+			Watchtowers.push_back(Red);
+			++Placed;
+		}
+	}
+
+	void FBattle::ApplyCapture(FUnit& Unit, int Tower, FTickReport& Report)
+	{
+		FWatchtower& Held = Watchtowers[static_cast<size_t>(Tower)];
+		// Progress belongs to one side at a time: the other side starting on a
+		// tower wipes out whatever the first had put in.
+		if (Held.Capturer != Unit.Team)
+		{
+			Held.Capturer = Unit.Team;
+			Held.Progress = 0;
+		}
+		++Held.Progress;
+		const int Needed = CaptureTurnsNeeded();
+
+		FEvent Spent;
+		Spent.Kind = EEventKind::Capturing;
+		Spent.Unit = Unit.Id;
+		Spent.Slot = Tower;
+		Spent.Amount = Held.Progress;
+		Spent.By = Needed;
+		Spent.Where = Held.Pos;
+		Report.Events.push_back(Spent);
+
+		if (Held.Progress >= Needed)
+		{
+			Held.Owner = Unit.Team;
+			Held.Capturer = -1;
+			Held.Progress = 0;
+			FEvent Taken;
+			Taken.Kind = EEventKind::Captured;
+			Taken.Unit = Unit.Id;
+			Taken.Slot = Tower;
+			Taken.By = Unit.Team;
+			Taken.Where = Held.Pos;
+			Report.Events.push_back(Taken);
+		}
+
+		// It costs the turn: the action, and the end of it. A unit that walked
+		// there first has used the whole turn, and keeps the gauge of one that did.
+		Unit.bActed = true;
+		EndTurn(Unit, false, Report);
 	}
 
 	void FBattle::FinishOnTime(FTickReport& Report)
@@ -648,9 +977,9 @@ namespace TMSim
 			{
 				continue;
 			}
-			for (int Slot = 0; Slot < 4; ++Slot)
+			for (int Slot = 0; Slot < ClassSlots; ++Slot)
 			{
-				const FAbility* Ability = JobAbility(Source.Job, Slot);
+				const FAbility* Ability = Source.Ability(Slot);
 				if (!Ability || Ability->Kind != "aura")
 				{
 					continue;
@@ -731,6 +1060,14 @@ namespace TMSim
 			Unit.Tg = Pace::TgKeepNone;
 		}
 
+		// Momentum Charm: gauge back for what it knocked out this turn.
+		if (Unit.KillTgPercent > 0)
+		{
+			Unit.Tg = std::min(Pace::TgMax - 1, Unit.Tg + Pace::TgMax * Unit.KillTgPercent / 100);
+			Unit.KillTgPercent = 0;
+		}
+		Unit.bStillLastTurn = !Unit.bMoved;
+
 		// Held its ability back: the gauge fills faster until its next turn.
 		Unit.bHustling = !Unit.bActed && !bTimedOut;
 		Unit.bReady = false;
@@ -761,6 +1098,20 @@ namespace TMSim
 		{
 			Unit.Statuses.swap(Kept);
 			Unit.Tg = Pace::TgMax - 1;
+		}
+
+		// Charmed: its turn for the other side is over.
+		if (Unit.CharmedFrom >= 0)
+		{
+			for (const FStatus& Status : Unit.Statuses)
+			{
+				if (Status.Id == "charmed" && Status.Amount >= 1)
+				{
+					RemoveStatus(Unit, "charmed");
+					ReleaseCharm(Unit, &Report);
+					break;
+				}
+			}
 		}
 	}
 }

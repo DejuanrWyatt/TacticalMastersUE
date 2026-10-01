@@ -1,0 +1,29 @@
+{
+  "format": "tactical-masters-item",
+  "version": 1,
+  "id": "feint_gauntlet",
+  "name": "Feint Gauntlet",
+  "desc": "A feinting jab that leaves the enemy Off-Balance.",
+  "icon": "gauntlet",
+  "tier": "uncommon",
+  "ability": {
+    "id": "item_feint",
+    "name": "Feint",
+    "desc": "Power 8 to an enemy within reach; it is Off-Balance: facing locked, the next hit lands as if from behind.",
+    "kind": "active",
+    "effect": "damage",
+    "scale": "att",
+    "target": "enemy",
+    "shape": "unit",
+    "power": 8,
+    "min_range": 0,
+    "max_range": 1.8,
+    "aoe": 0,
+    "cooldown": 3,
+    "cast": 0,
+    "status": {
+      "id": "offbalance",
+      "turns": 2
+    }
+  }
+}

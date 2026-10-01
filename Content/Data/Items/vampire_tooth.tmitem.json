@@ -1,0 +1,12 @@
+{
+  "format": "tactical-masters-item",
+  "version": 1,
+  "id": "vampire_tooth",
+  "name": "Vampire Tooth",
+  "desc": "Heals 15% of the damage your abilities deal.",
+  "icon": "tooth",
+  "tier": "uncommon",
+  "effects": {
+    "lifesteal_percent": 15
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "format": "tactical-masters-item",
+  "version": 1,
+  "id": "censer_of_mercy",
+  "name": "Censer of Mercy",
+  "desc": "Healing goes further.",
+  "icon": "censer",
+  "tier": "uncommon",
+  "bonus": {
+    "heal_percent": 15
+  }
+}

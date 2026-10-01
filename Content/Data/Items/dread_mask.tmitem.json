@@ -1,0 +1,29 @@
+{
+  "format": "tactical-masters-item",
+  "version": 1,
+  "id": "dread_mask",
+  "name": "Dread Mask",
+  "desc": "Terrify an enemy: on its next turn it runs from you first.",
+  "icon": "mask",
+  "tier": "rare",
+  "ability": {
+    "id": "item_dread",
+    "name": "Dread",
+    "desc": "An enemy up to 3 m away is Terrified: on its next turn it first runs its full move away from this unit, then may act.",
+    "kind": "active",
+    "effect": "support",
+    "scale": "mag",
+    "target": "enemy",
+    "shape": "unit",
+    "power": 0,
+    "min_range": 0,
+    "max_range": 3,
+    "aoe": 0,
+    "cooldown": 5,
+    "cast": 0,
+    "status": {
+      "id": "terrified",
+      "turns": 1
+    }
+  }
+}

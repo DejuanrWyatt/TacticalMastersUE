@@ -1,0 +1,12 @@
+{
+  "format": "tactical-masters-item",
+  "version": 1,
+  "id": "hourglass_pin",
+  "name": "Hourglass Pin",
+  "desc": "The Turn Gauge fills about 8% faster.",
+  "icon": "hourglass",
+  "tier": "uncommon",
+  "bonus": {
+    "tg_percent": 8
+  }
+}

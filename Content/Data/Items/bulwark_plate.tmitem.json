@@ -1,0 +1,14 @@
+{
+  "format": "tactical-masters-item",
+  "version": 1,
+  "id": "bulwark_plate",
+  "name": "Bulwark Plate",
+  "desc": "Heavy plate: very hard to fell, a step slower.",
+  "icon": "armour",
+  "tier": "rare",
+  "stats": {
+    "hp": 45,
+    "attdef": 4,
+    "move": -1
+  }
+}

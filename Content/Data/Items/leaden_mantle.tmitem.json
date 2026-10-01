@@ -1,0 +1,15 @@
+{
+  "format": "tactical-masters-item",
+  "version": 1,
+  "id": "leaden_mantle",
+  "name": "Leaden Mantle",
+  "desc": "+6 to both defences, but slower and shorter steps.",
+  "icon": "mantle",
+  "tier": "uncommon",
+  "stats": {
+    "attdef": 6,
+    "magdef": 6,
+    "move": -1,
+    "speed": -1
+  }
+}

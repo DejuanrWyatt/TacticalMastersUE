@@ -1,0 +1,30 @@
+{
+  "format": "tactical-masters-item",
+  "version": 1,
+  "id": "frost_charm",
+  "name": "Frost Charm",
+  "desc": "A touch of rime: power 10, and the target is Chilled.",
+  "icon": "charm",
+  "tier": "uncommon",
+  "ability": {
+    "id": "item_rime",
+    "name": "Rime Touch",
+    "desc": "Power 10 to an enemy up to 4 m away, and a layer of Chilled: slower gauge and steps. Three layers freeze it.",
+    "kind": "active",
+    "effect": "damage",
+    "scale": "mag",
+    "target": "enemy",
+    "shape": "unit",
+    "power": 10,
+    "min_range": 0,
+    "max_range": 4,
+    "aoe": 0,
+    "cooldown": 2,
+    "cast": 0,
+    "status": {
+      "id": "chilled",
+      "turns": 2
+    },
+    "element": "ice"
+  }
+}

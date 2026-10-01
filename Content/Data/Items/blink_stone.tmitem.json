@@ -1,0 +1,26 @@
+{
+  "format": "tactical-masters-item",
+  "version": 1,
+  "id": "blink_stone",
+  "name": "Blink Stone",
+  "desc": "Teleport to a spot you can see, up to 4 m away.",
+  "icon": "stone",
+  "tier": "rare",
+  "ability": {
+    "id": "item_blink",
+    "name": "Blink",
+    "desc": "Teleports to a spot the side can see, up to 4 m away.",
+    "kind": "active",
+    "effect": "support",
+    "scale": "mag",
+    "target": "ally",
+    "shape": "point",
+    "power": 0,
+    "min_range": 0,
+    "max_range": 4,
+    "aoe": 0,
+    "cooldown": 3,
+    "cast": 0,
+    "special": "blink"
+  }
+}

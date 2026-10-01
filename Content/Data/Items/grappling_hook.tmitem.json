@@ -1,0 +1,26 @@
+{
+  "format": "tactical-masters-item",
+  "version": 1,
+  "id": "grappling_hook",
+  "name": "Grappling Hook",
+  "desc": "Pull yourself to a spot up to 5 m away, however high.",
+  "icon": "hook",
+  "tier": "uncommon",
+  "ability": {
+    "id": "item_grapple",
+    "name": "Grapple",
+    "desc": "Pulls itself to a spot up to 5 m away the side can see.",
+    "kind": "active",
+    "effect": "support",
+    "scale": "mag",
+    "target": "ally",
+    "shape": "point",
+    "power": 0,
+    "min_range": 0,
+    "max_range": 5,
+    "aoe": 0,
+    "cooldown": 3,
+    "cast": 0,
+    "special": "blink"
+  }
+}

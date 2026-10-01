@@ -5,6 +5,7 @@
   "name": "Crown Keep",
   "desc": "A walled keep stands in the middle, climbed by one ramp from each side. Ruined pillars shelter one flank, a stream the other; springs sit out in the open.",
   "theme": "ruined_keep",
+  "boss": "helix_prime",
   "top": [
     "11111111111111111111",
     "1+11#11111111#111~11",

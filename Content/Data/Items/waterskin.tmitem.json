@@ -1,0 +1,30 @@
+{
+  "format": "tactical-masters-item",
+  "version": 1,
+  "id": "waterskin",
+  "name": "Waterskin",
+  "desc": "Douse an enemy: Wet for 2 turns (lightning stuns it, ice freezes it).",
+  "icon": "waterskin",
+  "tier": "common",
+  "ability": {
+    "id": "item_douse",
+    "name": "Douse",
+    "desc": "Soaks an enemy up to 5 m away: Wet for 2 turns. Lightning then stuns it, ice freezes it, and it puts out Burn.",
+    "kind": "active",
+    "effect": "support",
+    "scale": "mag",
+    "target": "enemy",
+    "shape": "unit",
+    "power": 0,
+    "min_range": 0,
+    "max_range": 5,
+    "aoe": 0,
+    "cooldown": 3,
+    "cast": 0,
+    "status": {
+      "id": "wet",
+      "turns": 2
+    },
+    "element": "water"
+  }
+}

@@ -1,0 +1,98 @@
+{
+  "format": "tactical-masters-class",
+  "version": 1,
+  "id": "dusk_archer",
+  "name": "Dusk Archer",
+  "color": "#7b6a9a",
+  "look": "archer",
+  "icon": "dusk_archer",
+  "roles": [
+    "damage"
+  ],
+  "stats": {
+    "hp": 28,
+    "attdef": 2,
+    "magdef": 4,
+    "aeva": 8,
+    "meva": 5,
+    "crit": 8,
+    "speed": 10,
+    "move": 4,
+    "patience": 5,
+    "sight": 11
+  },
+  "abilities": [
+    {
+      "id": "dusk_archer_bolt",
+      "name": "Bolt",
+      "desc": "Shoots an enemy up to 6 m away (power 18); the target is Suppressed for a turn.",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "att",
+      "target": "enemy",
+      "shape": "unit",
+      "power": 18,
+      "min_range": 1.5,
+      "max_range": 6,
+      "aoe": 0,
+      "cooldown": 0,
+      "cast": 0,
+      "status": {
+        "id": "suppressed",
+        "turns": 1
+      }
+    },
+    {
+      "id": "dusk_archer_idle1",
+      "name": "Wild Instinct",
+      "desc": "Always on: nothing to use.",
+      "kind": "passive",
+      "effect": "support",
+      "scale": "mag",
+      "target": "ally",
+      "shape": "self",
+      "power": 0,
+      "min_range": 0,
+      "max_range": 0,
+      "aoe": 0,
+      "cooldown": 0,
+      "cast": 0
+    },
+    {
+      "id": "dusk_archer_idle2",
+      "name": "Wild Instinct",
+      "desc": "Always on: nothing to use.",
+      "kind": "passive",
+      "effect": "support",
+      "scale": "mag",
+      "target": "ally",
+      "shape": "self",
+      "power": 0,
+      "min_range": 0,
+      "max_range": 0,
+      "aoe": 0,
+      "cooldown": 0,
+      "cast": 0
+    },
+    {
+      "id": "dusk_archer_idle3",
+      "name": "Wild Instinct",
+      "desc": "Always on: nothing to use.",
+      "kind": "passive",
+      "effect": "support",
+      "scale": "mag",
+      "target": "ally",
+      "shape": "self",
+      "power": 0,
+      "min_range": 0,
+      "max_range": 0,
+      "aoe": 0,
+      "cooldown": 0,
+      "cast": 0
+    }
+  ],
+  "monster": {
+    "tier": "medium",
+    "temperament": "patrol"
+  }
+}

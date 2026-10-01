@@ -5,6 +5,7 @@
   "name": "Frostwall Town",
   "desc": "A ruined town in the snow. A walled plaza holds the healing fountain at its heart, entered by four gates. Bell towers watch the side gates, flat roofs give archers a perch, and a frozen lake opens one flank while broken walls close the other.",
   "theme": "winter",
+  "boss": "chronos",
   "top": [
     "111111111111111222222211111111111111",
     "11111111111111#222222211111111111111",

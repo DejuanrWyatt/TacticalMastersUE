@@ -72,6 +72,31 @@ namespace TMSim
 		{ "immunity",   "Immunity",      "IMM",  0.0f,  1.0f, 1.0f, 1.0f, 0,  false, false, false, false, false, false, false, false, false, false, true,  false, true,  false, false },
 		{ "invuln",     "Invulnerable",  "INV",  0.0f,  1.0f, 1.0f, 1.0f, 0,  false, false, false, false, false, false, false, false, false, false, false, true,  false, false, false },
 		{ "relentless", "Relentless",    "RLN",  0.0f,  1.0f, 1.0f, 1.0f, 0,  false, false, false, false, false, false, false, false, true,  false, false, false, false, false, false },
+		// Not Godot's: the neutral camps' and items' own (Docs/design/feat-neutral-camps.md).
+		{ "surge",      "Surge",         "SRG",  0.0f,  1.0f, 1.0f, 1.0f, 0,  false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, 35, false, false },
+		{ "veil",       "Vanished",      "VNS",  0.0f,  1.0f, 1.0f, 1.0f, 0,  false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, 0,  true,  false },
+		{ "lured",      "Lured",         "LUR",  0.0f,  1.0f, 1.0f, 1.0f, 0,  true,  false, false, false, false, false, false, false, false, false, false, false, false, false, false, 0,  false, true  },
+		{ "staggered",  "Staggered",     "STG",  0.0f,  1.0f, 1.0f, 0.75f, 0, true,  true,  false, false, false, false, false, false, false, false, false, false, false, false, false, 0,  false, false },
+		// The second set (Docs/design/feat-status-effects.md): combos,
+		// elements, the timeline, allies and minds. Behaviour that is more than a
+		// number here lives with what it touches: SimResolve.cpp (hits, reactions),
+		// SimBattle.cpp (turns), SimMovement.cpp (Suppressed, Terrified).
+		{ "marked",     "Marked",        "MRK",  0.0f,  1.0f, 1.0f, 1.0f, 0 , true , false, false, false, false, false, false, false, false, false, false, false, false, false, false, 0,  false, false, false },
+		{ "offbalance", "Off-Balance",   "OFB",  0.0f,  1.0f, 1.0f, 1.0f, 0 , true , false, false, false, false, false, false, false, false, false, false, false, false, false, false, 0,  false, false, false },
+		{ "wet",        "Wet",           "WET",  0.0f,  1.0f, 1.0f, 1.0f, 0 , true , false, false, false, false, false, false, false, false, false, false, false, false, false, false, 0,  false, false, false },
+		{ "oiled",      "Oiled",         "OIL",  0.0f,  1.0f, 1.0f, 1.0f, 0 , true , false, false, false, false, false, false, false, false, false, false, false, false, false, false, 0,  false, false, false },
+		{ "chilled",    "Chilled",       "CHL",  0.0f,  0.8f, 0.8f, 1.0f, 0 , true , false, false, false, false, false, false, false, false, false, false, false, false, false, false, 0,  false, false, false },
+		{ "haste",      "Haste",         "HST",  0.0f,  1.5f, 1.0f, 1.0f, 0 , false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, 0,  false, false, false },
+		{ "stop",       "Stop",          "STP",  0.0f,  0.0f, 1.0f, 1.0f, 0 , true , false, false, false, false, false, false, false, false, false, false, false, false, false, false, 0,  false, false, false },
+		{ "suppressed", "Suppressed",    "SUP",  0.0f,  1.0f, 1.0f, 1.0f, 30, true , false, false, false, false, false, false, false, false, false, false, false, false, false, false, 0,  false, false, true  },
+		{ "protect",    "Protect",       "PRT",  0.0f,  1.0f, 1.0f, 1.0f, 0 , false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, 0,  false, false, false },
+		{ "shell",      "Shell",         "SHL",  0.0f,  1.0f, 1.0f, 1.0f, 0 , false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, 0,  false, false, false },
+		{ "guarded",    "Guarded",       "GRD",  0.0f,  1.0f, 1.0f, 1.0f, 0 , false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, 0,  false, false, true  },
+		{ "reraise",    "Reraise",       "RRS",  0.0f,  1.0f, 1.0f, 1.0f, 0 , false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, 0,  false, false, false },
+		{ "reflect",    "Reflect",       "RFL",  0.0f,  1.0f, 1.0f, 1.0f, 0 , false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, 0,  false, false, false },
+		{ "charmed",    "Charmed",       "CHM",  0.0f,  1.0f, 1.0f, 1.0f, 0 , true , false, false, false, false, false, false, false, false, false, false, false, false, false, false, 0,  false, false, true  },
+		{ "terrified",  "Terrified",     "TRF",  0.0f,  1.0f, 1.0f, 1.0f, 0 , true , false, false, false, false, false, false, false, false, false, false, false, false, false, false, 0,  false, false, true  },
+		{ "decay",      "Decay",         "DCY",  0.0f,  1.0f, 1.0f, 1.0f, 0 , true , false, false, false, false, false, false, false, false, false, false, false, false, false, false, 0,  false, false, false },
 	};
 
 	const FStatusDef* AllStatuses(int& OutCount)
@@ -135,6 +160,15 @@ namespace TMSim
 			{ "regen_percent", "Undamaged regen (% max HP)", "0 = off. Health a unit regains at the start of each of its turns once it has gone long enough without being hurt.", 0.0, 25.0, 1.0, &FTuning::RegenPercent },
 			{ "regen_after_turns", "Regen after (turns)", "How many of its own turns a unit must go through without taking damage before it starts mending.", 1.0, 10.0, 1.0, &FTuning::RegenAfterTurns },
 			{ "battle_seconds", "Battle time limit (s)", "0 = no limit. When it runs out, the side with more of its health left wins; level shares draw.", 0.0, 600.0, 15.0, &FTuning::BattleSeconds },
+			// Not Godot's: the watchtowers (Docs/design/feat-objectives.md). Added
+			// at the end so every older rule keeps its index in a Tune order.
+			{ "watchtower_count", "Watchtowers", "0 = none. How many watchtowers the battle starts with, placed at random in mirrored pairs; an odd one stands in the middle. Read when the battle starts.", 0.0, 8.0, 1.0, &FTuning::WatchtowerCount },
+			{ "watchtower_turns", "Watchtower capture (turns)", "How many turns a side must spend standing at a watchtower to take it. Each turn spent capturing is that unit's whole turn.", 1.0, 6.0, 1.0, &FTuning::WatchtowerTurns },
+			{ "watchtower_sight", "Watchtower sight (m)", "How far a held watchtower lets its side see, from the top of the tower.", 4.0, 30.0, 1.0, &FTuning::WatchtowerSight },
+			{ "item_budget", "Item points", "0 = none. Points each side may spend on items on the setup screen.", 0.0, 20.0, 1.0, &FTuning::ItemBudget },
+			{ "camps", "Neutral camps", "0 = off, 1 light, 2 standard, 3 wild. Monster camps that wake around the map and drop items.", 0.0, 3.0, 1.0, &FTuning::CampLevel },
+			{ "random_boss", "Random boss", "0 = the map's own boss, 1 = a boss drawn at random, at the map's boss spot.", 0.0, 1.0, 1.0, &FTuning::RandomBoss },
+			{ "elements", "Element reactions", "0 = off, 1 = on. Water abilities leave their target Wet and ice abilities Chill it; lightning stuns the Wet, ice freezes them, fire ignites the Oiled.", 0.0, 1.0, 1.0, &FTuning::Elements },
 		};
 		return Keys;
 	}

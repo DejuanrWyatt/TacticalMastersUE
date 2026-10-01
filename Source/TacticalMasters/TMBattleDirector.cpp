@@ -124,6 +124,35 @@ void ATMBattleDirector::BeginPlay()
 		Setup.PlanningSeconds = RuleSeconds;
 		bBuilt = false;
 	}
+	// -tmcamps=2: the neutral camps, as the setup screen's row (0 is none); -tmrandomboss.
+	int32 Camps = 0;
+	if (FParse::Value(FCommandLine::Get(), TEXT("tmcamps="), Camps))
+	{
+		Setup.CampLevel = FMath::Clamp(Camps, 0, 3);
+		bOfferedCamps = true;
+		bBuilt = false;
+	}
+	if (FParse::Param(FCommandLine::Get(), TEXT("tmrandomboss")))
+	{
+		Setup.bRandomBoss = true;
+		bBuilt = false;
+	}
+	// -tmelements=1: element reactions, as the setup screen's row.
+	int32 Elements = 0;
+	if (FParse::Value(FCommandLine::Get(), TEXT("tmelements="), Elements))
+	{
+		Setup.bElements = Elements != 0;
+		bOfferedElements = true;
+		bBuilt = false;
+	}
+	// -tmtowers=4: how many watchtowers, as the setup screen's row (0 is none).
+	int32 Towers = 0;
+	if (FParse::Value(FCommandLine::Get(), TEXT("tmtowers="), Towers))
+	{
+		Setup.Watchtowers = FMath::Clamp(Towers, 0, 8);
+		bOfferedTowers = true;  // what the command line says stands on the setup screen too
+		bBuilt = false;
+	}
 
 	if (!bBuilt)
 	{
@@ -237,6 +266,10 @@ void ATMBattleDirector::ClearBattle()
 		if (Prop) { Prop->DestroyComponent(); }
 	}
 	BoardProps.Reset();
+	TowerRoofs.Reset();
+	TowerRoofOwner.Reset();
+	Beacons.Reset();
+	HazardParts.Reset();
 	BoardLights.Reset();
 	BoardLightBase.Reset();
 	for (TObjectPtr<UPointLightComponent>& Light : ReadyLights)
@@ -307,6 +340,56 @@ namespace
 		}
 		UE_LOG(LogTemp, Log, TEXT("loaded %d of %d class files; %d classes in all"),
 			Loaded, Files.Num(), static_cast<int32>(TMSim::AllJobs().size()));
+
+		// The neutral monsters are class files too, kept apart so no side fields one
+		// (Docs/design/feat-neutral-camps.md).
+		const FString MonsterDir = FPaths::ProjectContentDir() / TEXT("Data/Monsters");
+		TArray<FString> MonsterFiles;
+		IFileManager::Get().FindFiles(MonsterFiles, *(MonsterDir / TEXT("*.tmclass.json")), true, false);
+		MonsterFiles.Sort();
+		for (const FString& File : MonsterFiles)
+		{
+			FString Text;
+			if (!FFileHelper::LoadFileToString(Text, *(MonsterDir / File)))
+			{
+				continue;
+			}
+			const std::string Refused = TMSim::LoadClassFile(TCHAR_TO_UTF8(*Text));
+			if (!Refused.empty())
+			{
+				UE_LOG(LogTemp, Warning, TEXT("monster file %s left out: %hs"), *File, Refused.c_str());
+			}
+		}
+		UE_LOG(LogTemp, Log, TEXT("%d monsters"), static_cast<int32>(TMSim::AllMonsters().size()));
+	}
+
+	/**
+	 * Every item file in Content/Data/Items, once per run (SimItem.h). One the
+	 * rules refuse is left out and said so, as classes are.
+	 */
+	void LoadItemFiles()
+	{
+		static bool bLoaded = false;
+		if (bLoaded)
+		{
+			return;
+		}
+		bLoaded = true;
+		const FString Dir = FPaths::ProjectContentDir() / TEXT("Data/Items");
+		TArray<FString> Files;
+		IFileManager::Get().FindFiles(Files, *(Dir / TEXT("*.tmitem.json")), true, false);
+		Files.Sort();
+		for (const FString& File : Files)
+		{
+			FString Text;
+			const std::string Refused = FFileHelper::LoadFileToString(Text, *(Dir / File))
+				? TMSim::LoadItemFile(TCHAR_TO_UTF8(*Text)) : std::string("could not be read");
+			if (!Refused.empty())
+			{
+				UE_LOG(LogTemp, Warning, TEXT("item file %s left out: %hs"), *File, Refused.c_str());
+			}
+		}
+		UE_LOG(LogTemp, Log, TEXT("%d items"), static_cast<int32>(TMSim::AllItems().size()));
 	}
 
 	/**
@@ -347,6 +430,7 @@ namespace
 void ATMBattleDirector::BuildBattle()
 {
 	LoadClassFiles();
+	LoadItemFiles();
 	LoadMapFiles();
 	LoadThemes();
 	ClearBattle();
@@ -393,6 +477,28 @@ void ATMBattleDirector::BuildBattle()
 		Unit.Pos = Unit.Team == 0 ? Spawn : TMSim::FVec2(Size.X - Spawn.X, Size.Y - Spawn.Y);
 		// Which way it faces is set by the rules when the battle starts.
 
+		// What it carries: the setup's choice, or the computer's own. The
+		// computer shares its side's points out, a quarter each, the rest to
+		// its first units; the picks are the rules' own (SuggestLoadout), so
+		// both machines of a match would pick the same.
+		const int32 Team = Unit.Team;
+		if (PicksOwnItems(Team) && Setup.ItemBudget > 0)
+		{
+			const int32 Share = Setup.ItemBudget / 4 + (Index % 4 < Setup.ItemBudget % 4 ? 1 : 0);
+			const std::vector<std::string> Picks = TMSim::SuggestLoadout(JobId, Share);
+			for (int32 Slot = 0; Slot < 3; ++Slot)
+			{
+				Unit.Gear[Slot] = Slot < static_cast<int32>(Picks.size()) ? TMSim::FindItem(Picks[static_cast<size_t>(Slot)]) : nullptr;
+			}
+		}
+		else
+		{
+			for (int32 Slot = 0; Slot < 3; ++Slot)
+			{
+				Unit.Gear[Slot] = TMSim::FindItem(Setup.Items[Team][Index % 4][Slot]);
+			}
+		}
+
 		Battle.Units.push_back(Unit);
 	}
 
@@ -414,6 +520,25 @@ void ATMBattleDirector::BuildBattle()
 	Battle.Tuning.CaptureSeconds = Setup.CaptureSeconds;
 	Battle.Tuning.BattleSeconds = Setup.BattleSeconds;
 	Battle.Tuning.PlanningSeconds = Setup.PlanningSeconds;
+	// And how many watchtowers: the rules place them when the battle starts.
+	Battle.Tuning.WatchtowerCount = Setup.Watchtowers;
+	// And the item points, and whether what the units carry keeps to them. A
+	// loadout the rules refuse goes into battle with nothing rather than as it is.
+	Battle.Tuning.ItemBudget = Setup.ItemBudget;
+	// And the neutral camps, with the map's own boss unless one is drawn at random.
+	Battle.Tuning.CampLevel = Setup.CampLevel;
+	Battle.Tuning.RandomBoss = Setup.bRandomBoss ? 1.0 : 0.0;
+	Battle.Tuning.Elements = Setup.bElements ? 1.0 : 0.0;
+	Battle.BossJob = MapDef.Boss;
+	const std::string Loadout = Battle.LoadoutProblem();
+	if (!Loadout.empty())
+	{
+		for (TMSim::FUnit& Each : Battle.Units)
+		{
+			Each.Gear[0] = Each.Gear[1] = Each.Gear[2] = nullptr;
+		}
+		Tell(FString::Printf(TEXT("Items left behind: %hs"), Loadout.c_str()));
+	}
 	PlaceId = -1;
 	Battle.CaptureTicks[0] = 0;
 	Battle.CaptureTicks[1] = 0;
@@ -455,6 +580,11 @@ void ATMBattleDirector::BuildBattle()
 		USkeletalMeshComponent* Visual = NewObject<USkeletalMeshComponent>(
 			this, Fresh(USkeletalMeshComponent::StaticClass(), TEXT("Unit"), Battle.Units[i].Id), RF_Transient);
 		Visual->SetupAttachment(RootComponent);
+		// Its pose kept up to date even while the fog hides it, and no blur per
+		// bone: a body shown again with no pose from the frame before tripped the
+		// engine's skinning check (crash 2026-09-30, GPUSkinVertexFactory bPrevious).
+		Visual->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::AlwaysTickPoseAndRefreshBones;
+		Visual->bPerBoneMotionBlur = false;
 		Visual->RegisterComponent();
 		// A hero not read yet is read in the background (LoadBodiesInBackground,
 		// below) and the unit wears the level's mesh until it is in.
@@ -509,8 +639,10 @@ void ATMBattleDirector::BuildBattle()
 	}
 
 	BuildBoard();
+	BuildCamps();
 	BuildTurnRings();
 	BuildIndicators();
+	BuildFog();
 
 	bBuilt = true;
 	ResetMotion();
@@ -525,7 +657,7 @@ FVector ATMBattleDirector::WorldFromMetres(const TMSim::FVec2& Point, int Level)
 	// The rules think in metres and Unreal in centimetres, and a height level is
 	// a fixed number of metres, so the board's shape comes out of the map rather
 	// than being decided here.
-	return FVector(Point.X * TileSize, Point.Y * TileSize, Level * TMSim::Ground::LevelHeight * TileSize);
+	return FVector(Point.X * TileSize, Point.Y * TileSize, Level * LevelCm());
 }
 
 FVector ATMBattleDirector::WorldFor(const TMSim::FUnit& Unit) const
@@ -574,7 +706,7 @@ void ATMBattleDirector::RefreshPlates()
 		if (Unit.IsCasting())
 		{
 			// What it is in the middle of, which is the thing worth reading.
-			const TMSim::FAbility* Ability = TMSim::JobAbility(Unit.Job, Unit.Casting.Slot);
+			const TMSim::FAbility* Ability = Unit.Ability(Unit.Casting.Slot);
 			Line += FString::Printf(TEXT("  casting %hs"),
 				Ability ? Ability->Name.c_str() : "something");
 		}
@@ -601,6 +733,7 @@ void ATMBattleDirector::RefreshVisuals()
 {
 	RefreshPlates();
 	ApplyOutlines();
+	RefreshTowers();
 	for (int32 i = 0; i < UnitVisuals.Num() && i < static_cast<int32>(Battle.Units.size()); ++i)
 	{
 		if (!UnitVisuals[i])
@@ -677,7 +810,7 @@ FString ATMBattleDirector::DescribeBattle() const
 			{
 				Bar += Step < Done ? TEXT("#") : TEXT("-");
 			}
-			const TMSim::FAbility* Ability = TMSim::JobAbility(Unit.Job, Unit.Casting.Slot);
+			const TMSim::FAbility* Ability = Unit.Ability(Unit.Casting.Slot);
 			Text += FString::Printf(TEXT("  casting %hs [%s] %.1fs"),
 				Ability ? Ability->Name.c_str() : "something", *Bar,
 				Unit.Casting.Ticks / float(TMSim::Pace::TicksPerSecond));
@@ -798,6 +931,12 @@ FString ATMBattleDirector::NameOf(int32 UnitId) const
 {
 	if (const TMSim::FUnit* Unit = const_cast<TMSim::FBattle&>(Battle).FindUnit(UnitId))
 	{
+		// A monster by its name: there is only ever a handful of each.
+		if (Unit->bMonster)
+		{
+			const TMSim::FJobDef* Job = TMSim::FindJob(Unit->Job);
+			return FString::Printf(TEXT("%hs"), Job ? Job->Name.c_str() : Unit->Job.c_str());
+		}
 		return FString::Printf(TEXT("%hs %d"), Unit->Job.c_str(), Unit->Id);
 	}
 	return FString::Printf(TEXT("unit %d"), UnitId);
@@ -905,7 +1044,8 @@ void ATMBattleDirector::FrameTheBoard()
 	CamTarget = CamWantTarget = Middle;
 	CamYaw = 45.0f;
 	CamPitch = CameraPitch;
-	CamDistance = CamWantDistance = static_cast<float>((Where - Middle).Size());
+	// A big map starts no further out than the wheel can reach.
+	CamDistance = CamWantDistance = FMath::Min(16000.0f, static_cast<float>((Where - Middle).Size()));
 	if (!Watcher)
 	{
 		return;
@@ -1078,8 +1218,11 @@ void ATMBattleDirector::Narrate(const TMSim::FTickReport& Report)
 				Event.Id.c_str(), Event.Amount);
 			break;
 		case TMSim::EEventKind::StatusApplied:
-			Line = FString::Printf(TEXT("    %s takes %hs"), *NameOf(Event.Unit), Event.Id.c_str());
+		{
+			const TMSim::FStatusDef* Def = TMSim::FindStatus(Event.Id);
+			Line = FString::Printf(TEXT("    %s takes %hs"), *NameOf(Event.Unit), Def ? Def->Name : Event.Id.c_str());
 			break;
+		}
 		case TMSim::EEventKind::GaugeChanged:
 			Line = FString::Printf(TEXT("    %s gauge %+d%%"), *NameOf(Event.Unit), Event.Amount);
 			break;
@@ -1087,7 +1230,97 @@ void ATMBattleDirector::Narrate(const TMSim::FTickReport& Report)
 			Line = FString::Printf(TEXT("    %s is knocked out!"), *NameOf(Event.Unit));
 			break;
 		case TMSim::EEventKind::Revived:
-			Line = FString::Printf(TEXT("    %s is back on its feet"), *NameOf(Event.Unit));
+			Line = Event.Id == "reraise" ? FString::Printf(TEXT("%s rises again (Reraise)"), *NameOf(Event.Unit))
+				: FString::Printf(TEXT("    %s is back on its feet"), *NameOf(Event.Unit));
+			break;
+		case TMSim::EEventKind::Reaction:
+		{
+			// Two things meeting on a unit (Docs/design/feat-status-effects.md).
+			const FString Who = NameOf(Event.Unit);
+			Line = Event.Id == "shock" ? FString::Printf(TEXT("    %s is Wet: the lightning stuns it!"), *Who)
+				: Event.Id == "freeze" ? FString::Printf(TEXT("    %s is Wet: the ice freezes it solid!"), *Who)
+				: Event.Id == "ignite" ? FString::Printf(TEXT("    %s is Oiled: the fire ignites it!"), *Who)
+				: Event.Id == "douse" ? FString::Printf(TEXT("    %s's burning is put out"), *Who)
+				: Event.Id == "thaw" ? FString::Printf(TEXT("    %s thaws"), *Who)
+				: Event.Id == "dry" ? FString::Printf(TEXT("    %s dries off"), *Who)
+				: FString::Printf(TEXT("    %s: %hs"), *Who, Event.Id.c_str());
+			break;
+		}
+		case TMSim::EEventKind::Redirected:
+			Line = Event.Id == "guard" ? FString::Printf(TEXT("    %s steps in front of %s"), *NameOf(Event.Unit), *NameOf(Event.By))
+				: FString::Printf(TEXT("    %s's Reflect turns the spell back on %s"), *NameOf(Event.By), *NameOf(Event.Unit));
+			break;
+		case TMSim::EEventKind::Fled:
+			Line = FString::Printf(TEXT("%s is Terrified and runs from %s"), *NameOf(Event.Unit), *NameOf(Event.By));
+			break;
+		case TMSim::EEventKind::CharmEnded:
+			Line = FString::Printf(TEXT("    %s comes to its senses"), *NameOf(Event.Unit));
+			break;
+		case TMSim::EEventKind::Capturing:
+			Line = FString::Printf(TEXT("%s spends its turn taking a watchtower (%d/%d)"), *NameOf(Event.Unit),
+				Event.Amount, Event.By);
+			break;
+		case TMSim::EEventKind::Captured:
+			Line = FString::Printf(TEXT("%s takes the watchtower for %s: its side sees far from it"), *NameOf(Event.Unit),
+				Event.By == 0 ? TEXT("blue") : TEXT("red"));
+			break;
+		case TMSim::EEventKind::CampWarning:
+			Line = FString::Printf(TEXT("A camp stirs: it wakes in %d s"), Event.Amount);
+			if (Event.Slot >= 0 && Event.Slot < static_cast<int32>(Battle.Camps.size()))
+			{
+				static const TCHAR* Tiers[] = { TEXT("easy"), TEXT("medium"), TEXT("hard"), TEXT("boss") };
+				Line = FString::Printf(TEXT("A%s %s camp stirs: it wakes in %d s"), Battle.Camps[Event.Slot].Tier == 0 ? TEXT("n") : TEXT(""),
+					Tiers[FMath::Clamp(Battle.Camps[Event.Slot].Tier, 0, 3)], Event.Amount);
+			}
+			break;
+		case TMSim::EEventKind::CampAwake:
+			Line = TEXT("A camp wakes");
+			break;
+		case TMSim::EEventKind::CampCleared:
+			Line = Event.Amount >= 0 ? TEXT("A camp is cleared: its loot lies on the ground") : TEXT("A camp is cleared");
+			break;
+		case TMSim::EEventKind::ItemTaken:
+		case TMSim::EEventKind::ItemDropped:
+		{
+			const TMSim::FItemDef* Item = TMSim::FindItem(Event.Id);
+			Line = FString::Printf(TEXT("%s %s the %hs"), *NameOf(Event.Unit),
+				Event.Kind == TMSim::EEventKind::ItemTaken ? TEXT("takes") : TEXT("leaves"), Item ? Item->Name.c_str() : Event.Id.c_str());
+			// Picked up (often just by walking onto it): its name rises off the unit in its tier's colour.
+			const TMSim::FUnit* Taker = Battle.FindUnit(Event.Unit);
+			if (Item && Taker && Event.Kind == TMSim::EEventKind::ItemTaken && IsSeen(*Taker))
+			{
+				static const FColor TierTint[] = { FColor(215, 218, 225), FColor(110, 220, 120), FColor(120, 170, 255), FColor(255, 190, 70) };
+				AddFloater(Event.Unit, FString::Printf(TEXT("+ %hs"), Item->Name.c_str()), TierTint[FMath::Clamp(static_cast<int32>(Item->Tier), 0, 3)], false);
+			}
+			break;
+		}
+		case TMSim::EEventKind::MonsterAlert:
+			Line = Event.By >= 0 ? FString::Printf(TEXT("%s is roused by %s!"), *NameOf(Event.Unit), *NameOf(Event.By))
+				: FString::Printf(TEXT("%s is roused!"), *NameOf(Event.Unit));
+			break;
+		case TMSim::EEventKind::Escaped:
+			Line = FString::Printf(TEXT("%s escapes with its treasure"), *NameOf(Event.Unit));
+			break;
+		case TMSim::EEventKind::Tamed:
+			Line = Event.Amount > 0 ? FString::Printf(TEXT("%s is tamed by %s for %d turns"), *NameOf(Event.Unit), *NameOf(Event.By), Event.Amount)
+				: FString::Printf(TEXT("%s goes wild again"), *NameOf(Event.Unit));
+			break;
+		case TMSim::EEventKind::PhaseChanged:
+			Line = FString::Printf(TEXT("%s grows desperate: phase %d!"), *NameOf(Event.Unit), Event.Amount + 1);
+			break;
+		case TMSim::EEventKind::Staggered:
+			Line = FString::Printf(TEXT("    %s is staggered!"), *NameOf(Event.Unit));
+			break;
+		case TMSim::EEventKind::Teleported:
+			// Shown at once where it went, not walked there (AdvanceMotion).
+			SnapUnits.Add(Event.Unit);
+			Line = FString::Printf(TEXT("%s blinks away"), *NameOf(Event.Unit));
+			break;
+		case TMSim::EEventKind::ShrineUsed:
+			Line = FString::Printf(TEXT("%s draws power from the shrine"), *NameOf(Event.Unit));
+			break;
+		case TMSim::EEventKind::Saved:
+			Line = FString::Printf(TEXT("    %s is saved (+%d)"), *NameOf(Event.Unit), Event.Amount);
 			break;
 		case TMSim::EEventKind::Won:
 			Line = HowWon().IsEmpty()
@@ -1159,6 +1392,12 @@ FString ATMBattleDirector::OrderAbilityAt(int32 UnitId, int32 Slot, int32 Target
 
 bool ATMBattleDirector::ComputerPlays(int32 Team) const
 {
+	// The neutral monsters: the host plays them and sends their orders on, as it
+	// sends everything; offline, this machine does.
+	if (Team == 2)
+	{
+		return !bOnline || bOnlineHost;
+	}
 	// Online, a person on each machine; the computer only in the online test (-tmnetbots).
 	if (bOnline)
 	{
@@ -1212,7 +1451,7 @@ FString ATMBattleDirector::TakeComputerTurn(int32 UnitId)
 		return TEXT("It isn't its turn.");
 	}
 
-	const TMSim::FOrder Order = Computers[Unit->Team].NextCommand(Battle, *Unit);
+	const TMSim::FOrder Order = Unit->Team == 2 ? Monsters.NextCommand(Battle, *Unit) : Computers[Unit->Team].NextCommand(Battle, *Unit);
 	const FString Refused = Submit(Order);
 	if (!Refused.IsEmpty())
 	{
@@ -1304,16 +1543,42 @@ void ATMBattleDirector::Tick(float DeltaSeconds)
 		}
 	}
 
-	AdvanceFloaters(DeltaSeconds);
-	AdvanceVfx(DeltaSeconds);
+	// How smoothly it runs, every ten seconds of play: the average frame rate
+	// and the longest frame. A frame over a tenth of a second is named on its own.
+	if (GetWorld() && GetWorld()->IsGameWorld() && Screen == EScreen::Battle)
+	{
+		FrameWindow += RealDelta;
+		++FrameCount;
+		FrameWorst = FMath::Max(FrameWorst, RealDelta);
+		if (RealDelta > 0.1f)
+		{
+			UE_LOG(LogTemp, Log, TEXT("SLOW frame: %.0f ms"), RealDelta * 1000.0f);
+		}
+		if (FrameWindow >= 10.0f)
+		{
+			UE_LOG(LogTemp, Log, TEXT("FRAMES: %.1f fps over %.0f s, worst %.0f ms"), FrameCount / FrameWindow, FrameWindow, FrameWorst * 1000.0f);
+			FrameWindow = 0.0f;
+			FrameCount = 0;
+			FrameWorst = 0.0f;
+		}
+	}
+
+	{ TM_SLOW("Floaters"); AdvanceFloaters(DeltaSeconds); }
+	{ TM_SLOW("Vfx"); AdvanceVfx(DeltaSeconds); }
+	{ TM_SLOW("Looks"); AdvanceLooks(DeltaSeconds); }
 	if (GetWorld() && GetWorld()->IsGameWorld())
 	{
-		AdvanceMotion(DeltaSeconds);
-		AdvanceTurnRings();
-		AdvanceIndicators();
-		AdvanceCardPortraits();
-		AdvanceBoard(DeltaSeconds);
-		UpdateCamera(DeltaSeconds);
+		{ TM_SLOW("Motion"); AdvanceMotion(DeltaSeconds); }
+		{ TM_SLOW("TurnRings"); AdvanceTurnRings(); }
+		{ TM_SLOW("Indicators"); AdvanceIndicators(); }
+		{ TM_SLOW("Marks"); UpdateMarks(); }
+		{ TM_SLOW("Fog"); AdvanceFog(); }
+		{ TM_SLOW("CardPortraits"); AdvanceCardPortraits(); }
+		{ TM_SLOW("Board"); AdvanceBoard(DeltaSeconds); }
+		{ TM_SLOW("Camps"); RefreshCamps(DeltaSeconds); }
+		{ TM_SLOW("Towers"); AdvanceTowers(DeltaSeconds); }
+		{ TM_SLOW("Hazards"); AdvanceHazards(DeltaSeconds); }
+		{ TM_SLOW("Camera"); UpdateCamera(DeltaSeconds); }
 		if (TunePendingFor >= 0.0f && DragSlider < 0)
 		{
 			TunePendingFor -= DeltaSeconds;
@@ -1420,12 +1685,13 @@ void ATMBattleDirector::Tick(float DeltaSeconds)
 		else
 		{
 			PlaceId = -1;
+			TM_SLOW("Selection");
 			MaintainSelection();
 		}
-		PickUnderCursor();
-		UpdateHoverPath();
+		{ TM_SLOW("PickUnderCursor"); PickUnderCursor(); }
+		{ TM_SLOW("HoverPath"); UpdateHoverPath(); }
 	}
-	UpdateThreat();
+	{ TM_SLOW("Threat"); UpdateThreat(); }
 
 	if (HudShotsAt >= 0.0f)
 	{
@@ -1528,6 +1794,7 @@ void ATMBattleDirector::Tick(float DeltaSeconds)
 	// Advance orders arrive (battle.gd:316-322).
 	if (Steps > 0 && (!bOnline || bOnlineHost))
 	{
+		TM_SLOW("StepTicks");
 		StepTicks(Steps);
 	}
 
@@ -1583,19 +1850,30 @@ void ATMBattleDirector::Tick(float DeltaSeconds)
 	if (ThinkingAbout != Unit->Id)
 	{
 		ThinkingAbout = Unit->Id;
-		ThinkRemainder = static_cast<float>(Computers[Unit->Team].Skill().Think);
+		ThinkRemainder = ThinkSeconds(Unit->Team, true);
 	}
 	ThinkRemainder -= DeltaSeconds;
 	if (ThinkRemainder <= 0.0f)
 	{
+		TM_SLOW("ComputerTurn");
 		const int32 UnitId = Unit->Id;
 		if (!TakeComputerTurn(UnitId).IsEmpty())
 		{
 			EndUnitTurn(UnitId);
 		}
 		++OrdersGiven;
-		ThinkRemainder = static_cast<float>(Computers[Unit->Team].Skill().Step);
+		ThinkRemainder = ThinkSeconds(Unit->Team, false);
 	}
+}
+
+float ATMBattleDirector::ThinkSeconds(int32 Team, bool bFirst) const
+{
+	// Monsters don't deliberate: a short beat so their moves can be followed.
+	if (Team < 0 || Team > 1)
+	{
+		return bFirst ? 0.35f : 0.45f;
+	}
+	return static_cast<float>(bFirst ? Computers[Team].Skill().Think : Computers[Team].Skill().Step);
 }
 
 // ============================================================ a person playing
@@ -1776,23 +2054,68 @@ void ATMBattleDirector::OnKey(FKey Key)
 				}
 			}
 		}
-		if (Screen == EScreen::Battle && Hud && CursorPosition(X, Y) && Hud->LogArea.bIsValid && Hud->LogArea.IsInside(FVector2D(X, Y)))
+		if (bGuideOpen)
+		{
+			// The guide covers the screen: the wheel scrolls it, the list by rows
+			// and a class's page by a little at a time. The HUD keeps both in range.
+			const bool bUp = Key == EKeys::MouseScrollUp;
+			if (bGuideDetail)
+			{
+				GuideDetailScroll = FMath::Max(0.0f, GuideDetailScroll + (bUp ? -90.0f : 90.0f));
+			}
+			else
+			{
+				// The Codex's pages by a row; the class and item lists by three.
+				const int32 By = GuideTab >= 2 ? 1 : 3;
+				GuideListScroll = FMath::Max(0, GuideListScroll + (bUp ? -By : By));
+			}
+		}
+		else if (ItemPickerSlot >= 0)
+		{
+			// The item picker's grid is longer than the screen: the wheel scrolls it.
+			ItemPickerScroll = FMath::Max(0, ItemPickerScroll + (Key == EKeys::MouseScrollUp ? -1 : 1));
+		}
+		else if (Screen == EScreen::Battle && Hud && CursorPosition(X, Y) && Hud->LogArea.bIsValid && Hud->LogArea.IsInside(FVector2D(X, Y)))
 		{
 			// The newest line is never more than a few turns of the wheel away.
 			LogScroll = FMath::Clamp(LogScroll + (Key == EKeys::MouseScrollUp ? 1 : -1), 0, FMath::Max(0, Log.Num() - 1));
 		}
 		else if (!bGuideOpen && PickerSlot < 0)
 		{
-			CamWantDistance = FMath::Clamp(CamWantDistance * (Key == EKeys::MouseScrollUp ? 0.9f : 1.1f), 400.0f, 8000.0f);
+			// Far enough out to see the whole of a big map (80 tiles, 160 m).
+			CamWantDistance = FMath::Clamp(CamWantDistance * (Key == EKeys::MouseScrollUp ? 0.9f : 1.1f), 400.0f, 16000.0f);
 		}
 		return;
 	}
 	// The Unit Guide covers the screen: only its key or Cancel closes it.
 	if (bGuideOpen)
 	{
-		if (Is(ETMAction::UnitGuide) || Is(ETMAction::Cancel))
+		if (Is(ETMAction::Cancel) && bGuideDetail)
+		{
+			// Back from a class's page to the list, before closing.
+			bGuideDetail = false;
+			HideGuideModel();
+		}
+		else if (Is(ETMAction::UnitGuide) || Is(ETMAction::Cancel))
 		{
 			ToggleGuide();
+		}
+		else if (bGuideDetail && (Key == EKeys::Left || Key == EKeys::Right))
+		{
+			GuideStep(Key == EKeys::Left ? -1 : 1);
+		}
+		else if (Key == EKeys::Up || Key == EKeys::Down || Key == EKeys::PageUp || Key == EKeys::PageDown)
+		{
+			const int32 Way = Key == EKeys::Up || Key == EKeys::PageUp ? -1 : 1;
+			const bool bPage = Key == EKeys::PageUp || Key == EKeys::PageDown;
+			if (bGuideDetail)
+			{
+				GuideDetailScroll = FMath::Max(0.0f, GuideDetailScroll + Way * (bPage ? 600.0f : 90.0f));
+			}
+			else
+			{
+				GuideListScroll = FMath::Max(0, GuideListScroll + Way * (bPage ? FMath::Max(1, GuideListPage - 1) : 1));
+			}
 		}
 		return;
 	}
@@ -1803,6 +2126,10 @@ void ATMBattleDirector::OnKey(FKey Key)
 		if (Is(ETMAction::Cancel) && PickerSlot >= 0)
 		{
 			PickerSlot = -1;
+		}
+		else if (Is(ETMAction::Cancel) && ItemPickerSlot >= 0)
+		{
+			ItemPickerSlot = -1;
 		}
 		else if (Is(ETMAction::Cancel) && Screen == EScreen::Setup && Setup.Mode == TEXT("online"))
 		{
@@ -1857,6 +2184,10 @@ void ATMBattleDirector::OnKey(FKey Key)
 	else if (Is(ETMAction::Ability2)) { SelectAbility(1); }
 	else if (Is(ETMAction::Ability3)) { SelectAbility(2); }
 	else if (Is(ETMAction::Ability4)) { SelectAbility(3); }
+	// The items' abilities, on the keys after the class's four.
+	else if (Key == EKeys::Five) { SelectAbility(4); }
+	else if (Key == EKeys::Six) { SelectAbility(5); }
+	else if (Key == EKeys::Seven) { SelectAbility(6); }
 	else if (Is(ETMAction::Move))
 	{
 		// battle.gd:966-972, _toggle_move.
@@ -2089,6 +2420,8 @@ void ATMBattleDirector::CycleReady()
 		}
 	}
 	SelectUnit(Ready[Next]->Id);
+	// Tab goes to the unit: the camera slides onto it, wherever it stands.
+	CenterCamera();
 }
 
 void ATMBattleDirector::EnterMoveMode(bool bSprint)
@@ -2188,6 +2521,8 @@ void ATMBattleDirector::MaintainSelection()
 	const TMSim::FUnit* Unit = SelectedUnit();
 	if (Unit && (!Unit->IsAlive() || !Unit->bReady || ComputerPlays(Unit->Team) || Battle.Winner != -1))
 	{
+		// Its turn used (or lost): the next one ready gets the camera (2026-09-30).
+		bSnapToNext = Battle.Winner == -1;
 		Deselect();
 		Unit = nullptr;
 	}
@@ -2201,6 +2536,12 @@ void ATMBattleDirector::MaintainSelection()
 	{
 		AutoSelect();
 		Unit = SelectedUnit();
+		if (Unit && bSnapToNext)
+		{
+			// As Tab does: the camera slides onto it, wherever it stands.
+			bSnapToNext = false;
+			CenterCamera();
+		}
 	}
 	// Somebody else moved or fell, so the ground this unit can reach has changed
 	// (battle.gd:482-483).
@@ -2308,6 +2649,7 @@ void ATMBattleDirector::PickUnderCursor()
 		bHaveHover = true;
 		HoverUnitId = Best;
 		HoverPoint = FindIn(Battle, Best)->Pos;
+		TetherAim();
 		return;
 	}
 	if (bGround)
@@ -2325,6 +2667,88 @@ void ATMBattleDirector::PickUnderCursor()
 				HoverUnitId = Near->Id;
 			}
 		}
+		TetherAim();
+	}
+}
+
+void ATMBattleDirector::TetherAim()
+{
+	if (!bHaveHover || AimMode != EAimMode::Ability || Battle.IsPlanning())
+	{
+		return;
+	}
+	const TMSim::FUnit* Unit = SelectedUnit();
+	if (!PlayerCanOrder(Unit))
+	{
+		return;
+	}
+	const TMSim::FAbility* Ability = Unit->Ability(AimSlot);
+	if (!Ability || Ability->MaxRange <= 0.0f)
+	{
+		return;
+	}
+	const std::string Shape = TMSim::ShapeOf(*Ability);
+	if (Shape == "global")
+	{
+		return;
+	}
+	// Where it could be used from: where it stands, and -- if it has not walked
+	// yet this turn -- anywhere it can still walk to (the walk into range a
+	// click out of range orders). A cone only points a way, so it is kept to
+	// its reach from the unit itself. Worked out again only when the board
+	// may have changed.
+	const bool bCanWalk = !Unit->bMoved && !Unit->IsCasting() && Shape != "cone";
+	const FString Key = FString::Printf(TEXT("%d/%d/%d/%d/%d/%d"), Unit->Id, Unit->Serial, AimSlot,
+		bCanWalk ? 1 : 0, OrdersApplied, Battle.TickCount);
+	if (Key != TetherKey)
+	{
+		TetherKey = Key;
+		TetherFrom.clear();
+		TetherFrom.push_back(Unit->Pos);
+		if (bCanWalk)
+		{
+			for (const std::pair<TMSim::FNode, double>& Entry : Battle.ReachableNodes(*Unit))
+			{
+				TetherFrom.push_back(TMSim::FMap::NodePos(Entry.first));
+			}
+		}
+	}
+	// The nearest of those spots to the pointer; the legal area is the ground
+	// within range of any of them, so the nearest legal point to the pointer
+	// lies toward the nearest one.
+	TMSim::FVec2 From = TetherFrom[0];
+	float Nearest = HoverPoint.DistanceTo(From);
+	for (const TMSim::FVec2& Spot : TetherFrom)
+	{
+		const float Distance = HoverPoint.DistanceTo(Spot);
+		if (Distance < Nearest)
+		{
+			Nearest = Distance;
+			From = Spot;
+		}
+	}
+	if (Nearest <= Ability->MaxRange)
+	{
+		return;
+	}
+	// Pulled in by just over half a node's diagonal, so the snapped aim point
+	// (Aim snaps to the half-metre grid) is still in range.
+	const float Reach = FMath::Max(Ability->MaxRange - 0.36f, 0.0f);
+	TMSim::FVec2 Tethered = From + (HoverPoint - From).Normalized() * Reach;
+	if (!Battle.InBounds(Tethered))
+	{
+		Tethered = From;
+	}
+	HoverPoint = Tethered;
+	// Whoever was under the pointer is out of reach; whoever stands on the
+	// tethered spot is aimed at instead.
+	HoverUnitId = -1;
+	if (const TMSim::FUnit* Near = Battle.UnitNear(Tethered, 0.5f))
+	{
+		if (IsSeen(*Near))
+		{
+			HoverUnitId = Near->Id;
+		}
 	}
 }
 
@@ -2334,7 +2758,7 @@ ATMBattleDirector::FAim ATMBattleDirector::Aim()
 	// follows it; pointing at the ground aims at that spot.
 	FAim Out;
 	const TMSim::FUnit* Unit = SelectedUnit();
-	const TMSim::FAbility* Ability = Unit ? TMSim::JobAbility(Unit->Job, AimSlot) : nullptr;
+	const TMSim::FAbility* Ability = Unit ? Unit->Ability(AimSlot) : nullptr;
 	if (!Ability)
 	{
 		return Out;
@@ -2499,6 +2923,50 @@ void ATMBattleDirector::Tell(const FString& What)
 	UE_LOG(LogTemp, Log, TEXT("player: %s"), *What);
 }
 
+int32 ATMBattleDirector::CapturableTower(const TMSim::FUnit& Unit, FString* WhyNot) const
+{
+	// The nearest tower in reach first: that is the one a person standing
+	// between two means. If it cannot be taken, the rules say why.
+	const int32 Near = Battle.TowerNear(Unit.Pos);
+	if (Near < 0)
+	{
+		if (WhyNot)
+		{
+			*WhyNot = Battle.Watchtowers.empty() ? FString(TEXT("There are no watchtowers in this battle."))
+				: FString(TEXT("Stand next to a watchtower to take it."));
+		}
+		return -1;
+	}
+	const std::string Refused = Battle.ValidateCapture(Unit.Id, Near);
+	if (!Refused.empty())
+	{
+		if (WhyNot)
+		{
+			*WhyNot = UTF8_TO_TCHAR(Refused.c_str());
+		}
+		return -1;
+	}
+	return Near;
+}
+
+void ATMBattleDirector::CaptureTower()
+{
+	const TMSim::FUnit* Unit = SelectedUnit();
+	if (!PlayerCanOrder(Unit))
+	{
+		return;
+	}
+	FString WhyNot;
+	const int32 Tower = CapturableTower(*Unit, &WhyNot);
+	if (Tower < 0)
+	{
+		Tell(WhyNot);
+		return;
+	}
+	// Through the same door as any order: checked, sent online, recorded.
+	OrderSelected(TMSim::FOrder::MakeCapture(Unit->Id, Unit->Serial, Tower));
+}
+
 FVector ATMBattleDirector::BoardPoint(const TMSim::FVec2& Point, float Lift) const
 {
 	const int Level = Battle.Map.NodeLevel(TMSim::FMap::NodeOf(Point));
@@ -2515,7 +2983,7 @@ bool ATMBattleDirector::ClosestSpotInRange(const TMSim::FUnit& Unit, int32 Slot,
 	// them; this runs through them in the order ReachableNodes gives, so between
 	// two spots exactly as far to walk it may pick the other. Either is a walk
 	// the person asked for, and nothing here is part of the rules.
-	const TMSim::FAbility* Ability = TMSim::JobAbility(Unit.Job, Slot);
+	const TMSim::FAbility* Ability = Unit.Ability(Slot);
 	if (!Ability)
 	{
 		return false;
@@ -2689,6 +3157,22 @@ void ATMBattleDirector::PressHudButton(const FTMHudButton& Button)
 			OrderSelected(TMSim::FOrder::MakeEndTurn(Unit->Id, Unit->Serial));
 		}
 		break;
+	case ETMHudAction::Capture:
+		CaptureTower();
+		break;
+	case ETMHudAction::Take:
+		TakeItem(Button.Value);
+		break;
+	case ETMHudAction::TakeOpen:
+	{
+		// The items panel: what lies in reach to take (-2: nothing in reach), and what the unit carries.
+		const int32 Cache = Unit ? TakeableCache(*Unit) : -1;
+		TakePickerCache = TakePickerCache != -1 ? -1 : (Cache >= 0 ? Cache : -2);
+		break;
+	}
+	case ETMHudAction::Drop:
+		DropItem(Button.Value);
+		break;
 	case ETMHudAction::PickUnit:
 	{
 		// A chip on the turn order: take that unit up if it can be ordered
@@ -2735,7 +3219,33 @@ void ATMBattleDirector::PressHudButton(const FTMHudButton& Button)
 		InspectedId = -1;
 		break;
 	case ETMHudAction::GuideJob:
+		// A class's own page: its hero, its stats, every ability in full.
 		GuideJob = Button.Value;
+		bGuideDetail = true;
+		GuideDetailScroll = 0.0f;
+		break;
+	case ETMHudAction::GuideBack:
+		bGuideDetail = false;
+		HideGuideModel();
+		break;
+	case ETMHudAction::GuideStep:
+		GuideStep(Button.Value);
+		break;
+	case ETMHudAction::GuideRole:
+		GuideRole = Button.Value;
+		GuideListScroll = 0;
+		break;
+	case ETMHudAction::GuideScroll:
+		GuideListScroll = FMath::Max(0, GuideListScroll + Button.Value * FMath::Max(1, GuideListPage - 1));
+		break;
+	case ETMHudAction::GuideTurn:
+		GuideModelTurn(Button.Value * 45.0f);
+		break;
+	case ETMHudAction::GuideTab:
+		GuideTab = Button.Value;
+		GuideListScroll = 0;
+		bGuideDetail = false;
+		HideGuideModel();
 		break;
 	case ETMHudAction::GuideAgainst:
 		GuideAgainst = (GuideAgainst + 1) % FMath::Max(1, static_cast<int32>(TMSim::AllJobs().size()));
@@ -2825,6 +3335,33 @@ void ATMBattleDirector::OpenSetup()
 	Screen = EScreen::Setup;
 	bMenuOpen = false;
 	bPaused = false;
+	// Watchtowers on by default for a person setting up a battle, but only the
+	// first time: after that the row keeps whatever they chose. A battle nobody
+	// set up has none, so it is still the battle the Godot game plays.
+	if (!bOfferedTowers)
+	{
+		bOfferedTowers = true;
+		Setup.Watchtowers = 2;
+	}
+	// Likewise items: 6 points a side the first time.
+	if (!bOfferedItems)
+	{
+		bOfferedItems = true;
+		Setup.ItemBudget = 6;
+	}
+	// And the camps: standard, with the map's own boss.
+	if (!bOfferedCamps)
+	{
+		bOfferedCamps = true;
+		Setup.CampLevel = 2;
+	}
+	// And element reactions, on.
+	if (!bOfferedElements)
+	{
+		bOfferedElements = true;
+		Setup.bElements = true;
+	}
+	ItemPickerSlot = -1;
 	BuildBattle();
 	// Random's next teams, their heroes loading while this screen is read.
 	for (int32 Team = 0; Team < 2; ++Team)
@@ -2900,6 +3437,37 @@ void ATMBattleDirector::PressMenuButton(const FTMHudButton& Button)
 	case ETMHudAction::PickerClose:
 		PickerSlot = -1;
 		break;
+	case ETMHudAction::SetupItem:
+		if (!PicksOwnItems(Button.Value / 12))
+		{
+			ItemPickerSlot = Button.Value;
+			ItemPickerScroll = 0;
+		}
+		break;
+	case ETMHudAction::ItemChoose:
+		ChooseItem(ItemPickerSlot, Button.Value);
+		break;
+	case ETMHudAction::ItemTier:
+		ItemPickerTier = Button.Value;
+		ItemPickerScroll = 0;
+		break;
+	case ETMHudAction::ItemClose:
+		ItemPickerSlot = -1;
+		break;
+	case ETMHudAction::SetupItemBudget:
+	{
+		// 0, 3, 6, 9, 12, round. Whatever no longer fits comes off, last slot first.
+		Setup.ItemBudget = Setup.ItemBudget >= 12 ? 0 : Setup.ItemBudget + 3;
+		for (int32 Team = 0; Team < 2; ++Team)
+		{
+			for (int32 Code = 11; Code >= 0 && ItemPointsSpent(Team) > Setup.ItemBudget; --Code)
+			{
+				Setup.Items[Team][Code / 3][Code % 3].clear();
+			}
+		}
+		BuildBattle();
+		break;
+	}
 	case ETMHudAction::SetupRandom:
 		RandomTeam(Button.Value);
 		break;
@@ -3005,6 +3573,23 @@ void ATMBattleDirector::PressMenuButton(const FTMHudButton& Button)
 		Setup.PlanningSeconds = Choices[(At + 1) % 4];
 		break;
 	}
+	case ETMHudAction::SetupTowers:
+		// Round every count the rules allow, none to eight.
+		Setup.Watchtowers = (Setup.Watchtowers + 1) % 9;
+		BuildBattle();
+		break;
+	case ETMHudAction::SetupCamps:
+		Setup.CampLevel = (Setup.CampLevel + 1) % 4;
+		BuildBattle();
+		break;
+	case ETMHudAction::SetupBoss:
+		Setup.bRandomBoss = !Setup.bRandomBoss;
+		BuildBattle();
+		break;
+	case ETMHudAction::SetupElements:
+		Setup.bElements = !Setup.bElements;
+		BuildBattle();
+		break;
 	case ETMHudAction::PlanningReady:
 		ReadyToFight();
 		break;
@@ -3250,7 +3835,7 @@ int32 ATMBattleDirector::ViewerTeam() const
 bool ATMBattleDirector::IsSeen(const TMSim::FUnit& Unit) const
 {
 	const int32 Viewer = ViewerTeam();
-	return Viewer < 0 || Battle.Winner != -1 || Unit.Team == Viewer || Battle.CanSee(Viewer, Unit.Pos);
+	return Viewer < 0 || Battle.Winner != -1 || Unit.Team == Viewer || Battle.CanSeeUnit(Viewer, Unit);
 }
 
 bool ATMBattleDirector::IsPointSeen(const TMSim::FVec2& Point) const
@@ -3295,7 +3880,7 @@ void ATMBattleDirector::UpdateThreat()
 	ThreatReach = 0.0f;
 	for (int32 Slot = 0; Slot < 4; ++Slot)
 	{
-		const TMSim::FAbility* Ability = TMSim::JobAbility(Unit->Job, Slot);
+		const TMSim::FAbility* Ability = Unit->Ability(Slot);
 		if (Ability && Ability->Effect == TMSim::EEffect::Damage)
 		{
 			ThreatReach = FMath::Max(ThreatReach, Ability->MaxRange);
@@ -3303,9 +3888,45 @@ void ATMBattleDirector::UpdateThreat()
 	}
 }
 
+TArray<int32> ATMBattleDirector::GuideShown() const
+{
+	static const char* const Roles[4] = { "tank", "damage", "support", "special" };
+	TArray<int32> Out;
+	const std::vector<const TMSim::FJobDef*>& Jobs = TMSim::AllJobs();
+	for (int32 j = 0; j < static_cast<int32>(Jobs.size()); ++j)
+	{
+		if (GuideRole < 0 || GuideRole > 3 || TMSim::JobHasRole(Jobs[j]->Id, Roles[GuideRole]))
+		{
+			Out.Add(j);
+		}
+	}
+	return Out;
+}
+
+void ATMBattleDirector::GuideStep(int32 By)
+{
+	// The next or previous class in the list as it is filtered, round and round.
+	const TArray<int32> Shown = GuideShown();
+	if (Shown.Num() == 0)
+	{
+		return;
+	}
+	const int32 At = Shown.Find(GuideJob);
+	const int32 Next = At == INDEX_NONE ? 0 : (At + By % Shown.Num() + Shown.Num()) % Shown.Num();
+	GuideJob = Shown[Next];
+	GuideDetailScroll = 0.0f;
+	// Keep the list scrolled to it, for coming back.
+	GuideListScroll = FMath::Max(0, Next - GuideListPage / 2);
+}
+
 void ATMBattleDirector::ToggleGuide()
 {
 	bGuideOpen = !bGuideOpen;
+	if (!bGuideOpen)
+	{
+		bGuideDetail = false;
+		HideGuideModel();
+	}
 	// A local battle stops while the guide is read, and starts again when it is
 	// closed -- unless it was already paused, which stays as it was.
 	if (Screen == EScreen::Battle && Battle.Winner == -1)
@@ -3336,7 +3957,10 @@ void ATMBattleDirector::ToggleGuide()
 			{
 				if (Jobs[i]->Id == Looking->Job)
 				{
+					// Straight to that class's page.
 					GuideJob = static_cast<int32>(i);
+					bGuideDetail = true;
+					GuideDetailScroll = 0.0f;
 				}
 			}
 		}
@@ -3499,7 +4123,8 @@ void ATMBattleDirector::ApplyCamera()
 		return;
 	}
 	const FRotator Looking(CamPitch, CamYaw, 0.0f);
-	Watcher->SetActorLocationAndRotation(CamTarget - Looking.Vector() * CamDistance, Looking);
+	// JoltOffset: a heavy blow shakes the camera for a moment (AdvanceLooks).
+	Watcher->SetActorLocationAndRotation(CamTarget - Looking.Vector() * CamDistance + JoltOffset, Looking);
 }
 
 void ATMBattleDirector::CenterCamera()
@@ -3525,7 +4150,73 @@ void ATMBattleDirector::CenterCamera()
 bool ATMBattleDirector::OnSetupScreen(int32 TuningIndex)
 {
 	const std::string Key = TMSim::TuningKeys()[static_cast<size_t>(TuningIndex)].Key;
-	return Key == "capture_seconds" || Key == "battle_seconds" || Key == "planning_seconds";
+	return Key == "capture_seconds" || Key == "battle_seconds" || Key == "planning_seconds"
+		|| Key == "watchtower_count" || Key == "item_budget";
+}
+
+int32 ATMBattleDirector::ItemPointsSpent(int32 Team) const
+{
+	int32 Spent = 0;
+	for (int32 Unit = 0; Unit < 4; ++Unit)
+	{
+		for (int32 Slot = 0; Slot < 3; ++Slot)
+		{
+			if (const TMSim::FItemDef* Item = TMSim::FindItem(Setup.Items[Team][Unit][Slot]))
+			{
+				Spent += Item->Cost;
+			}
+		}
+	}
+	return Spent;
+}
+
+bool ATMBattleDirector::PicksOwnItems(int32 Team) const
+{
+	return Setup.Mode == TEXT("cpu") || (Setup.Mode == TEXT("ai") && Setup.PlayerTeam != Team);
+}
+
+void ATMBattleDirector::ChooseItem(int32 SlotCode, int32 ItemIndex)
+{
+	if (SlotCode < 0 || SlotCode >= 24)
+	{
+		return;
+	}
+	const int32 Team = SlotCode / 12;
+	const int32 Unit = (SlotCode % 12) / 3;
+	const int32 Slot = SlotCode % 3;
+	std::string& Held = Setup.Items[Team][Unit][Slot];
+	const std::vector<const TMSim::FItemDef*>& All = TMSim::AllItems();
+	if (ItemIndex < 0 || ItemIndex >= static_cast<int32>(All.size()))
+	{
+		Held.clear();
+		ItemPickerSlot = -1;
+		BuildBattle();
+		return;
+	}
+	const TMSim::FItemDef& Item = *All[static_cast<size_t>(ItemIndex)];
+	if (Item.Cost <= 0)
+	{
+		Tell(FString::Printf(TEXT("%hs can't be bought: it's only found, from the epic camp."), Item.Name.c_str()));
+		return;
+	}
+	for (int32 Other = 0; Other < 3; ++Other)
+	{
+		if (Other != Slot && Setup.Items[Team][Unit][Other] == Item.Id)
+		{
+			Tell(FString::Printf(TEXT("That unit already carries %hs."), Item.Name.c_str()));
+			return;
+		}
+	}
+	const TMSim::FItemDef* Before = TMSim::FindItem(Held);
+	const int32 Left = Setup.ItemBudget - ItemPointsSpent(Team) + (Before ? Before->Cost : 0);
+	if (Item.Cost > Left)
+	{
+		Tell(FString::Printf(TEXT("%hs costs %d points; this side has %d left."), Item.Name.c_str(), Item.Cost, Left));
+		return;
+	}
+	Held = Item.Id;
+	ItemPickerSlot = -1;
+	BuildBattle();
 }
 
 bool ATMBattleDirector::SliderRange(int32 Id, double& Low, double& High, double& Step) const

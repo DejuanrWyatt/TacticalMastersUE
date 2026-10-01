@@ -12,7 +12,10 @@
 // shapes later without changing what a theme says.
 
 #include "TMBattleDirector.h"
+#include "TMSettings.h"
 
+#include "Camera/CameraActor.h"
+#include "Camera/CameraComponent.h"
 #include "Components/DirectionalLightComponent.h"
 #include "Components/ExponentialHeightFogComponent.h"
 #include "Components/PointLightComponent.h"
@@ -25,6 +28,7 @@
 #include "Engine/StaticMesh.h"
 #include "Engine/TextureRenderTarget2D.h"
 #include "EngineUtils.h"
+#include "Misc/App.h"
 #include "HAL/FileManager.h"
 #include "Kismet/KismetRenderingLibrary.h"
 #include "Materials/MaterialInstanceDynamic.h"
@@ -181,9 +185,76 @@ void ATMBattleDirector::LoadThemes()
 		Paths(TEXT("rock"), Theme.KitRock);
 		Paths(TEXT("tree"), Theme.KitTree);
 		Paths(TEXT("boulder"), Theme.KitBoulder);
+		Paths(TEXT("cliff"), Theme.KitCliff);
+		Paths(TEXT("structure"), Theme.KitStructure);
 		Theme.KitRockFill = Number(Kit, TEXT("rockFill"), Theme.KitRockFill);
 		Theme.KitTreeHeight = Number(Kit, TEXT("treeHeight"), Theme.KitTreeHeight);
 		Theme.KitBoulderSize = Number(Kit, TEXT("boulderSize"), Theme.KitBoulderSize);
+
+		// How the board is lit beyond sun, sky and fog.
+		const TSharedPtr<FJsonObject> Light = Part(TEXT("light"));
+		if (Light.IsValid())
+		{
+			Light->TryGetBoolField(TEXT("night"), Theme.bNight);
+			Light->TryGetBoolField(TEXT("volumetric"), Theme.bVolumetricFog);
+		}
+		Theme.SunDrift = Number(Light, TEXT("drift"), Theme.SunDrift);
+		Theme.TorchIntensity = Number(Light, TEXT("torches"), Theme.bNight ? 7000.0f : Theme.TorchIntensity);
+		Theme.TorchColour = Hex(Light, TEXT("torchColour"), Theme.TorchColour);
+		Theme.Exposure = Number(Light, TEXT("exposure"), Theme.Exposure);
+
+		// What grows on the board and round it.
+		const TSharedPtr<FJsonObject> Foliage = Part(TEXT("foliage"));
+		auto Sub = [&Foliage](const TCHAR* Key) { const TSharedPtr<FJsonObject>* Found = nullptr; return Foliage.IsValid() && Foliage->TryGetObjectField(Key, Found) ? *Found : TSharedPtr<FJsonObject>(); };
+		auto Colours = [](const TSharedPtr<FJsonObject>& Json, TArray<FLinearColor>& Into)
+		{
+			const TArray<TSharedPtr<FJsonValue>>* List = nullptr;
+			if (Json.IsValid() && Json->TryGetArrayField(TEXT("colours"), List))
+			{
+				for (const TSharedPtr<FJsonValue>& Item : *List)
+				{
+					Into.Add(FLinearColor(FColor::FromHex(Item->AsString())));
+				}
+			}
+		};
+		const TSharedPtr<FJsonObject> Grass = Sub(TEXT("grass"));
+		Theme.GrassDensity = Number(Grass, TEXT("density"), Theme.GrassDensity);
+		Theme.GrassHeight = Number(Grass, TEXT("height"), Theme.GrassHeight);
+		Colours(Grass, Theme.GrassColours);
+		const TSharedPtr<FJsonObject> Flowers = Sub(TEXT("flowers"));
+		Theme.FlowerDensity = Number(Flowers, TEXT("density"), Theme.FlowerDensity);
+		Colours(Flowers, Theme.FlowerColours);
+		const TSharedPtr<FJsonObject> Bushes = Sub(TEXT("bushes"));
+		Theme.BushDensity = Number(Bushes, TEXT("density"), Theme.BushDensity);
+		Theme.BushColour = Hex(Bushes, TEXT("colour"), Theme.BushColour);
+		Theme.ForestDensity = Number(Foliage, TEXT("forest"), Theme.ForestDensity);
+		const TSharedPtr<FJsonObject> FoliageKit = Sub(TEXT("kit"));
+		auto KitPaths = [&FoliageKit](const TCHAR* Key, TArray<FString>& Into)
+		{
+			const TArray<TSharedPtr<FJsonValue>>* List = nullptr;
+			if (FoliageKit.IsValid() && FoliageKit->TryGetArrayField(Key, List))
+			{
+				for (const TSharedPtr<FJsonValue>& Item : *List)
+				{
+					Into.Add(Item->AsString());
+				}
+			}
+		};
+		KitPaths(TEXT("grass"), Theme.KitGrass);
+		KitPaths(TEXT("flower"), Theme.KitFlower);
+		KitPaths(TEXT("bush"), Theme.KitBush);
+		Theme.KitGrassHeight = Number(FoliageKit, TEXT("grassHeight"), Theme.KitGrassHeight);
+		Theme.KitFlowerHeight = Number(FoliageKit, TEXT("flowerHeight"), Theme.KitFlowerHeight);
+		Theme.KitBushHeight = Number(FoliageKit, TEXT("bushHeight"), Theme.KitBushHeight);
+		if (Theme.GrassColours.Num() == 0)
+		{
+			// The theme's own ground, a shade brighter, so grass reads against it.
+			Theme.GrassColours = { Theme.Tops[0] * 1.15f, Theme.Tops[FMath::Min(1, Theme.Tops.Num() - 1)] * 1.25f, Theme.Leaves * 1.2f };
+		}
+		if (Theme.FlowerColours.Num() == 0)
+		{
+			Theme.FlowerColours = { FLinearColor(0.95f, 0.85f, 0.3f), FLinearColor(0.85f, 0.35f, 0.6f), FLinearColor(0.9f, 0.9f, 0.95f) };
+		}
 
 		ThemeIds.Add(Theme.Id);
 		Themes.Add(Theme.Id, Theme);
@@ -250,8 +321,32 @@ UStaticMeshComponent* ATMBattleDirector::Shape(const TCHAR* Name, const FVector&
 	return Part;
 }
 
+void ATMBattleDirector::RefreshTowers()
+{
+	// Embers while nobody holds it, then a fire in the holder's colour: the one
+	// thing about a tower worth seeing from across the board. Red is orange with
+	// the colour-blind option on, as everywhere else (PaintTower).
+	for (int32 i = 0; i < TowerRoofOwner.Num() && i < static_cast<int32>(Battle.Watchtowers.size()); ++i)
+	{
+		// Not called Owner: that is the actor's own.
+		const int32 Holder = Battle.Watchtowers[static_cast<size_t>(i)].Owner;
+		if (TowerRoofOwner[i] == Holder)
+		{
+			continue;
+		}
+		TowerRoofOwner[i] = Holder;
+		PaintTower(i, Holder);
+	}
+}
+
 UStaticMeshComponent* ATMBattleDirector::KitPiece(const FString& Path, const FVector& Foot, float Footprint, float Height, float Yaw, bool bStretch, float MinHeight)
 {
+	// With nothing drawn (a headless copy: the online test, a server) the kit's
+	// meshes would only cost minutes of building; the basic shapes stand in.
+	if (!FApp::CanEverRender())
+	{
+		return nullptr;
+	}
 	TObjectPtr<UStaticMesh>* Known = KitMeshes.Find(Path);
 	if (!Known)
 	{
@@ -294,7 +389,9 @@ UStaticMeshComponent* ATMBattleDirector::KitPiece(const FString& Path, const FVe
 	Part->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	Part->RegisterComponent();
 	Part->SetStaticMesh(Mesh);
-	Part->SetReceivesDecals(false);
+	// Rocks, ruins and the theme's pieces take the ground's paint, so an aim or a
+	// walk area reads over them as over the ground (2026-09-30).
+	Part->SetReceivesDecals(true);
 	Part->SetRelativeScale3D(Scale);
 	Part->SetRelativeRotation(Turn);
 	Part->SetRelativeLocation(Foot - Turn.RotateVector(Pivot * Scale));
@@ -309,9 +406,16 @@ void ATMBattleDirector::BuildBoard()
 	const TMSim::FMap& Map = Battle.Map;
 	const float M = TileSize;  // centimetres to a metre
 	const float Tile = TMSim::Ground::TileSize * M;
-	const float Level = TMSim::Ground::LevelHeight * M;
+	const float Level = LevelCm();
 	const FRandomStream Dice(GetTypeHash(FString(UTF8_TO_TCHAR(Setup.MapId.c_str()))) ^ GetTypeHash(Theme.Id));
 	auto TopColour = [&Theme](int32 Height) { return Theme.Tops[FMath::Clamp(Height - 1, 0, Theme.Tops.Num() - 1)]; };
+	// What stands on the board is hidden by the fog of war until seen (MarkFogged).
+	FogProps.Reset();
+	FogPropCell.Reset();
+	HazardParts.Reset();
+	// The tile-by-tile ground: kept for clicks, hidden under the smooth ground
+	// once that is built (TMBattleDirectorGround.cpp).
+	TArray<UStaticMeshComponent*> TilePieces;
 
 	for (int32 Y = 0; Y < Map.TilesY; ++Y)
 	{
@@ -331,20 +435,20 @@ void ATMBattleDirector::BuildBoard()
 				// A column of the side's colour up to under the top, the top on it.
 				const float Top = Height * Level;
 				const float Column = FMath::Max(1.0f, Top - SlabMetres * M);
-				Solid(Shape(TEXT("Cube"), Centre + FVector(0, 0, Column * 0.5f), FVector(Across, Across, Column), FRotator::ZeroRotator,
-					Wander(Theme.Side, Theme.Jitter * 0.6f, Seed + 1)));
+				UStaticMeshComponent* ColumnPart = Shape(TEXT("Cube"), Centre + FVector(0, 0, Column * 0.5f), FVector(Across, Across, Column), FRotator::ZeroRotator,
+					Wander(Theme.Side, Theme.Jitter * 0.6f, Seed + 1));
+				Solid(ColumnPart);
+				TilePieces.Add(ColumnPart);
 				FLinearColor Surface = Wander(TopColour(Height), Theme.Jitter, Seed);
 				if (Hazard < 0)
 				{
-					Surface = Wander(Theme.Embers, Theme.Jitter * 0.5f, Seed);
-				}
-				else if (Hazard > 0)
-				{
-					Surface = Theme.Spring;
+					// Darkened; the scorch and the fire are built on it (BuildHazard).
+					Surface = FMath::Lerp(Surface, Theme.Embers, 0.4f);
 				}
 				UStaticMeshComponent* Slab = Shape(TEXT("Cube"), Centre + FVector(0, 0, Top - SlabMetres * M * 0.5f), FVector(Across, Across, SlabMetres * M),
 					FRotator::ZeroRotator, Surface);
 				Solid(Slab);
+				TilePieces.Add(Slab);
 				if (Slab)
 				{
 					Slab->SetReceivesDecals(true);
@@ -356,27 +460,16 @@ void ATMBattleDirector::BuildBoard()
 					// Hidden, not gone: it is still what a click on the board finds.
 					Slab->SetHiddenInGame(true);
 					Cast<UStaticMeshComponent>(BoardProps.Last())->SetReceivesDecals(true);
+					TilePieces.Add(Cast<UStaticMeshComponent>(BoardProps.Last()));
 				}
 
 				if (Hazard != 0)
 				{
-					// Embers glow and smoulder; a spring shines. A light each, and for
-					// embers a scatter of hot coals on the ground.
+					// Burning ground or a healing spring, in the theme's look
+					// (TMBattleDirectorHazards.cpp); and a light each.
+					const int32 HazardFrom = BoardProps.Num();
 					const FLinearColor Glow = Hazard < 0 ? Theme.EmberGlow : Theme.SpringGlow;
-					if (Hazard < 0)
-					{
-						for (int32 k = 0; k < 7; ++k)
-						{
-							const FVector Coal(Dice.FRandRange(-0.4f, 0.4f) * Tile, Dice.FRandRange(-0.4f, 0.4f) * Tile, Top + 4.0f);
-							Shape(TEXT("Cube"), Centre + Coal, FVector(Dice.FRandRange(10.0f, 22.0f), Dice.FRandRange(10.0f, 22.0f), 8.0f),
-								FRotator(0, Dice.FRandRange(0.0f, 90.0f), 0), Glow);
-						}
-					}
-					else
-					{
-						Shape(TEXT("Cylinder"), Centre + FVector(0, 0, Top + 2.0f), FVector(Tile * 0.7f, Tile * 0.7f, 4.0f), FRotator::ZeroRotator,
-							Glow * 0.9f);
-					}
+					BuildHazard(Theme, Centre + FVector(0, 0, Top), Hazard, Seed);
 					UPointLightComponent* Light = NewObject<UPointLightComponent>(this, NAME_None, RF_Transient);
 					Light->SetupAttachment(RootComponent);
 					Light->RegisterComponent();
@@ -388,17 +481,28 @@ void ATMBattleDirector::BuildBoard()
 					BoardProps.Add(Light);
 					BoardLights.Add(Light);
 					BoardLightBase.Add(Light->Intensity);
+					MarkFogged(HazardFrom, Centre);
 				}
 			}
 			else if (bRock)
 			{
 				// Rock stands on the ground: a floor, and the rock itself, tall
-				// enough that it plainly hides what is behind it.
-				Shape(TEXT("Cube"), Centre + FVector(0, 0, Level * 0.5f), FVector(Across, Across, Level), FRotator::ZeroRotator,
-					Wander(Theme.Side, Theme.Jitter * 0.6f, Seed + 1));
+				// enough that it plainly hides what is behind it. The floor takes
+				// the fog; the rock is hidden until seen.
+				if (UStaticMeshComponent* Floor = Shape(TEXT("Cube"), Centre + FVector(0, 0, Level * 0.5f), FVector(Across, Across, Level), FRotator::ZeroRotator,
+					Wander(Theme.Side, Theme.Jitter * 0.6f, Seed + 1)))
+				{
+					Floor->SetReceivesDecals(true);
+					TilePieces.Add(Floor);
+				}
+				const int32 RockFrom = BoardProps.Num();
 				const FLinearColor Stone = Wander(Theme.Rock, Theme.Jitter, Seed + 2);
-				if (Theme.KitRock.Num() > 0
-					&& KitPiece(Theme.KitRock[Dice.RandHelper(Theme.KitRock.Num())], Centre + FVector(0, 0, Level), Tile * Theme.KitRockFill,
+				if (MaybeStructure(Theme, Centre + FVector(0, 0, Level), Tile, Dice))
+				{
+					// A ruin stands here instead of a rock (TMBattleDirectorCliffs.cpp).
+				}
+				else if (RockKit(Theme).Num() > 0
+					&& KitPiece(RockKit(Theme)[Dice.RandHelper(RockKit(Theme).Num())], Centre + FVector(0, 0, Level), Tile * Theme.KitRockFill,
 						0.0f, Dice.FRandRange(0.0f, 360.0f), false, 1.8f * M))
 				{
 					// The kit's rock stands here; nothing else is needed.
@@ -431,13 +535,15 @@ void ATMBattleDirector::BuildBoard()
 					Shape(TEXT("Sphere"), Centre + FVector(Dice.FRandRange(-0.3f, 0.3f) * Tile, Dice.FRandRange(-0.3f, 0.3f) * Tile, Level + 0.5f * M),
 						FVector(Tile * 0.55f, Tile * 0.5f, 1.1f * M), FRotator(0, Dice.FRandRange(0.0f, 360.0f), 0), Stone * 0.85f);
 				}
+				MarkFogged(RockFrom, Centre);
 			}
 			else
 			{
 				// Water: a bed below and the surface over it, lower than the banks.
-				Shape(TEXT("Cube"), Centre + FVector(0, 0, 10.0f), FVector(Tile, Tile, 20.0f), FRotator::ZeroRotator, Theme.Water * 0.35f);
+				TilePieces.Add(Shape(TEXT("Cube"), Centre + FVector(0, 0, 10.0f), FVector(Tile, Tile, 20.0f), FRotator::ZeroRotator, Theme.Water * 0.35f));
 				UStaticMeshComponent* Surface = Shape(TEXT("Plane"), Centre + FVector(0, 0, Level * 0.62f), FVector(Tile, Tile, 100.0f),
 					FRotator::ZeroRotator, Theme.Water);
+				TilePieces.Add(Surface);
 				UMaterialInterface* Clear = LoadObject<UMaterialInterface>(nullptr, TEXT("/Engine/EngineMaterials/Widget3DPassThrough_Translucent.Widget3DPassThrough_Translucent"));
 				if (Surface && Clear)
 				{
@@ -471,6 +577,22 @@ void ATMBattleDirector::BuildBoard()
 			}
 		}
 	}
+
+	// The ground as one smooth surface instead of a box per tile. The tiles stay,
+	// unseen: clicks on the board are traced into them.
+	if (BuildSmoothGround(Theme))
+	{
+		for (UStaticMeshComponent* Piece : TilePieces)
+		{
+			if (Piece)
+			{
+				Piece->SetVisibility(false);
+			}
+		}
+		// Rock faces on the tall steps, so hills read as hills and cliffs as cliffs.
+		DressCliffs(Theme);
+	}
+	DressStructures(Theme);
 
 	// The land around the board: flat ground far out, with trees and rocks on
 	// it -- never close enough to hide the board from the camera.
@@ -542,6 +664,68 @@ void ATMBattleDirector::BuildBoard()
 			FRotator(0, Dice.FRandRange(0.0f, 360.0f), 0), Wander(Theme.Rock, Theme.Jitter, 5000 + i));
 	}
 
+	// The watchtowers the rules placed (Docs/design/feat-objectives.md): the
+	// Signal Beacon (TMBattleDirectorTower.cpp), its fire in the colour of whoever
+	// holds it (RefreshTowers).
+	TowerRoofs.Reset();
+	TowerRoofOwner.Reset();
+	Beacons.Reset();
+	for (const TMSim::FWatchtower& Tower : Battle.Watchtowers)
+	{
+		const int32 Height = Battle.LevelAt(Tower.Pos);
+		const FVector Foot(Tower.Pos.X * M, Tower.Pos.Y * M, Height * Level);
+		const int32 TowerFrom = BoardProps.Num();
+		MakeTower(Foot, 31 + 17 * TowerRoofOwner.Num());
+		TowerRoofOwner.Add(-2);  // painted on the first refresh
+		MarkFogged(TowerFrom, Foot);
+	}
+	RefreshTowers();
+
+	// Torches: round the board's edge, and one atop each watchtower, where the
+	// theme lights them (every night theme does). They gutter with the rest.
+	if (Theme.TorchIntensity > 0.0f)
+	{
+		auto Torch = [&](const FVector& Foot, bool bPole)
+		{
+			if (bPole)
+			{
+				Shape(TEXT("Cylinder"), Foot + FVector(0, 0, 90.0f), FVector(10.0f, 10.0f, 180.0f), FRotator::ZeroRotator, Theme.Trunk);
+				Shape(TEXT("Sphere"), Foot + FVector(0, 0, 190.0f), FVector(22.0f, 22.0f, 30.0f), FRotator::ZeroRotator, Theme.TorchColour * 2.0f);
+			}
+			UPointLightComponent* Light = NewObject<UPointLightComponent>(this, NAME_None, RF_Transient);
+			Light->SetupAttachment(RootComponent);
+			Light->RegisterComponent();
+			Light->SetRelativeLocation(Foot + FVector(0, 0, bPole ? 200.0f : 40.0f));
+			Light->SetLightColor(Theme.TorchColour);
+			Light->SetIntensity(Theme.TorchIntensity);
+			Light->SetAttenuationRadius(900.0f);
+			// Only a few cast shadows: many shadowed lights cost a lot.
+			Light->SetCastShadows(false);
+			BoardProps.Add(Light);
+			BoardLights.Add(Light);
+			BoardLightBase.Add(Light->Intensity);
+		};
+		const float Spacing = 12.0f * M;
+		const float Out = 1.2f * M;
+		for (float Along = Spacing * 0.5f; Along < Board.X; Along += Spacing)
+		{
+			Torch(FVector(Along, -Out, 0.0f), true);
+			Torch(FVector(Along, Board.Y + Out, 0.0f), true);
+		}
+		for (float Along = Spacing * 0.5f; Along < Board.Y; Along += Spacing)
+		{
+			Torch(FVector(-Out, Along, 0.0f), true);
+			Torch(FVector(Board.X + Out, Along, 0.0f), true);
+		}
+		for (const TMSim::FWatchtower& Tower : Battle.Watchtowers)
+		{
+			const FVector Foot(Tower.Pos.X * M, Tower.Pos.Y * M, Battle.LevelAt(Tower.Pos) * Level + TMSim::Watchtower::EyeHeight * M);
+			Torch(Foot, false);
+		}
+	}
+
+	BuildFoliage(Theme);
+
 	ApplyThemeLighting();
 	UE_LOG(LogTemp, Log, TEXT("Board built: %d by %d tiles, %d pieces, dressed as %s"), Map.TilesX, Map.TilesY, BoardProps.Num(), *Theme.Id);
 }
@@ -556,6 +740,9 @@ void ATMBattleDirector::ApplyThemeLighting()
 		return;
 	}
 	const FTMTheme& Theme = ActiveTheme();
+	// Shadows far enough to cover the whole board from any camera angle.
+	const TMSim::FVec2 Size = Battle.Map.SizeMeters();
+	const float Across = FMath::Sqrt(Size.X * Size.X + Size.Y * Size.Y) * TileSize;
 	for (TActorIterator<ADirectionalLight> It(World); It; ++It)
 	{
 		if (UDirectionalLightComponent* Sun = Cast<UDirectionalLightComponent>(It->GetLightComponent()))
@@ -564,13 +751,24 @@ void ATMBattleDirector::ApplyThemeLighting()
 			It->SetActorRotation(FRotator(Theme.SunPitch, Theme.SunYaw, 0.0f));
 			Sun->SetIntensity(Theme.SunIntensity);
 			Sun->SetLightColor(Theme.SunColour);
+			Sun->SetCastShadows(true);
+			Sun->SetDynamicShadowDistanceMovableLight(FMath::Max(8000.0f, Across * 1.3f));
+			Sun->MarkRenderStateDirty();
+			// It turns slowly through the battle (AdvanceBoard).
+			SunActor = *It;
+			SunBaseYaw = Theme.SunYaw;
+			SunBasePitch = Theme.SunPitch;
 		}
 	}
 	for (TActorIterator<ASkyLight> It(World); It; ++It)
 	{
 		if (USkyLightComponent* Sky = It->GetLightComponent())
 		{
+			// Captured as the sun moves, so shade follows it.
+			Sky->SetMobility(EComponentMobility::Movable);
+			Sky->bRealTimeCapture = true;
 			Sky->SetIntensity(Theme.SkyIntensity);
+			Sky->MarkRenderStateDirty();
 			Sky->RecaptureSky();
 		}
 	}
@@ -580,6 +778,21 @@ void ATMBattleDirector::ApplyThemeLighting()
 		{
 			Fog->SetFogDensity(Theme.FogDensity);
 			Fog->SetFogInscatteringColor(Theme.FogColour);
+			// Light shafts where the sun cuts through it.
+			Fog->SetVolumetricFog(Theme.bVolumetricFog);
+			Fog->SetVolumetricFogScatteringDistribution(0.5f);
+		}
+	}
+	// How bright the picture is, relative to the engine's own judgement: a
+	// night theme darkens it rather than having auto-exposure brighten it back.
+	if (Watcher)
+	{
+		if (UCameraComponent* Lens = Watcher->GetCameraComponent())
+		{
+			Lens->PostProcessSettings.bOverride_AutoExposureBias = true;
+			Lens->PostProcessSettings.AutoExposureBias = Theme.Exposure + (Theme.bNight ? -1.0f : 0.0f);
+			Lens->PostProcessSettings.bOverride_BloomIntensity = true;
+			Lens->PostProcessSettings.BloomIntensity = Theme.bNight ? 0.9f : 0.5f;
 		}
 	}
 }
@@ -594,6 +807,15 @@ void ATMBattleDirector::AdvanceBoard(float DeltaSeconds)
 		{
 			const float Beat = FMath::Sin(Now * (3.0f + (i % 5)) + i * 1.7f) * FMath::Sin(Now * 7.3f + i);
 			Light->SetIntensity(BoardLightBase[i] * (0.8f + 0.25f * Beat));
+		}
+	}
+	// The sun turns slowly round the board through a battle, so shadows move.
+	if (ADirectionalLight* Sun = SunActor.Get())
+	{
+		const float Drift = ActiveTheme().SunDrift;
+		if (Drift != 0.0f && GetWorld() && GetWorld()->IsGameWorld())
+		{
+			Sun->SetActorRotation(FRotator(SunBasePitch, SunBaseYaw + Drift * Now / 60.0f, 0.0f));
 		}
 	}
 	(void)DeltaSeconds;

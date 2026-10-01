@@ -126,6 +126,13 @@ namespace TMSim
 		std::vector<std::string> Top;
 		/** Blue's starting spots in metres, on navigation node centres. */
 		std::vector<FVec2> Spawns;
+		/**
+		 * The boss that wakes in the middle when a battle has neutral camps
+		 * (a monster class id, Docs/design/feat-neutral-camps.md 14), or empty
+		 * for one drawn at random. Checked when a battle starts, not here: the
+		 * monster files may not be loaded yet.
+		 */
+		std::string Boss;
 	};
 
 	/**

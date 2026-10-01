@@ -1,0 +1,15 @@
+{
+  "format": "tactical-masters-item",
+  "version": 1,
+  "id": "executioners_edge",
+  "name": "Executioner's Edge",
+  "desc": "Abilities hit 15% harder and find weak spots.",
+  "icon": "blade",
+  "tier": "rare",
+  "stats": {
+    "crit": 6
+  },
+  "bonus": {
+    "damage_percent": 15
+  }
+}

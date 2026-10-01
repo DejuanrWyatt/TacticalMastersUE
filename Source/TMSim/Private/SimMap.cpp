@@ -175,15 +175,17 @@ namespace TMSim
 			Say("name: missing");
 		}
 		// Big enough to manoeuvre on, small enough for the pathfinder to stay quick.
-		if (Def.Top.size() < 3 || Def.Top.size() > 20)
+		// Up to 80 by 80 tiles (160 m a side): room for the big maps with camps
+		// and watchtowers (Docs/design/feat-neutral-camps.md).
+		if (Def.Top.size() < 3 || Def.Top.size() > 40)
 		{
-			Say("top: 3 to 20 rows (the map is twice that tall)");
+			Say("top: 3 to 40 rows (the map is twice that tall)");
 			return Problems;
 		}
 		const size_t Width = Def.Top[0].size();
-		if (Width < 8 || Width > 40)
+		if (Width < 8 || Width > 80)
 		{
-			Say("top: rows 8 to 40 tiles wide");
+			Say("top: rows 8 to 80 tiles wide");
 			return Problems;
 		}
 		for (size_t Row = 0; Row < Def.Top.size(); ++Row)
@@ -301,7 +303,7 @@ namespace TMSim
 		{
 			return "version: must be 1";
 		}
-		static const char* const Keys[] = { "format", "version", "id", "name", "desc", "theme", "top", "spawns" };
+		static const char* const Keys[] = { "format", "version", "id", "name", "desc", "theme", "top", "spawns", "boss" };
 		std::string Problems;
 		for (const auto& Member : Json.Object)
 		{
@@ -325,6 +327,7 @@ namespace TMSim
 		Out.Name = TextOf("name");
 		Out.Desc = TextOf("desc");
 		Out.Theme = TextOf("theme");
+		Out.Boss = TextOf("boss");
 		if (const FJson* Top = Json.Find("top"); Top && Top->IsArray())
 		{
 			for (const FJson& Row : Top->Array)

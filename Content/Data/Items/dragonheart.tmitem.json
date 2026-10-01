@@ -1,0 +1,16 @@
+{
+  "format": "tactical-masters-item",
+  "version": 1,
+  "id": "dragonheart",
+  "name": "Dragonheart",
+  "desc": "A drake's heart, still warm. Tougher, harder hitting, quicker.",
+  "icon": "heart",
+  "tier": "epic",
+  "stats": {
+    "hp": 50,
+    "speed": 1
+  },
+  "bonus": {
+    "damage_percent": 15
+  }
+}

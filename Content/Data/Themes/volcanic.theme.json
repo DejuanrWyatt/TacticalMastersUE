@@ -1,13 +1,101 @@
 {
   "format": "tactical-masters-theme",
   "name": "Ashen Caldera",
-  "ground": {"tops": ["#3d3834", "#4a433d", "#574e46", "#655a50", "#72665a"], "side": "#2a2522", "jitter": 0.05},
-  "rock": {"colour": "#4a3f4f", "style": "crystals"},
-  "water": {"colour": "#ff5a14", "opacity": 1.0, "glows": true},
-  "embers": {"colour": "#401a0e", "glow": "#ff5a14"},
-  "spring": {"colour": "#46b8a8", "glow": "#7fffe0"},
-  "around": {"ground": "#2e2926", "trees": "dead", "treeCount": 35, "leaves": "#2a2420", "trunk": "#2b211b", "rockCount": 45},
-  "sun": {"pitch": -18, "yaw": -75, "intensity": 5, "colour": "#ffb07a"},
-  "sky": {"intensity": 2.5},
-  "fog": {"density": 0.04, "colour": "#8a5a45"}
+  "ground": {
+    "tops": [
+      "#3d3834",
+      "#4a433d",
+      "#574e46",
+      "#655a50",
+      "#72665a"
+    ],
+    "side": "#2a2522",
+    "jitter": 0.05
+  },
+  "rock": {
+    "colour": "#4a3f4f",
+    "style": "crystals"
+  },
+  "water": {
+    "colour": "#ff5a14",
+    "opacity": 1.0,
+    "glows": true
+  },
+  "embers": {
+    "colour": "#401a0e",
+    "glow": "#ff5a14"
+  },
+  "spring": {
+    "colour": "#46b8a8",
+    "glow": "#7fffe0"
+  },
+  "around": {
+    "ground": "#2e2926",
+    "trees": "dead",
+    "treeCount": 35,
+    "leaves": "#2a2420",
+    "trunk": "#2b211b",
+    "rockCount": 45
+  },
+  "sun": {
+    "pitch": -18,
+    "yaw": -75,
+    "intensity": 5,
+    "colour": "#ffb07a"
+  },
+  "sky": {
+    "intensity": 2.5
+  },
+  "fog": {
+    "density": 0.04,
+    "colour": "#8a5a45"
+  },
+  "light": {
+    "drift": 0.5,
+    "exposure": -0.3,
+    "volumetric": true
+  },
+  "foliage": {
+    "grass": {
+      "density": 0.25,
+      "height": 0.25,
+      "colours": [
+        "#3a332e",
+        "#4a3a2a"
+      ]
+    },
+    "flowers": {
+      "density": 0.0
+    },
+    "bushes": {
+      "density": 0.15,
+      "colour": "#2a2420"
+    },
+    "forest": 0.015
+  },
+  "kit": {
+    "rock": [
+      "/Game/JayantChakradhariAssets_Free_Stylized_Lava_Rock/Meshes/SM_Lava_Rock_1.SM_Lava_Rock_1",
+      "/Game/JayantChakradhariAssets_Free_Stylized_Lava_Rock/Meshes/SM_Lava_Rock_3.SM_Lava_Rock_3",
+      "/Game/JayantChakradhariAssets_Free_Stylized_Lava_Rock/Meshes/SM_Lava_Rock_10.SM_Lava_Rock_10",
+      "/Game/JayantChakradhariAssets_Free_Stylized_Lava_Rock/Meshes/SM_Lava_Rock_11.SM_Lava_Rock_11",
+      "/Game/JayantChakradhariAssets_Free_Stylized_Lava_Rock/Meshes/SM_Lava_Rock_17.SM_Lava_Rock_17",
+      "/Game/JayantChakradhariAssets_Free_Stylized_Lava_Rock/Meshes/SM_Lava_Rock_19.SM_Lava_Rock_19",
+      "/Game/JayantChakradhariAssets_Free_Stylized_Lava_Rock/Meshes/SM_Clustered_Lava_Rock_2.SM_Clustered_Lava_Rock_2",
+      "/Game/JayantChakradhariAssets_Free_Stylized_Lava_Rock/Meshes/SM_Clustered_Lava_Rock_4.SM_Clustered_Lava_Rock_4"
+    ],
+    "boulder": [
+      "/Game/JayantChakradhariAssets_Free_Stylized_Lava_Rock/Meshes/SM_Lava_Pillar_Rock_1.SM_Lava_Pillar_Rock_1",
+      "/Game/JayantChakradhariAssets_Free_Stylized_Lava_Rock/Meshes/SM_Lava_Pillar_Rock_2.SM_Lava_Pillar_Rock_2",
+      "/Game/JayantChakradhariAssets_Free_Stylized_Lava_Rock/Meshes/SM_Lava_Pillar_Rock_9.SM_Lava_Pillar_Rock_9",
+      "/Game/JayantChakradhariAssets_Free_Stylized_Lava_Rock/Meshes/SM_Lava_Arch_Rock_1.SM_Lava_Arch_Rock_1",
+      "/Game/JayantChakradhariAssets_Free_Stylized_Lava_Rock/Meshes/SM_Lava_Arch_Rock_3.SM_Lava_Arch_Rock_3",
+      "/Game/JayantChakradhariAssets_Free_Stylized_Lava_Rock/Meshes/SM_Lava_Arch_Rock_5.SM_Lava_Arch_Rock_5",
+      "/Game/KiteDemo/Environments/Rocks/Large_Volcanic_Rock_001/LargeVolcanicRock_001.LargeVolcanicRock_001",
+      "/Game/KiteDemo/Environments/Rocks/Large_Volcanic_Rock_001/LargeVolcanicRock_002.LargeVolcanicRock_002",
+      "/Game/KiteDemo/Environments/Rocks/Large_Volcanic_Rock_001/LargeVolcanicRock_004.LargeVolcanicRock_004"
+    ],
+    "rockFill": 1.0,
+    "boulderSize": 4.0
+  }
 }

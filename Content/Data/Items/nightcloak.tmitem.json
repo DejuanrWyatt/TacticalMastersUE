@@ -1,0 +1,12 @@
+{
+  "format": "tactical-masters-item",
+  "version": 1,
+  "id": "nightcloak",
+  "name": "Nightcloak",
+  "desc": "+8 A-Eva and M-Eva while unseen as your turn begins.",
+  "icon": "cloak",
+  "tier": "rare",
+  "effects": {
+    "unseen_evasion": 8
+  }
+}

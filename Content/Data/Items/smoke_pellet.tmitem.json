@@ -1,0 +1,29 @@
+{
+  "format": "tactical-masters-item",
+  "version": 1,
+  "id": "smoke_pellet",
+  "name": "Smoke Pellet",
+  "desc": "Vanish until your next turn ends.",
+  "icon": "smoke",
+  "tier": "uncommon",
+  "ability": {
+    "id": "item_smoke",
+    "name": "Smoke",
+    "desc": "Unseen by the other side for 2 turns, until it deals or takes damage.",
+    "kind": "active",
+    "effect": "support",
+    "scale": "mag",
+    "target": "ally",
+    "shape": "self",
+    "power": 0,
+    "min_range": 0,
+    "max_range": 0,
+    "aoe": 0,
+    "cooldown": 5,
+    "cast": 0,
+    "status": {
+      "id": "veil",
+      "turns": 2
+    }
+  }
+}

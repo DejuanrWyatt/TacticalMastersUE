@@ -1,0 +1,95 @@
+{
+  "format": "tactical-masters-class",
+  "version": 1,
+  "id": "siege_crawler",
+  "name": "Siege Crawler",
+  "color": "#8a7a5a",
+  "look": "knight",
+  "icon": "siege_crawler",
+  "roles": [
+    "damage"
+  ],
+  "stats": {
+    "hp": 60,
+    "attdef": 6,
+    "magdef": 3,
+    "aeva": 0,
+    "meva": 2,
+    "crit": 5,
+    "speed": 6,
+    "move": 2,
+    "patience": 5,
+    "sight": 11
+  },
+  "abilities": [
+    {
+      "id": "siege_crawler_mortar",
+      "name": "Mortar",
+      "desc": "Lobs a shell 3 to 9 m, hitting everyone within 1 m of where it lands (power 24).",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "att",
+      "target": "enemy",
+      "shape": "circle",
+      "power": 24,
+      "min_range": 3,
+      "max_range": 9,
+      "aoe": 1,
+      "cooldown": 0,
+      "cast": 0
+    },
+    {
+      "id": "siege_crawler_idle1",
+      "name": "Dug In",
+      "desc": "Always on: nothing to use.",
+      "kind": "passive",
+      "effect": "support",
+      "scale": "mag",
+      "target": "ally",
+      "shape": "self",
+      "power": 0,
+      "min_range": 0,
+      "max_range": 0,
+      "aoe": 0,
+      "cooldown": 0,
+      "cast": 0
+    },
+    {
+      "id": "siege_crawler_idle2",
+      "name": "Plated",
+      "desc": "Always on: nothing to use.",
+      "kind": "passive",
+      "effect": "support",
+      "scale": "mag",
+      "target": "ally",
+      "shape": "self",
+      "power": 0,
+      "min_range": 0,
+      "max_range": 0,
+      "aoe": 0,
+      "cooldown": 0,
+      "cast": 0
+    },
+    {
+      "id": "siege_crawler_idle3",
+      "name": "Wild Instinct",
+      "desc": "Always on: nothing to use.",
+      "kind": "passive",
+      "effect": "support",
+      "scale": "mag",
+      "target": "ally",
+      "shape": "self",
+      "power": 0,
+      "min_range": 0,
+      "max_range": 0,
+      "aoe": 0,
+      "cooldown": 0,
+      "cast": 0
+    }
+  ],
+  "monster": {
+    "tier": "medium",
+    "temperament": "guard_place",
+    "ring": 6
+  }
+}
