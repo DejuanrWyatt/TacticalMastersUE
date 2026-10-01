@@ -33,24 +33,32 @@ How to write here:
 - Please don't: delete or move `E:\UnrealProjects\TM_Release`, or change Content assets, while it cooks.
   A second heavy build at the same time may run the PC out of memory again.
 
-### Watchtower session (claude-fd), 2026-09-29
-- Doing: watchtowers (`Docs/design/feat-objectives.md` section 13). Rules done and tested on Linux (every
-  test passes, `SimWatchtowerTest` new); the Unreal side is written but not yet compiled. Now: running
-  `scripts\build.bat` and `scripts\test.bat` for the human.
-- Claimed, uncommitted: `Source/TMSim/Public/{SimAI,SimBattle,SimOrder,SimTypes}.h`,
-  `Source/TMSim/Private/{SimAI,SimBattle,SimOrderText,SimTypes,SimWorld}.cpp`,
-  `Source/TacticalMasters/{TMBattleDirector.cpp,TMBattleDirector.h,TMBattleDirectorBoard.cpp,TMBattleDirectorOnline.cpp,TMBattleHud.cpp,TMBattleHud.h,TMBattleHudOptions.cpp,TMNet.h,TMRobotPlayer.cpp}`,
-  `Tests/{RunTests.bat,SimPlayTest.cpp,SimWatchtowerTest.cpp}`, my rows in `Docs/backlog.md` and
-  `CLAUDE.md` (watchtower command + porting-status paragraph), `Docs/design/feat-objectives.md`, `feat-items.md`.
-- Not safe to ship yet: until build.bat and test.bat pass on this PC, package from the last commit. I'll
-  say here when they pass (and commit only these files).
-
 ## Notes for others
 
+- For every session (from the watchtower session): the device bridge can write an older copy of a file when the same
+  container path is committed twice. Commit each change from a fresh path, and re-stage to check what landed.
 - To the watchtower session (from packaging): online protocol v2 means a build with your changes can't
   play one without them. Both players need the same build either way.
 
 ## Log
+
+- 2026-09-30 19:45 (watchtower session) `3114b33`: everything this session had claimed since 2026-09-29, committed at
+  the human's ask after a clean build and every test passing (19:12): watchtowers, items, neutral camps and bosses, the
+  second set of statuses, four 64 x 64 maps, lighting and foliage, ability looks, fog of war over everything, the red
+  hover outline, cliffs and ruins, walking onto items picks them up, item icons, outlined world text, the Runic Coffer
+  chest and the Signal Beacon tower. Later the same day, in the same commit: lag fixes (looks and sounds preloaded, frame
+  timers in the log), no sight lines, the comet trail round a toggle that is on, ground indicators and tower/centre rings
+  painted over the land, taller towers that see their whole radius, blue hover for allies, the camera following to the
+  next unit, the ten hazard looks (TMBattleDirectorHazards.cpp), and the Codex (TMBattleHudCodex.cpp). Online protocol 7.
+  Block removed. Not committed, nobody's claim: the Fab content
+  packs under `Content/`, `Content/{SampleMap,Lighting,ErodingCircle}`, `SnippingSS/`, `scripts/`, `Tools/MapAnalyzer`
+  (but its four new maps), `Docs/{AgentTeam,AssetShortlist}.md`, `Docs/{qa,tech}/`, `Docs/design/_TEMPLATE.md`.
+  The class creator's changes went into its own repository.
+- 2026-09-29 20:48 (watchtower session, resuming packaging) Packaged build done: `E:\Builds\TacticalMasters\Windows\TacticalMasters.exe`,
+  from `TM_Release` at `a75a859` (no watchtowers). The cook finished 11110/11110 but UAT failed on 1025 `LogAssetManager`
+  "PrimaryAssetId TMDataNamed:... does not match object's real id" errors; an incremental rerun with `-ignorecookerrors`
+  (`E:\Builds\agent-finish-package.bat`, log `E:\Builds\package.log`) finished it. Online guide copied next to the exe.
+  Packaging session: those errors will fail the next normal cook too. (This entry was lost once when the file was rewritten.)
 
 - 2026-09-29 (packaging) `a75a859` packaging config (startup map, cook list, data staged, cook memory cap);
   `08883a5`/`a177e4c` this work log and its rule in CLAUDE.md.
