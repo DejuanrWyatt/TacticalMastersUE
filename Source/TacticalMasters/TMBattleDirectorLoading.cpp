@@ -16,6 +16,7 @@
 // heroes load is time not passing, as a pause is.
 
 #include "TMBattleDirector.h"
+#include "TMDrawable.h"
 
 #include "Components/SkeletalMeshComponent.h"
 #include "Dom/JsonObject.h"
@@ -70,12 +71,28 @@ namespace
 	}
 }
 
-void ATMBattleDirector::WearBody(USkeletalMeshComponent* Visual, const FTMBody& Body) const
+void ATMBattleDirector::WearBody(USkeletalMeshComponent* Visual, const FTMBody& Body, bool bNoCloth) const
 {
+	// No cloth simulation (2026-10-01): every render-thread crash in the
+	// play tests was in drawing skinned meshes, and the heroes' cloth being made
+	// and torn down each time a battle is rebuilt is the likeliest part of it.
+	// Capes and robes are drawn skinned, moving with the body. (Before, cloth was
+	// simulated unless the set said it flies apart, FTMAnimSet::bCloth.) Set
+	// before the mesh, so no cloth is made for it at all.
+	//
+	// No morph targets either (2026-10-01): picking Berserker crashed every time,
+	// in the engine's morph buffers (FMorphVertexBufferPool::GetReadingIndex,
+	// "Index == 1") just after Grux's mesh, which carries morph targets, was put
+	// on. Units never drive morphs, so they are off for every body.
+	(void)bNoCloth;
+	Visual->bDisableClothSimulation = true;
+	Visual->bDisableMorphTarget = true;
+	Visual->ClearMorphTargets();
 	Visual->SetSkeletalMeshAsset(Body.Mesh);
+	// A slot whose material was cooked without shaders (Narbash's legs) is
+	// drawn with the default surface instead (TMDrawable.h).
+	TMDrawable::MendBody(Visual);
 	Visual->SetRelativeScale3D(FVector(Body.Scale));
-	// Cloth simulated unless the hero's set says it flies apart (FTMAnimSet::bCloth).
-	Visual->bDisableClothSimulation = Body.Animations && !Body.Animations->bCloth;
 }
 
 bool ATMBattleDirector::IsBodyLoaded(const FTMBody& Body) const

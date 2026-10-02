@@ -257,6 +257,33 @@ namespace TMSim
 		double RandomBoss = 0.0;
 		/** 1: element hits leave their mark (water makes a unit Wet, ice Chills it). 0 in a Godot battle. */
 		double Elements = 0.0;
+		/**
+		 * 1: an area blow meant for the enemy hurts the caster's own side too,
+		 * whoever stands in it -- a cone, a lane, a charge, a blast (the human's
+		 * ask, 2026-10-01). Never the caster itself, and never a single-target
+		 * blow. 0 in a Godot battle.
+		 */
+		double FriendlyFire = 0.0;
+		/** 1: a cleared camp wakes again after its respawn time; 0 (the default, 2026-10-01): once cleared, gone. */
+		double CampRespawn = 0.0;
+		/**
+		 * How defense works (2026-10-01, Docs/design/feat-defense.md). 0, Godot's
+		 * and the default here: AttDef or MagDef is taken off the hit, and A-Eva
+		 * or M-Eva is the chance it misses. 1, the game's: Armor (AttDef) or
+		 * Resist (MagDef) takes a share, Scale / (Scale + it), off every hit;
+		 * one Evasion, the higher of A-Eva and M-Eva plus whatever is added to
+		 * either, is the chance a hit is evaded -- and an evaded hit is dodged
+		 * outright one time in ten, grazed for half the other nine.
+		 */
+		double DefenseModel = 0.0;
+		/** The defense at which a hit is halved, in model 1. */
+		double DefenseScale = 30.0;
+		/**
+		 * Zone of control (2026-10-01, "Class Rebalance Mockups" 3): 1, an enemy
+		 * that walks within EngageRadius of a unit whose first role is tank must
+		 * stop there. 0, Godot's and the default here: no such stop.
+		 */
+		double ZoneOfControl = 0.0;
 	};
 
 	/**
@@ -278,6 +305,15 @@ namespace TMSim
 	/** Every rule number that can be tuned, in Godot's order. */
 	TMSIM_API const std::vector<FTuningKey>& TuningKeys();
 
+	/**
+	 * The rules the game plays: Godot's defaults, which stay the defaults here so
+	 * the port can be checked against Godot, with the newer rules on top
+	 * (2026-10-01: defense rules 1, Docs/design/feat-defense.md). One place, read
+	 * by the game (ATMBattleDirector::GameTuning) and by the class lab
+	 * (Tools/ClassLab), so a class is measured on the rules it is played on.
+	 */
+	TMSIM_API FTuning GameTuning();
+
 	namespace Combat
 	{
 		/** An ability's power is the damage; this is the scale it is read at. */
@@ -292,6 +328,11 @@ namespace TMSim
 		 * health lost. Taking a beating earns a comeback.
 		 */
 		inline constexpr double UltFromDamage = 0.5;
+		/** Defense model 1: of the hits evaded, the share dodged outright (the rest are grazed), and what a graze lands. */
+		inline constexpr int DodgeOneIn = 10;
+		inline constexpr double GrazeDamage = 0.5;
+		/** What an evasion is worth on average, in model 1: a tenth dodged whole, nine tenths halved. */
+		inline constexpr double EvadedShare = 1.0 / DodgeOneIn + (1.0 - 1.0 / DodgeOneIn) * (1.0 - GrazeDamage);
 	}
 
 	/** Godot's roundi(): halves go away from zero, which is what the rules assume. */

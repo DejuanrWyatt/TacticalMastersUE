@@ -3,11 +3,11 @@
   "version": 1,
   "id": "last_stand_band",
   "name": "Last Stand Band",
-  "desc": "Below 30% health: 20% more damage and +8 A-Eva.",
+  "desc": "Below 30% health: 20% more damage and +9 Evasion.",
   "icon": "band",
   "tier": "rare",
   "effects": {
     "low_health_percent": 20,
-    "low_health_evasion": 8
+    "low_health_evasion": 9
   }
 }

@@ -933,11 +933,32 @@ int main(int ArgCount, char** Args)
 		}
 	}
 
+	// With respawns off (the default), a cleared camp stays cleared.
+	{
+		FArena Off;
+		Off.Setup(*Big, "skink_den");
+		Off.Clear();
+		FUnit& Skink = Off.Member(0);
+		FUnit& Knight = Off.Unit(0);
+		Off.Put(Knight, FVec2(Skink.Pos.X + 1.0f, Skink.Pos.Y));
+		Skink.Hp = 1;
+		for (int Try = 0; Try < 10 && Skink.IsAlive(); ++Try)
+		{
+			Off.TurnFor(Knight);
+			Off.Battle.Apply(FOrder::MakeUseAbility(Knight.Id, Knight.Serial, 0, Skink.Pos, Skink.Id), Off.Report);
+		}
+		Off.Battle.Advance(1, Off.Report);
+		if (Skink.IsAlive() || Off.Battle.Camps[0].Timer < 1000000)
+		{
+			Fail("with camp respawns off, a cleared camp should never wake again");
+		}
+	}
 	// Clearing, loot, Take and Drop, and dropping on death.
 	{
 		const int Before = Failures;
 		FArena A;
 		A.Setup(*Big, "skink_den");
+		A.Battle.Tuning.CampRespawn = 1.0;
 		A.Clear();
 		FUnit& Skink = A.Member(0);
 		FUnit& Knight = A.Unit(0);
@@ -984,65 +1005,95 @@ int main(int ArgCount, char** Args)
 			{
 				Fail("taking from a cache that isn't there should be refused");
 			}
+			// Taking puts it in the side's stash (2026-10-01): free, whatever the unit wears.
 			Archer.Gear[0] = FindItem("iron_charm");
 			Archer.Gear[1] = FindItem("lucky_coin");
 			Archer.Gear[2] = FindItem("worry_beads");
-			if (A.Battle.ValidateTake(Archer.Id, 0, Id, -1) != "Its slots are full: say which item to leave." && Id != "iron_charm"
-				&& Id != "lucky_coin" && Id != "worry_beads")
+			const int Side = Archer.Team;
+			const FOrder Take = FOrder::MakeTake(Archer.Id, Archer.Serial, 0, Id, -1);
+			if (!A.Battle.Validate(Take).empty())
 			{
-				Fail("with full slots and none named, a take should be refused");
+				Fail("a take into the stash should be allowed with full slots: " + A.Battle.Validate(Take));
 			}
-			const FOrder Take = FOrder::MakeTake(Archer.Id, Archer.Serial, 0, Id, 1);
-			if (Id != "iron_charm" && Id != "lucky_coin" && Id != "worry_beads")
+			A.Battle.Apply(Take, A.Report);
+			if (A.Battle.Stash[Side].size() != 1 || A.Battle.Stash[Side][0].Item->Id != Id || !A.Battle.Caches[0].Items.empty()
+				|| Archer.bActed || Archer.Gear[1]->Id != "lucky_coin")
 			{
-				if (!A.Battle.Validate(Take).empty())
+				Fail("taking should move the item to the side's stash, free, leaving what the unit wears");
+			}
+			// Equipping: only into an open slot.
+			if (Id != "iron_charm" && Id != "worry_beads")
+			{
+				if (A.Battle.ValidateEquip(Archer.Id, Id, -1) != "Its slots are full.")
 				{
-					Fail("a take naming a slot to empty should be allowed: " + A.Battle.Validate(Take));
+					Fail("equipping a unit with no open slot should be refused");
 				}
-				A.Battle.Apply(Take, A.Report);
-				if (Archer.Gear[1]->Id != Id || A.Battle.Caches[0].Items.size() != 1 || A.Battle.Caches[0].Items[0]->Id != "lucky_coin"
-					|| !Archer.bActed)
+				if (A.Battle.ValidateEquip(Archer.Id, Id, 1).empty())
 				{
-					Fail("taking into a full slot should leave the old item in the cache, and use the action");
+					Fail("equipping into a slot already worn should be refused");
 				}
-				if (A.Battle.ValidateTake(Archer.Id, 0, "lucky_coin", 1) != "Already used its action this turn.")
+				Archer.Gear[1] = nullptr;
+				const FOrder Equip = FOrder::MakeEquip(Archer.Id, Id, 1);
+				if (!A.Battle.Validate(Equip).empty())
 				{
-					Fail("a second take in a turn should be refused");
+					Fail("equipping from the stash into an open slot should be allowed: " + A.Battle.Validate(Equip));
+				}
+				A.Battle.Apply(Equip, A.Report);
+				if (!Archer.Gear[1] || Archer.Gear[1]->Id != Id || !A.Battle.Stash[Side].empty())
+				{
+					Fail("equipping should move the item from the stash into the slot");
+				}
+				if (A.Battle.ValidateEquip(Archer.Id, Id, -1) != "That item isn't in the stash.")
+				{
+					Fail("equipping an item the stash doesn't hold should be refused");
 				}
 			}
-			// Drop is free; a Health item's health goes with it.
+			// Unequipping is the unit's whole turn; a Health item's health goes with it.
+			A.Battle.Stash[Side].clear();
+			A.TurnFor(Archer);
+			Archer.bActed = false;
+			Archer.bMoved = true;
+			if (A.Battle.ValidateDrop(Archer.Id, 0).empty())
+			{
+				Fail("unequipping after moving should be refused: it takes the whole turn");
+			}
+			Archer.bMoved = false;
 			const int Hp = Archer.Hp;
 			const int Max = Archer.MaxHp();
 			const FOrder Drop = FOrder::MakeDrop(Archer.Id, Archer.Serial, 0);
 			if (!A.Battle.Validate(Drop).empty())
 			{
-				Fail("dropping should be free: " + A.Battle.Validate(Drop));
+				Fail("unequipping at the start of a turn should be allowed: " + A.Battle.Validate(Drop));
 			}
 			A.Battle.Apply(Drop, A.Report);
 			if (Archer.Gear[0] || Archer.MaxHp() != Max - 12 || Archer.Hp > Archer.MaxHp() || Hp < Archer.Hp)
 			{
-				Fail("dropping the Iron Charm should take its 12 health off the most, never adding health");
+				Fail("unequipping the Iron Charm should take its 12 health off the most, never adding health");
 			}
-			// Finished off, a unit leaves what it carried where it fell.
+			if (Archer.bReady || A.Battle.Stash[Side].size() != 1 || A.Battle.Stash[Side][0].Item->Id != "iron_charm")
+			{
+				Fail("unequipping should put the item in the stash and end the turn");
+			}
+			// Finished off, a side's unit's items go back to its side's stash.
 			const size_t Lying = A.Battle.Caches.size();
+			Archer.Gear[2] = FindItem("worry_beads");
 			Archer.Hp = 0;
 			A.Battle.KnockOut(Archer, A.Report);
 			for (int Tick = 0; Tick < 200 && Archer.IsKo(); ++Tick)
 			{
 				A.Battle.Advance(1, A.Report);
 			}
-			bool bDropped = false;
-			for (const FCache& Each : A.Battle.Caches)
+			bool bStashed = false;
+			for (const FBattle::FStashed& Held : A.Battle.Stash[Side])
 			{
-				bDropped = bDropped || (Each.Pos.DistanceTo(Archer.Pos) < 0.5f
-					&& std::find_if(Each.Items.begin(), Each.Items.end(), [](const FItemDef* I) { return I->Id == "worry_beads"; }) != Each.Items.end());
+				bStashed = bStashed || Held.Item->Id == "worry_beads";
 			}
-			if (!bDropped || Archer.HasItems() || A.Battle.Caches.size() < Lying)
+			if (!bStashed || Archer.HasItems() || A.Battle.Caches.size() != Lying)
 			{
-				Fail("a unit finished off should drop everything it carried where it fell");
+				Fail("a side's unit finished off should send what it wore to its side's stash");
 			}
 		}
-		// Walking onto items picks them up: free, into empty slots, best tier first.
+		// Walking onto items puts all of them in the side's stash: free.
 		{
 			FArena W;
 			W.Setup(*Big, "skink_den");
@@ -1069,6 +1120,7 @@ int main(int ArgCount, char** Args)
 			}
 			W.Battle.Caches.clear();
 			W.Battle.Caches.push_back(Lying);
+			W.Battle.Stash[Walker.Team].clear();
 			const FOrder Walk = FOrder::MakeMove(Walker.Id, Walker.Serial, To);
 			if (To == Walker.Pos || !W.Battle.Validate(Walk).empty())
 			{
@@ -1083,24 +1135,16 @@ int main(int ArgCount, char** Args)
 				{
 					Taken += Event.Kind == EEventKind::ItemTaken ? 1 : 0;
 				}
-				const FCache& Left = W.Battle.Caches[0];
-				if (!Walker.Gear[1] || !Walker.Gear[2] || Taken != 2 || Left.Items.size() != 2 || Walker.bActed)
+				if (Taken != 4 || !W.Battle.Caches[0].Items.empty() || W.Battle.Stash[Walker.Team].size() != 4 || Walker.bActed
+					|| Walker.Gear[1] || Walker.Gear[2])
 				{
-					Fail("walking onto items should fill the empty slots, free, leaving the rest");
-				}
-				else if (Walker.Gear[1]->Tier < Left.Items[0]->Tier || Walker.Gear[2]->Tier < Left.Items[1]->Tier
-					|| Walker.Gear[1]->Id == "iron_charm" || Walker.Gear[2]->Id == "iron_charm")
-				{
-					Fail("walking onto items should take the best tiers first, and never a second of one it carries");
-				}
-				else if (!W.Battle.Validate(FOrder::MakeTake(Walker.Id, Walker.Serial, 0, Left.Items[0]->Id == "iron_charm" ? Left.Items[1]->Id : Left.Items[0]->Id, 0)).empty())
-				{
-					Fail("after walking onto items a swap should still be a Take");
+					Fail("walking onto items should put all of them in the side's stash, free, and none on the unit");
 				}
 			}
 		}
-		// Take and Drop as text.
-		for (const FOrder& Order : { FOrder::MakeTake(3, 9, 2, "blink_stone", -1), FOrder::MakeTake(3, 9, 0, "iron_charm", 2), FOrder::MakeDrop(5, 1, 2) })
+		// Take, Drop and Equip as text.
+		for (const FOrder& Order : { FOrder::MakeTake(3, 9, 2, "blink_stone", -1), FOrder::MakeTake(3, 9, 0, "iron_charm", 2), FOrder::MakeDrop(5, 1, 2),
+			FOrder::MakeEquip(4, "lucky_coin", -1), FOrder::MakeEquip(6, "iron_charm", 2) })
 		{
 			FOrder Back;
 			if (!OrderFromText(OrderToText(Order), Back).empty() || Back.Type != Order.Type || Back.Cache != Order.Cache
@@ -1109,7 +1153,7 @@ int main(int ArgCount, char** Args)
 				Fail("a take or drop should survive being written as text: " + OrderToText(Order));
 			}
 		}
-		for (const char* Bad : { "take 3 9 2", "take 3 9 2 Blink 0", "take 3 9 2 blink_stone 3", "drop 3 9", "drop 3 9 -1" })
+		for (const char* Bad : { "take 3 9 2", "take 3 9 2 Blink 0", "take 3 9 2 blink_stone 3", "drop 3 9", "drop 3 9 -1", "equip 4", "equip 4 Coin 0", "equip 4 lucky_coin 3" })
 		{
 			FOrder Ignored;
 			if (OrderFromText(Bad, Ignored).empty())
@@ -1119,7 +1163,7 @@ int main(int ArgCount, char** Args)
 		}
 		if (Failures == Before)
 		{
-			std::printf("a cleared camp leaves loot of its tier and waits to wake; take refused when too far, not there, full without a slot, or a second time; drop is free; health follows the item; the finished-off drop what they carry; take and drop survive the trip as text\n");
+			std::printf("a cleared camp leaves loot of its tier and waits to wake; taking and walking onto items fill the side's stash, free; equipping only into an open slot; unequipping is the whole turn; health follows the item; the finished-off send what they wore to the stash; take, drop and equip survive the trip as text\n");
 		}
 	}
 

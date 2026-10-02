@@ -15,6 +15,7 @@
 // filmed to the size wanted here. Nothing here is read by the rules.
 
 #include "TMBattleDirector.h"
+#include "TMDrawable.h"
 
 #include "Components/PointLightComponent.h"
 #include "Components/StaticMeshComponent.h"
@@ -400,6 +401,11 @@ UFXSystemComponent* ATMBattleDirector::PlayFx(const TCHAR* Path, const FVector& 
 		if (!System || !(System->IsA<UNiagaraSystem>() || System->IsA<UParticleSystem>()))
 		{
 			UE_LOG(LogTemp, Warning, TEXT("An ability look names a particle effect that is not in the project: %s"), *Key);
+			System = nullptr;
+		}
+		// One holding a material cooked without shaders is not played (TMDrawable.h).
+		if (System && !TMDrawable::EffectUsable(Cast<UParticleSystem>(System), GetWorld()))
+		{
 			System = nullptr;
 		}
 		Known = &LoadedVfx.Add(Key, System);

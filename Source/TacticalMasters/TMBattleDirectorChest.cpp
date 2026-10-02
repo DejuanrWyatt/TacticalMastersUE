@@ -26,7 +26,9 @@
 #include "ProceduralMeshComponent.h"
 #include "TMPropMesh.h"
 
-namespace
+// Named, not anonymous: in a unity build an anonymous namespace's names reach
+// every file compiled after this one (2026-10-01: 'Unit' hid others' locals).
+namespace TMChestLook
 {
 	/** A tier's look: post metal, rune and crystal colour, and how strongly it glows. */
 	struct FChestLook
@@ -45,7 +47,6 @@ namespace
 	/** How big a mockup unit is, in centimetres: the coffer is about two thirds of a metre long. */
 	constexpr float Unit = 62.0f;
 
-	using namespace TMProp;
 	using FChestMesh = TMProp::FPropMesh;
 }
 
@@ -74,6 +75,8 @@ UMaterialInstanceDynamic* ATMBattleDirector::GlowPaint(const FLinearColor& Colou
 
 USceneComponent* ATMBattleDirector::MakeChest(const FVector& Foot, int32 Tier, float Yaw, int32 Seed)
 {
+	using namespace TMChestLook;
+	using namespace TMProp;
 	const FChestLook& Look = ChestLooks[FMath::Clamp(Tier, 0, 3)];
 	USceneComponent* Root = NewObject<USceneComponent>(this, NAME_None, RF_Transient);
 	Root->SetMobility(EComponentMobility::Movable);
@@ -210,6 +213,8 @@ USceneComponent* ATMBattleDirector::MakeChest(const FVector& Foot, int32 Tier, f
 
 void ATMBattleDirector::AdvanceChests(float DeltaSeconds)
 {
+	using namespace TMChestLook;
+	using namespace TMProp;
 	ChestClock += DeltaSeconds;
 	for (FTMChest& Chest : Chests)
 	{

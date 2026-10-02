@@ -1,0 +1,11 @@
+// Two Fords: a river across the middle, crossed at columns 4 and 7, with a
+// level-3 perch over each ford. Water stops walking, not sight or shots.
+// Blue starts on the west edge, red on the east (the battle director's spots).
+// A sketch to try, not a finished map.
+name Two Fords
+111111111111
+111111111+11
+111111111111
+111#13311#11
+111112211111
+111~1~~1~~~~

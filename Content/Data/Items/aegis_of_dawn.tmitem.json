@@ -8,7 +8,7 @@
   "tier": "epic",
   "stats": {
     "hp": 60,
-    "attdef": 5,
-    "magdef": 5
+    "attdef": 8,
+    "magdef": 8
   }
 }

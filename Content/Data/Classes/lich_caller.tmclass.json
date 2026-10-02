@@ -81,7 +81,7 @@
     {
       "id": "lich_caller_lich_pact",
       "name": "Lich Pact",
-      "desc": "Bless every ally within 3 m of a point up to 6 m away; Power +4 for 2 turns. (1 s)",
+      "desc": "Bless every ally within 3 m of a point up to 6 m away; Crit +8 for 2 turns. (1 s)",
       "kind": "active",
       "effect": "support",
       "scale": "mag",
@@ -141,5 +141,11 @@
         "scale": 1
       }
     }
-  ]
+  ],
+  "creator": {
+    "reworded": {
+      "on": "2026-10-02",
+      "why": "Descriptions say what the abilities do (2026-10-02): Stun not sleep, Crit not the old Power, turns not seconds"
+    }
+  }
 }

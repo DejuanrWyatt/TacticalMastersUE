@@ -41,12 +41,11 @@ void ATMBattleHud::DrawOptions(ATMBattleDirector& From)
 	UFont* Big = GEngine->GetLargeFont();
 	DrawRect(FLinearColor(0.02f, 0.03f, 0.05f, 0.92f), 0.0f, 0.0f, Canvas->ClipX, Canvas->ClipY);
 	const float PX = 60.0f * S;
-	float Y = 40.0f * S;
-	Text(TEXT("Options"), PX, Y, Gold, Big, 1.0f * S);
-	const float BW = 200.0f * S;
-	MenuButton(Canvas->ClipX - PX - BW, Y, BW, 44.0f * S, TEXT("Close  (Esc)"), ETMHudAction::CloseOverlay, -1, true);
-	MenuButton(Canvas->ClipX - PX - BW * 2.0f - 12.0f * S, Y, BW, 44.0f * S, TEXT("Reset to defaults"), ETMHudAction::ResetOptions);
-	Y += 70.0f * S;
+	// The page is taller than a small window: the wheel scrolls it under a
+	// fixed title row (2026-10-01: "cannot scroll down in options menu").
+	const float Top = 110.0f * S;
+	const float Scrolled = From.OptionsScroll * S;
+	float Y = Top - Scrolled;
 
 	// Game.
 	Text(TEXT("Game"), PX, Y, Gold, Font, 0.8f * S);
@@ -86,6 +85,10 @@ void ATMBattleHud::DrawOptions(ATMBattleDirector& From)
 	Label(TEXT("Turn order as fixed squares instead of sliding bars"), Y, PX,
 		TEXT("A square per unit, filling as its turn comes, instead of chips sliding along two bars. Move and reorder them in Edit layout."));
 	MenuButton(PX + LabelW, Y, 160.0f * S, RowH, Settings.bTurnSquares ? TEXT("On") : TEXT("Off"), ETMHudAction::OptionTurnSquares);
+	Y += RowH + 8.0f * S;
+	Label(FString::Printf(TEXT("Camera follows to the next ready unit  (%s toggles)"), *Settings.KeyName(ETMAction::AutoRecenter)), Y, PX,
+		TEXT("When a unit's turn ends, the camera slides to the next of yours that is ready. Off, it stays where you left it; Center camera and Next ready unit still move it."));
+	MenuButton(PX + LabelW, Y, 160.0f * S, RowH, Settings.bAutoRecenter ? TEXT("On") : TEXT("Off"), ETMHudAction::OptionAutoRecenter);
 	Y += RowH + 8.0f * S;
 	Label(TEXT("Sound effects volume"), Y, PX, TEXT("How loud swings, spells, hits, footsteps and the menus are."));
 	Slider(PX + LabelW, Y + 6.0f * S, ControlW, RowH - 12.0f * S, ATMBattleDirector::SliderSfxVolume, Settings.SfxVolume, 0.0, 1.0);
@@ -127,6 +130,30 @@ void ATMBattleHud::DrawOptions(ATMBattleDirector& From)
 	Y += PerColumn * (KeyRowH + 4.0f * S) + 12.0f * S;
 	Text(TEXT("Mouse (fixed): left-click select / move / target · right-click cancel · right-drag rotate and tilt camera · middle-drag pan · wheel zoom (or scroll the log)"),
 		PX, Y, Dim, Font, 0.52f * S);
+	Y += 40.0f * S;
+
+	// Keep the scroll in range, now the page's height is known.
+	const float Whole = Y + Scrolled - Top;
+	const float Shown = Canvas->ClipY - Top;
+	const float Most = FMath::Max(0.0f, (Whole - Shown) / S);
+	From.OptionsScroll = FMath::Clamp(From.OptionsScroll, 0.0f, Most);
+	if (Most > 0.0f)
+	{
+		ScrollBar(Canvas->ClipX - 24.0f * S, Top, Shown - 10.0f * S, Shown, Whole, Scrolled);
+	}
+
+	// The title row, over whatever has scrolled under it; it catches clicks there too.
+	DrawRect(FLinearColor(0.02f, 0.03f, 0.05f, 1.0f), 0.0f, 0.0f, Canvas->ClipX, Top - 6.0f * S);
+	AddButton(0.0f, 0.0f, Canvas->ClipX, Top - 6.0f * S, ETMHudAction::OverlayBlock, -1);
+	const float TitleY = 40.0f * S;
+	Text(TEXT("Options"), PX, TitleY, Gold, Big, 1.0f * S);
+	if (Most > 0.0f)
+	{
+		Text(TEXT("Scroll with the mouse wheel"), PX + 220.0f * S, TitleY + 22.0f * S, Dim, Font, 0.5f * S);
+	}
+	const float BW = 200.0f * S;
+	MenuButton(Canvas->ClipX - PX - BW, TitleY, BW, 44.0f * S, TEXT("Close  (Esc)"), ETMHudAction::CloseOverlay, -1, true);
+	MenuButton(Canvas->ClipX - PX - BW * 2.0f - 12.0f * S, TitleY, BW, 44.0f * S, TEXT("Reset to defaults"), ETMHudAction::ResetOptions);
 }
 
 void ATMBattleHud::DrawDevTools(ATMBattleDirector& From)
@@ -144,7 +171,7 @@ void ATMBattleHud::DrawDevTools(ATMBattleDirector& From)
 	const bool bLive = From.Screen == ATMBattleDirector::EScreen::Battle && From.Battle.Winner == -1;
 	Text(bLive
 			? TEXT("Kept for the next battle, and applied to this one at once: each change goes to the rules as a recorded order, so a replay has it too.")
-			: TEXT("Kept for the next battle. Rest the pointer on a name for what it does. Victory, the time limit, planning time and how many watchtowers are on the battle setup screen."),
+			: TEXT("Kept for the next battle, and after the game is closed. Rest the pointer on a name for what it does. Victory, time limits, watchtowers, items, camps, elements and friendly fire are on the battle setup screen, which is kept too."),
 		PX, Y, Dim, Font, 0.55f * S);
 	Y += 34.0f * S;
 
@@ -160,7 +187,8 @@ void ATMBattleHud::DrawDevTools(ATMBattleDirector& From)
 	const int32 PerColumn = (Rows.Num() + 1) / 2;
 	const float ColumnW = (Canvas->ClipX - PX * 2.0f) * 0.5f;
 	const float RowH = FMath::Min(34.0f * S, (Canvas->ClipY - Y - 60.0f * S) / FMath::Max(1, PerColumn));
-	const TMSim::FTuning Defaults;
+	// The game's defaults, not the rules' Godot ones, so only real changes show gold.
+	const TMSim::FTuning Defaults = TMSim::GameTuning();
 	for (int32 Row = 0; Row < Rows.Num(); ++Row)
 	{
 		const int32 Index = Rows[Row];

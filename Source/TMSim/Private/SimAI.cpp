@@ -261,7 +261,9 @@ namespace TMSim
 			{
 				// What it would do on average rather than at best: some of it gets
 				// dodged, some of it lands hard.
-				const double Evade = Battle.EvadeChance(*Target, Ability, &User) / 100.0;
+				// Defense model 1: an evasion only takes part of the hit away.
+				const double Evade = Battle.EvadeChance(*Target, Ability, &User) / 100.0
+					* (Battle.NewDefense() ? Combat::EvadedShare : 1.0);
 				const double Crit = Battle.CritChance(User) / 100.0;
 				Amount = std::max(1, RoundToInt(Amount * (1.0 - Evade)
 					* (1.0 + Crit * (Battle.Tuning.CritMultiplier - 1.0))));
@@ -270,6 +272,13 @@ namespace TMSim
 			switch (Ability.Effect)
 			{
 			case EEffect::Damage:
+				if (Target->Team == User.Team)
+				{
+					// Friendly fire: its own side in the blast counts against it,
+					// more than the same harm to an enemy counts for it.
+					Total -= Amount * 1.5 + (Amount >= Target->Hp ? 60.0 : 0.0);
+					break;
+				}
 				Total += Amount * TargetWorth(User, *Target, bSmart);
 				if (Amount >= Target->Hp)
 				{
@@ -549,8 +558,14 @@ namespace TMSim
 					for (const FVec2& Middle : Spreads)
 					{
 						const float Distance = Spot.DistanceTo(Middle);
+						// And ground the side can see, or will once the caster stands
+						// there, as for a unit (2026-10-01): a midpoint between a seen
+						// enemy and an unseen one can lie in the fog, and the rules
+						// refuse an aim there ("You can't see that spot").
 						if (Distance >= MinRange && Distance <= MaxRange && Battle.InBounds(Middle)
-							&& (!bNeedsLos || Battle.HasLineOfSight(Spot, Middle)))
+							&& (!bNeedsLos || Battle.HasLineOfSight(Spot, Middle))
+							&& (Battle.CanSee(Unit.Team, Middle)
+								|| (Distance <= Sight && (bNeedsLos || Battle.HasLineOfSight(Spot, Middle)))))
 						{
 							Aims.push_back(Middle);
 						}
@@ -637,6 +652,31 @@ namespace TMSim
 		// knocked-down unit walks or acts, never both. With none of them on the
 		// unit every choice below is Godot's, which is why the recorded battles
 		// (SimTraceTest, SimAIActionTest) still match decision for decision.
+		// The side's stash first (2026-10-01): an item waiting there goes on
+		// whoever has room, this unit before the rest. Free, so the next call
+		// carries on with the turn itself.
+		if (!Unit.bMonster && (Unit.Team == 0 || Unit.Team == 1) && Unit.Team == Unit.HomeTeam() && !Battle.Stash[Unit.Team].empty())
+		{
+			for (const FBattle::FStashed& Held : Battle.Stash[Unit.Team])
+			{
+				if (!Held.Item)
+				{
+					continue;
+				}
+				if (Battle.ValidateEquip(Unit.Id, Held.Item->Id, -1).empty())
+				{
+					return FOrder::MakeEquip(Unit.Id, Held.Item->Id, -1);
+				}
+				for (const FUnit& Ally : Battle.Units)
+				{
+					if (Ally.Id != Unit.Id && Ally.Team == Unit.Team && Battle.ValidateEquip(Ally.Id, Held.Item->Id, -1).empty())
+					{
+						return FOrder::MakeEquip(Ally.Id, Held.Item->Id, -1);
+					}
+				}
+			}
+		}
+
 		const bool bCanWalk = !Unit.bMoved && !Unit.IsCasting() && !Unit.IsRooted()
 			&& !(Unit.ActsOnce() && Unit.bActed);
 		const bool bCanAct = !Unit.bActed && !(Unit.ActsOnce() && Unit.bMoved);
@@ -698,7 +738,20 @@ namespace TMSim
 		// or to a camp it can see awake -- the boss only while its side is ahead.
 		if (!Battle.Camps.empty() || !Battle.Caches.empty())
 		{
-			if (bCanAct && (Unit.Team == 0 || Unit.Team == 1))
+			// Loot within reach goes to the side's stash, free, whatever it carries.
+			if (!Unit.bMonster && (Unit.Team == 0 || Unit.Team == 1))
+			{
+				const int Cache = Battle.CacheNear(Unit.Pos);
+				if (Cache >= 0 && !Battle.Caches[static_cast<size_t>(Cache)].Items.empty())
+				{
+					const std::string& First = Battle.Caches[static_cast<size_t>(Cache)].Items[0]->Id;
+					if (Battle.ValidateTake(Unit.Id, Cache, First, -1).empty())
+					{
+						return FOrder::MakeTake(Unit.Id, Unit.Serial, Cache, First, -1);
+					}
+				}
+			}
+			if (bCanAct && Unit.bMonster && (Unit.Team == 0 || Unit.Team == 1))
 			{
 				const int Cache = Battle.CacheNear(Unit.Pos);
 				if (Cache >= 0)

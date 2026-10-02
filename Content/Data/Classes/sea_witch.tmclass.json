@@ -46,7 +46,7 @@
     {
       "id": "sea_witch_tide_curse",
       "name": "Tide Curse",
-      "desc": "Weaken an enemy 2-8 m away for 2 turns; Power -6. (1 s)",
+      "desc": "Weaken an enemy 2-8 m away for 2 turns; Crit -12. (1 s)",
       "kind": "active",
       "effect": "support",
       "scale": "mag",
@@ -75,7 +75,7 @@
     {
       "id": "sea_witch_tide_slumber",
       "name": "Tide Slumber",
-      "desc": "Put an enemy 2-7 m away to sleep; Stuns for 1 turn. (2 s)",
+      "desc": "Lull an enemy 2-7 m away into a stupor; Stuns for 1 turn. (2 s)",
       "kind": "active",
       "effect": "support",
       "scale": "mag",
@@ -124,5 +124,11 @@
         "scale": 1
       }
     }
-  ]
+  ],
+  "creator": {
+    "reworded": {
+      "on": "2026-10-02",
+      "why": "Descriptions say what the abilities do (2026-10-02): Stun not sleep, Crit not the old Power, turns not seconds"
+    }
+  }
 }

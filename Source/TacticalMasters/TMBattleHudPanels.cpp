@@ -330,10 +330,22 @@ FString ATMBattleHud::ExplainAbility(ATMBattleDirector& From, const TMSim::FUnit
 		Lines.Add(FString::Printf(TEXT("Damage = power %s"), *Num(Ability->Power)));
 		Lines.Add(FString::Printf(TEXT("  x height (%s per level) x side %s / back %s"),
 			*Num(Tune.HeightBonus), *Num(Tune.SideBonus), *Num(Tune.BackBonus)));
-		Lines.Add(FString::Printf(TEXT("  - target's %s, x damage multiplier %s (at least 1)"),
-			Ability->Scale == TMSim::EScale::Att ? TEXT("AttDef") : TEXT("MagDef"), *Num(Tune.DamageMultiplier)));
-		Lines.Add(FString::Printf(TEXT("  target's %s evades it; %d%% chance of a critical hit (x %s)"),
-			Ability->Scale == TMSim::EScale::Att ? TEXT("A-Eva") : TEXT("M-Eva"), Battle.CritChance(Unit), *Num(Tune.CritMultiplier)));
+		if (Battle.NewDefense())
+		{
+			// 2026-10-01 (Docs/design/feat-defense.md).
+			Lines.Add(FString::Printf(TEXT("  x damage multiplier %s, less the target's %s share: %s / (%s + it) (at least 1)"),
+				*Num(Tune.DamageMultiplier), Ability->Scale == TMSim::EScale::Att ? TEXT("Armor") : TEXT("Resist"),
+				*Num(Tune.DefenseScale), *Num(Tune.DefenseScale)));
+			Lines.Add(FString::Printf(TEXT("  target's Evasion: 1 in 10 evasions dodge it, the rest graze for half; %d%% chance of a critical hit (x %s)"),
+				Battle.CritChance(Unit), *Num(Tune.CritMultiplier)));
+		}
+		else
+		{
+			Lines.Add(FString::Printf(TEXT("  - target's %s, x damage multiplier %s (at least 1)"),
+				Ability->Scale == TMSim::EScale::Att ? TEXT("AttDef") : TEXT("MagDef"), *Num(Tune.DamageMultiplier)));
+			Lines.Add(FString::Printf(TEXT("  target's %s evades it; %d%% chance of a critical hit (x %s)"),
+				Ability->Scale == TMSim::EScale::Att ? TEXT("A-Eva") : TEXT("M-Eva"), Battle.CritChance(Unit), *Num(Tune.CritMultiplier)));
+		}
 		break;
 	case TMSim::EEffect::Heal:
 		Lines.Add(FString::Printf(TEXT("Heal = power %s x %s x heal multiplier %s = %d"), *Num(Ability->Power),
@@ -865,6 +877,20 @@ void ATMBattleHud::DrawTurnSquares(ATMBattleDirector& From)
 				DrawRect(FLinearColor(0.0f, 0.0f, 0.0f, 0.6f), X + FrameWidth, RowY + FrameWidth, Crest, Crest);
 				Picture(ClassIcon(*Unit), X + FrameWidth, RowY + FrameWidth, Crest, Crest);
 			}
+			// A plan waiting for its turn (2026-10-01): a gold corner with a P; on a
+			// Go To, ">" and its turns left instead.
+			const ATMBattleDirector::FTMGoTo* Marching = From.GoToOf(Unit->Id);
+			if ((Marching || From.PlanOf(Unit->Id)) && !bFogged)
+			{
+				const FString Sign = Marching ? FString::Printf(TEXT(">%d"), static_cast<int32>(Marching->Stops.size())) : FString(TEXT("P"));
+				const FVector2D PSize = TextSize(Sign, Font, 0.42f * S);
+				const float Mark = FMath::Max(18.0f * S, PSize.X + 6.0f * S);
+				const float MX = X + SW - Mark - 1.0f * S;
+				const float MY = RowY + 1.0f * S;
+				DrawRect(FLinearColor(0.0f, 0.0f, 0.0f, 0.7f), MX - 1.0f, MY - 1.0f, Mark + 2.0f, 18.0f * S + 2.0f);
+				DrawRect(Gold, MX, MY, Mark, 18.0f * S);
+				Text(Sign, MX + (Mark - PSize.X) * 0.5f, MY + (18.0f * S - PSize.Y) * 0.5f, FLinearColor(0.1f, 0.08f, 0.02f), Font, 0.42f * S, false);
+			}
 			// The moment its turn comes, the whole card flashes yellow and fades
 			// to its gold; it keeps a soft yellow beat for as long as it can act.
 			if (Unit->bReady)
@@ -908,6 +934,15 @@ void ATMBattleHud::DrawTurnSquares(ATMBattleDirector& From)
 					Tip += FString::Printf(TEXT("\nCasting %hs"), Ability ? Ability->Name.c_str() : "");
 				}
 				Tip += TEXT("\n\n") + ExplainTurn(From, *Unit) + TEXT("\n") + ExplainCountdown(From, *Unit);
+				// Queued orders (2026-10-01).
+				if (From.PlanOf(Unit->Id))
+				{
+					Tip += TEXT("\n\nPlanned: it carries the plan out the moment its turn begins. Click to change it.");
+				}
+				else if (!Unit->bReady && From.PlayerCanPlan(Unit))
+				{
+					Tip += TEXT("\n\nClick to plan its next turn.");
+				}
 			}
 			AddTip(X, RowY, SW, SH, Tip);
 			X += SW + Gap;
@@ -925,43 +960,181 @@ void ATMBattleHud::DrawTurnSquares(ATMBattleDirector& From)
 void ATMBattleHud::DrawLog(ATMBattleDirector& From)
 {
 	const FPanelScale Sized(*this, TEXT("log"));
-	// The combat log under the turn order: the last lines of the fight, older
-	// ones fading. L or the Log button shows or hides it, + makes it taller, and
-	// the mouse wheel scrolls back through the fight. Godot's can be dragged and
-	// resized; this one keeps its place.
+	// The combat log under the turn order (2026-10-01, design A with C's tabs):
+	// each action on a line of its own -- the time, who in their side's colour,
+	// what -- and under it what it did to each unit, the numbers lined up on the
+	// right, red for harm, green for healing, gold for a crit, with tags for
+	// statuses. Tabs keep only what matters now. L or the Log button shows or
+	// hides it, + makes it taller, the wheel scrolls back.
 	if (!From.bShowLog)
 	{
 		return;
 	}
+	using FEntry = ATMBattleDirector::FTMLogEntry;
+	using EKind = FEntry::EKind;
 	UFont* Font = GEngine->GetMediumFont();
 	const float Scale = 0.5f * S;
-	const float LineH = TextSize(TEXT("Ag"), Font, Scale).Y;
-	const int32 Shown = From.bLogLarge ? 28 : 10;
+	const float SmallScale = 0.4f * S;
+	const float LineH = TextSize(TEXT("Ag"), Font, Scale).Y + 3.0f * S;
+	const int32 Shown = From.bLogLarge ? 26 : 10;
 	const float X = 16.0f * S + Nudge(TEXT("log")).X;
 	const float Y = 12.0f * S + 2.0f * RowHeight * S + 18.0f * S + Nudge(TEXT("log")).Y;
 	const float W = 520.0f * S;
-	const float Head = 24.0f * S;
-	const int32 Last = FMath::Max(0, From.Log.Num() - From.LogScroll);
+	const float Head = 30.0f * S;
+	const FLinearColor Harm(1.0f, 0.54f, 0.48f);
+	const FLinearColor Heal(0.5f, 0.88f, 0.6f);
+	const FLinearColor TimeColour(0.44f, 0.47f, 0.56f);
+	const FLinearColor Bright(0.95f, 0.96f, 0.98f);
+	const FLinearColor MonsterColour(1.0f, 0.75f, 0.38f);
+
+	// Which side is "mine" for the Mine tab.
+	const int32 Mine = From.ItemsTeam();
+	auto UnitColour = [&](int32 Id)
+	{
+		const TMSim::FUnit* Unit = From.Battle.FindUnit(Id);
+		if (!Unit)
+		{
+			return TextColour;
+		}
+		return Unit->Team == 0 || Unit->Team == 1 ? TeamColour(Unit->Team) : MonsterColour;
+	};
+	auto IsMine = [&](int32 Id)
+	{
+		const TMSim::FUnit* Unit = From.Battle.FindUnit(Id);
+		return Unit && Unit->Team == Mine;
+	};
+
+	// The tab's lines: whole actions are kept or dropped together.
+	const TArray<FEntry>& All = From.LogEntries;
+	TSet<int32> KeepGroups;
+	if (From.LogTab >= 2)
+	{
+		for (const FEntry& Entry : All)
+		{
+			if ((From.LogTab == 2 && Entry.Kind != EKind::Turn && Entry.Kind != EKind::System && IsMine(Entry.Unit))
+				|| (From.LogTab == 3 && Entry.bKey))
+			{
+				KeepGroups.Add(Entry.Group);
+			}
+		}
+	}
+	TArray<int32> Lines;
+	for (int32 i = 0; i < All.Num(); ++i)
+	{
+		const FEntry& Entry = All[i];
+		const bool bKeep = From.LogTab == 0
+			|| (From.LogTab == 1 && Entry.Kind != EKind::Turn)
+			|| (From.LogTab >= 2 && KeepGroups.Contains(Entry.Group) && Entry.Kind != EKind::Turn);
+		if (bKeep)
+		{
+			Lines.Add(i);
+		}
+	}
+	From.LogScroll = FMath::Clamp(From.LogScroll, 0, FMath::Max(0, Lines.Num() - 1));
+	const int32 Last = FMath::Max(0, Lines.Num() - From.LogScroll);
 	const int32 First = FMath::Max(0, Last - Shown);
 	const int32 Count = Last - First;
-	const float H = Head + FMath::Max(1, Count) * LineH + 8.0f * S;
-	Panel(X - 6.0f * S, Y - 4.0f * S, W, H, FLinearColor(0.06f, 0.08f, 0.12f, 0.62f), FLinearColor(1, 1, 1, 0.12f), 1.0f);
+	const float H = Head + FMath::Max(1, Count) * LineH + 10.0f * S;
+	Panel(X - 6.0f * S, Y - 4.0f * S, W, H, FLinearColor(0.06f, 0.08f, 0.12f, 0.82f), FLinearColor(1, 1, 1, 0.12f), 1.0f);
 	LogArea = FBox2D(FVector2D(X - 6.0f * S, Y - 4.0f * S), FVector2D(X - 6.0f * S + W, Y - 4.0f * S + H));
 	Movable(TEXT("log"), TEXT("Combat log"), X - 6.0f * S, Y - 4.0f * S, W, H);
 	LogBottom = Y - 4.0f * S + H;
-	FString Title = TEXT("Log");
+
+	// The tabs, and grow / close.
+	static const TCHAR* Tabs[] = { TEXT("All"), TEXT("Combat"), TEXT("Mine"), TEXT("Key") };
+	float TX = X;
+	for (int32 t = 0; t < 4; ++t)
+	{
+		const float TW = TextSize(Tabs[t], Font, 0.44f * S).X + 16.0f * S;
+		const bool bOn = From.LogTab == t;
+		Panel(TX, Y - 1.0f * S, TW, 22.0f * S, bOn ? FLinearColor(1.0f, 0.82f, 0.35f, 0.16f) : FLinearColor(0, 0, 0, 0),
+			bOn ? Gold : FLinearColor(1, 1, 1, 0.14f), 1.0f);
+		Text(Tabs[t], TX + 8.0f * S, Y + 1.0f * S, bOn ? Gold : Dim, Font, 0.44f * S);
+		AddButton(TX, Y - 1.0f * S, TW, 22.0f * S, ETMHudAction::LogTab, t);
+		TX += TW + 4.0f * S;
+	}
 	if (From.LogScroll > 0)
 	{
-		Title += FString::Printf(TEXT("   (%d lines back; scroll down for the newest)"), From.LogScroll);
+		Text(FString::Printf(TEXT("%d back"), From.LogScroll), TX + 6.0f * S, Y + 2.0f * S, Dim, Font, SmallScale);
 	}
-	Text(Title, X, Y, Dim, Font, 0.48f * S);
-	MenuButton(X + W - 70.0f * S, Y - 2.0f * S, 28.0f * S, 20.0f * S, From.bLogLarge ? TEXT("-") : TEXT("+"), ETMHudAction::GrowLog);
-	MenuButton(X + W - 38.0f * S, Y - 2.0f * S, 28.0f * S, 20.0f * S, TEXT("x"), ETMHudAction::ToggleLog);
-	for (int32 i = 0; i < Count; ++i)
+	MenuButton(X + W - 70.0f * S, Y - 1.0f * S, 28.0f * S, 22.0f * S, From.bLogLarge ? TEXT("-") : TEXT("+"), ETMHudAction::GrowLog);
+	MenuButton(X + W - 38.0f * S, Y - 1.0f * S, 28.0f * S, 22.0f * S, TEXT("x"), ETMHudAction::ToggleLog);
+
+	const float TimeW = 38.0f * S;
+	const float Right = X + W - 18.0f * S;
+	for (int32 n = 0; n < Count; ++n)
 	{
-		const float Age = static_cast<float>(Count - 1 - i) / FMath::Max(1, Count - 1);
-		const FLinearColor Colour(0.8f, 0.83f, 0.9f, 1.0f - 0.5f * Age);
-		Text(From.Log[First + i], X, Y + Head + i * LineH, Colour, Font, Scale);
+		const FEntry& Entry = All[Lines[First + n]];
+		const float LY = Y + Head + n * LineH;
+		// Older lines fade a little; the newest is brightest.
+		const float Fade = 1.0f - 0.35f * static_cast<float>(Count - 1 - n) / FMath::Max(1, Count - 1);
+		auto A = [Fade](const FLinearColor& C) { return FLinearColor(C.R, C.G, C.B, C.A * Fade); };
+		const bool bResult = Entry.Kind == EKind::Result;
+		if (!bResult)
+		{
+			const int32 Seconds = FMath::FloorToInt(Entry.Seconds);
+			Text(FString::Printf(TEXT("%d:%02d"), Seconds / 60, Seconds % 60), X, LY + 1.0f * S, A(TimeColour), Font, SmallScale);
+		}
+		float LX = X + TimeW;
+		auto Word = [&](const FString& What, const FLinearColor& Colour, float WScale = 0.0f)
+		{
+			const float Sc = WScale > 0.0f ? WScale : Scale;
+			Text(What, LX, LY, A(Colour), Font, Sc);
+			LX += TextSize(What + TEXT(" "), Font, Sc).X;
+		};
+		switch (Entry.Kind)
+		{
+		case EKind::Action:
+			Word(From.LogName(Entry.Unit), UnitColour(Entry.Unit));
+			Word(Entry.Verb, Dim);
+			Word(Entry.What, Bright);
+			break;
+		case EKind::Result:
+		{
+			LX += 14.0f * S;
+			Word(From.LogName(Entry.Unit), UnitColour(Entry.Unit));
+			for (const FString& Tag : Entry.Tags)
+			{
+				const bool bCrit = Tag == TEXT("CRIT");
+				const bool bAlly = Tag == TEXT("ALLY");
+				const FVector2D TagSize = TextSize(Tag, Font, 0.36f * S);
+				const FLinearColor Fill = bCrit ? Gold : bAlly ? FLinearColor(0.85f, 0.45f, 0.25f) : FLinearColor(0.42f, 0.36f, 0.72f);
+				DrawRect(A(Fill), LX, LY + 2.0f * S, TagSize.X + 8.0f * S, LineH - 6.0f * S);
+				Text(Tag, LX + 4.0f * S, LY + 3.0f * S, A(bCrit ? FLinearColor(0.1f, 0.12f, 0.18f) : Bright), Font, 0.36f * S);
+				LX += TagSize.X + 12.0f * S;
+			}
+			if (!Entry.Amount.IsEmpty())
+			{
+				const FLinearColor Tone = Entry.Tone == 1 ? Harm : Entry.Tone == 2 ? Heal : Entry.Tone == 3 ? Gold : Dim;
+				const FVector2D Size = TextSize(Entry.Amount, Font, Scale);
+				Text(Entry.Amount, Right - Size.X, LY, A(Tone), Font, Scale);
+			}
+			break;
+		}
+		case EKind::Ko:
+			DrawRect(A(FLinearColor(1.0f, 0.38f, 0.32f, 0.16f)), X - 4.0f * S, LY - 1.0f * S, W - 6.0f * S, LineH);
+			Word(From.LogName(Entry.Unit), UnitColour(Entry.Unit));
+			Word(TEXT("is knocked out"), Harm);
+			break;
+		case EKind::Turn:
+			Word(From.LogName(Entry.Unit), A(UnitColour(Entry.Unit)) * FLinearColor(1, 1, 1, 0.7f), SmallScale);
+			Word(Entry.Text, Dim, SmallScale);
+			break;
+		case EKind::System:
+			Word(Entry.Text, Entry.bKey ? Gold : Dim);
+			break;
+		default:
+			if (Entry.Unit >= 0)
+			{
+				Word(From.LogName(Entry.Unit), UnitColour(Entry.Unit));
+			}
+			Word(Entry.Text, Entry.bKey ? Bright : TextColour * FLinearColor(1, 1, 1, 0.85f));
+			break;
+		}
+	}
+	if (Count == 0)
+	{
+		Text(From.LogTab == 3 ? TEXT("No key moments yet.") : TEXT("Nothing yet."), X + TimeW, Y + Head, Dim, Font, Scale);
 	}
 }
 
@@ -1297,21 +1470,136 @@ float ATMBattleHud::StatusChips(const TMSim::FUnit& Unit, float X, float Y, floa
 
 // ------------------------------------------------------------- over heads
 
+void ATMBattleHud::PopBar(ATMBattleDirector& From, const TMSim::FUnit& Unit, float CentreX, float Bottom)
+{
+	const ATMBattleDirector::FTMHpPop* Found = From.HpPops.Find(Unit.Id);
+	if (!Found)
+	{
+		return;
+	}
+	const ATMBattleDirector::FTMHpPop& Pop = *Found;
+	// "Combat Text Mockups" B and C: up for three seconds, in and out softly; the
+	// part lost stays in the bar and drains away over two, flashing as it goes.
+	const double Now = From.PopClock();
+	const float Since = static_cast<float>(Now - Pop.ShownAt);
+	const float Life = static_cast<float>(ATMBattleDirector::HpPopSeconds);
+	if (Since < 0.0f || Since >= Life)
+	{
+		return;
+	}
+	const float Fade = 0.35f;
+	const float A = Since > Life - Fade ? (Life - Since) / Fade : FMath::Min(1.0f, Since / 0.12f);
+	const float O = FTMSettings::Get().OverheadScale;
+	const float W = 96.0f * S * O;
+	const float H = 7.0f * S * O;
+	const float X = CentreX - W * 0.5f;
+	const float Y = Bottom - H;
+	const int32 MaxHp = FMath::Max(1, Unit.MaxHp());
+	auto Part = [MaxHp](float Hp) { return FMath::Clamp(Hp / MaxHp, 0.0f, 1.0f); };
+	const bool bBlink = FMath::Fmod(Now, 0.22) < 0.11;
+
+	DrawRect(FLinearColor(0.85f, 0.88f, 0.95f, 0.35f * A), X - 1.0f, Y - 1.0f, W + 2.0f, H + 2.0f);
+	DrawRect(FLinearColor(0.03f, 0.03f, 0.05f, 0.92f * A), X, Y, W, H);
+	const float Front = Part(static_cast<float>(Pop.Hp));
+	DrawRect(SideColour(true).CopyWithNewOpacity(A), X, Y, W * Front, H);
+	const float Trail = Part(From.PopTrail(Pop, Now));
+	if (Trail > Front)
+	{
+		const FLinearColor Lost = bBlink ? FLinearColor(1.0f, 0.89f, 0.87f, A) : FLinearColor(1.0f, 0.23f, 0.18f, A);
+		DrawRect(Lost, X + W * Front, Y, W * (Trail - Front), H);
+	}
+	if (Pop.HealAt >= 0.0 && Now - Pop.HealAt < ATMBattleDirector::HpHealGlowSeconds && Pop.HealFrom < Pop.Hp)
+	{
+		const float From0 = Part(static_cast<float>(Pop.HealFrom));
+		const FLinearColor Gained = bBlink ? FLinearColor(0.85f, 1.0f, 0.89f, A) : FLinearColor(0.49f, 0.95f, 0.6f, A);
+		DrawRect(Gained, X + W * From0, Y, W * (Front - From0), H);
+	}
+	// The same notches as the full read: 25 a notch, more for the big ones.
+	const int32 Notch = MaxHp <= 400 ? 25 : MaxHp <= 800 ? 50 : MaxHp <= 2000 ? 100 : 250;
+	for (int32 Mark = Notch, Count = 1; Mark < MaxHp; Mark += Notch, ++Count)
+	{
+		const bool bHeavy = Count % 4 == 0;
+		DrawRect(FLinearColor(0.03f, 0.03f, 0.05f, 0.9f * A), X + W * Mark / MaxHp - (bHeavy ? 1.0f : 0.5f) * S,
+			Y + (bHeavy ? 0.0f : H * 0.25f), (bHeavy ? 2.0f : 1.0f) * S, bHeavy ? H : H * 0.75f);
+	}
+	UFont* Font = GEngine->GetMediumFont();
+	const FString Hp = FString::Printf(TEXT("%d/%d"), Pop.Hp, MaxHp);
+	const FVector2D HpSize = TextSize(Hp, Font, 0.3f * S * O);
+	OutlinedText(Hp, X + W + 4.0f * S, Y + (H - HpSize.Y) * 0.5f, FLinearColor(1.0f, 1.0f, 1.0f, A), Font, 0.3f * S * O, 1.0f * S);
+}
+
+void ATMBattleHud::DrawGoToMarks(ATMBattleDirector& From)
+{
+	// "Multi-Turn Move Mockups", Main: a number where each turn's walk ends, as
+	// Civilization III marks a Go To; the selected unit's bright, others faint,
+	// and the route under the pointer before it is set.
+	if (!PlayerOwner || From.Screen != ATMBattleDirector::EScreen::Battle)
+	{
+		return;
+	}
+	UFont* Font = GEngine->GetMediumFont();
+	const float Scale = 0.36f * S;
+	auto Mark = [&](const TMSim::FVec2& Point, const FString& Label, float Strength, bool bEnd)
+	{
+		const int Level = From.Battle.Map.NodeLevel(TMSim::FMap::NodeOf(Point));
+		const FVector World = From.GetActorTransform().TransformPosition(From.WorldFromMetres(Point, Level) + FVector(0.0f, 0.0f, 12.0f));
+		FVector2D At;
+		if (!PlayerOwner->ProjectWorldLocationToScreen(World, At))
+		{
+			return;
+		}
+		const FVector2D Size = TextSize(Label, Font, Scale);
+		const float Box = FMath::Max(Size.X + 8.0f * S, 18.0f * S);
+		const FLinearColor Edge = bEnd ? FLinearColor(Gold.R, Gold.G, Gold.B, Strength) : FLinearColor(0.44f, 0.66f, 1.0f, Strength);
+		DrawRect(Edge, At.X - Box * 0.5f - 1.5f * S, At.Y - 9.0f * S - 1.5f * S, Box + 3.0f * S, 18.0f * S + 3.0f * S);
+		DrawRect(FLinearColor(0.07f, 0.09f, 0.13f, 0.92f * Strength), At.X - Box * 0.5f, At.Y - 9.0f * S, Box, 18.0f * S);
+		Text(Label, At.X - Size.X * 0.5f, At.Y - Size.Y * 0.5f, FLinearColor(0.95f, 0.96f, 0.98f, Strength), Font, Scale, false);
+	};
+	for (const TPair<int32, ATMBattleDirector::FTMGoTo>& Pair : From.GoTos)
+	{
+		const TMSim::FUnit* Unit = From.Battle.FindUnit(Pair.Key);
+		if (!Unit || !Unit->IsAlive())
+		{
+			continue;
+		}
+		const float Strength = Pair.Key == From.SelectedId ? 1.0f : 0.5f;
+		const int32 Count = static_cast<int32>(Pair.Value.Stops.size());
+		for (int32 i = 0; i < Count; ++i)
+		{
+			Mark(Pair.Value.Stops[static_cast<size_t>(i)], FString::FromInt(i + 1), Strength, i + 1 == Count);
+		}
+	}
+	const int32 Hovered = static_cast<int32>(From.GoToHoverStops.size());
+	for (int32 i = 0; i < Hovered; ++i)
+	{
+		Mark(From.GoToHoverStops[static_cast<size_t>(i)], i + 1 == Hovered ? FString::Printf(TEXT("%d turn%s"), Hovered, Hovered == 1 ? TEXT("") : TEXT("s"))
+			: FString::FromInt(i + 1), 0.85f, i + 1 == Hovered);
+	}
+}
+
 void ATMBattleHud::DrawOverheads(ATMBattleDirector& From)
 {
-	// Name, health and statuses over every unit, as Atlas Reactor floats them:
-	// blue for an ally and red for an enemy, nearest drawn last so it is on top.
+	// Each unit's health is the ring on the ground under it (TMBattleDirectorLooks.cpp,
+	// the human's pick "C", 2026-10-01), so nothing hangs over the battlefield.
+	// Here: its statuses small beside that ring, a cast on its way out, and for
+	// the unit under the pointer alone the full read over its head -- name,
+	// health in segments ("B"), turn gauge, ultimate, statuses, items ("E").
 	if (!PlayerOwner)
 	{
 		return;
 	}
+	// Go To turn numbers on the ground first, under the units' own marks.
+	DrawGoToMarks(From);
 	FVector Eye;
 	FRotator Look;
 	PlayerOwner->GetPlayerViewPoint(Eye, Look);
+	const FVector Right = FRotationMatrix(Look).GetScaledAxis(EAxis::Y);
 	struct FHead
 	{
 		const TMSim::FUnit* Unit;
 		FVector2D At;
+		FVector2D Foot;
+		float Ring;
 		float Distance;
 	};
 	TArray<FHead> Heads;
@@ -1321,75 +1609,109 @@ void ATMBattleHud::DrawOverheads(ATMBattleDirector& From)
 		{
 			continue;
 		}
-		const FVector World = From.GetActorTransform().TransformPosition(From.ShownAt(Unit) + FVector(0.0f, 0.0f, Unit.IsAlive() ? 262.0f : 70.0f));
+		const FVector Shown = From.ShownAt(Unit);
+		const FVector World = From.GetActorTransform().TransformPosition(Shown + FVector(0.0f, 0.0f, Unit.IsAlive() ? 262.0f : 70.0f));
+		const FVector FootWorld = From.GetActorTransform().TransformPosition(Shown + FVector(0.0f, 0.0f, 5.0f));
 		FVector2D At;
-		if (PlayerOwner->ProjectWorldLocationToScreen(World, At))
+		FVector2D Foot;
+		FVector2D Edge;
+		if (PlayerOwner->ProjectWorldLocationToScreen(World, At) && PlayerOwner->ProjectWorldLocationToScreen(FootWorld, Foot)
+			&& PlayerOwner->ProjectWorldLocationToScreen(FootWorld + Right * 55.0f, Edge))
 		{
-			Heads.Add({ &Unit, At, static_cast<float>(FVector::Dist(Eye, World)) });
+			Heads.Add({ &Unit, At, Foot, static_cast<float>(FVector2D::Distance(Foot, Edge)), static_cast<float>(FVector::Dist(Eye, World)) });
 		}
 	}
 	Heads.Sort([](const FHead& A, const FHead& B) { return A.Distance > B.Distance; });
 
 	UFont* Font = GEngine->GetMediumFont();
+	const float O = FTMSettings::Get().OverheadScale;
 	for (const FHead& Head : Heads)
 	{
 		const TMSim::FUnit& Unit = *Head.Unit;
 		const bool bFriend = From.IsFriend(Unit);
-		// Sized as Options says (Overhead bar size, Status icon size).
-		const float O = FTMSettings::Get().OverheadScale;
-		const float W = 124.0f * S * O;
-		const float H = 14.0f * S * O;
-		const float X = Head.At.X - W * 0.5f;
-		float Y = Head.At.Y;
-
-		// The name, gold for the unit being ordered.
-		// A monster by its name and what it is doing: its temperament until it is set off.
-		const FString Name = Unit.bMonster ? From.MonsterLine(Unit) : FString::Printf(TEXT("%s %d"), *JobName(Unit), Unit.Id);
-		const FVector2D NameSize = TextSize(Name, Font, 0.42f * S * O);
-		OutlinedText(Name, Head.At.X - NameSize.X * 0.5f, Y - NameSize.Y - 2.0f * S,
-			Unit.Id == From.SelectedId ? Gold : FLinearColor(0.97f, 0.97f, 1.0f), Font, 0.42f * S * O, 1.4f * S);
+		const bool bHovered = Unit.Id == From.HoverUnitId;
 
 		if (!Unit.IsAlive())
 		{
-			Bar(X, Y, W, H, 0.0f, Dim, FLinearColor(0.1f, 0.1f, 0.12f, 0.85f), 6.0f * S);
-			Text(FString::Printf(TEXT("DOWN %.0fs"), Unit.KoTicks / Tps), X + 10.0f * S, Y - 1.0f * S, Urgent, Font, 0.34f * S);
+			// Knocked out: no ring, just how long it has to be revived.
+			const FString Down = FString::Printf(TEXT("DOWN %.0fs"), Unit.KoTicks / Tps);
+			const FVector2D DownSize = TextSize(Down, Font, 0.34f * S * O);
+			OutlinedText(Down, Head.At.X - DownSize.X * 0.5f, Head.At.Y, Urgent, Font, 0.34f * S * O, 1.0f * S);
 			continue;
 		}
 
-		// Health, with a shield's worth drawn on after it in white.
-		const float MaxHp = static_cast<float>(FMath::Max(1, Unit.MaxHp()));
+		if (!bHovered)
+		{
+			// Its statuses, small, beside its ring.
+			const float Small = 11.0f * S * FTMSettings::Get().StatusIconScale;
+			StatusChips(Unit, Head.Foot.X + Head.Ring + 4.0f * S, Head.Foot.Y - Small * 0.5f, Small, false, false);
+			// A spell on its way out stays in sight: a short thin bar over its head.
+			float PopY = Head.At.Y;
+			if (Unit.IsCasting())
+			{
+				const float CastW = 48.0f * S * O;
+				const float Done = 1.0f - static_cast<float>(Unit.Casting.Ticks) / FMath::Max(1, Unit.Casting.Total);
+				Bar(Head.At.X - CastW * 0.5f, Head.At.Y, CastW, 3.0f * S * O, Done, CastColour, FLinearColor(0.05f, 0.05f, 0.08f, 0.8f), 0.0f);
+				PopY -= 10.0f * S * O;
+			}
+			// One of ours that just took or dealt a blow: its health, for a few seconds.
+			PopBar(From, Unit, Head.At.X, PopY);
+			continue;
+		}
+
+		// The unit under the pointer: the full read, still slim.
+		const float W = 104.0f * S * O;
+		const float H = 7.0f * S * O;
+		const float X = Head.At.X - W * 0.5f;
+		float Y = Head.At.Y;
+		// A monster by its name and what it is doing: its temperament until it is set off.
+		const FString Name = Unit.bMonster ? From.MonsterLine(Unit) : FString::Printf(TEXT("%s %d"), *JobName(Unit), Unit.Id);
+		const FVector2D NameSize = TextSize(Name, Font, 0.38f * S * O);
+		OutlinedText(Name, Head.At.X - NameSize.X * 0.5f, Y - NameSize.Y - 3.0f * S,
+			Unit.Id == From.SelectedId ? Gold : FLinearColor(0.97f, 0.97f, 1.0f), Font, 0.38f * S * O, 1.2f * S);
+
+		// Health, in segments, with a shield's worth after it in white.
+		const int32 MaxHp = FMath::Max(1, Unit.MaxHp());
 		int32 Soak = 0;
 		for (const TMSim::FStatus& Status : Unit.Statuses)
 		{
 			const TMSim::FStatusDef* Def = TMSim::FindStatus(Status.Id);
 			Soak += Def && Def->bAbsorbs ? Status.Amount : 0;
 		}
+		const float Part = FMath::Clamp(static_cast<float>(Unit.Hp) / MaxHp, 0.0f, 1.0f);
 		if (Unit.bReady)
 		{
-			// Its turn: a gold frame round its health.
-			Slant(X - 2.0f * S, Y - 2.0f * S, W + 4.0f * S, H + 4.0f * S, Gold, 6.0f * S);
+			// Its turn: a thin gold frame round its health.
+			DrawRect(Gold, X - 2.0f * S, Y - 2.0f * S, W + 4.0f * S, H + 4.0f * S);
 		}
-		// Neither side's: the monsters' health is amber (feat-neutral-camps.md 9).
-		Bar(X, Y, W, H, Unit.Hp / MaxHp, Unit.bMonster ? FLinearColor(0.95f, 0.68f, 0.18f) : SideColour(bFriend),
-			FLinearColor(0.05f, 0.05f, 0.08f, 0.9f), 6.0f * S);
+		Bar(X, Y, W, H, Part, Unit.bMonster ? FLinearColor(0.95f, 0.68f, 0.18f) : SideColour(bFriend), FLinearColor(0.05f, 0.05f, 0.08f, 0.92f), 0.0f);
 		if (Soak > 0)
 		{
-			const float From0 = W * FMath::Clamp(Unit.Hp / MaxHp, 0.0f, 1.0f);
-			Slant(X + From0, Y, FMath::Min(W - From0, W * Soak / MaxHp), H, FLinearColor(1.0f, 1.0f, 1.0f, 0.75f), 6.0f * S);
+			DrawRect(FLinearColor(1.0f, 1.0f, 1.0f, 0.8f), X + W * Part, Y, FMath::Min(W * (1.0f - Part), W * Soak / MaxHp), H);
 		}
-		const FString Hp = FString::FromInt(Unit.Hp);
-		OutlinedText(Hp, X + 10.0f * S * O, Y + (H - TextSize(Hp, Font, 0.34f * S * O).Y) * 0.5f, FLinearColor::White, Font, 0.34f * S * O, 1.0f * S);
-		// What it carries, beside its health: each item's icon.
+		// A notch every so many points, heavier every fourth, so how much is left
+		// reads without the number: 25 a notch, more for the big ones.
+		const int32 Notch = MaxHp <= 400 ? 25 : MaxHp <= 800 ? 50 : MaxHp <= 2000 ? 100 : 250;
+		for (int32 Mark = Notch, Count = 1; Mark < MaxHp; Mark += Notch, ++Count)
+		{
+			const bool bHeavy = Count % 4 == 0;
+			const float MarkX = X + W * Mark / MaxHp;
+			DrawRect(FLinearColor(0.03f, 0.03f, 0.05f, 0.9f), MarkX - (bHeavy ? 1.0f : 0.5f) * S, Y + (bHeavy ? 0.0f : H * 0.25f), (bHeavy ? 2.0f : 1.0f) * S,
+				bHeavy ? H : H * 0.75f);
+		}
+		const FString Hp = Soak > 0 ? FString::Printf(TEXT("%d/%d +%d"), Unit.Hp, MaxHp, Soak) : FString::Printf(TEXT("%d/%d"), Unit.Hp, MaxHp);
+		const FVector2D HpSize = TextSize(Hp, Font, 0.32f * S * O);
+		OutlinedText(Hp, X + W + 5.0f * S, Y + (H - HpSize.Y) * 0.5f, FLinearColor::White, Font, 0.32f * S * O, 1.0f * S);
+		// What it carries, after the number: each item's icon.
 		if (Unit.HasItems())
 		{
-			const float Gear = 20.0f * S * O;
-			GearRow(Unit, X + W + 5.0f * S, Y + (H - Gear) * 0.5f, Gear);
+			const float Gear = 16.0f * S * O;
+			GearRow(Unit, X + W + 9.0f * S + HpSize.X, Y + (H - Gear) * 0.5f, Gear);
 		}
 		Y += H + 3.0f * S;
 
-		// Its turn gauge, as its turn card shows it: filling toward its turn,
-		// then gold and draining while it can act.
-		const float Thin = 4.0f * S * O;
+		// Its turn gauge, filling toward its turn, then gold and draining while it can act.
+		const float Thin = 2.0f * S * O;
 		float Gauge = static_cast<float>(Unit.Tg) / TMSim::Pace::TgMax;
 		FLinearColor GaugeColour(0.55f, 0.75f, 0.95f);
 		if (Unit.bReady)
@@ -1397,27 +1719,26 @@ void ATMBattleHud::DrawOverheads(ATMBattleDirector& From)
 			Gauge = static_cast<float>(Unit.Clock) / FMath::Max(1, From.Battle.ClockTicks(Unit));
 			GaugeColour = Gold;
 		}
-		Bar(X, Y, W, Thin, FMath::Clamp(Gauge, 0.0f, 1.0f), GaugeColour, FLinearColor(0.05f, 0.05f, 0.08f, 0.85f), 2.0f * S);
+		Bar(X, Y, W, Thin, FMath::Clamp(Gauge, 0.0f, 1.0f), GaugeColour, FLinearColor(0.05f, 0.05f, 0.08f, 0.85f), 0.0f);
 		Y += Thin + 2.0f * S;
 		// The ultimate meter, pulsing once it is full.
 		const bool bUltReady = Unit.Ult >= TMSim::Pace::UltMax;
 		const float Beat = bUltReady ? 0.7f + 0.3f * FMath::Sin((GetWorld() ? GetWorld()->GetRealTimeSeconds() : 0.0f) * 6.0f) : 1.0f;
 		const FLinearColor UltColour = bUltReady ? FLinearColor(1.0f, 0.62f, 0.2f, Beat) : FLinearColor(0.78f, 0.5f, 1.0f, 0.9f);
-		Bar(X, Y, W, Thin, static_cast<float>(Unit.Ult) / TMSim::Pace::UltMax, UltColour, FLinearColor(0.05f, 0.05f, 0.08f, 0.85f), 2.0f * S);
+		Bar(X, Y, W, Thin, static_cast<float>(Unit.Ult) / TMSim::Pace::UltMax, UltColour, FLinearColor(0.05f, 0.05f, 0.08f, 0.85f), 0.0f);
 		Y += Thin + 3.0f * S;
 
 		// A spell on its way out: how long it has left.
 		if (Unit.IsCasting())
 		{
 			const float Done = 1.0f - static_cast<float>(Unit.Casting.Ticks) / FMath::Max(1, Unit.Casting.Total);
-			Bar(X, Y, W, 4.0f * S, Done, CastColour, FLinearColor(0.05f, 0.05f, 0.08f, 0.8f), 2.0f * S);
-			Y += 7.0f * S;
+			Bar(X, Y, W, 3.0f * S, Done, CastColour, FLinearColor(0.05f, 0.05f, 0.08f, 0.8f), 0.0f);
+			Y += 6.0f * S;
 		}
 
-		// Its statuses, centred under the bar.
-		const float Chip = 18.0f * S * FTMSettings::Get().StatusIconScale;
-		const float Across = Unit.Statuses.size() * Chip * 1.15f - Chip * 0.15f;
-		StatusChips(Unit, Head.At.X - Across * 0.5f, Y, Chip, false, false);
+		// Its statuses, under the bars.
+		const float Chip = 15.0f * S * FTMSettings::Get().StatusIconScale;
+		StatusChips(Unit, X, Y, Chip, false, false);
 	}
 }
 
@@ -1437,7 +1758,7 @@ void ATMBattleHud::AbilityTile(ATMBattleDirector& From, const TMSim::FUnit& Unit
 	const bool bCooling = Unit.Cooldowns[Slot] > 0;
 	const bool bUltWaiting = Slot == 3 && Unit.Ult < TMSim::Pace::UltMax;
 	const bool bBlocked = !From.Battle.AbilityBlockedReason(Unit, Slot).empty();
-	const bool bUsable = bButton ? From.PlayerCanOrder(&Unit) && !Unit.bActed && !bBlocked : !bBlocked || Unit.bActed;
+	const bool bUsable = bButton ? From.PlayerCanCommand(&Unit) && !Unit.bActed && !bBlocked : !bBlocked || Unit.bActed;
 	const bool bColour = !bCooling && !bUltWaiting && !bPassive && bUsable;
 	const bool bAiming = bButton && From.AimMode == ATMBattleDirector::EAimMode::Ability && From.AimSlot == Slot;
 	const bool bOver = FBox2D(FVector2D(X, Y), FVector2D(X + Size, Y + Size)).IsInside(MousePoint());
@@ -1500,6 +1821,34 @@ void ATMBattleHud::AbilityTile(ATMBattleDirector& From, const TMSim::FUnit& Unit
 		}
 		Fitted(Effect, Y + Size - Band, EffectColour * FLinearColor(1, 1, 1, Fade));
 		Top = Y + Band;
+		if (!bPassive)
+		{
+			// How far it reaches, in the bottom left corner above the effect
+			// (2026-10-01): "6m", "2-6m" with a near limit, "self", "all".
+			const std::string Shape = TMSim::ShapeOf(*Ability);
+			FString Reach;
+			if (Shape == "global")
+			{
+				Reach = TEXT("all");
+			}
+			else if (Ability->MaxRange <= 0.0f)
+			{
+				Reach = Ability->Aoe > 0.0f ? FString::Printf(TEXT("self %gm"), FMath::RoundToFloat(Ability->Aoe * 10.0f) / 10.0f) : FString(TEXT("self"));
+			}
+			else if (Ability->MinRange > 0.0f)
+			{
+				Reach = FString::Printf(TEXT("%g-%gm"), FMath::RoundToFloat(Ability->MinRange * 10.0f) / 10.0f, FMath::RoundToFloat(Ability->MaxRange * 10.0f) / 10.0f);
+			}
+			else
+			{
+				Reach = FString::Printf(TEXT("%gm"), FMath::RoundToFloat(Ability->MaxRange * 10.0f) / 10.0f);
+			}
+			const float ReachScale = Size / 290.0f;
+			const FVector2D ReachSize = TextSize(Reach, Font, ReachScale);
+			const float ReachY = Y + Size - Band - ReachSize.Y - 1.0f * S;
+			DrawRect(FLinearColor(0.0f, 0.0f, 0.0f, 0.72f), X, ReachY, ReachSize.X + 6.0f * S, ReachSize.Y + 1.0f * S);
+			Text(Reach, X + 3.0f * S, ReachY, FLinearColor(0.55f, 0.95f, 0.92f, Fade), Font, ReachScale);
+		}
 		if (!bPassive)
 		{
 			// Its shape, so a cone reads as a cone before it is aimed.
@@ -1591,9 +1940,17 @@ void ATMBattleHud::DrawUnitPanel(ATMBattleDirector& From, const TMSim::FUnit& Un
 	const float Badge = 42.0f * S;
 	DrawRect(FLinearColor(0.0f, 0.0f, 0.0f, 0.6f), PX + 4.0f * S, Y + 4.0f * S, Badge, Badge);
 	Picture(ClassIcon(Unit), PX + 4.0f * S, Y + 4.0f * S, Badge, Badge);
-	AddTip(PX, Y, Portrait, Portrait, FString::Printf(TEXT("%s %d\nDEF %d  MDF %d  CRIT %d%%\nAEV %d%%  MEV %d%%  SPD %d  MOV %sm  PAT %d  SGT %sm\n\n"),
-		*JobName(Unit), Unit.Id, Unit.Stat(TMSim::EStat::AttDef), Unit.Stat(TMSim::EStat::MagDef), Unit.Stat(TMSim::EStat::Crit),
-		Unit.Stat(TMSim::EStat::AEva), Unit.Stat(TMSim::EStat::MEva), Unit.Stat(TMSim::EStat::Speed), *Num(Battle.MoveOf(Unit)),
+	// The defenses as the rules read them: a share off each hit and one
+	// Evasion (2026-10-01), or, under the classic rules, the old four.
+	const int32 ArmorNow = Unit.Stat(TMSim::EStat::AttDef);
+	const int32 ResistNow = Unit.Stat(TMSim::EStat::MagDef);
+	const FString Defenses = Battle.NewDefense()
+		? FString::Printf(TEXT("Armor %d (-%d%% physical)  Resist %d (-%d%% magic)\nEvasion %d%% (1 in 10 dodged, the rest grazed for half)  CRIT %d%%"),
+			ArmorNow, Battle.DefenseShare(ArmorNow), ResistNow, Battle.DefenseShare(ResistNow), Battle.EvasionOf(Unit), Unit.Stat(TMSim::EStat::Crit))
+		: FString::Printf(TEXT("DEF %d  MDF %d  CRIT %d%%\nAEV %d%%  MEV %d%%"), ArmorNow, ResistNow, Unit.Stat(TMSim::EStat::Crit),
+			Unit.Stat(TMSim::EStat::AEva), Unit.Stat(TMSim::EStat::MEva));
+	AddTip(PX, Y, Portrait, Portrait, FString::Printf(TEXT("%s %d\n%s\nSPD %d  MOV %sm  PAT %d  SGT %sm\n\n"),
+		*JobName(Unit), Unit.Id, *Defenses, Unit.Stat(TMSim::EStat::Speed), *Num(Battle.MoveOf(Unit)),
 		Unit.Stat(TMSim::EStat::Patience), *Num(Battle.SightOf(Unit)))
 		+ ExplainMove(From, Unit) + TEXT("\n") + ExplainSight(From, Unit) + BuffText(Unit));
 	// What it carries, along the foot of the portrait.
@@ -1768,9 +2125,9 @@ void ATMBattleHud::DrawCornerButtons(ATMBattleDirector& From)
 	const float BW = 60.0f * S;
 	const float BH = 30.0f * S;
 	const float Gap = 4.0f * S;
-	float X = Canvas->ClipX - 10.0f * S - 6.0f * BW - 5.0f * Gap + Nudge(TEXT("corner")).X;
+	float X = Canvas->ClipX - 10.0f * S - 7.0f * BW - 6.0f * Gap + Nudge(TEXT("corner")).X;
 	const float Y = 12.0f * S + Nudge(TEXT("corner")).Y;
-	Movable(TEXT("corner"), TEXT("Buttons"), X, Y, 6.0f * BW + 5.0f * Gap, BH);
+	Movable(TEXT("corner"), TEXT("Buttons"), X, Y, 7.0f * BW + 6.0f * Gap, BH);
 	MenuButton(X, Y, BW, BH, TEXT("Layout"), ETMHudAction::ToggleLayout, -1, From.bEditingLayout);
 	AddTip(X, Y, BW, BH, FString::Printf(TEXT("Move the screen's panels where you want them, then lock them again (%s)"),
 		*FTMSettings::Get().KeyName(ETMAction::EditLayout)));
@@ -1783,6 +2140,9 @@ void ATMBattleHud::DrawCornerButtons(ATMBattleDirector& From)
 	X += BW + Gap;
 	MenuButton(X, Y, BW, BH, TEXT("Codex"), ETMHudAction::ToggleGuide, -1, From.bGuideOpen);
 	AddTip(X, Y, BW, BH, TEXT("The Codex: how to play, every class, item and status, the ground and the objectives (U)"));
+	X += BW + Gap;
+	MenuButton(X, Y, BW, BH, TEXT("Items"), ETMHudAction::TakeOpen, -1, From.bTeamItemsOpen);
+	AddTip(X, Y, BW, BH, TEXT("Your team's items: what each unit wears, its open slots, and the stash of items picked up"));
 	X += BW + Gap;
 	MenuButton(X, Y, BW, BH, From.bPaused ? TEXT("Go") : TEXT("Pause"), ETMHudAction::Pause, -1, From.bPaused);
 	AddTip(X, Y, BW, BH, TEXT("Pause or carry on (P)"));
@@ -2106,11 +2466,64 @@ void ATMBattleHud::DrawWorldWords(ATMBattleDirector& From)
 	const float Numbers = FTMSettings::Get().DamageTextScale;
 	for (const FTMFloater& Floater : From.Floaters)
 	{
-		if (Floater.Text)
+		if (!Floater.Text)
 		{
-			const FColor C = Floater.Text->TextRenderColor;
+			continue;
+		}
+		const FColor C = Floater.Text->TextRenderColor;
+		const float Alpha = C.A / 255.0f;
+		if (!Floater.bExact)
+		{
 			Lines(Floater.Text->Text.ToString(), Floater.Text->GetComponentLocation(),
-				Whiter(FColor(C.R, C.G, C.B).ReinterpretAsLinear(), 0.4f, C.A / 255.0f), Big, 0.95f * S * Numbers, 2.0f * S);
+				Whiter(FColor(C.R, C.G, C.B).ReinterpretAsLinear(), 0.4f, Alpha), Big, 0.95f * S * Numbers, 2.0f * S);
+			continue;
+		}
+		// Its own look ("Combat Text Mockups" A): exact colour, size, weight, a pop, a tag.
+		FVector2D At;
+		if (!PlayerOwner->ProjectWorldLocationToScreen(Floater.Text->GetComponentLocation(), At))
+		{
+			continue;
+		}
+		const float Pop = Floater.bPop ? 1.0f + 0.4f * FMath::Max(0.0f, 1.0f - Floater.Age / 0.16f) : 1.0f;
+		const float Scale = 0.95f * S * Numbers * Floater.Scale * Pop;
+		const FString Word = Floater.Text->Text.ToString();
+		const FVector2D Size = TextSize(Word, Big, Scale);
+		const float TagScale = 0.95f * S * Numbers * 0.5f;
+		const FVector2D TagSize = Floater.Tag.IsEmpty() ? FVector2D::ZeroVector : TextSize(Floater.Tag, Big, TagScale);
+		const float Gap = Floater.Tag.IsEmpty() ? 0.0f : 5.0f * S;
+		const float X = At.X - (Size.X + Gap + TagSize.X) * 0.5f;
+		const float Y = At.Y - Size.Y;
+		const FLinearColor Colour = FColor(C.R, C.G, C.B).ReinterpretAsLinear().CopyWithNewOpacity(Alpha);
+		if (Floater.bEmber)
+		{
+			// A soft ember glow, then a pale edge: dark red reads on a dark field.
+			const FLinearColor Glow(1.0f, 0.43f, 0.2f, 0.28f * Alpha);
+			const FLinearColor Rim(1.0f, 0.79f, 0.72f, Alpha);
+			for (int32 k = 0; k < 8; ++k)
+			{
+				const float A = k * PI / 4.0f;
+				DrawText(Word, Glow, X + FMath::Cos(A) * 3.5f * S, Y + FMath::Sin(A) * 3.5f * S, Big, Scale * FontBoost);
+			}
+			for (int32 k = 0; k < 8; ++k)
+			{
+				const float A = k * PI / 4.0f;
+				DrawText(Word, Rim, X + FMath::Cos(A) * 1.3f * S, Y + FMath::Sin(A) * 1.3f * S, Big, Scale * FontBoost);
+			}
+			DrawText(Word, Colour, X, Y, Big, Scale * FontBoost);
+		}
+		else
+		{
+			OutlinedText(Word, X, Y, Colour, Big, Scale, 2.0f * S);
+		}
+		if (Floater.bBold)
+		{
+			// Twice, a hair apart: heavier.
+			DrawText(Word, Colour, X + FMath::Max(1.0f, 0.9f * S * Floater.Scale), Y, Big, Scale * FontBoost);
+		}
+		if (!Floater.Tag.IsEmpty())
+		{
+			OutlinedText(Floater.Tag, X + Size.X + Gap, Y + Size.Y - TagSize.Y - 2.0f * S,
+				Floater.TagTint.ReinterpretAsLinear().CopyWithNewOpacity(Alpha), Big, TagScale, 1.5f * S);
 		}
 	}
 }
@@ -2245,6 +2658,143 @@ void ATMBattleHud::DrawTakePicker(ATMBattleDirector& From)
 			ChoiceButton(X + 46.0f * S, Y + 4.0f * S, 150.0f * S, 32.0f * S, TEXT("Leave it here"), ETMHudAction::Drop, Slot, bControllable);
 		}
 		X += 230.0f * S;
+	}
+}
+
+void ATMBattleHud::DrawTeamItems(ATMBattleDirector& From)
+{
+	// The team items screen (2026-10-01): every unit of the side in one place,
+	// what each wears and its open slots, and the side's stash. Pick an item in
+	// the stash, then an open slot, to equip it (free, any time). A worn item
+	// comes off only on its wearer's turn, and that is the whole turn.
+	if (!From.bTeamItemsOpen || From.Screen != ATMBattleDirector::EScreen::Battle)
+	{
+		return;
+	}
+	const int32 Team = From.ItemsTeam();
+	if (Team != 0 && Team != 1)
+	{
+		return;
+	}
+	const bool bManage = From.MayManageItems(Team);
+	UFont* Font = GEngine->GetMediumFont();
+	UFont* Big = GEngine->GetLargeFont();
+	const std::vector<TMSim::FBattle::FStashed>& Held = From.Battle.Stash[Team];
+	TArray<const TMSim::FUnit*> Party;
+	for (const TMSim::FUnit& Unit : From.Battle.Units)
+	{
+		if (!Unit.bMonster && Unit.HomeTeam() == Team)
+		{
+			Party.Add(&Unit);
+		}
+	}
+
+	const float Badge = 54.0f * S;
+	const float RowH = Badge + 30.0f * S;
+	const float PW = FMath::Min(Canvas->ClipX - 40.0f * S, 1080.0f * S);
+	const float PH = 210.0f * S + Party.Num() * RowH;
+	const float PX = (Canvas->ClipX - PW) * 0.5f;
+	const float PY = FMath::Max(20.0f * S, (Canvas->ClipY - PH) * 0.42f);
+	Panel(PX, PY, PW, PH, FLinearColor(0.04f, 0.05f, 0.09f, 0.97f), TeamColour(Team) * FLinearColor(1, 1, 1, 0.75f), 1.5f);
+	// The panel itself catches clicks, so one on its empty part doesn't fall through to the board (and drops a pick).
+	AddButton(PX, PY, PW, PH, ETMHudAction::StashPick, -1);
+	Text(FString::Printf(TEXT("%s team items"), Team == 0 ? TEXT("Blue") : TEXT("Red")), PX + 22.0f * S, PY + 14.0f * S, TeamColour(Team), Big, 0.7f * S);
+	MenuButton(PX + PW - 140.0f * S, PY + 14.0f * S, 120.0f * S, 34.0f * S, TEXT("Close  (Esc)"), ETMHudAction::TakeOpen);
+
+	// The stash.
+	float Y = PY + 60.0f * S;
+	Text(FString::Printf(TEXT("Stash  (%d)"), static_cast<int32>(Held.size())), PX + 22.0f * S, Y, Gold, Font, 0.6f * S);
+	Text(Held.empty() ? FString(TEXT("Empty: walk a unit onto items on the ground and they come here."))
+		: From.StashPick >= 0 ? FString(TEXT("Now click an open slot below to equip it."))
+		: FString(TEXT("Click an item, then an open slot below, to equip it. Free, any time.")),
+		PX + 140.0f * S, Y + 4.0f * S, Dim, Font, 0.48f * S);
+	Y += 30.0f * S;
+	float X = PX + 22.0f * S;
+	for (int32 i = 0; i < static_cast<int32>(Held.size()); ++i)
+	{
+		if (X + Badge > PX + PW - 20.0f * S)
+		{
+			break;
+		}
+		const TMSim::FItemDef* Item = Held[static_cast<size_t>(i)].Item;
+		if (From.StashPick == i)
+		{
+			DrawRect(Gold, X - 3.0f * S, Y - 3.0f * S, Badge + 6.0f * S, Badge + 6.0f * S);
+		}
+		ItemBadge(Item, X, Y, Badge);
+		if (bManage)
+		{
+			AddButton(X, Y, Badge, Badge, ETMHudAction::StashPick, i);
+		}
+		X += Badge + 10.0f * S;
+	}
+
+	// Items lying within reach of the unit in hand, to pick up into the stash.
+	const TMSim::FUnit* InHand = From.SelectedUnit();
+	const int32 Near = InHand && From.PlayerCanOrder(InHand) && InHand->Team == Team ? From.Battle.CacheNear(InHand->Pos) : -1;
+	Y += Badge + 14.0f * S;
+	if (Near >= 0 && !From.Battle.Caches[static_cast<size_t>(Near)].Items.empty())
+	{
+		const TMSim::FCache& Cache = From.Battle.Caches[static_cast<size_t>(Near)];
+		Text(FString::Printf(TEXT("Within %s's reach:"), *From.NameOf(InHand->Id)), PX + 22.0f * S, Y + 6.0f * S, Dim, Font, 0.5f * S);
+		float CX = PX + 230.0f * S;
+		for (int32 i = 0; i < static_cast<int32>(Cache.Items.size()) && CX + 180.0f * S < PX + PW; ++i)
+		{
+			ItemBadge(Cache.Items[static_cast<size_t>(i)], CX, Y, 32.0f * S);
+			MenuButton(CX + 36.0f * S, Y, 110.0f * S, 32.0f * S, TEXT("Pick up"), ETMHudAction::Take, i);
+			CX += 160.0f * S;
+		}
+		Y += 42.0f * S;
+	}
+	else
+	{
+		Y += 6.0f * S;
+	}
+
+	// The party: each unit, what it wears, its open slots.
+	for (const TMSim::FUnit* Unit : Party)
+	{
+		const bool bUp = Unit->IsAlive();
+		const TMSim::FJobDef* Job = TMSim::FindJob(Unit->Job);
+		Panel(PX + 16.0f * S, Y, PW - 32.0f * S, RowH - 8.0f * S, FLinearColor(0.07f, 0.08f, 0.12f, 0.9f),
+			FLinearColor(0.3f, 0.34f, 0.42f, 0.6f), 1.0f);
+		const FString Name = Job ? FString(UTF8_TO_TCHAR(Job->Name.c_str())) : From.NameOf(Unit->Id);
+		Text(Name, PX + 30.0f * S, Y + 10.0f * S, bUp ? TextColour : Dim, Font, 0.62f * S);
+		Text(bUp ? FString::Printf(TEXT("HP %d / %d"), Unit->Hp, Unit->MaxHp()) : FString(TEXT("fallen")),
+			PX + 30.0f * S, Y + 38.0f * S, bUp ? Dim : Urgent * FLinearColor(1, 1, 1, 0.7f), Font, 0.48f * S);
+		const bool bTurn = bUp && From.PlayerCanOrder(Unit);
+		float SX = PX + 260.0f * S;
+		const float SY = Y + (RowH - 8.0f * S - Badge) * 0.5f;
+		for (int32 Slot = 0; Slot < 3; ++Slot)
+		{
+			const TMSim::FItemDef* Worn = Unit->Gear[Slot];
+			const int32 Code = Unit->Id * 4 + Slot;
+			if (Worn)
+			{
+				ItemBadge(Worn, SX, SY, Badge);
+				Text(UTF8_TO_TCHAR(Worn->Name.c_str()), SX + Badge + 8.0f * S, SY + 2.0f * S, TierColour(static_cast<int32>(Worn->Tier)), Font, 0.45f * S);
+				const bool bCanOff = bTurn && From.Battle.ValidateDrop(Unit->Id, Slot).empty();
+				ChoiceButton(SX + Badge + 8.0f * S, SY + 24.0f * S, 150.0f * S, 28.0f * S, TEXT("Take off (turn)"), ETMHudAction::Drop, Code, bCanOff);
+				AddTip(SX + Badge + 8.0f * S, SY + 24.0f * S, 150.0f * S, 28.0f * S, bCanOff
+					? FString(TEXT("Back into the stash. It takes this unit's whole turn."))
+					: FString(TEXT("An item comes off only on its wearer's turn, before it has moved or acted, and that is its whole turn. When a unit falls, what it wore comes back to the stash.")));
+			}
+			else
+			{
+				const bool bReady = bManage && bUp && From.StashPick >= 0;
+				Panel(SX, SY, Badge, Badge, bReady ? FLinearColor(0.16f, 0.14f, 0.06f, 0.95f) : FLinearColor(0.03f, 0.04f, 0.07f, 0.85f),
+					bReady ? Gold : FLinearColor(0.3f, 0.33f, 0.4f, 0.55f), bReady ? 1.5f : 1.0f);
+				const FVector2D Plus = TextSize(TEXT("+"), Font, 0.8f * S);
+				Text(TEXT("+"), SX + (Badge - Plus.X) * 0.5f, SY + (Badge - Plus.Y) * 0.5f, bReady ? Gold : Dim, Font, 0.8f * S);
+				Text(TEXT("open slot"), SX + Badge + 8.0f * S, SY + 16.0f * S, Dim, Font, 0.45f * S);
+				if (bManage && bUp)
+				{
+					AddButton(SX, SY, Badge, Badge, ETMHudAction::EquipSlot, Code);
+				}
+			}
+			SX += Badge + 175.0f * S;
+		}
+		Y += RowH;
 	}
 }
 
@@ -2517,21 +3067,23 @@ void ATMBattleHud::DrawGuideList(ATMBattleDirector& From, float PX, float PY, fl
 		FX + 16.0f * S, FY + 7.0f * S, Dim, Font, 0.46f * S);
 
 	// The table: a header, then as many rows as fit, from where it is scrolled to.
+	// One Evasion column (the higher of a class's two, 2026-10-01).
 	const TMSim::EStat Columns[] =
 	{
-		TMSim::EStat::Hp, TMSim::EStat::AttDef, TMSim::EStat::MagDef, TMSim::EStat::AEva, TMSim::EStat::MEva,
+		TMSim::EStat::Hp, TMSim::EStat::AttDef, TMSim::EStat::MagDef, TMSim::EStat::AEva,
 		TMSim::EStat::Crit, TMSim::EStat::Speed, TMSim::EStat::Move, TMSim::EStat::Patience, TMSim::EStat::Sight
 	};
+	constexpr int32 ColumnCount = UE_ARRAY_COUNT(Columns);
 	const float X = PX + 24.0f * S;
 	const float IconW = 34.0f * S;
 	const float NameW = 230.0f * S;
 	const float RoleW = 190.0f * S;
 	const float RowW = PW - 64.0f * S;
-	const float ColW = FMath::Min(95.0f * S, (RowW - IconW - NameW - RoleW) / 10.0f);
+	const float ColW = FMath::Min(95.0f * S, (RowW - IconW - NameW - RoleW) / ColumnCount);
 	float Y = FY + 50.0f * S;
 	Text(TEXT("Class"), X + IconW, Y, Dim, Font, 0.5f * S);
 	Text(TEXT("Role"), X + IconW + NameW, Y, Dim, Font, 0.5f * S);
-	for (int32 c = 0; c < 10; ++c)
+	for (int32 c = 0; c < ColumnCount; ++c)
 	{
 		Text(ShownStatName(Columns[c]), X + IconW + NameW + RoleW + c * ColW, Y, Dim, Font, 0.5f * S);
 	}
@@ -2564,9 +3116,10 @@ void ATMBattleHud::DrawGuideList(ATMBattleDirector& From, float PX, float PY, fl
 			RoleText += (RoleText.IsEmpty() ? TEXT("") : TEXT(", ")) + FString(UTF8_TO_TCHAR(JobRole.c_str()));
 		}
 		Text(RoleText, X + IconW + NameW, Y, Dim, Font, 0.5f * S);
-		for (int32 c = 0; c < 10; ++c)
+		for (int32 c = 0; c < ColumnCount; ++c)
 		{
-			Text(FString::FromInt(Job.Stats.Get(Columns[c])), X + IconW + NameW + RoleW + c * ColW, Y, TextColour, Font, 0.54f * S);
+			const int32 Value = Columns[c] == TMSim::EStat::AEva ? ClassEvasion(Job.Stats) : Job.Stats.Get(Columns[c]);
+			Text(FString::FromInt(Value), X + IconW + NameW + RoleW + c * ColW, Y, TextColour, Font, 0.54f * S);
 		}
 		AddButton(X - 6.0f * S, Y - 3.0f * S, RowW, RowH, ETMHudAction::GuideJob, j);
 		Y += Step;
@@ -2669,12 +3222,18 @@ void ATMBattleHud::DrawGuideDetail(ATMBattleDirector& From, float PX, float PY, 
 	for (int32 k = 0; k < TMSim::StatCount; ++k)
 	{
 		const TMSim::EStat Stat = static_cast<TMSim::EStat>(k);
+		// One Evasion row: the higher of the two (2026-10-01).
+		if (Stat == TMSim::EStat::MEva)
+		{
+			continue;
+		}
+		auto Read = [Stat](const TMSim::FJobStats& Stats) { return Stat == TMSim::EStat::AEva ? ClassEvasion(Stats) : Stats.Get(Stat); };
 		int32 Most = 1;
 		for (const TMSim::FJobDef* Other : Jobs)
 		{
-			Most = FMath::Max(Most, Other->Stats.Get(Stat));
+			Most = FMath::Max(Most, Read(Other->Stats));
 		}
-		const int32 Value = Job.Stats.Get(Stat);
+		const int32 Value = Read(Job.Stats);
 		const float RowH = 26.0f * S;
 		if (Inside(Y, RowH))
 		{
@@ -2757,8 +3316,11 @@ void ATMBattleHud::DrawGuideDetail(ATMBattleDirector& From, float PX, float PY, 
 		if (Ability->Effect == TMSim::EEffect::Damage)
 		{
 			const int32 Amount = Battle.CalcAmount(User, *Ability, User.Pos, Target, Target.Pos, 1, 1);
-			Result = FString::Printf(TEXT("Against %hs: %d damage  (%d%% miss, %d%% crit)"), Against.Name.c_str(), Amount,
-				Battle.EvadeChance(Target, *Ability, &User), Battle.CritChance(User));
+			Result = Battle.NewDefense()
+				? FString::Printf(TEXT("Against %hs: %d damage  (%d%% evade: most graze for %d; %d%% crit)"), Against.Name.c_str(), Amount,
+					Battle.EvadeChance(Target, *Ability, &User), FMath::Max(1, TMSim::RoundToInt(Amount * TMSim::Combat::GrazeDamage)), Battle.CritChance(User))
+				: FString::Printf(TEXT("Against %hs: %d damage  (%d%% miss, %d%% crit)"), Against.Name.c_str(), Amount,
+					Battle.EvadeChance(Target, *Ability, &User), Battle.CritChance(User));
 		}
 		else if (Ability->Effect == TMSim::EEffect::Heal || Ability->Effect == TMSim::EEffect::Revive)
 		{
@@ -2905,9 +3467,9 @@ void ATMBattleHud::DrawClassPicker(ATMBattleDirector& From)
 		const bool bCurrent = Job.Id == From.Setup.Rosters[Team][Slot];
 		MenuButton(X, Y, CellW, CellH, UTF8_TO_TCHAR(Job.Name.c_str()), ETMHudAction::PickerChoose, j, bCurrent, RoleText);
 		// The numbers that tell classes apart at a glance.
-		AddTip(X, Y, CellW, CellH, FString::Printf(TEXT("%hs  (%s)\nHP %d  AttDef %d  MagDef %d  Speed %d  Move %d\n%hs, %hs, %hs, %hs"),
+		AddTip(X, Y, CellW, CellH, FString::Printf(TEXT("%hs  (%s)\nHP %d  Armor %d  Resist %d  Evasion %d%%  Speed %d  Move %d\n%hs, %hs, %hs, %hs"),
 			Job.Name.c_str(), *RoleText, Job.Stats.Get(TMSim::EStat::Hp), Job.Stats.Get(TMSim::EStat::AttDef),
-			Job.Stats.Get(TMSim::EStat::MagDef), Job.Stats.Get(TMSim::EStat::Speed), Job.Stats.Get(TMSim::EStat::Move),
+			Job.Stats.Get(TMSim::EStat::MagDef), ClassEvasion(Job.Stats), Job.Stats.Get(TMSim::EStat::Speed), Job.Stats.Get(TMSim::EStat::Move),
 			TMSim::JobAbility(Job.Id, 0) ? TMSim::JobAbility(Job.Id, 0)->Name.c_str() : "",
 			TMSim::JobAbility(Job.Id, 1) ? TMSim::JobAbility(Job.Id, 1)->Name.c_str() : "",
 			TMSim::JobAbility(Job.Id, 2) ? TMSim::JobAbility(Job.Id, 2)->Name.c_str() : "",
@@ -2920,4 +3482,4 @@ void ATMBattleHud::DrawClassPicker(ATMBattleDirector& From)
 	}
 	Text(TEXT("Rest the pointer on a class for its numbers. Classes are made in the class creator (E:\\TacticsClassCreator)."),
 		PX + 24.0f * S, PY + PH - 32.0f * S, Dim, Font, 0.46f * S);
-}
+}

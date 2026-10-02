@@ -511,6 +511,19 @@ namespace TMSim
 			Mix(static_cast<uint64_t>(Held.Wakes));
 			Mix(static_cast<uint64_t>(Held.Route.size()));
 		}
+		for (int Team = 0; Team < 2; ++Team)
+		{
+			Mix(static_cast<uint64_t>(Stash[Team].size()));
+			for (const FStashed& Held : Stash[Team])
+			{
+				Mix(0x53u);
+				for (const char C : Held.Item ? Held.Item->Id : std::string())
+				{
+					Mix(static_cast<uint64_t>(static_cast<unsigned char>(C)));
+				}
+				Mix(static_cast<uint64_t>(Held.Cooldown));
+			}
+		}
 		Mix(static_cast<uint64_t>(Caches.size()));
 		for (const FCache& Cache : Caches)
 		{
@@ -673,6 +686,15 @@ namespace TMSim
 		{
 			return "No such unit.";
 		}
+		// Equipping from the stash is any time, not a turn's (2026-10-01).
+		if (Order.Type == EOrderType::Equip)
+		{
+			if (Winner != -1)
+			{
+				return "The battle is over.";
+			}
+			return ValidateEquip(Order.UnitId, Order.ItemId, Order.GearSlot);
+		}
 		// Placing happens before the battle, while nobody is ready yet, so it is
 		// checked before the turn an order was written for: there are no turns
 		// yet (game_state.gd:1058-1065).
@@ -706,7 +728,7 @@ namespace TMSim
 		switch (Order.Type)
 		{
 		case EOrderType::Move:
-			return ValidateMove(Order.UnitId, Order.To, Order.bSprint);
+			return ValidateMove(Order.UnitId, Order.To, Order.bSprint, Order.Via);
 		case EOrderType::EndTurn:
 			return std::string();
 		case EOrderType::UseAbility:
@@ -816,7 +838,7 @@ namespace TMSim
 			return true;
 
 		case EOrderType::Move:
-			return ApplyMove(Order.UnitId, Order.To, Order.bSprint, Report);
+			return ApplyMove(Order.UnitId, Order.To, Order.bSprint, Report, Order.Via);
 
 		case EOrderType::UseAbility:
 			if (FUnit* Unit = FindUnit(Order.UnitId))
@@ -875,6 +897,14 @@ namespace TMSim
 			if (FUnit* Unit = FindUnit(Order.UnitId))
 			{
 				ApplyDrop(*Unit, Order.GearSlot, Report);
+				return true;
+			}
+			return false;
+
+		case EOrderType::Equip:
+			if (FUnit* Unit = FindUnit(Order.UnitId))
+			{
+				ApplyEquip(*Unit, Order.ItemId, Order.GearSlot, Report);
 				return true;
 			}
 			return false;

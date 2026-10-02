@@ -3,10 +3,10 @@
   "version": 1,
   "id": "spirit_bangle",
   "name": "Spirit Bangle",
-  "desc": "Spells slide off it, now and then.",
+  "desc": "Now and then, a blow or a spell slides off it.",
   "icon": "bangle",
   "tier": "common",
   "stats": {
-    "meva": 4
+    "meva": 3
   }
 }

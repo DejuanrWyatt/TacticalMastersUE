@@ -96,7 +96,7 @@
     {
       "id": "time_mage_time_stop",
       "name": "Time Stop",
-      "desc": "ULTIMATE: Freeze time around a point 3-9 m away: every enemy within 3 m takes damage and is Stunned for 2 s.",
+      "desc": "ULTIMATE: Freeze time around a point 3-9 m away: every enemy within 3 m takes damage and is Stunned for 1 turn. (2.5 s)",
       "kind": "active",
       "effect": "damage",
       "scale": "mag",
@@ -119,5 +119,11 @@
         "scale": 1
       }
     }
-  ]
+  ],
+  "creator": {
+    "reworded": {
+      "on": "2026-10-02",
+      "why": "Descriptions say what the abilities do (2026-10-02): Stun not sleep, Crit not the old Power, turns not seconds"
+    }
+  }
 }

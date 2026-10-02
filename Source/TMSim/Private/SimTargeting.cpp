@@ -186,13 +186,24 @@ namespace TMSim
 			return Out;
 		}
 
+		// Friendly fire: an area blow meant for the enemy catches the caster's
+		// own side too (FTuning::FriendlyFire), though never the caster.
+		const std::string Shape = ShapeOf(*Ability);
+		const bool bFriendlyFire = Tuning.FriendlyFire >= 0.5 && !Unit.bMonster && Ability->Target == ETargetSide::Enemy
+			&& Ability->Effect == EEffect::Damage && Shape != "global"
+			&& (Ability->Aoe > 0.0f || Shape == "cone" || Shape == "line" || Shape == "vector" || Shape == "circle");
+
 		// In id order, which is not merely tidy: resolution rolls to evade and to
 		// crit while walking this list, so the order decides the order the dice
 		// come out in, and two machines disagreeing about it would disagree about
 		// every roll after the first.
 		for (const FUnit& Target_ : Units)
 		{
-			if (Ability->Target == ETargetSide::KoAlly)
+			if (bFriendlyFire && Target_.IsAlive() && Target_.Team == Unit.Team && Target_.Id != Unit.Id)
+			{
+				// One of its own, standing in the way: taken as an enemy would be.
+			}
+			else if (Ability->Target == ETargetSide::KoAlly)
 			{
 				if (!Target_.IsKo() || Target_.Team != Unit.Team)
 				{

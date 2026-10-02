@@ -1,0 +1,11 @@
+// Canyon: each side starts on its own ridge; between them a two-tile pass
+// through rock, with open flanks either side and embers on the north one.
+// Blue starts on the west edge, red on the east (the battle director's spots).
+// A sketch to try, not a finished map.
+name Canyon
+111111111xx1
+111111+111x1
+111111111111
+2211#11#1111
+332##11##111
+332##11##111

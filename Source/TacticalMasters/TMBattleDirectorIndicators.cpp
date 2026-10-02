@@ -18,6 +18,7 @@
 #include "Components/DecalComponent.h"
 #include "Engine/Canvas.h"
 #include "Engine/TextureRenderTarget2D.h"
+#include "GameFramework/PlayerController.h"
 #include "Kismet/KismetRenderingLibrary.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Materials/MaterialInterface.h"
@@ -25,7 +26,8 @@
 #include "SimAbility.h"
 #include "TMLines.h"
 
-namespace
+// Named, not anonymous, so its names stay out of the files a unity build puts after it.
+namespace TMIndicatorPaint
 {
 	/** Picture pixels to a metre of board. */
 	constexpr float Ppm = 24.0f;
@@ -33,8 +35,14 @@ namespace
 	const FLinearColor Sprint(1.0f, 0.62f, 0.2f);
 	const FLinearColor Refused(1.0f, 0.32f, 0.28f);
 	const FLinearColor PathGold(1.0f, 0.88f, 0.35f);
-	/** Width of the line round the walk area, in picture pixels (24 to a metre). */
-	constexpr float MoveEdgeWidth = 1.5f;
+	/** Width of the line round the walk area, in picture pixels (24 to a metre): as thin as
+	 *  the picture allows (2026-10-01: "as thin as possible"), and no glow round it. */
+	constexpr float MoveEdgeWidth = 1.0f;
+	/** Width of the walk's path line, in picture pixels; no glow round it either. */
+	constexpr float PathWidth = 1.25f;
+	/** Width of every aiming line -- a cone's edges, a lane, a charge, a ring where a
+	 *  blow lands -- in picture pixels: thin as the walk's, and no glow (2026-10-01). */
+	constexpr float AimWidth = 1.25f;
 
 	/** Painting into the picture, in metres. */
 	struct FPainter
@@ -68,12 +76,26 @@ namespace
 				Tris.Reset();
 			}
 		}
-		/** A glowing line: a wide faint one under a narrow bright one. */
-		void Glow(const FVector2D& A, const FVector2D& B, const FLinearColor& Colour, float Width = 3.0f)
+		/** An aiming line: once a glow, now a thin solid line, batched with the
+		 *  rest (2026-10-01: "reduce the width of targeting lines"). The width
+		 *  each caller asks for is kept only as a hint and no longer used. */
+		void Glow(const FVector2D& A, const FVector2D& B, const FLinearColor& Colour, float /*Width*/ = 3.0f)
 		{
-			Flush();
-			Canvas->K2_DrawLine(A, B, Width * 3.5f, FLinearColor(Colour.R, Colour.G, Colour.B, 0.22f));
-			Canvas->K2_DrawLine(A, B, Width, FLinearColor(Colour.R, Colour.G, Colour.B, 0.95f));
+			Thin(A, B, AimWidth, FLinearColor(Colour.R, Colour.G, Colour.B, 0.95f));
+		}
+		/** A thin line as two triangles, batched with the rest: far cheaper than a
+		 *  line drawn on its own, which is what made repainting lag. */
+		void Thin(const FVector2D& A, const FVector2D& B, float Width, const FLinearColor& Colour)
+		{
+			const FVector2D Along = B - A;
+			const double Length = Along.Size();
+			if (Length < 1e-3)
+			{
+				return;
+			}
+			const FVector2D Across = FVector2D(-Along.Y, Along.X) / Length * (Width * 0.5);
+			Tri(A + Across, B + Across, B - Across, Colour);
+			Tri(A + Across, B - Across, A - Across, Colour);
 		}
 		/** A plain line, solid, with no glow round it. */
 		void Line(const FVector2D& A, const FVector2D& B, const FLinearColor& Colour, float Width)
@@ -119,10 +141,16 @@ namespace
 
 	FLinearColor Alpha(const FLinearColor& C, float A) { return FLinearColor(C.R, C.G, C.B, A); }
 
+	/** The walk area last worked out (PaintMoveArea), what it was for, and its edge in metres. */
+	TArray<FCanvasUVTri> MoveAreaTris;
+	FString MoveAreaKey;
+	TArray<TPair<FVector2D, FVector2D>> MoveAreaEdges;
+
 }
 
 void ATMBattleDirector::BuildIndicators()
 {
+	using namespace TMIndicatorPaint;
 	UMaterialInterface* Base = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/UI/M_GroundIndicator.M_GroundIndicator"), nullptr, LOAD_NoWarn | LOAD_Quiet);
 	if (!Base || !GetWorld() || !GetWorld()->IsGameWorld())
 	{
@@ -130,14 +158,15 @@ void ATMBattleDirector::BuildIndicators()
 		return;
 	}
 	const TMSim::FVec2 Size = Battle.Map.SizeMeters();
-	if (!IndicatorFilm)
+	// Never resized in place while the decal draws with it (FilmOfSize).
+	IndicatorFilm = FilmOfSize(IndicatorFilm, FMath::CeilToInt(Size.X * Ppm), FMath::CeilToInt(Size.Y * Ppm), false);
+	if (IndicatorDecal)
 	{
-		IndicatorFilm = NewObject<UTextureRenderTarget2D>(this);
-		IndicatorFilm->RenderTargetFormat = RTF_RGBA8;
-		IndicatorFilm->ClearColor = FLinearColor::Transparent;
+		if (UMaterialInstanceDynamic* Mid = Cast<UMaterialInstanceDynamic>(IndicatorDecal->GetDecalMaterial()))
+		{
+			Mid->SetTextureParameterValue(TEXT("Paint"), IndicatorFilm);
+		}
 	}
-	IndicatorFilm->InitAutoFormat(FMath::CeilToInt(Size.X * Ppm), FMath::CeilToInt(Size.Y * Ppm));
-	IndicatorFilm->UpdateResourceImmediate(true);
 	if (!IndicatorDecal)
 	{
 		IndicatorDecal = NewObject<UDecalComponent>(this, NAME_None, RF_Transient);
@@ -159,6 +188,7 @@ void ATMBattleDirector::BuildIndicators()
 	IndicatorDecal->DecalSize = FVector(Tall * 0.5f + 50.0f, Size.Y * 0.5f * TileSize, Size.X * 0.5f * TileSize);
 	IndicatorDecal->MarkRenderStateDirty();
 	IndicatorSignature.Reset();
+	MoveAreaKey.Reset();
 	bIndicatorDecal = true;
 	for (TObjectPtr<USkeletalMeshComponent>& Body : UnitVisuals)
 	{
@@ -171,26 +201,26 @@ void ATMBattleDirector::BuildIndicators()
 
 void ATMBattleDirector::AdvanceIndicators()
 {
+	using namespace TMIndicatorPaint;
 	if (!bIndicatorDecal || !IndicatorFilm)
 	{
 		return;
 	}
 	// What would be shown, in a line: painted again only when it changes.
 	const TMSim::FUnit* Unit = SelectedUnit();
-	const bool bShow = Screen == EScreen::Battle && PlayerCanOrder(Unit) && !Battle.IsPlanning();
+	const bool bShow = Screen == EScreen::Battle && PlayerCanCommand(Unit) && !Battle.IsPlanning();
 	FAim Where;
 	if (bShow && AimMode == EAimMode::Ability)
 	{
 		Where = Aim();
 	}
-	// The rings that are part of the ground -- each watchtower's, and the middle's
-	// while holding it can win -- in the colour of whoever holds them (0 grey, 1
-	// blue, 2 red), painted with the rest so they lie over the land too.
-	FString Rings;
-	for (const TMSim::FWatchtower& Tower : Battle.Watchtowers)
-	{
-		Rings += FString::Printf(TEXT("t%d"), Tower.Owner + 1);
-	}
+	// The rings that are part of the ground -- the middle's while holding it can
+	// win, in the colour of whoever holds it (0 grey, 1 blue, 2 red) -- painted
+	// with the rest so they lie over the land too. A watchtower has no ring of its
+	// own any more; the one under the pointer shows its reach as thin white lines
+	// (2026-10-01).
+	const int32 TowerHovered = HoveredTower();
+	FString Rings = TowerHovered >= 0 ? FString::Printf(TEXT("w%d"), TowerHovered) : FString();
 	// And a ring at the edge of each hazard tile, so it reads as "this tile does
 	// something" before its look is made out: orange burns, cyan mends.
 	for (const int Each : Battle.Map.Hazards)
@@ -217,7 +247,9 @@ void ATMBattleDirector::AdvanceIndicators()
 		Rings += FString::Printf(TEXT("m%d"), MiddleHolder);
 	}
 	const bool bBattle = Screen == EScreen::Battle;
-	const FString Signature = Rings + (!bShow ? FString(TEXT("-"))
+	// Queued orders (2026-10-01): every plan of this machine's, and the waypoints being set.
+	const FString Planned = bBattle ? PlanSignature() : FString();
+	const FString Signature = Rings + Planned + (!bShow ? FString(TEXT("-"))
 		: FString::Printf(TEXT("%d/%d/%d/%d/%d/%d/%.2f,%.2f/%d/%d/%d"), Unit->Id, Unit->Serial, static_cast<int32>(AimMode), AimSlot,
 			bSprinting ? 1 : 0, static_cast<int32>(Reachable.size()), Where.Point.X, Where.Point.Y, Where.bHave ? 1 : 0, Where.bOk ? 1 : 0,
 			static_cast<int32>(PathShown.size()) * 1000 + (PathShown.empty() ? 0 : TMSim::FMap::NodeOf(PathShown.back()).X * 50 + TMSim::FMap::NodeOf(PathShown.back()).Y)));
@@ -229,7 +261,7 @@ void ATMBattleDirector::AdvanceIndicators()
 	MoveEdgeMetres.Reset();
 
 	UKismetRenderingLibrary::ClearRenderTarget2D(this, IndicatorFilm, FLinearColor::Transparent);
-	if (!bShow && (!bBattle || Rings.IsEmpty()))
+	if (!bShow && (!bBattle || (Rings.IsEmpty() && Planned.IsEmpty())))
 	{
 		return;
 	}
@@ -256,9 +288,26 @@ void ATMBattleDirector::AdvanceIndicators()
 			Paint.Band(Paint.P(Centre), Radius * Ppm - 5.0f, Radius * Ppm, Alpha(Colour, 0.3f));
 			Paint.Band(Paint.P(Centre), Radius * Ppm - 1.6f, Radius * Ppm, Alpha(Colour, 0.9f));
 		};
-		for (const TMSim::FWatchtower& Tower : Battle.Watchtowers)
+		if (TowerHovered >= 0 && TowerHovered < static_cast<int32>(Battle.Watchtowers.size()))
 		{
-			GroundRing(Tower.Pos, static_cast<float>(TMSim::Watchtower::Reach), Holder(Tower.Owner + 1));
+			// Just the lines, thin and white, with nothing lit or filled inside:
+			// how far the tower sees for whoever holds it, and, fainter, how near
+			// a unit must stand to take it.
+			const TMSim::FWatchtower& Tower = Battle.Watchtowers[static_cast<size_t>(TowerHovered)];
+			auto Outline = [&](float Radius, float Opacity)
+			{
+				const int32 Steps = FMath::Clamp(FMath::CeilToInt(Radius * 12.0f), 48, 360);
+				const FVector2D Middle = Paint.P(Tower.Pos);
+				for (int32 i = 0; i < Steps; ++i)
+				{
+					const float A0 = UE_TWO_PI * i / Steps;
+					const float A1 = UE_TWO_PI * (i + 1) / Steps;
+					Paint.Thin(Middle + FVector2D(FMath::Cos(A0), FMath::Sin(A0)) * Radius * Ppm,
+						Middle + FVector2D(FMath::Cos(A1), FMath::Sin(A1)) * Radius * Ppm, MoveEdgeWidth, FLinearColor(1.0f, 1.0f, 1.0f, Opacity));
+				}
+			};
+			Outline(static_cast<float>(Battle.Tuning.WatchtowerSight), 0.9f);
+			Outline(static_cast<float>(TMSim::Watchtower::Reach), 0.55f);
 		}
 		if (MiddleHolder >= 0)
 		{
@@ -283,6 +332,10 @@ void ATMBattleDirector::AdvanceIndicators()
 			}
 		}
 	}
+	if (bBattle && !Planned.IsEmpty())
+	{
+		PaintPlans(&Paint);
+	}
 	if (!bShow)
 	{
 		Paint.Flush();
@@ -295,29 +348,187 @@ void ATMBattleDirector::AdvanceIndicators()
 	}
 	else if (AimMode == EAimMode::Ability)
 	{
+		// A unit being planned aims from where its planned walk ends (FPlanStandIn).
+		const FPlanStandIn Stand(*this);
 		PaintAbility(&Paint, *Unit, Where);
 	}
-	// The way there, whether a walk or a walk into range.
+	// The way there, whether a walk or a walk into range: a thin line, and a
+	// small dot where it ends.
 	for (size_t i = 1; i < PathShown.size(); ++i)
 	{
-		Paint.Glow(Paint.P(PathShown[i - 1]), Paint.P(PathShown[i]), PathGold, 4.0f);
+		Paint.Thin(Paint.P(PathShown[i - 1]), Paint.P(PathShown[i]), PathWidth, Alpha(PathGold, 0.95f));
 	}
 	if (!PathShown.empty())
 	{
-		Paint.Disc(Paint.P(PathShown.back()), 0.22f * Ppm, Alpha(PathGold, 0.9f));
+		Paint.Disc(Paint.P(PathShown.back()), 0.12f * Ppm, Alpha(PathGold, 0.9f));
 	}
 	Paint.Flush();
 	UKismetRenderingLibrary::EndDrawCanvasToRenderTarget(this, Context);
 }
 
+FString ATMBattleDirector::PlanSignature() const
+{
+	FString Out;
+	for (const TPair<int32, FTMPlan>& Pair : Plans)
+	{
+		const FTMPlan& Plan = Pair.Value;
+		Out += FString::Printf(TEXT("p%d:%d:%.2f,%.2f:%d:%d:%.2f,%.2f:%d;"), Pair.Key, Plan.bWalk ? 1 : 0, Plan.To.X, Plan.To.Y,
+			static_cast<int32>(Plan.Via.size()), Plan.Slot, Plan.Target.X, Plan.Target.Y, Plan.Follow);
+	}
+	for (const TMSim::FVec2& Point : WayPoints)
+	{
+		Out += FString::Printf(TEXT("w%.2f,%.2f;"), Point.X, Point.Y);
+	}
+	// Go Tos: where each is going, how far it has to go, and which is lit.
+	for (const TPair<int32, FTMGoTo>& Pair : GoTos)
+	{
+		const FTMGoTo& Order = Pair.Value;
+		Out += FString::Printf(TEXT("g%d:%.2f,%.2f:%d:%d:%d:%.2f,%.2f;"), Pair.Key, Order.Dest.X, Order.Dest.Y, static_cast<int32>(Order.Route.size()),
+			static_cast<int32>(Order.Stops.size()), Pair.Key == SelectedId ? 1 : 0,
+			Order.Stops.empty() ? 0.0 : Order.Stops.front().X, Order.Stops.empty() ? 0.0 : Order.Stops.front().Y);
+	}
+	if (!GoToHoverStops.empty())
+	{
+		Out += FString::Printf(TEXT("h%d:%.2f,%.2f;"), static_cast<int32>(GoToHoverStops.size()), GoToHoverStops.back().X, GoToHoverStops.back().Y);
+	}
+	return Out;
+}
+
+void ATMBattleDirector::PaintPlans(void* Painter)
+{
+	using namespace TMIndicatorPaint;
+	FPainter& Paint = *static_cast<FPainter*>(Painter);
+	// Planned: dashed, so it reads as "to come", in the walk's gold; where the
+	// unit will stand, a ring; what it will aim at, a violet line from there.
+	const FLinearColor Aimed(0.82f, 0.65f, 1.0f);
+	auto Dashed = [&Paint](const FVector2D& A, const FVector2D& B, const FLinearColor& Colour)
+	{
+		const FVector2D Along = B - A;
+		const double Length = Along.Size();
+		if (Length < 0.01)
+		{
+			return;
+		}
+		const double Dash = 0.4 * Ppm;
+		const double Gap = 0.25 * Ppm;
+		for (double At = 0.0; At < Length; At += Dash + Gap)
+		{
+			const double End = FMath::Min(Length, At + Dash);
+			Paint.Thin(A + Along * (At / Length), A + Along * (End / Length), PathWidth, Colour);
+		}
+	};
+	for (const TPair<int32, FTMPlan>& Pair : Plans)
+	{
+		const FTMPlan& Plan = Pair.Value;
+		const TMSim::FUnit* Unit = const_cast<TMSim::FBattle&>(Battle).FindUnit(Pair.Key);
+		if (!Unit || !Unit->IsAlive())
+		{
+			continue;
+		}
+		TMSim::FVec2 Stands = Unit->Pos;
+		if (Plan.bWalk)
+		{
+			for (size_t i = 1; i < Plan.Path.size(); ++i)
+			{
+				Dashed(Paint.P(Plan.Path[i - 1]), Paint.P(Plan.Path[i]), Alpha(PathGold, 0.8f));
+			}
+			for (const TMSim::FVec2& Point : Plan.Via)
+			{
+				Paint.Disc(Paint.P(Point), 0.1f * Ppm, Alpha(PathGold, 0.85f));
+			}
+			Stands = Plan.To;
+			Paint.Disc(Paint.P(Stands), 0.45f * Ppm, Alpha(PathGold, 0.08f));
+			Paint.Band(Paint.P(Stands), 0.45f * Ppm - AimWidth, 0.45f * Ppm, Alpha(PathGold, 0.85f));
+		}
+		if (Plan.HasAbility())
+		{
+			TMSim::FVec2 Target = Plan.Target;
+			if (const TMSim::FUnit* Followed = Plan.Follow >= 0 ? const_cast<TMSim::FBattle&>(Battle).FindUnit(Plan.Follow) : nullptr)
+			{
+				Target = Followed->Pos;
+			}
+			Dashed(Paint.P(Stands), Paint.P(Target), Alpha(Aimed, 0.85f));
+			const TMSim::FAbility* Ability = Unit->Ability(Plan.Slot);
+			const float Reach = Ability && Ability->Aoe > 0.0f ? Ability->Aoe : 0.35f;
+			Paint.Disc(Paint.P(Target), Reach * Ppm, Alpha(Aimed, 0.08f));
+			Paint.Band(Paint.P(Target), Reach * Ppm - AimWidth, Reach * Ppm, Alpha(Aimed, 0.85f));
+		}
+	}
+	// Each Go To's road (2026-10-01): dashed blue, the selected unit's bright,
+	// a ring where each turn's walk ends and a gold one at the end. The numbers
+	// are the HUD's (ATMBattleHud::DrawGoToMarks).
+	const FLinearColor GoBlue(0.44f, 0.66f, 1.0f);
+	for (const TPair<int32, FTMGoTo>& Pair : GoTos)
+	{
+		const FTMGoTo& Order = Pair.Value;
+		const TMSim::FUnit* Unit = const_cast<TMSim::FBattle&>(Battle).FindUnit(Pair.Key);
+		if (!Unit || !Unit->IsAlive())
+		{
+			continue;
+		}
+		const float Strength = Pair.Key == SelectedId ? 0.85f : 0.45f;
+		TMSim::FVec2 Last = Unit->Pos;
+		for (const TMSim::FVec2& Point : Order.Route)
+		{
+			Dashed(Paint.P(Last), Paint.P(Point), Alpha(GoBlue, Strength));
+			Last = Point;
+		}
+		for (size_t i = 0; i < Order.Stops.size(); ++i)
+		{
+			const bool bEnd = i + 1 == Order.Stops.size();
+			const float Ring = (bEnd ? 0.45f : 0.3f) * Ppm;
+			Paint.Disc(Paint.P(Order.Stops[i]), Ring, Alpha(bEnd ? PathGold : GoBlue, 0.08f));
+			Paint.Band(Paint.P(Order.Stops[i]), Ring - AimWidth, Ring, Alpha(bEnd ? PathGold : GoBlue, Strength));
+		}
+	}
+	// A Go To under the pointer: its turn ends, before the click.
+	for (size_t i = 0; i < GoToHoverStops.size(); ++i)
+	{
+		const bool bEnd = i + 1 == GoToHoverStops.size();
+		const float Ring = (bEnd ? 0.45f : 0.3f) * Ppm;
+		Paint.Band(Paint.P(GoToHoverStops[i]), Ring - AimWidth, Ring, Alpha(bEnd ? PathGold : GoBlue, 0.8f));
+	}
+
+	// The waypoints of the walk being aimed: a dot and a ring each.
+	for (const TMSim::FVec2& Point : WayPoints)
+	{
+		Paint.Disc(Paint.P(Point), 0.12f * Ppm, Alpha(PathGold, 0.95f));
+		Paint.Band(Paint.P(Point), 0.28f * Ppm - AimWidth, 0.28f * Ppm, Alpha(PathGold, 0.9f));
+	}
+}
+
 void ATMBattleDirector::PaintMoveArea(void* Painter, const TMSim::FUnit& Unit)
 {
+	using namespace TMIndicatorPaint;
 	// The ground it can reach, filled and edged, with the edge cut smooth
 	// across each half-metre square (marching squares on the node centres), so
 	// it reads as an area rather than a staircase.
 	FPainter& Paint = *static_cast<FPainter*>(Painter);
 	const TMSim::FMap& Map = Battle.Map;
 	const FLinearColor Colour = bSprinting ? Sprint : Teal;
+	// Whatever was painted before (the rings) goes down first, so only the area is kept.
+	Paint.Flush();
+	// The area only changes with the unit, its sprint and where everyone stands;
+	// the path over it changes as the pointer moves. So the area is worked out
+	// once and kept, and each repaint for a new path only puts it down again.
+	FString Key = FString::Printf(TEXT("%d/%d/%d/%d"), Unit.Id, Unit.Serial, bSprinting ? 1 : 0, static_cast<int32>(Reachable.size()));
+	for (const TMSim::FUnit& Each : Battle.Units)
+	{
+		Key += FString::Printf(TEXT("/%.1f,%.1f"), Each.Pos.X, Each.Pos.Y);
+	}
+	// On from the last waypoint, with what is left (2026-10-01).
+	for (const TMSim::FVec2& Point : WayPoints)
+	{
+		Key += FString::Printf(TEXT("|%.2f,%.2f"), Point.X, Point.Y);
+	}
+	if (Key == MoveAreaKey)
+	{
+		Paint.Tris.Append(MoveAreaTris);
+		Paint.Flush();
+		MoveEdgeMetres = MoveAreaEdges;
+		return;
+	}
+	MoveAreaKey.Reset();
 	TArray<uint8> Inside;
 	Inside.SetNumZeroed(Map.NavX * Map.NavY);
 	int32 MinX = Map.NavX, MinY = Map.NavY, MaxX = -1, MaxY = -1;
@@ -331,6 +542,9 @@ void ATMBattleDirector::PaintMoveArea(void* Painter, const TMSim::FUnit& Unit)
 	}
 	if (MaxX < 0)
 	{
+		MoveAreaTris.Reset();
+		MoveAreaEdges.Reset();
+		MoveAreaKey = Key;
 		return;
 	}
 	// A spot another unit stands on is still inside the area around it, so a
@@ -370,7 +584,9 @@ void ATMBattleDirector::PaintMoveArea(void* Painter, const TMSim::FUnit& Unit)
 	}
 	auto In = [&](int32 X, int32 Y) { return X >= 0 && Y >= 0 && X < Map.NavX && Y < Map.NavY && Inside[Y * Map.NavX + X] != 0; };
 	auto At = [&](float X, float Y) { return Paint.P(X * 0.5 + 0.25, Y * 0.5 + 0.25); };
-	const FLinearColor Fill = Alpha(Colour, 0.11f);
+	// Faint, so the models standing inside it still read (2026-10-01: "reduce
+	// brightness of movement radius inner circle").
+	const FLinearColor Fill = Alpha(Colour, 0.035f);
 	TArray<TPair<FVector2D, FVector2D>> Edges;
 	for (int32 Y = MinY - 1; Y <= MaxY; ++Y)
 	{
@@ -400,29 +616,30 @@ void ATMBattleDirector::PaintMoveArea(void* Painter, const TMSim::FUnit& Unit)
 			}
 		}
 	}
-	Paint.Flush();
 	// The edge as smooth curves, not a staircase of half-metre squares, with a
 	// soft glow: wide and faint fading in to a thin bright line, as League of
 	// Legends draws its range rings.
 	// Relaxed over a few squares, then rounded: the staircase of half-metre
 	// squares becomes a curve (TMLines.h).
 	const TArray<TPair<FVector2D, FVector2D>> Curve = TMLines::SmoothEdges(Edges, 10, 2);
-	const float Bands[4][2] = { { 16.0f, 0.07f }, { 9.0f, 0.16f }, { 4.5f, 0.4f }, { MoveEdgeWidth, 1.0f } };
-	for (const auto& Band : Bands)
+	// One thin line, no glow (2026-10-01), drawn with the fill in one batch.
+	for (const TPair<FVector2D, FVector2D>& Piece : Curve)
 	{
-		for (const TPair<FVector2D, FVector2D>& Piece : Curve)
-		{
-			Paint.Canvas->K2_DrawLine(Piece.Key, Piece.Value, Band[0], Alpha(Colour, Band[1]));
-		}
+		Paint.Thin(Piece.Key, Piece.Value, MoveEdgeWidth, Alpha(Colour, 0.95f));
 	}
+	MoveAreaTris = Paint.Tris;
+	MoveAreaKey = Key;
+	Paint.Flush();
 	for (const TPair<FVector2D, FVector2D>& Piece : Curve)
 	{
 		MoveEdgeMetres.Add({ Piece.Key / Ppm, Piece.Value / Ppm });
 	}
+	MoveAreaEdges = MoveEdgeMetres;
 }
 
 void ATMBattleDirector::PaintAbility(void* Painter, const TMSim::FUnit& Unit, const FAim& Where)
 {
+	using namespace TMIndicatorPaint;
 	FPainter& Paint = *static_cast<FPainter*>(Painter);
 	const TMSim::FAbility* Ability = Unit.Ability(AimSlot);
 	if (!Ability)
@@ -439,10 +656,10 @@ void ATMBattleDirector::PaintAbility(void* Painter, const TMSim::FUnit& Unit, co
 	{
 		const float Reach = Ability->MaxRange * Ppm;
 		Paint.Disc(Me, Reach, Alpha(Teal, 0.07f));
-		Paint.Band(Me, Reach - 3.0f, Reach, Alpha(Teal, 0.85f));
+		Paint.Band(Me, Reach - AimWidth, Reach, Alpha(Teal, 0.85f));
 		if (Ability->MinRange > 0.0f)
 		{
-			Paint.Band(Me, Ability->MinRange * Ppm - 2.0f, Ability->MinRange * Ppm, Alpha(Refused, 0.6f));
+			Paint.Band(Me, Ability->MinRange * Ppm - AimWidth, Ability->MinRange * Ppm, Alpha(Refused, 0.6f));
 		}
 	}
 	if (!Where.bHave && Ability->MaxRange > 0.0f && Shape != "global")
@@ -459,7 +676,7 @@ void ATMBattleDirector::PaintAbility(void* Painter, const TMSim::FUnit& Unit, co
 		// A wedge out to its reach, edged, with a double arc across its end.
 		const float Reach = Ability->MaxRange * Ppm;
 		const float Half = Ability->Angle * 0.5f;
-		Paint.Disc(Me, Reach, Alpha(Colour, 0.2f), Deg - Half, Deg + Half);
+		Paint.Disc(Me, Reach, Alpha(Colour, 0.1f), Deg - Half, Deg + Half);
 		const FVector2D EdgeA = Me + FVector2D(FMath::Cos(FMath::DegreesToRadians(Deg - Half)), FMath::Sin(FMath::DegreesToRadians(Deg - Half))) * Reach;
 		const FVector2D EdgeB = Me + FVector2D(FMath::Cos(FMath::DegreesToRadians(Deg + Half)), FMath::Sin(FMath::DegreesToRadians(Deg + Half))) * Reach;
 		Paint.Glow(Me, EdgeA, Colour);
@@ -472,7 +689,7 @@ void ATMBattleDirector::PaintAbility(void* Painter, const TMSim::FUnit& Unit, co
 		// A skillshot: a lane to where it is aimed, and a chevron at its end.
 		const float Width = FMath::Max(Ability->Aoe, 0.6f) * Ppm;
 		const FVector2D End = Aim;
-		Paint.Poly({ Me + Across * Width, End + Across * Width, End - Across * Width, Me - Across * Width }, Alpha(Colour, 0.16f));
+		Paint.Poly({ Me + Across * Width, End + Across * Width, End - Across * Width, Me - Across * Width }, Alpha(Colour, 0.09f));
 		Paint.Glow(Me + Across * Width, End + Across * Width, Colour, 2.5f);
 		Paint.Glow(Me - Across * Width, End - Across * Width, Colour, 2.5f);
 		Paint.Glow(End - Toward * Width * 1.2f + Across * Width, End, Colour, 3.5f);
@@ -486,7 +703,7 @@ void ATMBattleDirector::PaintAbility(void* Painter, const TMSim::FUnit& Unit, co
 		Paint.Glow(Aim + Across * Cap, Aim - Across * Cap, Colour, 4.0f);
 		Paint.Glow(Me + Across * Cap * 0.6f, Me - Across * Cap * 0.6f, Colour, 3.0f);
 		const FVector2D Mid = (Me + Aim) * 0.5f;
-		Paint.Band(Mid, Cap * 0.35f, Cap * 0.5f, Alpha(Colour, 0.8f));
+		Paint.Band(Mid, Cap * 0.5f - AimWidth, Cap * 0.5f, Alpha(Colour, 0.8f));
 	}
 	else if (Shape == "global")
 	{
@@ -496,7 +713,7 @@ void ATMBattleDirector::PaintAbility(void* Painter, const TMSim::FUnit& Unit, co
 			const bool bFits = Other.IsAlive() && (Other.Team != Unit.Team) == (Ability->Target == TMSim::ETargetSide::Enemy);
 			if (bFits && IsSeen(Other))
 			{
-				Paint.Band(Paint.P(Other.Pos), 0.5f * Ppm, 0.62f * Ppm, Alpha(Colour, 0.85f));
+				Paint.Band(Paint.P(Other.Pos), 0.62f * Ppm - AimWidth, 0.62f * Ppm, Alpha(Colour, 0.85f));
 			}
 		}
 	}
@@ -512,11 +729,11 @@ void ATMBattleDirector::PaintAbility(void* Painter, const TMSim::FUnit& Unit, co
 		}
 		// Where it lands: a ring with an inner ring and three spokes.
 		const float Radius = FMath::Max(Ability->Aoe, TMSim::Ground::HitRadius) * Ppm;
-		Paint.Disc(Aim, Radius, Alpha(Colour, 0.18f));
-		Paint.Band(Aim, Radius - 4.0f, Radius, Alpha(Colour, 0.95f));
+		Paint.Disc(Aim, Radius, Alpha(Colour, 0.09f));
+		Paint.Band(Aim, Radius - AimWidth, Radius, Alpha(Colour, 0.95f));
 		if (Ability->Aoe > 0.0f)
 		{
-			Paint.Band(Aim, Radius * 0.86f - 1.5f, Radius * 0.86f, Alpha(Colour, 0.6f));
+			Paint.Band(Aim, Radius * 0.86f - AimWidth, Radius * 0.86f, Alpha(Colour, 0.5f));
 			for (int32 k = 0; k < 3; ++k)
 			{
 				const float A = FMath::DegreesToRadians(90.0f + 120.0f * k);
@@ -526,4 +743,47 @@ void ATMBattleDirector::PaintAbility(void* Painter, const TMSim::FUnit& Unit, co
 			Paint.Disc(Aim, 0.12f * Ppm, Alpha(Colour, 0.9f));
 		}
 	}
+}
+
+int32 ATMBattleDirector::HoveredTower() const
+{
+	// The pointer is on a tower if it is near the line from its foot to its fire
+	// on screen (the tower is tall and thin, and nothing can be clicked on it),
+	// or the ground under the pointer is right at its foot.
+	if (Screen != EScreen::Battle || Battle.Watchtowers.empty())
+	{
+		return -1;
+	}
+	float MouseX = 0.0f;
+	float MouseY = 0.0f;
+	APlayerController* Player = GetWorld() ? GetWorld()->GetFirstPlayerController() : nullptr;
+	const bool bMouse = Player && CursorPosition(MouseX, MouseY);
+	const FVector2D Mouse(MouseX, MouseY);
+	int32 Best = -1;
+	double BestAway = 18.0;  // screen pixels
+	for (int32 i = 0; i < static_cast<int32>(Battle.Watchtowers.size()); ++i)
+	{
+		if (bHaveHover && static_cast<double>(HoverPoint.DistanceTo(Battle.Watchtowers[static_cast<size_t>(i)].Pos)) < 1.2)
+		{
+			return i;
+		}
+		if (!bMouse || !Beacons.IsValidIndex(i) || !Beacons[i].Root)
+		{
+			continue;
+		}
+		const FVector Foot = Beacons[i].Root->GetComponentLocation();
+		FVector2D A;
+		FVector2D B;
+		if (!Player->ProjectWorldLocationToScreen(Foot, A) || !Player->ProjectWorldLocationToScreen(Foot + FVector(0.0f, 0.0f, 760.0f), B))
+		{
+			continue;
+		}
+		const double Away = FMath::PointDistToSegment(FVector(Mouse, 0.0), FVector(A, 0.0), FVector(B, 0.0));
+		if (Away < BestAway)
+		{
+			BestAway = Away;
+			Best = i;
+		}
+	}
+	return Best;
 }

@@ -86,6 +86,8 @@ UTextureRenderTarget2D* ATMBattleDirector::GuideModel(const std::string& JobId, 
 		ShowcaseBody = NewObject<USkeletalMeshComponent>(this,
 			MakeUniqueObjectName(this, USkeletalMeshComponent::StaticClass(), TEXT("GuideHero")), RF_Transient);
 		ShowcaseBody->SetupAttachment(RootComponent);
+		ShowcaseBody->bDisableClothSimulation = true;
+		ShowcaseBody->bDisableMorphTarget = true;
 		ShowcaseBody->RegisterComponent();
 		ShowcaseBody->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 		ShowcaseBody->SetCastShadow(false);
@@ -127,10 +129,16 @@ UTextureRenderTarget2D* ATMBattleDirector::GuideModel(const std::string& JobId, 
 
 	// Dressed as the class, idling, when the class changes.
 	const FString Want = UTF8_TO_TCHAR(JobId.c_str());
-	if (ShowcaseJob != Want || !ShowcaseBody->IsVisible())
+	// A new body at most every quarter second: flipping through the Codex fast
+	// swapped skeletal meshes faster than the renderer let go of the last one,
+	// and crashed it (2026-10-01, SkeletalRenderGPUSkin.cpp "Index == 1").
+	// The guide's hero has no cloth either: it only stands and turns.
+	const double SwapNow = World->GetRealTimeSeconds();
+	if ((ShowcaseJob != Want || !ShowcaseBody->IsVisible()) && (ShowcaseSwappedAt < 0.0 || SwapNow - ShowcaseSwappedAt >= 0.25))
 	{
+		ShowcaseSwappedAt = SwapNow;
 		ShowcaseJob = Want;
-		WearBody(ShowcaseBody, *Body);
+		WearBody(ShowcaseBody, *Body, true);
 		ShowcaseBody->SetVisibility(true);
 		ShowcaseLight->SetVisibility(true);
 		if (Body->Animations && Body->Animations->Idle)
@@ -173,7 +181,9 @@ UTextureRenderTarget2D* ATMBattleDirector::GuideModel(const std::string& JobId, 
 	const FVector Eye = Middle + FVector(Distance, 0.0f, ShowcaseHeight * 0.1f);
 	ShowcaseCamera->SetWorldLocationAndRotation(Eye, (Middle - Eye).Rotation());
 	ShowcaseLight->SetWorldLocation(Feet + FVector(Distance * 0.5f, -Distance * 0.35f, ShowcaseHeight * 1.2f));
-	ShowcaseCamera->CaptureScene();
+	// Deferred: a capture in the middle of a tick can trip the engine's
+	// end-of-frame assertion (see PortraitOf, TMBattleDirectorLooks.cpp).
+	ShowcaseCamera->CaptureSceneDeferred();
 	return ShowcaseFilm;
 }
 

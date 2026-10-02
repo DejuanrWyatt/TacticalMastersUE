@@ -349,7 +349,7 @@ int main(int ArgCount, char** Args)
 			const int Base = KnightJob->Stats.Get(EStat::Hp);
 			Expect(K.MaxHp(), Base + 20 + 45, "max HP with Chain Vest and Bulwark Plate");
 			Expect(K.Hp, K.MaxHp(), "a unit starts the battle at its max HP, items included");
-			Expect(K.Stat(EStat::AttDef), KnightJob->Stats.Get(EStat::AttDef) + 2 + 4, "AttDef with both");
+			Expect(K.Stat(EStat::AttDef), KnightJob->Stats.Get(EStat::AttDef) + 3 + 6, "AttDef (Armor) with both");
 			Expect(K.Stat(EStat::Move), KnightJob->Stats.Get(EStat::Move) - 1, "Move with Bulwark Plate");
 			Expect(K.ItemJump(), 1, "climbing one more level with Spring Greaves");
 			Expect(Battle.Units[1].ItemJump(), 0, "climbing with nothing");

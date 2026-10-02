@@ -3,10 +3,10 @@
   "version": 1,
   "id": "anchor_stone",
   "name": "Anchor Stone",
-  "desc": "+4 to both defences if you didn't move on your last turn.",
+  "desc": "+6 Armor and Resist if you didn't move on your last turn.",
   "icon": "anchor",
   "tier": "uncommon",
   "effects": {
-    "still_defence": 4
+    "still_defence": 6
   }
 }

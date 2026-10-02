@@ -8,6 +8,7 @@
 // the other one is a replay that goes wrong.
 
 #include "SimBattle.h"
+#include "SimAbility.h"
 
 #include <algorithm>
 #include <cmath>
@@ -122,6 +123,13 @@ namespace TMSim
 		const double EngageRadius = Tuning.EngageRadius;
 		const double EngageCost = Tuning.EngageCost;
 		const bool bEngaging = Team >= 0 && EngageRadius > 0.0 && EngageCost > 0.0;
+		// Zone of control: within reach of an enemy tank a walk ends (FTuning::ZoneOfControl).
+		std::vector<uint8_t> Zoned;
+		const bool bZones = Team >= 0 && Tuning.ZoneOfControl >= 1.0 && EngageRadius > 0.0;
+		if (bZones)
+		{
+			Zoned.assign(Count, 0);
+		}
 		if (Team >= 0)
 		{
 			for (const FUnit& Other : Units)
@@ -132,6 +140,22 @@ namespace TMSim
 					if (bEngaging)
 					{
 						MarkBlocked(Other.Pos, EngageRadius, Engaged);
+					}
+					if (bZones)
+					{
+						const FJobDef* Job = FindJob(Other.Job);
+						// A tank whose reach the walk starts in does not hold it: a
+						// unit already beside one can still walk away.
+						bool bStartsInside = false;
+						for (const FNode& S : Starts)
+						{
+							bStartsInside = bStartsInside
+								|| static_cast<double>(FMap::NodePos(S).DistanceTo(Other.Pos)) < EngageRadius;
+						}
+						if (Job && !Job->Roles.empty() && Job->Roles.front() == "tank" && !bStartsInside)
+						{
+							MarkBlocked(Other.Pos, EngageRadius, Zoned);
+						}
 					}
 				}
 			}
@@ -159,6 +183,12 @@ namespace TMSim
 			const int i = HeapNode[0];
 			HeapPop();
 			if (C > Cost[i])
+			{
+				continue;
+			}
+			// Stepped into a tank's zone: the walk can end here, and go no further.
+			// (A tank the walk starts beside has no zone for it: see above.)
+			if (bZones && Zoned[i] == 1 && C > 0.0)
 			{
 				continue;
 			}
@@ -272,7 +302,172 @@ namespace TMSim
 		return Path;
 	}
 
-	std::string FBattle::ValidateMove(int UnitId, const FVec2& To, bool bSprint)
+	bool FBattle::WalkVia(const FUnit& Unit, const std::vector<FVec2>& Via, bool bSprint, double& OutLeft)
+	{
+		// Waypoints (2026-10-01): one walk in legs, each a shortest way from the
+		// last spot to the next with what is left of the move. The legs add up to
+		// exactly what the walk costs, engagement included, so a walk by
+		// waypoints is never further than the unit could have gone.
+		OutLeft = MoveOf(Unit, bSprint);
+		FNode From = FMap::NodeOf(Unit.Pos);
+		for (const FVec2& Point : Via)
+		{
+			const FNode Next = FMap::NodeOf(Point);
+			if (Next.X < 0 || Next.Y < 0 || Next.X >= Map.NavX || Next.Y >= Map.NavY)
+			{
+				return false;
+			}
+			// A waypoint inside an enemy tank's zone would be a walk that goes on
+			// past where it had to stop (FTuning::ZoneOfControl).
+			if (Tuning.ZoneOfControl >= 1.0)
+			{
+				for (const FUnit& Other : Units)
+				{
+					const FJobDef* Job = Other.IsAlive() && Other.Team != Unit.Team ? FindJob(Other.Job) : nullptr;
+					if (Job && !Job->Roles.empty() && Job->Roles.front() == "tank"
+						&& static_cast<double>(FMap::NodePos(Next).DistanceTo(Other.Pos)) < Tuning.EngageRadius)
+					{
+						return false;
+					}
+				}
+			}
+			RunDijkstra({ From }, OutLeft, Unit.Team, JumpOf(Unit));
+			const double Leg = Cost[Map.NodeIndex(Next)];
+			if (Leg == Infinity)
+			{
+				return false;
+			}
+			OutLeft -= Leg;
+			From = Next;
+		}
+		return true;
+	}
+
+	std::vector<std::pair<FNode, double>> FBattle::ReachableVia(const FUnit& Unit, const std::vector<FVec2>& Via, bool bSprint)
+	{
+		if (Via.empty())
+		{
+			return ReachableNodes(Unit, bSprint);
+		}
+		std::vector<std::pair<FNode, double>> Out;
+		double Left = 0.0;
+		if (!WalkVia(Unit, Via, bSprint, Left))
+		{
+			return Out;
+		}
+		const double Spent = MoveOf(Unit, bSprint) - Left;
+		RunDijkstra({ FMap::NodeOf(Via.back()) }, Left, Unit.Team, JumpOf(Unit));
+		for (int i = 0; i < static_cast<int>(Cost.size()); ++i)
+		{
+			if (Cost[i] == Infinity)
+			{
+				continue;
+			}
+			const FNode N = Map.NodeAt(i);
+			const FVec2 P = FMap::NodePos(N);
+			// As ReachableNodes: walked through, but not stood on.
+			bool bTaken = false;
+			for (const FUnit& Other : Units)
+			{
+				if (&Other != &Unit && Other.IsAlive() && Other.Pos.DistanceTo(P) < Ground::UnitSpacing)
+				{
+					bTaken = true;
+					break;
+				}
+			}
+			if (!bTaken)
+			{
+				Out.push_back({ N, Spent + Cost[i] });
+			}
+		}
+		return Out;
+	}
+
+	std::vector<FVec2> FBattle::PathVia(const FUnit& Unit, const std::vector<FVec2>& Via, const FNode& To, bool bSprint)
+	{
+		if (Via.empty())
+		{
+			return PathTo(Unit, To, bSprint);
+		}
+		std::vector<FVec2> Path;
+		double Left = MoveOf(Unit, bSprint);
+		FNode From = FMap::NodeOf(Unit.Pos);
+		std::vector<FNode> Stops;
+		for (const FVec2& Point : Via)
+		{
+			Stops.push_back(FMap::NodeOf(Point));
+		}
+		Stops.push_back(To);
+		for (const FNode& Next : Stops)
+		{
+			if (Next.X < 0 || Next.Y < 0 || Next.X >= Map.NavX || Next.Y >= Map.NavY)
+			{
+				return std::vector<FVec2>();
+			}
+			RunDijkstra({ From }, Left, Unit.Team, JumpOf(Unit));
+			const int Target = Map.NodeIndex(Next);
+			if (Cost[Target] == Infinity)
+			{
+				return std::vector<FVec2>();
+			}
+			Left -= Cost[Target];
+			std::vector<FVec2> Leg;
+			for (int At = Target; At >= 0; At = Parent[At])
+			{
+				Leg.insert(Leg.begin(), FMap::NodePos(Map.NodeAt(At)));
+			}
+			// Each leg starts where the last one ended: that spot once.
+			const size_t Skip = Path.empty() ? 0 : 1;
+			Path.insert(Path.end(), Leg.begin() + static_cast<std::ptrdiff_t>(std::min(Skip, Leg.size())), Leg.end());
+			From = Next;
+		}
+		return Path;
+	}
+
+	std::vector<FVec2> FBattle::RouteTo(const FUnit& Unit, const std::vector<FVec2>& Via, const FNode& To, double* OutCost)
+	{
+		// As PathVia, in legs, with no budget: the move limit is what splits it
+		// into turns, and that is the caller's to do.
+		constexpr double NoLimit = 1.0e9;
+		std::vector<FVec2> Route;
+		double Spent = 0.0;
+		FNode From = FMap::NodeOf(Unit.Pos);
+		std::vector<FNode> Stops;
+		for (const FVec2& Point : Via)
+		{
+			Stops.push_back(FMap::NodeOf(Point));
+		}
+		Stops.push_back(To);
+		for (const FNode& Next : Stops)
+		{
+			if (Next.X < 0 || Next.Y < 0 || Next.X >= Map.NavX || Next.Y >= Map.NavY)
+			{
+				return std::vector<FVec2>();
+			}
+			RunDijkstra({ From }, NoLimit, Unit.Team, JumpOf(Unit));
+			const int Target = Map.NodeIndex(Next);
+			if (Cost[Target] == Infinity)
+			{
+				return std::vector<FVec2>();
+			}
+			Spent += Cost[Target];
+			std::vector<FVec2> Leg;
+			for (int At = Target; At >= 0; At = Parent[At])
+			{
+				Leg.insert(Leg.begin(), FMap::NodePos(Map.NodeAt(At)));
+			}
+			const size_t Skip = Route.empty() ? 0 : 1;
+			Route.insert(Route.end(), Leg.begin() + static_cast<std::ptrdiff_t>(std::min(Skip, Leg.size())), Leg.end());
+			From = Next;
+		}
+		if (OutCost)
+		{
+			*OutCost = Spent;
+		}
+		return Route;
+	}
+
+	std::string FBattle::ValidateMove(int UnitId, const FVec2& To, bool bSprint, const std::vector<FVec2>& Via)
 	{
 		FUnit* Unit = FindUnit(UnitId);
 		if (!Unit || !Unit->IsAlive())
@@ -314,8 +509,34 @@ namespace TMSim
 		{
 			return "That isn't a spot on the board.";
 		}
+		// Waypoints: a few, each a node centre, each a step on from the last.
+		if (static_cast<int>(Via.size()) > MaxWaypoints)
+		{
+			return "Too many waypoints.";
+		}
+		FNode Previous = FMap::NodeOf(Unit->Pos);
+		for (const FVec2& Point : Via)
+		{
+			if (FMap::Snap(Point).DistanceTo(Point) > 0.001f)
+			{
+				return "A waypoint isn't a spot on the board.";
+			}
+			if (FMap::NodeOf(Point) == Previous)
+			{
+				return "Two waypoints on one spot.";
+			}
+			Previous = FMap::NodeOf(Point);
+		}
+		if (!Via.empty())
+		{
+			double Left = 0.0;
+			if (!WalkVia(*Unit, Via, bSprint, Left))
+			{
+				return "It can't reach that waypoint.";
+			}
+		}
 		const FNode Target = FMap::NodeOf(To);
-		for (const auto& Pair : ReachableNodes(*Unit, bSprint))
+		for (const auto& Pair : ReachableVia(*Unit, Via, bSprint))
 		{
 			if (Pair.first == Target)
 			{
@@ -325,7 +546,7 @@ namespace TMSim
 		return "It can't reach there.";
 	}
 
-	bool FBattle::ApplyMove(int UnitId, const FVec2& To, bool bSprint, FTickReport& Report)
+	bool FBattle::ApplyMove(int UnitId, const FVec2& To, bool bSprint, FTickReport& Report, const std::vector<FVec2>& Via)
 	{
 		FUnit* Unit = FindUnit(UnitId);
 		if (!Unit)
@@ -335,7 +556,16 @@ namespace TMSim
 
 		// It faces the way it last stepped, which is what decides whether the
 		// next blow lands on its front, its side or its back.
-		const std::vector<FVec2> Path = PathTo(*Unit, FMap::NodeOf(To), bSprint);
+		const std::vector<FVec2> Path = PathVia(*Unit, Via, FMap::NodeOf(To), bSprint);
+		Unit->WalkFrom = Unit->Pos;
+		Unit->WalkVia = Via;
+		// Walking by a waypoint on a cache picks it up on the way, as stopping
+		// there would (2026-10-01: "past an item to pick it up").
+		for (const FVec2& Point : Via)
+		{
+			Unit->Pos = Point;
+			PickUpAt(*Unit, Report);
+		}
 		FVec2 Step = To - Unit->Pos;
 		if (Path.size() >= 2)
 		{

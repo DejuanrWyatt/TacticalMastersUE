@@ -54,9 +54,16 @@ namespace
 			|| A.Slot != B.Slot || A.Follow != B.Follow || A.Team != B.Team || A.Ticks != B.Ticks
 			|| !SameBits(A.To.X, B.To.X) || !SameBits(A.To.Y, B.To.Y)
 			|| !SameBits(A.Target.X, B.Target.X) || !SameBits(A.Target.Y, B.Target.Y)
-			|| A.TuneValues.size() != B.TuneValues.size())
+			|| A.TuneValues.size() != B.TuneValues.size() || A.Via.size() != B.Via.size())
 		{
 			return false;
+		}
+		for (size_t i = 0; i < A.Via.size(); ++i)
+		{
+			if (!SameBits(A.Via[i].X, B.Via[i].X) || !SameBits(A.Via[i].Y, B.Via[i].Y))
+			{
+				return false;
+			}
 		}
 		for (size_t i = 0; i < A.TuneValues.size(); ++i)
 		{
@@ -133,6 +140,15 @@ int main()
 	RoundTrip(FOrder::MakeMove(3, 7, FVec2(10.25f, 5.0f)));
 	RoundTrip(FOrder::MakeMove(0, 0, FVec2(-0.0f, 0.1f), true));
 	RoundTrip(FOrder::MakeMove(7, 123456, FVec2(Smallest, 3.4e38f)));
+	// Waypoints (2026-10-01): one, and the most there may be.
+	RoundTrip(FOrder::MakeMove(3, 7, FVec2(10.25f, 5.0f), false, { FVec2(4.75f, 6.25f) }));
+	RoundTrip(FOrder::MakeMove(3, 7, FVec2(10.25f, 5.0f), true,
+		{ FVec2(0.25f, 0.75f), FVec2(1.25f, 1.75f), FVec2(2.25f, 2.75f), FVec2(Smallest, 3.4e38f) }));
+	if (OrderToText(FOrder::MakeMove(3, 7, FVec2(10.25f, 5.0f))).find("  ") != std::string::npos
+		|| OrderToText(FOrder::MakeMove(3, 7, FVec2(10.25f, 5.0f))) != "move 3 7 41240000 40a00000 0")
+	{
+		Fail("a walk with no waypoints is not written as it always was: " + OrderToText(FOrder::MakeMove(3, 7, FVec2(10.25f, 5.0f))));
+	}
 	RoundTrip(FOrder::MakeUseAbility(2, 9, 3, FVec2(12.3456789f, 0.3333333f), 5));
 	RoundTrip(FOrder::MakeUseAbility(2, 9, 0, FVec2(1.0f, 2.0f), -1));
 	RoundTrip(FOrder::MakeEndTurn(6, 42));
@@ -155,6 +171,9 @@ int main()
 		"ready 2", "ready -1", "advance -5", "advance 1.5", "advance 0x10", "tune 1 0", "tune 2 0 3ff0000000000000",
 		"tune 1 999 3ff0000000000000", "tune 1 0 7ff0000000000000", "place 1 2 0", "end 99999999999999999999 1",
 		std::string(5000, 'a'),
+		// Waypoints: a count of none, more than four, or a point missing its half.
+		"move 1 2 41200000 40a00000 0 0", "move 1 2 41200000 40a00000 0 5 0 0 0 0 0 0 0 0 0 0",
+		"move 1 2 41200000 40a00000 0 1 41200000", "move 1 2 41200000 40a00000 0 1 41200000 40a00000 0",
 	};
 	const int Before = Failures;
 	for (const std::string& Line : Bad)

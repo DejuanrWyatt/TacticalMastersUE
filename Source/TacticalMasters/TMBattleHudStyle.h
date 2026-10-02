@@ -160,16 +160,24 @@ namespace TMHudStyle
 		return Name.Left(2);
 	}
 
+	/** A class's one Evasion, as the defense rules read it (FBattle::EvasionOf): the higher of its two. */
+	inline int ClassEvasion(const TMSim::FJobStats& Stats)
+	{
+		return FMath::Max(Stats.Get(TMSim::EStat::AEva), Stats.Get(TMSim::EStat::MEva));
+	}
+
 	/** A stat's name as the HUD writes it. */
 	inline const TCHAR* ShownStatName(TMSim::EStat Stat)
 	{
 		switch (Stat)
 		{
 		case TMSim::EStat::Hp: return TEXT("HP");
-		case TMSim::EStat::AttDef: return TEXT("AttDef");
-		case TMSim::EStat::MagDef: return TEXT("MagDef");
-		case TMSim::EStat::AEva: return TEXT("A-Eva");
-		case TMSim::EStat::MEva: return TEXT("M-Eva");
+		// 2026-10-01 (Docs/design/feat-defense.md): Armor and Resist take a share
+		// off physical and magic hits, and the two evasions are one Evasion.
+		case TMSim::EStat::AttDef: return TEXT("Armor");
+		case TMSim::EStat::MagDef: return TEXT("Resist");
+		case TMSim::EStat::AEva: return TEXT("Evasion");
+		case TMSim::EStat::MEva: return TEXT("Evasion");
 		case TMSim::EStat::Crit: return TEXT("Crit");
 		case TMSim::EStat::Speed: return TEXT("Speed");
 		case TMSim::EStat::Move: return TEXT("Move");

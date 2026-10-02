@@ -69,7 +69,7 @@
     {
       "id": "ninja_smoke_bomb",
       "name": "Smoke Bomb",
-      "desc": "Slow every enemy within 2 m of a point 1-5 m away for 4 s.",
+      "desc": "Slow every enemy within 2 m of a point 1-5 m away for 2 turns.",
       "kind": "active",
       "effect": "support",
       "scale": "mag",
@@ -114,5 +114,11 @@
         "scale": 1
       }
     }
-  ]
+  ],
+  "creator": {
+    "reworded": {
+      "on": "2026-10-02",
+      "why": "Descriptions say what the abilities do (2026-10-02): Stun not sleep, Crit not the old Power, turns not seconds"
+    }
+  }
 }

@@ -241,6 +241,8 @@ namespace TMSim
 	{
 		Camps.clear();
 		Caches.clear();
+		Stash[0].clear();
+		Stash[1].clear();
 		CampRng.Seed(InSeed ^ Camp::Salt);
 		LootRng.Seed(InSeed ^ Camp::LootSalt);
 		const int Level = std::max(0, std::min(3, RoundToInt(Tuning.CampLevel)));
@@ -568,9 +570,10 @@ namespace TMSim
 			Event.Where = Held.Spot;
 			Report.Events.push_back(Event);
 
-			// Back later, somewhere new on its own side's half (the boss where it was).
+			// Back later, somewhere new on its own side's half (the boss where it was);
+			// or, with respawns off (the default since 2026-10-01), never.
 			Held.State = ECampState::Waiting;
-			Held.Timer = Camp::Respawn[Held.Tier] * TicksPerSecond;
+			Held.Timer = Tuning.CampRespawn >= 0.5 ? Camp::Respawn[Held.Tier] * TicksPerSecond : std::numeric_limits<int>::max();
 			// A reserve spent is spent until the camp wakes again.
 			for (const int Id : Held.Reserves)
 			{
@@ -680,12 +683,27 @@ namespace TMSim
 	void FBattle::OnGone(FUnit& Unit, FTickReport& Report)
 	{
 		// Finished off: what it carried falls where it lay (3.4.4). A monster
-		// leaves the board until its camp wakes again.
+		// leaves the board until its camp wakes again. A side's own unit's
+		// items go back to its side's stash instead, for another to wear
+		// (2026-10-01).
 		std::vector<const FItemDef*> Dropped;
 		std::vector<int> Cooldowns;
 		for (int i = 0; i < Items::Slots; ++i)
 		{
-			if (Unit.Gear[i])
+			if (Unit.Gear[i] && UsesStash(Unit))
+			{
+				ToStash(Unit.HomeTeam(), Unit.Gear[i], Unit.Cooldowns[ClassSlots + i]);
+				FEvent Event;
+				Event.Kind = EEventKind::ItemDropped;
+				Event.Unit = Unit.Id;
+				Event.Slot = -1;
+				Event.Where = Unit.Pos;
+				Event.Id = Unit.Gear[i]->Id;
+				Report.Events.push_back(Event);
+				Unit.Gear[i] = nullptr;
+				Unit.Cooldowns[ClassSlots + i] = 0;
+			}
+			else if (Unit.Gear[i])
 			{
 				Dropped.push_back(Unit.Gear[i]);
 				Cooldowns.push_back(Unit.Cooldowns[ClassSlots + i]);
@@ -755,7 +773,9 @@ namespace TMSim
 		{
 			return "It can't act.";
 		}
-		if (Unit->bActed || Unit->IsCasting())
+		// A side's unit takes into its side's stash, free; a monster into its own slots, with its action.
+		const bool bToStash = UsesStash(*Unit);
+		if (!bToStash && (Unit->bActed || Unit->IsCasting()))
 		{
 			return "Already used its action this turn.";
 		}
@@ -771,6 +791,10 @@ namespace TMSim
 		if (static_cast<double>(Unit->Pos.DistanceTo(Cache.Pos)) > Camp::TakeReach)
 		{
 			return "Too far: stand next to the items.";
+		}
+		if (bToStash)
+		{
+			return std::string();
 		}
 		if (Unit->Carries(ItemId))
 		{
@@ -810,7 +834,98 @@ namespace TMSim
 		{
 			return "Nothing in that slot.";
 		}
+		// Taking an item off is the turn: nothing else may have been done in it.
+		if (UsesStash(*Unit) && (Unit->bActed || Unit->bMoved || Unit->IsCasting() || Unit->IsChanneling()))
+		{
+			return "Unequipping takes the whole turn: it has already moved or acted.";
+		}
 		return std::string();
+	}
+
+	std::string FBattle::ValidateEquip(int UnitId, const std::string& ItemId, int GearSlot) const
+	{
+		const FUnit* Unit = nullptr;
+		for (const FUnit& Each : Units)
+		{
+			Unit = Each.Id == UnitId ? &Each : Unit;
+		}
+		if (!Unit || !Unit->IsAlive())
+		{
+			return "No such unit.";
+		}
+		if (!UsesStash(*Unit) || Unit->Team != Unit->HomeTeam())
+		{
+			return "Only a side's own units wear its items.";
+		}
+		const std::vector<FStashed>& Held = Stash[Unit->Team];
+		if (std::none_of(Held.begin(), Held.end(), [&](const FStashed& Each) { return Each.Item && Each.Item->Id == ItemId; }))
+		{
+			return "That item isn't in the stash.";
+		}
+		if (Unit->Carries(ItemId))
+		{
+			return "It already wears one.";
+		}
+		if (GearSlot < -1 || GearSlot >= Items::Slots)
+		{
+			return "No such slot.";
+		}
+		if (GearSlot >= 0 && Unit->Gear[GearSlot])
+		{
+			return "That slot is taken: an item comes off only by spending a turn.";
+		}
+		if (GearSlot == -1 && Unit->Gear[0] && Unit->Gear[1] && Unit->Gear[2])
+		{
+			return "Its slots are full.";
+		}
+		return std::string();
+	}
+
+	void FBattle::ToStash(int Team, const FItemDef* Item, int Cooldown)
+	{
+		if (Item && (Team == 0 || Team == 1))
+		{
+			FStashed Put;
+			Put.Item = Item;
+			Put.Cooldown = Cooldown;
+			Stash[Team].push_back(Put);
+		}
+	}
+
+	void FBattle::ApplyEquip(FUnit& Unit, const std::string& ItemId, int GearSlot, FTickReport& Report)
+	{
+		std::vector<FStashed>& Held = Stash[Unit.Team];
+		size_t At = 0;
+		while (At < Held.size() && (!Held[At].Item || Held[At].Item->Id != ItemId))
+		{
+			++At;
+		}
+		if (At >= Held.size())
+		{
+			return;
+		}
+		int Slot = GearSlot;
+		if (Slot < 0)
+		{
+			for (int i = Items::Slots - 1; i >= 0; --i)
+			{
+				Slot = Unit.Gear[i] ? Slot : i;
+			}
+		}
+		if (Slot < 0 || Unit.Gear[Slot])
+		{
+			return;
+		}
+		const FStashed Taken = Held[At];
+		Held.erase(Held.begin() + static_cast<std::ptrdiff_t>(At));
+		PutInSlot(Unit, Slot, Taken.Item, Taken.Cooldown);
+		FEvent Event;
+		Event.Kind = EEventKind::ItemTaken;
+		Event.Unit = Unit.Id;
+		Event.Slot = -1;
+		Event.Where = Unit.Pos;
+		Event.Id = Taken.Item->Id;
+		Report.Events.push_back(Event);
 	}
 
 	void FBattle::ApplyTake(FUnit& Unit, int CacheIndex, const std::string& ItemId, int GearSlot, FTickReport& Report)
@@ -831,6 +946,19 @@ namespace TMSim
 		if (At < Cache.Cooldowns.size())
 		{
 			Cache.Cooldowns.erase(Cache.Cooldowns.begin() + static_cast<std::ptrdiff_t>(At));
+		}
+		if (UsesStash(Unit))
+		{
+			// Into the side's stash, free: who wears it is chosen with Equip.
+			ToStash(Unit.HomeTeam(), Item, Cooldown);
+			FEvent Stashed;
+			Stashed.Kind = EEventKind::ItemTaken;
+			Stashed.Unit = Unit.Id;
+			Stashed.Slot = CacheIndex;
+			Stashed.Where = Cache.Pos;
+			Stashed.Id = Item->Id;
+			Report.Events.push_back(Stashed);
+			return;
 		}
 		int Slot = GearSlot;
 		if (Slot < 0)
@@ -876,46 +1004,23 @@ namespace TMSim
 		{
 			return;
 		}
-		for (;;)
+		// Everything lying there goes into the side's stash (2026-10-01): which
+		// unit wears what is chosen afterwards, on the team's items screen.
 		{
-			int Slot = -1;
-			for (int i = Items::Slots - 1; i >= 0; --i)
-			{
-				Slot = Unit.Gear[i] ? Slot : i;
-			}
-			if (Slot < 0)
-			{
-				return;  // full: swapping one is still a Take, the turn's action
-			}
 			FCache& Cache = Caches[static_cast<size_t>(CacheIndex)];
-			size_t Best = Cache.Items.size();
 			for (size_t i = 0; i < Cache.Items.size(); ++i)
 			{
-				// The best tier; among equals, the one lying there longest.
-				if (!Unit.Carries(Cache.Items[i]->Id) && (Best == Cache.Items.size() || Cache.Items[i]->Tier > Cache.Items[Best]->Tier))
-				{
-					Best = i;
-				}
+				ToStash(Unit.HomeTeam(), Cache.Items[i], i < Cache.Cooldowns.size() ? Cache.Cooldowns[i] : 0);
+				FEvent Event;
+				Event.Kind = EEventKind::ItemTaken;
+				Event.Unit = Unit.Id;
+				Event.Slot = CacheIndex;
+				Event.Where = Cache.Pos;
+				Event.Id = Cache.Items[i]->Id;
+				Report.Events.push_back(Event);
 			}
-			if (Best == Cache.Items.size())
-			{
-				return;
-			}
-			const FItemDef* Item = Cache.Items[Best];
-			const int Cooldown = Best < Cache.Cooldowns.size() ? Cache.Cooldowns[Best] : 0;
-			Cache.Items.erase(Cache.Items.begin() + static_cast<std::ptrdiff_t>(Best));
-			if (Best < Cache.Cooldowns.size())
-			{
-				Cache.Cooldowns.erase(Cache.Cooldowns.begin() + static_cast<std::ptrdiff_t>(Best));
-			}
-			PutInSlot(Unit, Slot, Item, Cooldown);
-			FEvent Event;
-			Event.Kind = EEventKind::ItemTaken;
-			Event.Unit = Unit.Id;
-			Event.Slot = CacheIndex;
-			Event.Where = Cache.Pos;
-			Event.Id = Item->Id;
-			Report.Events.push_back(Event);
+			Cache.Items.clear();
+			Cache.Cooldowns.clear();
 		}
 	}
 
@@ -924,6 +1029,22 @@ namespace TMSim
 		const FItemDef* Item = Unit.Gear[GearSlot];
 		const int Cooldown = Unit.Cooldowns[ClassSlots + GearSlot];
 		PutInSlot(Unit, GearSlot, nullptr, 0);
+		if (UsesStash(Unit))
+		{
+			// Off, into the side's stash, and that is the turn.
+			ToStash(Unit.HomeTeam(), Item, Cooldown);
+			FEvent Off;
+			Off.Kind = EEventKind::ItemDropped;
+			Off.Unit = Unit.Id;
+			Off.Slot = -1;
+			Off.Where = Unit.Pos;
+			Off.Id = Item->Id;
+			Report.Events.push_back(Off);
+			Unit.bMoved = true;
+			Unit.bActed = true;
+			EndTurn(Unit, false, Report);
+			return;
+		}
 		const int Cache = DropItems(Unit.Pos, { Item }, { Cooldown }, Report);
 		FEvent Event;
 		Event.Kind = EEventKind::ItemDropped;

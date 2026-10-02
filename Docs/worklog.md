@@ -33,6 +33,22 @@ How to write here:
 - Please don't: delete or move `E:\UnrealProjects\TM_Release`, or change Content assets, while it cooks.
   A second heavy build at the same time may run the PC out of memory again.
 
+### Lobby and items session (the watchtower session, continued), 2026-10-01
+- Doing: the online lobby (up to four players, sides chosen, the draft), friendly fire, the team stash and
+  team items screen, thinner aiming lines, a dimmer walk area, range on ability buttons, Tab for status bars.
+  Since: the combat log redesign (one line per action, tabs All/Combat/Mine/Key), the options menu scrolls, camp
+  respawns as a setup option (off by default), auto-recenter as an option with V to toggle, and crash fixes
+  (Codex hero flipping, fullscreen toggling, render targets no longer resized in place, cloth and morph targets off).
+  Then queued orders (Docs/design/feat-move-queue.md): plan a waiting unit's next turn, plan a turn and go in one
+  (G), and waypoints (Ctrl+click). Then Go To, Civilization III style (feat-move-queue.md, "Go To"), and the new
+  combat text and the health bar that shows over your own units in a fight (feat-combat-text.md).
+- Claimed (changed, built, tests passing, not committed): `Source/TacticalMasters/` TMNet.{h,cpp},
+  TMBattleDirector.{h,cpp}, TMBattleDirector{Online,Lobby,Draft,Camps,Indicators,Fog,Loading,Showcase,Motion,Plans}.cpp (Plans is new), TMBattleHud.{h,cpp},
+  TMBattleHud{Lobby,Panels,Codex,Options}.cpp, TMBattleHudStyle.h, TMBattleDirectorBlows.cpp, TMBattleDirectorAbilityFx.cpp, TMDrawable.{h,cpp} (new), TMSettings.{h,cpp}; `Source/TMSim/` SimOrder.h, SimBattle.h, SimTypes.{h,cpp},
+  SimTargeting.cpp, SimAI.cpp, SimCamps.cpp, SimWorld.cpp, SimOrderText.cpp, SimUnit.h, SimMovement.cpp, SimBattle.cpp, SimResolve.cpp; `Tests/` SimCampTest.cpp, SimPlayTest.cpp, SimMoveTest.cpp, SimOrderTextTest.cpp;
+  `Docs/design/feat-lobby.md`, `Docs/design/feat-team-items.md`, `Docs/design/feat-move-queue.md`, `Docs/design/feat-defense.md`, `Docs/design/feat-combat-text.md`, `Docs/design/feat-class-balance.md`, `Docs/CHANGELOG.md` (new).
+- Online protocol is now 14: builds from before today can't play these.
+
 ## Notes for others
 
 - For every session (from the watchtower session): the device bridge can write an older copy of a file when the same
@@ -42,6 +58,118 @@ How to write here:
 
 ## Log
 
+- 2026-10-02 10:50 (lobby and items session) Class creator (E:\TacticsClassCreator): a "Game roster" page
+  (app/roster.mjs, sidebar button, #roster): all 101 game classes as cards grouped by role, a sortable table of
+  every stat (tinted above/below the role's usual), or a map of budget against win rate; filters for role, rule
+  breaks, over/under budget and the 40-60% band; a side panel with stats against the role's usual and "Bring in and
+  open" (imports into the library if needed). tests/roster.test.mjs. Mockups: "Class Roster Mockups".
+  Earlier, 10:13: build-and-test passed (replays and battle report compile); not committed.
+- 2026-10-02 09:50 (lobby and items session) Not committed. End-of-battle stats screen built
+  (Docs/design/feat-battle-report.md): new TMBattleDirectorReport.cpp (per-unit tallies, MVP score: damage .1, taken
+  .04, mitigated .03, healing .1, kill 12, assist 5 within 60 s, death -10, monster 4, boss 15, buff/debuff 2,
+  control 3, revive 10, tower 8) and TMBattleHudReport.cpp. First build-and-test of the replay and report code
+  failed with 9 errors (std::vector .Num(); helpers named Initials and Role clashing with TMHudStyle::Initials and
+  AActor::Role); fixed (ReportInitials, RoleWord, .size()), not yet rebuilt. Class creator (E:\TacticsClassCreator):
+  class rules flagged, not refused (deals damage; a tank protects; a support helps allies) and a stat budget
+  (app/rules.mjs, app/budget.mjs). The 7 game tanks that break "a tank protects" (blazeblade, crusader,
+  earthshaker, frostblade, hexblade, thunder_spellblade, windblade) and the Spellblade archetype stay flagged; the
+  human will design their kits.
+- 2026-10-02 09:10 (lobby and items session) Not committed; built by the build-and-test script only: replays
+  (Docs/design/feat-replays.md). New TMBattleDirectorReplay.cpp and TMBattleHudReplay.cpp; hooks in
+  TMBattleDirector.cpp (BuildBattle records or applies the replay's start before Battle.Start; Submit records every
+  applied order and refuses all but the replay's own while watching; Tick plays the replay; ViewerTeam; keys; menu),
+  TMBattleDirector.h, TMBattleHud.cpp/h (Replays on the title, Watch replay at the end, the replay bar).
+  Saved/agent-replay-check.bat plays a battle and checks its replay with -tmreplaycheck. The end-of-battle
+  stats screen waits on the human's answer to "Battle Report Mockups".
+- 2026-10-02 08:55 (lobby and items session) Not built, not committed: 15 item files retuned for defense model 1
+  (Docs/design/feat-items.md section 13): defensive numbers rescaled so each item takes off about the same share
+  of its holder's damage as under the old rules (modelled over every class against every damaging ability).
+  Tests/SimItemTest.cpp expects Armor +3 +6 for Chain Vest + Bulwark Plate. Item, camp and status suites pass
+  locally. Next in this session: end-of-game stats/MVP mockup, then a replay system.
+- 2026-10-02 09:05 (lobby and items session) Not built, not committed: 28 ability descriptions in 24 class files
+  (Content/Data/Classes) rewritten to say what the abilities do, numbers untouched: "Slumber"/Sleep say Stun,
+  Power -> Crit, seconds -> turns. Each class carries `creator.reworded`; `Tests/SimClassTest.cpp` skips only the
+  description comparison with Godot for those (numbers still compared). Local run: 77 compared, every field agrees.
+  The creator's library copies of these classes will show "Game's copy differs" until taken.
+- 2026-10-02 08:40 (lobby and items session) Class creator: ability descriptions written from the numbers
+  (app/describe.mjs). Abilities tab, Description: "From the numbers" keeps a flavour line (creator.flavour[slot])
+  and adds what the ability does in the game's terms, rewritten on every change (distances in the flavour follow
+  the ranges); "By hand" is checked instead, and disagreements show in the authoring checks. New classes start
+  written from their numbers. The check finds 28 of the game's 404 ability descriptions wrong in 24 classes: eight
+  "Slumber"/Sleep abilities say sleep and give Stun, ten still name Power, eleven give seconds for turns.
+- 2026-10-02 08:05 (lobby and items session) Class creator: a live scorecard heads the right pane. 1.2 s after a
+  change the game would see, it plays 20 games (class lab, game rules, Highlands) and shows the win %, the 40-60%
+  band, the change since the last run (same seeds, so like for like), rank in the last balance pass, margin, as-four,
+  and how often each ability was used ("never" in amber). "+20 games" plays new games on top; Live/Off kept in the
+  browser. (In a test library, the old Frost Hexer's Curse showed as never used.)
+- 2026-10-02 07:40 (lobby and items session) Class creator (E:\TacticsClassCreator, its own folder): the
+  Stats tab uses the game's names (Armor, Resist, Evasion A/M with "AttDef in the file") and marks the lower
+  evasion number as unused; a new "In the game" panel shows what lands through Armor/Resist, the one Evasion and
+  the damage to knock the class out (app/defense.mjs). The New class dialog shows the class lab's result for each
+  archetype (the game's classes made from it, game rules) in place of the old Godot margins. A badge on each class
+  says whether the game's copy matches (Same / Changed since install / Game's copy differs), opens a diff with
+  Install or "Take the game's copy", and an "Out of step" library filter (app/sync.mjs). Tests: tests/sync.test.mjs.
+- 2026-10-01 23:55 (lobby and items session) Not committed, built by the build-and-test script only (no release):
+  the human chose option A and zone of control from "Class Rebalance Mockups". `FTuning::ZoneOfControl` (40th rule
+  number; the game sets 1 in `TMSim::GameTuning`): within EngageRadius of an enemy whose first role is tank a walk ends
+  (SimMovement RunDijkstra; a tank the walk starts beside doesn't hold it; a waypoint in a zone is refused).
+  `TMSim::ApplyGameBalance` (SimAbility) changes the built-in Knight and Archer for the game only, so the Godot tests
+  hold; the director and the class lab (game rules) call it. The computer no longer aims an area between two targets
+  at fogged ground (SimAI). Class files: Berserker, Samurai (descriptions), Frost Hexer, Frost Witch (split), each
+  marked `creator.rebalanced`, which SimClassTest's Godot comparison now skips. The setup screen's choices are kept
+  between sessions (`FTMSettings::LastSetup`); Dev Tools no longer shows the five rules the setup screen owns.
+  `Docs/CHANGELOG.md` is new: player-facing, newest first; the release script copies it next to the exe. Keep it
+  current with every change a player would notice. Protocol 14. Docs/design/feat-class-balance.md.
+
+- 2026-10-01 22:00 (lobby and items session) Release `E:\Builds\TacticalMasters-2026-10-01-v15` (protocol 13): combat
+  text, the fight health bar, Go To, the portrait-capture crash (deferred captures). Then the class lab measures on the
+  game's rules: `TMSim::GameTuning` (SimTypes) is now the one place the game's rules are set (the director calls it);
+  `Tools/ClassLab` fights on them at hard, 40 games, the class standing in for the reference member with its first role,
+  plus four of it ("stack"), `--maps` round every map, and a `tournament` command for every class. Its Build.bat now
+  compiles every Sim*.cpp (the list had fallen behind, so the lab last built 2026-09-29). The class creator
+  (`E:\TacticsClassCreator`, its own repository): 40-game playtests, an "Every map" switch, the stack figure, a rank, and
+  "Among every class" (the tournament, kept in `Saved/ClassLab/balance.json`); the stale "auras do nothing" warning
+  removed. Not committed.
+
+- 2026-10-01 20:45 (lobby and items session) Go To (click beyond the walk area: walks there over several turns,
+  walk-and-end by default, stops when an enemy comes into sight, when hurt or blocked; G keeps going, Backspace cancels;
+  numbers on the ground for each turn's end, a ">N" corner on the turn square, a strip with its buttons) and the combat
+  text redesign ("Combat Text Mockups": red damage, big bold crits with "!", dark red ember burn, crimson bleed, green
+  heals, statuses in their own colours; own units' health bar for 3 s on dealing or taking damage, the lost part
+  flashing as it drains over 2 s). Built with the build-and-test script; no release packaged (the human's rule: no
+  release without their OK). Not committed.
+- 2026-10-01 20:01 (lobby and items session) Release `E:\Builds\TacticalMasters-2026-10-01-v14` (protocol 13): the play-test
+  crash. Four Fab materials are cooked with no shaders (textures missing from the packs; package.log "Shadermap pointer is
+  null"): ParagonMorigesh bugs (M_Bug_Mesh, M_Bug_ParticleSubUV_Trans), Narbash's M_Narbash_Legs_Drumsticks (on the Narbash
+  body), Rampage's M_Rock_To_Throw. Drawing one crashed the render thread (SetShaderParameters). New TMDrawable.{h,cpp}: in a
+  packaged game a body slot with such a material gets the default surface, and a Cascade effect holding one isn't played.
+  Fixing the materials themselves is editor work (human-only). Also the new defense rules (entry below).
+- 2026-10-01 19:40 (lobby and items session) Not committed: new defense rules (Docs/design/feat-defense.md). Armor
+  (AttDef) and Resist (MagDef) take a share, 30 / (30 + it), instead of being subtracted; one Evasion (the higher of
+  A-Eva and M-Eva, plus bonuses to either); an evaded hit is dodged 1 in 10, grazed for half otherwise. Behind
+  `FTuning::DefenseModel` (0, Godot's, stays the rules' default so the Godot comparisons hold; the game sets 1 in
+  `GameTuning`). Protocol 13. Also: the setup screen's Start no longer covers its last rule; "Not ported yet" gone.
+- 2026-10-01 17:30 (lobby and items session) Not committed: queued orders (Docs/design/feat-move-queue.md). Plan a
+  waiting unit's next turn (click it): a walk and an ability aimed from where it ends, run when its turn begins; plan a
+  turn and go in one (G); waypoints on any walk (Ctrl+click, up to 4; the move order carries them, protocol 12).
+  New TMBattleDirectorPlans.cpp; sim tests pass here (SimMoveTest has waypoint checks).
+- 2026-10-01 16:10 (lobby and items session) Built and tested, not committed: crash fixes from the play tests. Picking
+  Berserker crashed every time (engine morph buffers, `FMorphVertexBufferPool::GetReadingIndex` "Index == 1", on Grux's
+  mesh): morph targets are now off on every unit and guide body, and cloth too (WearBody). Also render targets are made
+  new rather than resized (FilmOfSize), the Codex guide hero swaps at most every 0.25 s, fullscreen is debounced.
+  Earlier today: the combat log redesign, a scrolling options menu, camp respawns (setup, off by default), auto-recenter
+  (option, V). Protocol 11. Release `E:\Builds\TacticalMasters-2026-10-01-v11` (has the Berserker crash); v12 next.
+- 2026-10-01 10:30 (lobby and items session) Built and tested, not committed: the online lobby for up to four
+  (sides chosen, units shared out by order of joining, the computer on an empty side) and a LoL-style draft with bans
+  (Docs/design/feat-lobby.md; protocol 8); friendly fire as a setup option (9); the team stash: items picked up go
+  to the side, equipped from the team items screen, taking one off is a turn, the fallen's go back (10;
+  Docs/design/feat-team-items.md); thin aiming lines for every shape, a dimmer walk area, range on ability
+  buttons, Tab shows/hides status bars (rebindable; "next unit" moved to N). Free-for-all (3-4 sides) is not started.
+- 2026-10-01 01:34 (watchtower session) LAN play-test build of `3ab5f9e` packaged:
+  `E:\Builds\TacticalMasters-2026-09-30\Windows\TacticalMasters.exe` (online protocol 7; the 2026-09-29 build is kept in
+  `E:\Builds\TacticalMasters`). `Tools/cook_list.py` now also cooks the `/Game/...` paths named in the C++; it and the
+  regenerated `Config/DefaultGame.ini` are changed in this folder, not committed. `TM_Release`'s `Source` and `Config`
+  were mirrored from here (its git HEAD still reads `a75a859`). Script `E:\Builds\agent-release-build.bat`. Block removed.
 - 2026-09-30 19:45 (watchtower session) `3114b33`: everything this session had claimed since 2026-09-29, committed at
   the human's ask after a clean build and every test passing (19:12): watchtowers, items, neutral camps and bosses, the
   second set of statuses, four 64 x 64 maps, lighting and foliage, ability looks, fog of war over everything, the red

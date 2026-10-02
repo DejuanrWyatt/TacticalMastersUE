@@ -49,6 +49,7 @@ namespace
 		{
 		case TMSim::EEventKind::Hit:
 		case TMSim::EEventKind::Evaded:
+		case TMSim::EEventKind::Grazed:
 		case TMSim::EEventKind::Critical:
 		case TMSim::EEventKind::Absorbed:
 		case TMSim::EEventKind::StatusApplied:
@@ -163,6 +164,45 @@ namespace
 
 	/** The brightness of a status glow, well under the ready light's. */
 	constexpr float GlowBrightness = 4000.0f;
+
+	/**
+	 * The colour a status's name rises in when it lands: its glow's, lightened to
+	 * read as words, with a few set by hand where the glow is too dark or too like
+	 * another ("Combat Text Mockups" A).
+	 */
+	FColor StatusWordTint(const std::string& Id)
+	{
+		static const TMap<FString, FColor> ByHand =
+		{
+			{ TEXT("burn"), FColor(255, 138, 42) },
+			{ TEXT("bleed"), FColor(214, 51, 108) },
+			{ TEXT("chilled"), FColor(159, 216, 255) },
+			{ TEXT("freeze"), FColor(221, 243, 255) },
+			{ TEXT("stun"), FColor(255, 216, 77) },
+			{ TEXT("root"), FColor(168, 198, 108) },
+			{ TEXT("charmed"), FColor(255, 143, 208) },
+			{ TEXT("silence"), FColor(185, 140, 255) },
+			{ TEXT("haste"), FColor(95, 224, 208) },
+			{ TEXT("regen"), FColor(155, 232, 168) },
+			{ TEXT("slow"), FColor(160, 168, 192) },
+			{ TEXT("blind"), FColor(140, 147, 166) },
+			{ TEXT("taunt"), FColor(255, 112, 64) },
+			{ TEXT("shield"), FColor(140, 200, 255) },
+			{ TEXT("barrier"), FColor(140, 200, 255) },
+		};
+		if (const FColor* Set = ByHand.Find(FString(UTF8_TO_TCHAR(Id.c_str()))))
+		{
+			return *Set;
+		}
+		for (const FStatusLook& Look : GLooks)
+		{
+			if (Id == Look.Id)
+			{
+				return FMath::Lerp(Look.Colour, FLinearColor::White, 0.3f).ToFColor(false);
+			}
+		}
+		return FColor(224, 153, 255);
+	}
 }
 
 const TArray<FString>& ATMBattleDirector::ExtraKeys()
@@ -566,57 +606,129 @@ void ATMBattleDirector::ShowOne(const TMSim::FEvent& Event, const TMSim::FAbilit
 
 	React(Event, CasterId);
 
+	// Each kind its own look (2026-10-01, "Combat Text Mockups" A): red damage,
+	// a bold bigger crit, a dark red burn, green healing, a status in its colour.
 	FString What;
 	FColor Tint = FColor::White;
+	FTMFloatLook Look;
 	bool bFlash = false;
 	FLinearColor FlashColour(1.0f, 0.25f, 0.2f);
 	switch (Event.Kind)
 	{
 	case TMSim::EEventKind::Hit:
+	{
+		// A Critical or a Grazed came just before this, for this unit.
+		uint8 Mark = 0;
+		BlowMarks.RemoveAndCopyValue(Event.Unit, Mark);
+		const bool bCrit = (Mark & 1) != 0;
+		const bool bGraze = (Mark & 2) != 0;
 		// Down for damage and a burn, up for healing and regen.
 		if (Harms(Event))
 		{
-			What = FString::Printf(TEXT("-%d"), Event.Amount);
-			Tint = FColor(255, 115, 90);
+			What = FString::Printf(TEXT("-%d%s"), Event.Amount, bCrit ? TEXT("!") : TEXT(""));
+			Tint = FColor(255, 74, 61);
+			Look.bBold = true;
+			if (Event.Id == "burn")
+			{
+				Tint = FColor(163, 21, 15);
+				Look.bEmber = true;
+				Look.Scale = 0.85f;
+			}
+			else if (Event.Id == "bleed")
+			{
+				Tint = FColor(214, 51, 108);
+				Look.Scale = 0.85f;
+			}
+			else if (Event.By < 0)
+			{
+				// The ground, decay: a tick, a size smaller.
+				Look.Scale = 0.85f;
+			}
+			else if (bCrit)
+			{
+				Tint = FColor(255, 59, 46);
+				Look.Scale = 1.45f;
+				Look.bPop = true;
+			}
+			else if (bGraze)
+			{
+				Look.Scale = 0.85f;
+				Look.bBold = false;
+				Look.Tag = TEXT("graze");
+				Look.TagTint = FColor(169, 200, 255);
+			}
 			bFlash = Event.By >= 0;
 			// Worth a picture: a timed capture almost never lands on the second
 			// and a half a number is up for, so the interesting frames were all
 			// of eight people standing about.
 			bWorthSeeing = bWorthSeeing || bFlash;
+			PopHealth(Event.Unit, -Event.Amount);
+			if (Event.By >= 0 && Event.By != Event.Unit)
+			{
+				PopHealth(Event.By, 0);
+			}
 		}
 		else if (Event.Amount > 0)
 		{
-			What = FString::Printf(TEXT("+%d"), Event.Amount);
-			Tint = FColor(115, 255, 128);
+			What = FString::Printf(TEXT("+%d%s"), Event.Amount, bCrit ? TEXT("!") : TEXT(""));
+			if (Event.By < 0)
+			{
+				// Regen, mending, healing ground: it adds up, it does not shout.
+				Tint = FColor(155, 232, 168);
+				Look.Scale = 0.8f;
+			}
+			else
+			{
+				Tint = bCrit ? FColor(47, 203, 92) : FColor(63, 212, 106);
+				Look.bBold = true;
+				Look.Scale = bCrit ? 1.4f : 1.0f;
+				Look.bPop = bCrit;
+			}
 			bFlash = Event.By >= 0;
 			FlashColour = FLinearColor(0.3f, 1.0f, 0.45f);
+			PopHealth(Event.Unit, Event.Amount);
 		}
 		break;
+	}
 	case TMSim::EEventKind::Evaded:
-		What = TEXT("miss");
+		What = TEXT("dodge");
 		Tint = FColor(215, 224, 255);
 		break;
+	case TMSim::EEventKind::Grazed:
+		// Said on the halved hit that follows, as "-21 graze".
+		BlowMarks.FindOrAdd(Event.Unit) |= 2;
+		break;
 	case TMSim::EEventKind::Critical:
-		What = TEXT("critical!");
-		Tint = FColor(255, 217, 77);
+		// The hit that follows is drawn big and bold, with a "!".
+		BlowMarks.FindOrAdd(Event.Unit) |= 1;
 		break;
 	case TMSim::EEventKind::Absorbed:
 		What = FString::Printf(TEXT("soaked %d"), Event.Amount);
-		Tint = FColor(153, 217, 255);
+		Tint = FColor(140, 200, 255);
+		Look.Scale = 0.8f;
 		bFlash = true;
 		FlashColour = FLinearColor(0.45f, 0.7f, 1.0f);
 		break;
 	case TMSim::EEventKind::StatusApplied:
-		What = UTF8_TO_TCHAR(Event.Id.c_str());
-		Tint = FColor(224, 153, 255);
+	{
+		const TMSim::FStatusDef* Def = TMSim::FindStatus(Event.Id);
+		What = (Def ? FString(UTF8_TO_TCHAR(Def->Name)) : FString(UTF8_TO_TCHAR(Event.Id.c_str()))).ToUpper();
+		Tint = StatusWordTint(Event.Id);
+		Look.Scale = 0.7f;
+		Look.bBold = true;
 		break;
+	}
 	case TMSim::EEventKind::Knocked:
-		What = TEXT("down");
-		Tint = FColor(255, 77, 77);
+		What = TEXT("DOWN");
+		Tint = FColor(255, 90, 77);
+		Look.Scale = 1.1f;
+		Look.bBold = true;
 		break;
 	case TMSim::EEventKind::Revived:
-		What = TEXT("up again");
-		Tint = FColor(255, 242, 153);
+		What = TEXT("UP AGAIN");
+		Tint = FColor(255, 226, 122);
+		Look.Scale = 0.85f;
+		Look.bBold = true;
 		bFlash = true;
 		FlashColour = FLinearColor(1.0f, 0.85f, 0.4f);
 		break;
@@ -629,7 +741,7 @@ void ATMBattleDirector::ShowOne(const TMSim::FEvent& Event, const TMSim::FAbilit
 	{
 		return;
 	}
-	AddFloater(Event.Unit, What, Tint);
+	AddFloater(Event.Unit, What, Tint, true, &Look);
 	if (bFlash)
 	{
 		FFlash& Flash = Flashes.AddDefaulted_GetRef();
@@ -638,7 +750,7 @@ void ATMBattleDirector::ShowOne(const TMSim::FEvent& Event, const TMSim::FAbilit
 	}
 }
 
-void ATMBattleDirector::AddFloater(int32 UnitId, const FString& What, const FColor& Tint, bool bCount)
+void ATMBattleDirector::AddFloater(int32 UnitId, const FString& What, const FColor& Tint, bool bCount, const FTMFloatLook* Look)
 {
 	const TMSim::FUnit* Unit = Battle.FindUnit(UnitId);
 	if (!Unit)
@@ -659,6 +771,7 @@ void ATMBattleDirector::AddFloater(int32 UnitId, const FString& What, const FCol
 	// As big as the player set it in Options, and stacked that far apart.
 	const float Size = FloaterSize * FTMSettings::Get().DamageTextScale;
 	const FVector Where = ShownAt(*Unit) + FVector(0.0f, 0.0f, 190.0f + Stacked * Size);
+	const float Scale = Look ? Look->Scale : 1.0f;
 
 	UTextRenderComponent* Text = NewObject<UTextRenderComponent>(this, NAME_None, RF_Transient);
 	Text->SetMobility(EComponentMobility::Movable);
@@ -666,16 +779,83 @@ void ATMBattleDirector::AddFloater(int32 UnitId, const FString& What, const FCol
 	Text->RegisterComponent();
 	Text->SetText(FText::FromString(What));
 	Text->SetTextRenderColor(Tint);
-	Text->SetWorldSize(Size);
+	Text->SetWorldSize(Size * Scale);
 	Text->SetHorizontalAlignment(EHTA_Center);
 	Text->SetRelativeLocation(Where);
 	// In a game the HUD draws it, outlined (ATMBattleHud::DrawWorldWords); this says where and what.
 	Text->SetHiddenInGame(GetWorld() && GetWorld()->IsGameWorld());
 	// Facing the camera is a per-frame job; billboarded in AdvanceFloaters.
-	Floaters.Add({ Text, UnitId, 0.0f });
+	FTMFloater& Floater = Floaters.AddDefaulted_GetRef();
+	Floater.Text = Text;
+	Floater.UnitId = UnitId;
+	if (Look)
+	{
+		Floater.Scale = Look->Scale;
+		Floater.bBold = Look->bBold;
+		Floater.bPop = Look->bPop;
+		Floater.bEmber = Look->bEmber;
+		Floater.bExact = true;
+		Floater.Tag = Look->Tag;
+		Floater.TagTint = Look->TagTint;
+	}
 	if (bCount)
 	{
 		++NumbersShown;
+	}
+}
+
+double ATMBattleDirector::PopClock() const
+{
+	return FPlatformTime::Seconds();
+}
+
+float ATMBattleDirector::PopTrail(const FTMHpPop& Pop, double Now) const
+{
+	if (Pop.TrailAt < 0.0)
+	{
+		return static_cast<float>(Pop.Hp);
+	}
+	// Eased, so it slides off rather than ticking down.
+	const float P = FMath::Clamp(static_cast<float>((Now - Pop.TrailAt) / HpDrainSeconds), 0.0f, 1.0f);
+	const float Eased = P * P * (3.0f - 2.0f * P);
+	return FMath::Max(static_cast<float>(Pop.Hp), Pop.TrailFrom + (Pop.Hp - Pop.TrailFrom) * Eased);
+}
+
+void ATMBattleDirector::PopHealth(int32 UnitId, int32 Change)
+{
+	// Only this side's own units: an enemy keeps its ring, and the full read on pointing.
+	const TMSim::FUnit* Unit = Battle.FindUnit(UnitId);
+	if (!Unit || !IsFriend(*Unit) || !IsSeen(*Unit))
+	{
+		return;
+	}
+	const double Now = PopClock();
+	const int32 MaxHp = FMath::Max(1, Unit->MaxHp());
+	// The bar ends where the rules are, so it is never wrong for long; a blow
+	// still in flight may already be in that number.
+	const int32 Hp = FMath::Clamp(Unit->Hp, 0, MaxHp);
+	FTMHpPop* Pop = HpPops.Find(UnitId);
+	const bool bLive = Pop && Now - Pop->ShownAt < HpPopSeconds;
+	if (!bLive)
+	{
+		Pop = &HpPops.Add(UnitId);
+		*Pop = FTMHpPop();
+		Pop->Hp = FMath::Clamp(Hp - Change, 0, MaxHp);
+	}
+	const int32 Before = Pop->Hp;
+	const float Trail = PopTrail(*Pop, Now);
+	Pop->ShownAt = Now;
+	Pop->Hp = Hp;
+	if (Change < 0)
+	{
+		// The lost part stays, from wherever an earlier drain had got to.
+		Pop->TrailFrom = FMath::Max(FMath::RoundToInt(Trail), Before);
+		Pop->TrailAt = Now;
+	}
+	else if (Change > 0)
+	{
+		Pop->HealFrom = FMath::Min(Before, Hp);
+		Pop->HealAt = Now;
 	}
 }
 

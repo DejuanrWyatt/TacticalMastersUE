@@ -48,7 +48,7 @@
     {
       "id": "geomancer_quake",
       "name": "Quake",
-      "desc": "Shake every enemy within 3 m of a point 2-7 m away, Stunning for 1 s (2 s).",
+      "desc": "Shake every enemy within 3 m of a point 2-7 m away; Stuns for 1 turn. (2 s)",
       "kind": "active",
       "effect": "damage",
       "scale": "mag",
@@ -103,7 +103,7 @@
     {
       "id": "geomancer_tectonic_rift",
       "name": "Tectonic Rift",
-      "desc": "ULTIMATE: Split the earth under every enemy within 3.5 m of a point 3-10 m away; Slows for 6 s (3 s).",
+      "desc": "ULTIMATE: Split the earth under every enemy within 3.5 m of a point 3-10 m away; Slows for 2 turns. (3 s)",
       "kind": "active",
       "effect": "damage",
       "scale": "mag",
@@ -126,5 +126,11 @@
         "scale": 1
       }
     }
-  ]
+  ],
+  "creator": {
+    "reworded": {
+      "on": "2026-10-02",
+      "why": "Descriptions say what the abilities do (2026-10-02): Stun not sleep, Crit not the old Power, turns not seconds"
+    }
+  }
 }

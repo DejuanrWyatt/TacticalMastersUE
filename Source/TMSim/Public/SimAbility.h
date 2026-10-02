@@ -226,6 +226,15 @@ namespace TMSim
 	TMSIM_API bool JobHasRole(const std::string& JobId, const std::string& Role);
 
 	/**
+	 * The game's balance changes to the built-in classes (2026-10-01, "Class
+	 * Rebalance Mockups" 2A: the Knight and the Archer). The built-ins stay as
+	 * Godot has them unless this is called, so the Godot comparisons hold; the
+	 * game calls it once at startup, as the class lab does when it measures on
+	 * the game's rules. Calling it again does nothing.
+	 */
+	TMSIM_API void ApplyGameBalance();
+
+	/**
 	 * Every class a side can field, for listings: the built-in six, then any
 	 * loaded, each in id order. Neutral monsters are not among them.
 	 */

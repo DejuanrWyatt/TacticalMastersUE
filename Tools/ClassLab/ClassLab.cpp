@@ -7,33 +7,49 @@
 // parity tests are, so making a class needs neither Godot nor Astra.
 //
 //   TMClassLab check <class file> [--battle]
-//   TMClassLab playtest <class file> [games] [--skill easy|medium|hard]
+//   TMClassLab playtest <class file> [games] [--skill easy|medium|hard] [--rules game|godot] [--maps <dir>]
+//   TMClassLab tournament <classes dir> [games] [--skill ...] [--rules ...] [--maps <dir>]
+//   TMClassLab map <map file> [games]
 //
-// Each prints one line the creator reads -- CLASSCHECK {json} or PLAYTEST {json}
-// -- and nothing else on stdout.
+// Each prints the lines the creator reads -- CLASSCHECK {json}, PLAYTEST {json},
+// TOURNEY {json} per class then TOURNEYDONE {json}, MAPCHECK {json} -- and nothing
+// else on stdout.
+//
+// The rules (2026-10-01): battles are fought on the rules the game plays
+// (TMSim::GameTuning: Armor and Resist take a share, one Evasion), not the
+// defaults the rules keep for checking against Godot; --rules godot measures the
+// old way. The computer plays at "hard", the game's own computer opponent, and a
+// playtest is 40 games, not 8, since the win rate swung by 25 points between runs
+// at eight. With --maps, games go round the Highlands and every map in that
+// folder (Content/Data/Maps), so a class is not tuned to one board.
 //
 // check reads the file with the rules' own strict reader (SimClassFile.cpp) and
 // reports what the rules understood; with --battle it also fights one battle
 // through the order path and counts the orders the rules refused, as
 // check_class.gd did. A class can read perfectly and still be unplayable.
 //
-// playtest is balance.gd: the class in a team with a knight, an archer and a
-// white mage, against a black mage, a knight, an archer and a white mage,
-// computer against computer, sides alternating, each pair of games on its own
-// seed. It reports the margin -- how much more of its health the class's team
-// kept than the other side, +100 to -100 -- which is the number to compare
-// classes by; the win rate swings by 25 points between runs at eight games.
-// Measured with the port's "medium", as balance.gd measures with Godot's. The
-// port's medium thinks as Godot's does but does not yet make its random
-// mistakes (Randf is not ported), so margins here are close to Godot's, not
-// equal to them.
+// playtest is balance.gd: the reference team -- a black mage, a knight, an
+// archer and a white mage -- with the class standing in for the one that shares
+// its first role (tank: knight, support: white mage, special: archer, damage:
+// black mage), against the reference team, computer against computer, sides
+// alternating, each pair of games on its own seed. It reports the win rate
+// ("solo"; a class as good at its job as the one it replaces wins half)
+// and the margin -- how much more of its health the class's team kept than the
+// other side, +100 to -100. It also plays four of the class against the same
+// team ("stack"), which shows what a class does on its own rather than what it
+// adds to a sound team.
+//
+// tournament plays every class in a folder, and the six built in, the same
+// way, so a class can be read against all the others: the creator's Balance tab.
 
 #include "SimAI.h"
+#include "SimAbility.h"
 #include "SimBattle.h"
 #include "SimClassFile.h"
 
 #include <algorithm>
 #include <chrono>
+#include <filesystem>
 #include <cstdio>
 #include <fstream>
 #include <sstream>
@@ -96,23 +112,62 @@ namespace
 	// ----------------------------------------------------------------- battles
 
 	const char* const Reference[4] = { "black_mage", "knight", "archer", "white_mage" };
-	const char* const Mates[3] = { "knight", "archer", "white_mage" };
 
-	/** The two sides, the class's team on Side, as balance.gd deals them. */
-	void Deal(FBattle& Battle, const std::string& JobId, int Side, uint64_t Seed)
+	/**
+	 * Which of the reference four the class stands in for: the one with its
+	 * first role (2026-10-01). A tank replaces the Knight, a support the White
+	 * Mage, a special the Archer, damage the Black Mage -- so a class is judged
+	 * at its own job, and a built-in class standing in for itself wins half.
+	 * It used to replace the Black Mage whatever it was for, which made every
+	 * tank and healer look broken.
+	 */
+	int StandIn(const std::string& JobId)
+	{
+		const FJobDef* Job = FindJob(JobId);
+		const std::string Role = Job && !Job->Roles.empty() ? Job->Roles.front() : std::string("damage");
+		return Role == "tank" ? 1 : Role == "special" ? 2 : Role == "support" ? 3 : 0;
+	}
+
+	/** The rules battles are fought on: the game's, unless --rules godot. */
+	FTuning Rules = GameTuning();
+	std::string RulesName = "game";
+
+	/** A board to fight on, and where blue's four stand (red stands turned about). */
+	struct FArena
+	{
+		std::string Id;
+		std::vector<std::string> Top;
+		std::vector<FVec2> Spawns;
+	};
+
+	/** The Highlands, always; and with --maps, every map in that folder. */
+	std::vector<FArena> Arenas;
+
+	void AddHighlands()
+	{
+		FArena Highlands;
+		Highlands.Id = "highlands";
+		Highlands.Top = HighlandsRows();
+		Highlands.Spawns = { FVec2(2.75f, 4.75f), FVec2(0.75f, 8.75f), FVec2(4.75f, 6.75f), FVec2(2.75f, 10.75f) };
+		Arenas.push_back(Highlands);
+	}
+
+	/**
+	 * The two sides, the class's team on Side, as balance.gd deals them; stacked,
+	 * the class's team is four of it. On the game's rules (or Godot's), on the
+	 * arena given.
+	 */
+	void Deal(FBattle& Battle, const std::string& JobId, int Side, uint64_t Seed, bool bStack, const FArena& Arena)
 	{
 		std::string Rosters[2][4];
+		const int Stands = StandIn(JobId);
 		for (int i = 0; i < 4; ++i)
 		{
 			Rosters[1 - Side][i] = Reference[i];
+			Rosters[Side][i] = bStack || i == Stands ? JobId : std::string(Reference[i]);
 		}
-		Rosters[Side][0] = JobId;
-		for (int i = 0; i < 3; ++i)
-		{
-			Rosters[Side][i + 1] = Mates[i];
-		}
-		const FVec2 Blue[4] = { FVec2(2.75f, 4.75f), FVec2(0.75f, 8.75f), FVec2(4.75f, 6.75f), FVec2(2.75f, 10.75f) };
-		Battle.Map.BuildMirrored(HighlandsRows());
+		Battle.Tuning = Rules;
+		Battle.Map.BuildMirrored(Arena.Top);
 		const FVec2 Size = Battle.Map.SizeMeters();
 		for (int Index = 0; Index < 8; ++Index)
 		{
@@ -121,10 +176,12 @@ namespace
 			Unit.Team = Index < 4 ? 0 : 1;
 			Unit.Job = Rosters[Unit.Team][Index % 4];
 			Unit.Stats = &FindJob(Unit.Job)->Stats;
-			const FVec2 Spot = Blue[Index % 4];
+			const FVec2 Spot = Arena.Spawns[static_cast<size_t>(Index % 4) % Arena.Spawns.size()];
 			Unit.Pos = Index < 4 ? Spot : FVec2(Size.X - Spot.X, Size.Y - Spot.Y);
 			Battle.Units.push_back(Unit);
 		}
+		Battle.SpawnPoints[0] = Arena.Spawns[0];
+		Battle.SpawnPoints[1] = FVec2(Size.X - Arena.Spawns[0].X, Size.Y - Arena.Spawns[0].Y);
 		Battle.Start(Seed);
 	}
 
@@ -171,13 +228,14 @@ namespace
 	};
 
 	/** One battle through the order path, the class's unit watched throughout. */
-	FFought Fight(const std::string& JobId, int Side, uint64_t Seed, uint64_t AiSeed, const char* Skill, int TickLimit)
+	FFought Fight(const std::string& JobId, int Side, uint64_t Seed, uint64_t AiSeed, const char* Skill, int TickLimit,
+		bool bStack = false, size_t ArenaIndex = 0)
 	{
 		FBattle Battle;
-		Deal(Battle, JobId, Side, Seed);
+		Deal(Battle, JobId, Side, Seed, bStack, Arenas[ArenaIndex % Arenas.size()]);
 		FAIPlayer Computer(Skill);
 		Computer.Rng.Seed(AiSeed);
-		const int Watched = Side == 0 ? 0 : 4;
+		const int Watched = (Side == 0 ? 0 : 4) + (bStack ? 0 : StandIn(JobId));
 		int KnockedAt = -1;
 
 		FFought Out;
@@ -347,6 +405,29 @@ namespace
 		return Problems.empty() ? 0 : 1;
 	}
 
+	/** Four of the class against the reference team: its win rate, a draw a half. */
+	double StackWins(const std::string& JobId, int Games, const char* Skill)
+	{
+		double Wins = 0.0;
+		for (int Game = 0; Game < Games; ++Game)
+		{
+			const int Side = Game % 2;
+			const FFought Fought = Fight(JobId, Side, 5001 + Game / 2, 5001 + Game, Skill, 40000, true, static_cast<size_t>(Game / 2));
+			Wins += Fought.Winner == Side ? 1.0 : Fought.Winner == -1 ? 0.5 : 0.0;
+		}
+		return Wins / Games;
+	}
+
+	std::string ArenaList()
+	{
+		std::string Out = "[";
+		for (size_t i = 0; i < Arenas.size(); ++i)
+		{
+			Out += std::string(i ? "," : "") + Quote(Arenas[i].Id);
+		}
+		return Out + "]";
+	}
+
 	int Playtest(const char* Path, int Games, const char* Skill)
 	{
 		FJobDef Job;
@@ -369,7 +450,8 @@ namespace
 			// balance.gd: sides alternate; each pair of games has its own seed,
 			// and the computer is seeded from the game.
 			const int Side = Game % 2;
-			const FFought Fought = Fight(Job.Id, Side, 1 + Game / 2, 1 + Game, Skill, 40000);
+			// Each pair of games on the next arena, so both sides play every board.
+			const FFought Fought = Fight(Job.Id, Side, 1 + Game / 2, 1 + Game, Skill, 40000, false, static_cast<size_t>(Game / 2));
 			Margin += Fought.Margin;
 			Dealt += Fought.Dealt;
 			AliveTicks += Fought.AliveTicks;
@@ -387,8 +469,12 @@ namespace
 				Wins += 0.5;
 			}
 		}
+		const double Stack = StackWins(Job.Id, Games, Skill);
 		const long long Ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - Start).count();
 		std::string Out = "{\"ok\":true,\"id\":" + Quote(Job.Id) + ",\"games\":" + Number(Games) + ",\"skill\":" + Quote(Skill);
+		Out += ",\"rules\":" + Quote(RulesName) + ",\"maps\":" + ArenaList();
+		Out += ",\"standsIn\":" + Quote(Reference[StandIn(Job.Id)]);
+		Out += ",\"stack\":" + Number(static_cast<double>(RoundToInt(100.0 * Stack)));
 		Out += ",\"win\":" + Number(static_cast<double>(RoundToInt(100.0 * Wins / Games)));
 		Out += ",\"margin\":" + Number(RoundToInt(Margin / Games * 10.0) / 10.0);
 		Out += ",\"dealt\":" + Number(static_cast<double>(Dealt / Games));
@@ -439,6 +525,7 @@ namespace
 		for (int Game = 0; Game < Games; ++Game)
 		{
 			FBattle Battle;
+			Battle.Tuning = Rules;
 			Battle.Map = Map;
 			for (int Index = 0; Index < 8; ++Index)
 			{
@@ -530,8 +617,197 @@ namespace
 	}
 }
 
+namespace
+{
+	/**
+	 * Every class in a folder, and the six built in, measured as playtest does:
+	 * one TOURNEY line each, then TOURNEYDONE. The creator's Balance tab reads
+	 * these to place a class among all the others.
+	 */
+	int Tournament(const char* Dir, int Games, const char* Skill)
+	{
+		const auto Start = std::chrono::steady_clock::now();
+		std::vector<std::string> Ids;
+		std::vector<std::string> Refused;
+		std::vector<std::filesystem::path> Files;
+		std::error_code Error;
+		for (const auto& Entry : std::filesystem::directory_iterator(Dir, Error))
+		{
+			const std::string Name = Entry.path().filename().string();
+			if (Name.size() > 13 && Name.compare(Name.size() - 13, 13, ".tmclass.json") == 0)
+			{
+				Files.push_back(Entry.path());
+			}
+		}
+		std::sort(Files.begin(), Files.end());
+		for (const std::filesystem::path& File : Files)
+		{
+			FJobDef Job;
+			std::vector<FAbility> Abilities;
+			const std::string Problems = Load(File.string().c_str(), Job, Abilities);
+			if (Problems.empty())
+			{
+				Ids.push_back(Job.Id);
+			}
+			else
+			{
+				Refused.push_back(File.filename().string() + ": " + Problems);
+			}
+		}
+		for (const char* Builtin : { "squire", "knight", "archer", "monk", "black_mage", "white_mage" })
+		{
+			Ids.push_back(Builtin);
+		}
+		for (const std::string& Id : Ids)
+		{
+			double Wins = 0.0;
+			double Margin = 0.0;
+			int Illegal = 0;
+			for (int Game = 0; Game < Games; ++Game)
+			{
+				const int Side = Game % 2;
+				const FFought Fought = Fight(Id, Side, 1 + Game / 2, 1 + Game, Skill, 40000, false, static_cast<size_t>(Game / 2));
+				Wins += Fought.Winner == Side ? 1.0 : Fought.Winner == -1 ? 0.5 : 0.0;
+				Margin += Fought.Margin;
+				Illegal += Fought.Illegal;
+			}
+			const double Stack = StackWins(Id, Games, Skill);
+			const FJobDef* Job = FindJob(Id);
+			std::string Out = "{\"id\":" + Quote(Id) + ",\"name\":" + Quote(Job ? Job->Name : Id);
+			Out += ",\"builtin\":" + std::string(&Id >= &Ids[Ids.size() - 6] ? "true" : "false");
+			Out += ",\"standsIn\":" + Quote(Reference[StandIn(Id)]);
+			Out += ",\"solo\":" + Number(static_cast<double>(RoundToInt(100.0 * Wins / Games)));
+			Out += ",\"margin\":" + Number(RoundToInt(Margin / Games * 10.0) / 10.0);
+			Out += ",\"stack\":" + Number(static_cast<double>(RoundToInt(100.0 * Stack)));
+			Out += ",\"illegal\":" + Number(Illegal) + "}";
+			std::printf("TOURNEY %s\n", Out.c_str());
+			std::fflush(stdout);
+		}
+		const long long Ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - Start).count();
+		std::string Done = "{\"ok\":true,\"classes\":" + Number(static_cast<double>(Ids.size())) + ",\"games\":" + Number(Games)
+			+ ",\"skill\":" + Quote(Skill) + ",\"rules\":" + Quote(RulesName) + ",\"maps\":" + ArenaList() + ",\"refused\":[";
+		for (size_t i = 0; i < Refused.size(); ++i)
+		{
+			Done += std::string(i ? "," : "") + Quote(Refused[i]);
+		}
+		Done += "],\"ms\":" + Number(static_cast<double>(Ms)) + "}";
+		std::printf("TOURNEYDONE %s\n", Done.c_str());
+		return 0;
+	}
+
+	/** The Highlands, then, with --maps, every map file in the folder, in name order. */
+	std::string LoadArenas(const char* Dir)
+	{
+		AddHighlands();
+		if (!Dir)
+		{
+			return std::string();
+		}
+		std::vector<std::filesystem::path> Files;
+		std::error_code Error;
+		for (const auto& Entry : std::filesystem::directory_iterator(Dir, Error))
+		{
+			const std::string Name = Entry.path().filename().string();
+			if (Name.size() > 11 && Name.compare(Name.size() - 11, 11, ".tmmap.json") == 0)
+			{
+				Files.push_back(Entry.path());
+			}
+		}
+		if (Error)
+		{
+			return std::string("could not read the maps folder ") + Dir;
+		}
+		std::sort(Files.begin(), Files.end());
+		for (const std::filesystem::path& File : Files)
+		{
+			FMapDef Def;
+			const std::string Text = ReadAll(File.string().c_str());
+			if (Text.empty() || !ReadMapFile(Text, Def).empty() || Def.Spawns.empty())
+			{
+				continue;
+			}
+			FArena Arena;
+			Arena.Id = Def.Id;
+			Arena.Top = Def.Top;
+			Arena.Spawns = Def.Spawns;
+			Arenas.push_back(Arena);
+		}
+		return std::string();
+	}
+}
+
 int main(int ArgCount, char** Args)
 {
+	// The options every battle reads: --skill, --rules, --maps; anything else is
+	// the command's own. The game's rules, the game's computer, the Highlands.
+	const char* Skill = "hard";
+	const char* MapsDir = nullptr;
+	std::vector<std::string> Rest;
+	for (int i = 1; i < ArgCount; ++i)
+	{
+		const std::string Arg = Args[i];
+		if (Arg == "--skill" && i + 1 < ArgCount)
+		{
+			Skill = Args[++i];
+		}
+		else if (Arg == "--rules" && i + 1 < ArgCount)
+		{
+			RulesName = Args[++i];
+			if (RulesName != "game" && RulesName != "godot")
+			{
+				std::fprintf(stderr, "rules must be game or godot\n");
+				return 2;
+			}
+			Rules = RulesName == "game" ? GameTuning() : FTuning();
+		}
+		else if (Arg == "--maps" && i + 1 < ArgCount)
+		{
+			MapsDir = Args[++i];
+		}
+		else
+		{
+			Rest.push_back(Arg);
+		}
+	}
+	// On the game's rules, the game's built-ins too: its Knight and Archer.
+	if (RulesName == "game")
+	{
+		ApplyGameBalance();
+	}
+	const std::string Problem = LoadArenas(MapsDir);
+	if (!Problem.empty())
+	{
+		std::fprintf(stderr, "%s\n", Problem.c_str());
+		return 2;
+	}
+	if (Rest.size() >= 2 && Rest[0] == "tournament")
+	{
+		const int Games = Rest.size() >= 3 ? std::atoi(Rest[2].c_str()) : 20;
+		if (Games < 2 || Games > 200)
+		{
+			std::fprintf(stderr, "games must be 2 to 200\n");
+			return 2;
+		}
+		return Tournament(Rest[1].c_str(), Games, Skill);
+	}
+	if (Rest.size() >= 2 && Rest[0] == "playtest")
+	{
+		const int Games = Rest.size() >= 3 ? std::atoi(Rest[2].c_str()) : 40;
+		if (Games < 1 || Games > 200)
+		{
+			std::fprintf(stderr, "games must be 1 to 200\n");
+			return 2;
+		}
+		return Playtest(Rest[1].c_str(), Games, Skill);
+	}
+	// The older commands read their own arguments, the options taken out.
+	std::vector<char*> Kept = { Args[0] };
+	for (std::string& Arg : Rest)
+	{
+		Kept.push_back(Arg.data());
+	}
+	ArgCount = static_cast<int>(Kept.size());
+	Args = Kept.data();
 	if (ArgCount >= 3 && std::string(Args[1]) == "map")
 	{
 		const int Games = ArgCount >= 4 ? std::atoi(Args[3]) : 8;
@@ -547,29 +823,9 @@ int main(int ArgCount, char** Args)
 		const bool bBattle = ArgCount >= 4 && std::string(Args[3]) == "--battle";
 		return Check(Args[2], bBattle);
 	}
-	if (ArgCount >= 3 && std::string(Args[1]) == "playtest")
-	{
-		int Games = 8;
-		const char* Skill = "medium";
-		for (int i = 3; i < ArgCount; ++i)
-		{
-			const std::string Arg = Args[i];
-			if (Arg == "--skill" && i + 1 < ArgCount)
-			{
-				Skill = Args[++i];
-			}
-			else
-			{
-				Games = std::atoi(Args[i]);
-			}
-		}
-		if (Games < 1 || Games > 200)
-		{
-			std::fprintf(stderr, "games must be 1 to 200\n");
-			return 2;
-		}
-		return Playtest(Args[2], Games, Skill);
-	}
-	std::fprintf(stderr, "usage:\n  TMClassLab check <class file> [--battle]\n  TMClassLab playtest <class file> [games] [--skill easy|medium|hard]\n  TMClassLab map <map file> [games]\n");
+	std::fprintf(stderr, "usage:\n  TMClassLab check <class file> [--battle]\n"
+		"  TMClassLab playtest <class file> [games, 40] [--skill easy|medium|hard] [--rules game|godot] [--maps <dir>]\n"
+		"  TMClassLab tournament <classes dir> [games, 20] [--skill ...] [--rules ...] [--maps <dir>]\n"
+		"  TMClassLab map <map file> [games]\n");
 	return 2;
 }

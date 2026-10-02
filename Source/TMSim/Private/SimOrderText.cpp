@@ -154,6 +154,16 @@ namespace TMSim
 		case EOrderType::Move:
 			Out << "move " << Order.UnitId << ' ' << Order.Serial << ' ' << FloatText(Order.To.X) << ' '
 				<< FloatText(Order.To.Y) << ' ' << (Order.bSprint ? 1 : 0);
+			// Waypoints (2026-10-01) after the rest, and only when there are any,
+			// so a plain walk reads exactly as it always has.
+			if (!Order.Via.empty())
+			{
+				Out << ' ' << Order.Via.size();
+				for (const FVec2& Point : Order.Via)
+				{
+					Out << ' ' << FloatText(Point.X) << ' ' << FloatText(Point.Y);
+				}
+			}
 			break;
 		case EOrderType::UseAbility:
 			Out << "ability " << Order.UnitId << ' ' << Order.Serial << ' ' << Order.Slot << ' '
@@ -179,6 +189,9 @@ namespace TMSim
 			break;
 		case EOrderType::Drop:
 			Out << "drop " << Order.UnitId << ' ' << Order.Serial << ' ' << Order.GearSlot;
+			break;
+		case EOrderType::Equip:
+			Out << "equip " << Order.UnitId << ' ' << (Order.ItemId.empty() ? std::string("-") : Order.ItemId) << ' ' << Order.GearSlot;
 			break;
 		case EOrderType::Tune:
 			Out << "tune " << Order.TuneValues.size();
@@ -214,6 +227,17 @@ namespace TMSim
 			Order.To.X = Read.Float("x");
 			Order.To.Y = Read.Float("y");
 			Order.bSprint = Read.Int("sprint", 0, 1) == 1;
+			if (Read.Error.empty() && Read.Next < List.size())
+			{
+				const int Count = Read.Int("waypoints", 1, MaxWaypoints);
+				for (int i = 0; i < Count && Read.Error.empty(); ++i)
+				{
+					FVec2 Point;
+					Point.X = Read.Float("waypoint x");
+					Point.Y = Read.Float("waypoint y");
+					Order.Via.push_back(Point);
+				}
+			}
 		}
 		else if (Kind == "ability")
 		{
@@ -258,6 +282,25 @@ namespace TMSim
 			Order.UnitId = Read.Int("unit", 0, MaxId);
 			Order.Serial = Read.Int("serial", 0, MaxSerial);
 			Order.Cache = Read.Int("cache", 0, 100000);
+			if (const std::string* Item = Read.Take("item"))
+			{
+				bool bWord = !Item->empty() && Item->size() <= 31;
+				for (const char C : *Item)
+				{
+					bWord = bWord && ((C >= 'a' && C <= 'z') || (C >= '0' && C <= '9') || C == '_');
+				}
+				if (!bWord)
+				{
+					Read.Error = "bad item: " + Item->substr(0, 32);
+				}
+				Order.ItemId = *Item;
+			}
+			Order.GearSlot = Read.Int("slot", -1, 2);
+		}
+		else if (Kind == "equip")
+		{
+			Order.Type = EOrderType::Equip;
+			Order.UnitId = Read.Int("unit", 0, MaxId);
 			if (const std::string* Item = Read.Take("item"))
 			{
 				bool bWord = !Item->empty() && Item->size() <= 31;

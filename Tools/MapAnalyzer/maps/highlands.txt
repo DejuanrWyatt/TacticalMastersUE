@@ -1,0 +1,9 @@
+// Highlands: the map every battle is fought on today (HighlandsRows in SimMap.cpp).
+// Rolling hills with a high ridge on each flank. Keep this in step with the code.
+name Highlands
+112233211111
+112233211111
+111222111111
+111111111111
+122111121111
+123111121111

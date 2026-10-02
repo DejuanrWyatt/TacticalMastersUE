@@ -3,12 +3,12 @@
   "version": 1,
   "id": "wardens_plate",
   "name": "Warden's Plate",
-  "desc": "Heavy plate: health and both defences.",
+  "desc": "Heavy plate: health, Armor and Resist.",
   "icon": "plate",
   "tier": "rare",
   "stats": {
     "hp": 40,
-    "attdef": 4,
-    "magdef": 4
+    "attdef": 6,
+    "magdef": 6
   }
 }

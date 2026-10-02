@@ -369,6 +369,15 @@ namespace TMSim
 				Scale *= Ability.Scale == EScale::Mag && Target.HasStatus("shell") ? 0.67 : 1.0;
 				Raw = Scale != 1.0 ? RoundToInt(Raw * Scale) : Raw;
 			}
+			// Defense model 1 (2026-10-01): a share off, never a slice, so a small
+			// hit counts and no pile of defense makes a unit immune. Defense below
+			// nothing (a debuff larger than it) counts as none.
+			if (NewDefense())
+			{
+				const double Scale = std::max(1.0, Tuning.DefenseScale);
+				return std::max(Combat::MinimumDamage,
+					RoundToInt(Raw * Tuning.DamageMultiplier * Scale / (Scale + std::max(0, Defence))));
+			}
 			return std::max(Combat::MinimumDamage, RoundToInt((Raw - Defence) * Tuning.DamageMultiplier));
 		}
 		case EEffect::Heal:
@@ -414,11 +423,34 @@ namespace TMSim
 		{
 			return 0;
 		}
-		const int Base = Target.Stat(Ability.Scale == EScale::Att ? EStat::AEva : EStat::MEva);
+		// Defense model 1: the one Evasion, against either kind of hit.
+		const int Base = NewDefense() ? EvasionOf(Target) : Target.Stat(Ability.Scale == EScale::Att ? EStat::AEva : EStat::MEva);
 		// A blinded attacker is that much easier to step around.
 		const int Blind = Attacker ? Attacker->MissChance() : 0;
 		const int Chance = RoundToInt(Base * Tuning.EvadeMultiplier) + Blind;
 		return std::max(0, std::min(95, Chance));
+	}
+
+	int FBattle::EvasionOf(const FUnit& Unit) const
+	{
+		if (!Unit.Stats)
+		{
+			return 0;
+		}
+		const int BaseA = Unit.Stats->Get(EStat::AEva);
+		const int BaseM = Unit.Stats->Get(EStat::MEva);
+		// Everything added on top of the class's own, to either: items, buffs,
+		// passives. Nightcloak adds to both, so it is counted once.
+		const int Added = (Unit.Stat(EStat::AEva) - BaseA) + (Unit.Stat(EStat::MEva) - BaseM);
+		const int Twice = Unit.HasItems() && Unit.bUnseenAtStart ? GearSum(Unit, &FItemDef::UnseenEvasion) : 0;
+		return std::max(0, std::max(BaseA, BaseM) + Added - Twice);
+	}
+
+	int FBattle::DefenseShare(int Defense) const
+	{
+		const double Scale = std::max(1.0, Tuning.DefenseScale);
+		const double D = std::max(0, Defense);
+		return RoundToInt(100.0 * D / (Scale + D));
 	}
 
 	int FBattle::CritChance(const FUnit& User) const
@@ -1072,6 +1104,7 @@ namespace TMSim
 		Unit.bHustling = !Unit.bActed && !bTimedOut;
 		Unit.bReady = false;
 		Unit.Clock = 0;
+		Unit.WalkVia.clear();
 		Unit.bMoved = false;
 		Unit.bActed = false;
 		Report.Say(EEventKind::TurnEnded, Unit.Id);

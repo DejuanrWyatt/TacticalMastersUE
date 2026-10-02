@@ -43,6 +43,16 @@ enum class ETMAction : uint8
 	EditLayout,
 	/** Online: type a line to the other player. */
 	Chat,
+	/** Show or hide the health and status bars over the units (2026-10-01). */
+	StatusBars,
+	/** Turn the camera's slide to the next ready unit on or off. */
+	AutoRecenter,
+	/** Queued orders (2026-10-01): held while clicking, adds a waypoint to the walk. */
+	Waypoint,
+	/** Plan the selected unit's turn ahead; again carries the plan out (or puts it by). */
+	PlanTurn,
+	/** Takes back the plan's last step: a waypoint, its ability, then its walk. */
+	PlanUndo,
 	Count
 };
 
@@ -71,6 +81,9 @@ public:
 	 * two bars (settings.gd turn_icons). The default here: the squares.
 	 */
 	bool bTurnSquares = true;
+
+	/** When a unit's turn ends, the camera slides to the next one ready (2026-10-01: optional, and a key toggles it). */
+	bool bAutoRecenter = true;
 
 	/** How big the name and health over each unit are drawn, and its status icons (Options). */
 	float OverheadScale = 1.35f;
@@ -101,6 +114,12 @@ public:
 
 	/** Rule numbers for the next battle, by tuning key; missing means the default. */
 	TMap<FString, double> Tuning;
+	/**
+	 * The last battle set up on this machine (2026-10-01: "dev tools options save
+	 * after closing game"): the setup screen's choices, by name, written as text.
+	 * Empty until a battle has been set up. Read by ATMBattleDirector::OpenSetup.
+	 */
+	TMap<FString, FString> LastSetup;
 
 	static const FTMActionInfo& Info(ETMAction Action);
 	const TArray<FKey>& Keys(ETMAction Action) const { return Bound[static_cast<int32>(Action)]; }

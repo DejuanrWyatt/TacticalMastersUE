@@ -473,11 +473,32 @@ namespace TMSim
 			// The dice, and the only place in the rules they are thrown.
 			bool bEvaded = false;
 			bool bCritical = false;
+			bool bGrazed = false;
 			if (Ability->Effect == EEffect::Damage)
 			{
 				bEvaded = static_cast<int>(Rng.RandiRange(1, 100)) <= EvadeChance(*Struck, *Ability, &User);
+				// Defense model 1 (2026-10-01): of the hits evaded, one in ten is
+				// dodged outright and the rest are grazed, landing for half and
+				// never critical. Its effects still come with it.
+				if (bEvaded && NewDefense() && static_cast<int>(Rng.RandiRange(1, Combat::DodgeOneIn)) != 1)
+				{
+					bEvaded = false;
+					bGrazed = true;
+					Amount = std::max(Combat::MinimumDamage, RoundToInt(Amount * Combat::GrazeDamage));
+					FEvent Graze;
+					Graze.Kind = EEventKind::Grazed;
+					Graze.Unit = Struck->Id;
+					Graze.By = User.Id;
+					Graze.Where = Struck->Pos;
+					Graze.Id = Ability->Id;
+					Report.Events.push_back(Graze);
+				}
+				if (bGrazed)
+				{
+					// A graze is never critical, and doesn't spend a First Strike.
+				}
 				// First Strike Gauntlet: its first hit that lands is critical, without a roll.
-				if (!bEvaded && User.HasItems() && !User.bFirstStrikeUsed && GearHas(User, &FItemDef::bFirstStrike))
+				else if (!bEvaded && User.HasItems() && !User.bFirstStrikeUsed && GearHas(User, &FItemDef::bFirstStrike))
 				{
 					User.bFirstStrikeUsed = true;
 					bCritical = true;

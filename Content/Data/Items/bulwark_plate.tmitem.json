@@ -8,7 +8,7 @@
   "tier": "rare",
   "stats": {
     "hp": 45,
-    "attdef": 4,
+    "attdef": 6,
     "move": -1
   }
 }

@@ -122,6 +122,13 @@ namespace TMSim
 		bool bMoved = false;
 		bool bActed = false;
 		/**
+		 * Its last walk's waypoints, and where that walk began, so a viewer can
+		 * show it going the way it was told rather than the shortest way. Not part
+		 * of the rules: nothing reads it but the screen, and no checksum holds it.
+		 */
+		std::vector<FVec2> WalkVia;
+		FVec2 WalkFrom;
+		/**
 		 * Ended a turn without using an ability, so the gauge fills faster until
 		 * the next one. Cleared when that turn comes round.
 		 */

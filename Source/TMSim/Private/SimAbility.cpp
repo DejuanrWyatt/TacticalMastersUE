@@ -251,6 +251,61 @@ namespace TMSim
 		return FindAbility(Job->AbilityIds[Slot]);
 	}
 
+	void ApplyGameBalance()
+	{
+		static bool bApplied = false;
+		if (bApplied)
+		{
+			return;
+		}
+		bApplied = true;
+		// The Knight was the weakest yardstick (tanks averaged 77% against it):
+		// faster, sturdier, and a tank's tools -- a Taunt, and a Guard for an ally.
+		const auto Knight = Jobs().find("knight");
+		if (Knight != Jobs().end())
+		{
+			FJobStats& Stats = Knight->second.Stats;
+			Stats.Set(EStat::Speed, 8);
+			Stats.Set(EStat::Hp, 115);
+			Stats.Set(EStat::MagDef, 9);
+		}
+		const auto Bash = Abilities().find("shield_bash");
+		if (Bash != Abilities().end())
+		{
+			Bash->second.StatusId = "taunt";
+			Bash->second.StatusTurns = 2;
+		}
+		const auto Guard = Abilities().find("guard");
+		if (Guard != Abilities().end())
+		{
+			// On an ally up to 4 m away: single-target hits on it go to the Knight.
+			Guard->second.MaxRange = 4.0f;
+			Guard->second.Buffs.clear();
+			Guard->second.StatusId = "guarded";
+			Guard->second.StatusTurns = 2;
+		}
+		// The Archer was the strongest (specials averaged 23% against it): it
+		// out-ranged and out-saw everything. Less of both, not less damage.
+		const auto Archer = Jobs().find("archer");
+		if (Archer != Jobs().end())
+		{
+			FJobStats& Stats = Archer->second.Stats;
+			Stats.Set(EStat::Speed, 10);
+			Stats.Set(EStat::Sight, 11);
+			Stats.Set(EStat::Crit, 10);
+		}
+		const auto Bow = Abilities().find("bow_shot");
+		if (Bow != Abilities().end())
+		{
+			Bow->second.MaxRange = 8.0f;
+		}
+		const auto Aimed = Abilities().find("aimed_shot");
+		if (Aimed != Abilities().end())
+		{
+			Aimed->second.Cooldown = 3;
+		}
+	}
+
 	const std::vector<const FJobDef*>& AllJobs()
 	{
 		if (JobList().empty())

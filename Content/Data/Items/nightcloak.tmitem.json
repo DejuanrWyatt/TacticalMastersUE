@@ -3,10 +3,10 @@
   "version": 1,
   "id": "nightcloak",
   "name": "Nightcloak",
-  "desc": "+8 A-Eva and M-Eva while unseen as your turn begins.",
+  "desc": "+15 Evasion while unseen as your turn begins.",
   "icon": "cloak",
   "tier": "rare",
   "effects": {
-    "unseen_evasion": 8
+    "unseen_evasion": 15
   }
 }

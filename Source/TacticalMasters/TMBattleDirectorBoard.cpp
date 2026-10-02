@@ -674,10 +674,9 @@ void ATMBattleDirector::BuildBoard()
 	{
 		const int32 Height = Battle.LevelAt(Tower.Pos);
 		const FVector Foot(Tower.Pos.X * M, Tower.Pos.Y * M, Height * Level);
-		const int32 TowerFrom = BoardProps.Num();
+		// Not hidden by the fog: a tower is a landmark, seen from anywhere (2026-10-01).
 		MakeTower(Foot, 31 + 17 * TowerRoofOwner.Num());
 		TowerRoofOwner.Add(-2);  // painted on the first refresh
-		MarkFogged(TowerFrom, Foot);
 	}
 	RefreshTowers();
 

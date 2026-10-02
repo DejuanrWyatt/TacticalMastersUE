@@ -25,7 +25,9 @@
 #include "Materials/MaterialInstanceDynamic.h"
 #include "ProceduralMeshComponent.h"
 
-namespace
+// Named, not anonymous: in a unity build an anonymous namespace's names reach
+// every file compiled after this one (2026-10-01: 'Across' and 'Up' hid others' locals).
+namespace TMTowerLook
 {
 	using namespace TMProp;
 
@@ -54,6 +56,7 @@ namespace
 
 void ATMBattleDirector::MakeTower(const FVector& Foot, int32 Seed)
 {
+	using namespace TMTowerLook;
 	USceneComponent* Root = NewObject<USceneComponent>(this, NAME_None, RF_Transient);
 	Root->SetMobility(EComponentMobility::Movable);
 	Root->SetupAttachment(RootComponent);
@@ -145,6 +148,7 @@ void ATMBattleDirector::MakeTower(const FVector& Foot, int32 Seed)
 
 void ATMBattleDirector::PaintTower(int32 Index, int32 Holder)
 {
+	using namespace TMTowerLook;
 	if (!Beacons.IsValidIndex(Index))
 	{
 		return;
@@ -174,6 +178,7 @@ void ATMBattleDirector::PaintTower(int32 Index, int32 Holder)
 
 void ATMBattleDirector::AdvanceTowers(float DeltaSeconds)
 {
+	using namespace TMTowerLook;
 	TowerClock += DeltaSeconds;
 	for (FTMTower& Tower : Beacons)
 	{

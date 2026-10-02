@@ -9,12 +9,12 @@
     "special"
   ],
   "stats": {
-    "hp": 72,
+    "hp": 66,
     "attdef": 5,
     "magdef": 15,
     "aeva": 6,
-    "meva": 18,
-    "crit": 10,
+    "meva": 14,
+    "crit": 16,
     "speed": 8,
     "move": 6,
     "patience": 9,
@@ -24,13 +24,13 @@
     {
       "id": "frost_witch_frost_hex",
       "name": "Frost Hex",
-      "desc": "A curse-bolt at an enemy 1-7 m away.",
+      "desc": "An ice bolt at an enemy 1-7 m away.",
       "kind": "active",
       "effect": "damage",
       "scale": "mag",
       "target": "enemy",
       "shape": "unit",
-      "power": 37,
+      "power": 44,
       "min_range": 1,
       "max_range": 7,
       "aoe": 0,
@@ -41,7 +41,8 @@
         "system": "/Game/ParagonAurora/FX/Particles/Abilities/Primary/FX/P_Aurora_Melee_SucessfulImpact.P_Aurora_Melee_SucessfulImpact",
         "at": "targets",
         "scale": 1
-      }
+      },
+      "element": "ice"
     },
     {
       "id": "frost_witch_frost_curse",
@@ -70,33 +71,31 @@
         "system": "/Game/ParagonAurora/FX/Particles/Abilities/Leap/FX/P_Aurora_Decoy_Explode_Fragments.P_Aurora_Decoy_Explode_Fragments",
         "at": "targets",
         "scale": 1
-      }
+      },
+      "element": "ice"
     },
     {
       "id": "frost_witch_frost_slumber",
-      "name": "Frost Slumber",
-      "desc": "Put an enemy 2-7 m away to sleep; Stuns for 1 turn. (2 s)",
+      "name": "Shatter",
+      "desc": "A shard of ice at an enemy 2-7 m away: heavy damage.",
       "kind": "active",
-      "effect": "support",
+      "effect": "damage",
       "scale": "mag",
       "target": "enemy",
       "shape": "unit",
-      "power": 0,
+      "power": 58,
       "min_range": 2,
       "max_range": 7,
       "aoe": 0,
       "cooldown": 3,
       "cast": 2,
-      "status": {
-        "id": "stun",
-        "turns": 1
-      },
-      "fx": "haste",
+      "fx": "blizzard",
       "vfx": {
         "system": "/Game/ParticleSystemVFXVol1/Systems/NS_EnergyVortex.NS_EnergyVortex",
         "at": "targets",
         "scale": 1
-      }
+      },
+      "element": "ice"
     },
     {
       "id": "frost_witch_frost_doom",
@@ -107,7 +106,7 @@
       "scale": "mag",
       "target": "enemy",
       "shape": "circle",
-      "power": 46,
+      "power": 54,
       "min_range": 3,
       "max_range": 10,
       "aoe": 3.5,
@@ -122,7 +121,14 @@
         "system": "/Game/ParagonAurora/FX/Particles/Abilities/Ultimate/FX/P_Aurora_Ultimate_Explode.P_Aurora_Ultimate_Explode",
         "at": "point",
         "scale": 1
-      }
+      },
+      "element": "ice"
     }
-  ]
+  ],
+  "creator": {
+    "rebalanced": {
+      "on": "2026-10-01",
+      "why": "Split from the Frost Hexer: the Witch hits hard (less health, more crit)"
+    }
+  }
 }

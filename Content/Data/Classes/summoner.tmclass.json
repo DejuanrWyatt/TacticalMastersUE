@@ -47,7 +47,7 @@
     {
       "id": "summoner_ifrit",
       "name": "Ifrit",
-      "desc": "Hellfire on every enemy within 2 m of a point 3-9 m away; Burns for 5 s.",
+      "desc": "Hellfire on every enemy within 2 m of a point 3-9 m away; Burns for 2 turns.",
       "kind": "active",
       "effect": "damage",
       "scale": "mag",
@@ -121,5 +121,11 @@
         "scale": 1
       }
     }
-  ]
+  ],
+  "creator": {
+    "reworded": {
+      "on": "2026-10-02",
+      "why": "Descriptions say what the abilities do (2026-10-02): Stun not sleep, Crit not the old Power, turns not seconds"
+    }
+  }
 }

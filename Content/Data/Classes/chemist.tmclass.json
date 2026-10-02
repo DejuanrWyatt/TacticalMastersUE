@@ -25,7 +25,7 @@
     {
       "id": "chemist_fire_bomb",
       "name": "Fire Bomb",
-      "desc": "Throw a bomb hitting enemies within 1.2 m of a point 2-6 m away; Burns for 4 s.",
+      "desc": "Throw a bomb hitting enemies within 1.2 m of a point 2-6 m away; Burns for 2 turns.",
       "kind": "active",
       "effect": "damage",
       "scale": "att",
@@ -114,5 +114,11 @@
         "scale": 1
       }
     }
-  ]
+  ],
+  "creator": {
+    "reworded": {
+      "on": "2026-10-02",
+      "why": "Descriptions say what the abilities do (2026-10-02): Stun not sleep, Crit not the old Power, turns not seconds"
+    }
+  }
 }

@@ -640,7 +640,10 @@ void ATMBattleDirector::AdvanceMotion(float DeltaSeconds)
 			{
 				Walker->Pos = From;
 				Walker->bMoved = false;
-				Way = Copy.PathTo(*Walker, TMSim::FMap::NodeOf(Unit.Pos), true);
+				// By its waypoints, when it was told to go by some (2026-10-01).
+				Way = !Unit.WalkVia.empty() && Unit.WalkFrom == From
+					? Copy.PathVia(*Walker, Unit.WalkVia, TMSim::FMap::NodeOf(Unit.Pos), true)
+					: Copy.PathTo(*Walker, TMSim::FMap::NodeOf(Unit.Pos), true);
 			}
 			if (Way.empty() || !(Way.back() == Unit.Pos))
 			{

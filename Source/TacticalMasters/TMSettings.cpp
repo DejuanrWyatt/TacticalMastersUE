@@ -29,7 +29,7 @@ namespace
 			{ TEXT("ability_4"), TEXT("Ability 4 (Ultimate)"), { EKeys::Four } },
 			{ TEXT("end_turn"), TEXT("End turn"), { EKeys::Enter } },
 			{ TEXT("cancel"), TEXT("Cancel"), { EKeys::Escape } },
-			{ TEXT("next_unit"), TEXT("Next ready unit"), { EKeys::Tab } },
+			{ TEXT("next_unit"), TEXT("Next ready unit"), { EKeys::N } },
 			{ TEXT("pause"), TEXT("Pause"), { EKeys::P } },
 			{ TEXT("unit_guide"), TEXT("Unit Guide"), { EKeys::U } },
 			{ TEXT("log"), TEXT("Show / hide combat log"), { EKeys::L } },
@@ -44,6 +44,11 @@ namespace
 			{ TEXT("cam_rotate_right"), TEXT("Rotate camera right"), { EKeys::E } },
 			{ TEXT("edit_layout"), TEXT("Edit layout / lock it"), { EKeys::F2 } },
 			{ TEXT("chat"), TEXT("Chat (online)"), { EKeys::T } },
+			{ TEXT("status_bars"), TEXT("Show / hide status bars"), { EKeys::Tab } },
+			{ TEXT("auto_recenter"), TEXT("Auto-recenter camera on / off"), { EKeys::V } },
+			{ TEXT("waypoint"), TEXT("Waypoint (hold while clicking a walk)"), { EKeys::LeftControl } },
+			{ TEXT("plan_turn"), TEXT("Plan a turn ahead / go"), { EKeys::G } },
+			{ TEXT("plan_undo"), TEXT("Undo the plan's last step"), { EKeys::BackSpace } },
 		};
 		return List;
 	}
@@ -142,6 +147,7 @@ void FTMSettings::ResetOptions()
 	bFullscreen = false;
 	bColorblind = false;
 	bTurnSquares = true;
+	bAutoRecenter = true;
 	ResetKeys();
 	Save();
 	Apply();
@@ -172,6 +178,7 @@ void FTMSettings::Load()
 	CardOrder[0].Reset();
 	CardOrder[1].Reset();
 	Tuning.Reset();
+	LastSetup.Reset();
 	double Number = 0.0;
 	if (Root->TryGetNumberField(TEXT("camera_speed"), Number)) { CameraSpeed = FMath::Clamp(static_cast<float>(Number), 0.5f, 2.0f); }
 	if (Root->TryGetNumberField(TEXT("ui_scale"), Number)) { UiScale = FMath::Clamp(static_cast<float>(Number), 0.9f, 1.3f); }
@@ -183,6 +190,7 @@ void FTMSettings::Load()
 	Root->TryGetBoolField(TEXT("fullscreen"), bFullscreen);
 	Root->TryGetBoolField(TEXT("colorblind"), bColorblind);
 	Root->TryGetBoolField(TEXT("turn_squares"), bTurnSquares);
+	Root->TryGetBoolField(TEXT("auto_recenter"), bAutoRecenter);
 	Root->TryGetBoolField(TEXT("layout_grid"), bLayoutGrid);
 	if (Root->TryGetNumberField(TEXT("grid_size"), Number)) { GridSize = FMath::Clamp(static_cast<float>(Number), 5.0f, 80.0f); }
 	const TSharedPtr<FJsonObject>* Sizes = nullptr;
@@ -239,6 +247,30 @@ void FTMSettings::Load()
 				}
 			}
 		}
+		// An action newer than the saved keys keeps its default key, taken from
+		// whatever older action had it (Tab was "next unit" until 2026-10-01).
+		for (int32 i = 0; i < static_cast<int32>(ETMAction::Count); ++i)
+		{
+			if ((*Keys)->HasField(Actions()[i].Id))
+			{
+				continue;
+			}
+			for (const FKey& Key : Actions()[i].Defaults)
+			{
+				for (int32 Other = 0; Other < static_cast<int32>(ETMAction::Count); ++Other)
+				{
+					if (Other != i && Bound[Other].Contains(Key))
+					{
+						Bound[Other].Remove(Key);
+						if (Bound[Other].Num() == 0)
+						{
+							Bound[Other] = Actions()[Other].Defaults;
+							Bound[Other].Remove(Key);
+						}
+					}
+				}
+			}
+		}
 	}
 	const TSharedPtr<FJsonObject>* Rules = nullptr;
 	if (Root->TryGetObjectField(TEXT("tuning"), Rules))
@@ -246,6 +278,14 @@ void FTMSettings::Load()
 		for (const TPair<FString, TSharedPtr<FJsonValue>>& Entry : (*Rules)->Values)
 		{
 			Tuning.Add(Entry.Key, Entry.Value->AsNumber());
+		}
+	}
+	const TSharedPtr<FJsonObject>* Chosen = nullptr;
+	if (Root->TryGetObjectField(TEXT("last_setup"), Chosen))
+	{
+		for (const TPair<FString, TSharedPtr<FJsonValue>>& Entry : (*Chosen)->Values)
+		{
+			LastSetup.Add(Entry.Key, Entry.Value->AsString());
 		}
 	}
 }
@@ -263,6 +303,7 @@ void FTMSettings::Save() const
 	Root->SetBoolField(TEXT("fullscreen"), bFullscreen);
 	Root->SetBoolField(TEXT("colorblind"), bColorblind);
 	Root->SetBoolField(TEXT("turn_squares"), bTurnSquares);
+	Root->SetBoolField(TEXT("auto_recenter"), bAutoRecenter);
 	Root->SetBoolField(TEXT("layout_grid"), bLayoutGrid);
 	Root->SetNumberField(TEXT("grid_size"), GridSize);
 	TSharedRef<FJsonObject> Sizes = MakeShared<FJsonObject>();
@@ -305,6 +346,12 @@ void FTMSettings::Save() const
 		Rules->SetNumberField(Entry.Key, Entry.Value);
 	}
 	Root->SetObjectField(TEXT("tuning"), Rules);
+	TSharedRef<FJsonObject> Chosen = MakeShared<FJsonObject>();
+	for (const TPair<FString, FString>& Entry : LastSetup)
+	{
+		Chosen->SetStringField(Entry.Key, Entry.Value);
+	}
+	Root->SetObjectField(TEXT("last_setup"), Chosen);
 	FString Text;
 	FJsonSerializer::Serialize(Root, TJsonWriterFactory<>::Create(&Text));
 	FFileHelper::SaveStringToFile(Text, *SettingsFile());

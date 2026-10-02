@@ -38,7 +38,7 @@ INI = os.path.join(ROOT, "Config", "DefaultGame.ini")
 BEGIN = "; ---- written by Tools/cook_list.py: do not edit by hand ----"
 END = "; ---- end of Tools/cook_list.py ----"
 
-# Asset paths the game's code names itself.
+# Asset paths the game's code names itself (code_paths finds the rest in Source/TacticalMasters).
 IN_CODE = [
     "/Game/UI/M_GroundIndicator.M_GroundIndicator",
     "/Game/UI/M_TeamOutline.M_TeamOutline",
@@ -54,6 +54,16 @@ def folders(paths):
         if not any(d == k or d.startswith(k + "/") for k in kept):
             kept.append(d)
     return kept
+
+
+def code_paths(into):
+    """Every "/Game/..." asset path written in the game's own C++ (ability looks, props, materials)."""
+    for path in glob.glob(os.path.join(ROOT, "Source", "TacticalMasters", "*.*")):
+        if not path.endswith((".cpp", ".h")):
+            continue
+        text = open(path, encoding="utf-8", errors="replace").read()
+        for found in re.findall(r'"(/Game/[^"%*]+\.[^"%*]+)"', text):
+            into.add(found)
 
 
 def game_paths(value, into):
@@ -78,6 +88,7 @@ def asset_exists(path):
 
 def main():
     wanted = set(IN_CODE)
+    code_paths(wanted)
     # The character map: the bodies worn, and their animation sets.
     the_map = json.load(open(os.path.join(DATA, "CharacterMap", "characters.json"), encoding="utf-8"))
     bodies = the_map.get("bodies", {})

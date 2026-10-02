@@ -80,7 +80,7 @@
     {
       "id": "shade_brawler_shadow_stance",
       "name": "Shadow Stance",
-      "desc": "Take a fighting stance; Power +4 for 2 turns. Switched on and off.",
+      "desc": "Take a fighting stance; Crit +8 while it is on. Switched on and off.",
       "kind": "toggle",
       "effect": "support",
       "scale": "mag",
@@ -135,5 +135,11 @@
         "scale": 1
       }
     }
-  ]
+  ],
+  "creator": {
+    "reworded": {
+      "on": "2026-10-02",
+      "why": "Descriptions say what the abilities do (2026-10-02): Stun not sleep, Crit not the old Power, turns not seconds"
+    }
+  }
 }

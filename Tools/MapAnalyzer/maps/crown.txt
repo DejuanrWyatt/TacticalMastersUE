@@ -1,0 +1,11 @@
+// Crown: a level-4 plateau in the middle with a sheer drop on every side but
+// one ramp each, springs out on the flanks where whoever heals is exposed.
+// Blue starts on the west edge, red on the east (the battle director's spots).
+// A sketch to try, not a finished map.
+name Crown
+111111111111
+111#11111111
+11111111+#11
+1111111x1111
+11#111131111
+111144441111

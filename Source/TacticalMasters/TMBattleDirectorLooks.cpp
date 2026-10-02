@@ -36,7 +36,7 @@ namespace
 	constexpr float RingSize = 110.0f;
 	const TCHAR* const OutlinePath = TEXT("/Game/UI/M_TeamOutline.M_TeamOutline");
 
-	FLinearColor SideColour(bool bFriend)
+	FLinearColor OutlineSideColour(bool bFriend)
 	{
 		if (bFriend)
 		{
@@ -121,20 +121,37 @@ void ATMBattleDirector::AdvanceTurnRings()
 		// On the ground where the body stands, just above the tiles.
 		Ring->SetRelativeLocation(Motions[i].Shown + FVector(0.0f, 0.0f, 3.0f));
 
-		// Full when its turn has come; how full the gauge is otherwise.
+		// The ring is the unit's health now, not only its turn (2026-10-01, the
+		// human's pick "C" of the health bar mockups): the outer band its health in
+		// its side's colour (amber for a monster), a shield's worth after it in
+		// white; a thin inner band its Turn Gauge, gold while it may act, with a gold
+		// edge round the whole. The bar over its head is shown only while the
+		// pointer is on it (TMBattleHudPanels.cpp DrawOverheads).
 		const float Full = Unit.bReady ? 1.0f : FMath::Clamp(static_cast<float>(Unit.Tg) / TMSim::Pace::TgMax, 0.0f, 1.0f);
-		FLinearColor Tint = SideColour(IsFriend(Unit));
+		const float MaxHp = static_cast<float>(FMath::Max(1, Unit.MaxHp()));
+		int32 Soak = 0;
+		for (const TMSim::FStatus& Status : Unit.Statuses)
+		{
+			const TMSim::FStatusDef* Def = TMSim::FindStatus(Status.Id);
+			Soak += Def && Def->bAbsorbs ? Status.Amount : 0;
+		}
+		const float Health = FMath::Clamp(Unit.Hp / MaxHp, 0.0f, 1.0f);
+		const float Shield = FMath::Clamp(Soak / MaxHp, 0.0f, 1.0f - Health);
 		// A unit whose turn it is breathes, so it is found at once.
-		Tint.A = Unit.bReady ? 0.75f + 0.25f * FMath::Sin(static_cast<float>(Now) * 5.0f) : 0.9f;
-		TurnRingPaint[i]->SetVectorParameterValue(TEXT("TintColorAndOpacity"), Tint);
-		if (FMath::Abs(Full - TurnRingDrawn[i]) < 0.004f)
+		const float Breath = Unit.bReady ? 0.8f + 0.2f * FMath::Sin(static_cast<float>(Now) * 5.0f) : 1.0f;
+		TurnRingPaint[i]->SetVectorParameterValue(TEXT("TintColorAndOpacity"), FLinearColor(1.0f, 1.0f, 1.0f, Breath));
+		// Painted again only when what it shows changes (a whole number, exact in a float).
+		const int32 Key = ((FMath::RoundToInt(Health * 400.0f) * 101 + FMath::RoundToInt(Shield * 100.0f)) * 101 + FMath::RoundToInt(Full * 100.0f)) * 2
+			+ (Unit.bReady ? 1 : 0);
+		if (static_cast<int32>(TurnRingDrawn[i]) == Key)
 		{
 			continue;
 		}
-		TurnRingDrawn[i] = Full;
+		TurnRingDrawn[i] = static_cast<float>(Key);
+		const FLinearColor Side = Unit.bMonster ? FLinearColor(0.95f, 0.66f, 0.2f) : OutlineSideColour(IsFriend(Unit));
+		const FLinearColor RingGold(1.0f, 0.82f, 0.35f);
 
-		// Drawn white, and coloured by the tint: a faint track all the way round,
-		// and the filled part from twelve o'clock clockwise.
+		// Each band from twelve o'clock clockwise, in its own colour.
 		UKismetRenderingLibrary::ClearRenderTarget2D(this, TurnRingTargets[i], FLinearColor::Transparent);
 		UCanvas* Canvas = nullptr;
 		FVector2D Size;
@@ -143,11 +160,11 @@ void ATMBattleDirector::AdvanceTurnRings()
 		if (Canvas)
 		{
 			const FVector2D Middle = Size * 0.5f;
-			const float Outer = Size.X * 0.48f;
-			const float Inner = Size.X * 0.39f;
+			const float Outer = Size.X * 0.47f;
+			const float Inner = Size.X * 0.405f;
 			const int32 Steps = 72;
 			TArray<FCanvasUVTri> Triangles;
-			auto Band = [&](float From, float To, float Alpha, float Out, float In)
+			auto Band = [&](float From, float To, const FLinearColor& C, float Out, float In)
 			{
 				const int32 Count = FMath::Max(1, FMath::CeilToInt(Steps * (To - From)));
 				for (int32 k = 0; k < Count; ++k)
@@ -156,7 +173,6 @@ void ATMBattleDirector::AdvanceTurnRings()
 					const float A1 = UE_TWO_PI * FMath::Lerp(From, To, static_cast<float>(k + 1) / Count) - UE_HALF_PI;
 					const FVector2D D0(FMath::Cos(A0), FMath::Sin(A0));
 					const FVector2D D1(FMath::Cos(A1), FMath::Sin(A1));
-					const FLinearColor C(1.0f, 1.0f, 1.0f, Alpha);
 					FCanvasUVTri T1;
 					T1.V0_Pos = Middle + D0 * Out; T1.V1_Pos = Middle + D1 * Out; T1.V2_Pos = Middle + D0 * In;
 					T1.V0_Color = T1.V1_Color = T1.V2_Color = C;
@@ -167,15 +183,28 @@ void ATMBattleDirector::AdvanceTurnRings()
 					Triangles.Add(T2);
 				}
 			};
-			Band(0.0f, 1.0f, 0.22f, Outer, Inner);
+			// Health: a dark track, the health over it, then any shield.
+			Band(0.0f, 1.0f, FLinearColor(0.02f, 0.02f, 0.04f, 0.55f), Outer, Inner);
+			if (Health > 0.0f)
+			{
+				Band(0.0f, Health, FLinearColor(Side.R, Side.G, Side.B, 1.0f), Outer, Inner);
+			}
+			if (Shield > 0.0f)
+			{
+				Band(Health, Health + Shield, FLinearColor(1.0f, 1.0f, 1.0f, 0.85f), Outer, Inner);
+			}
+			// The Turn Gauge, thin, inside it.
+			const float GaugeOut = Inner - Size.X * 0.035f;
+			const float GaugeIn = GaugeOut - Size.X * 0.025f;
+			Band(0.0f, 1.0f, FLinearColor(0.02f, 0.02f, 0.04f, 0.35f), GaugeOut, GaugeIn);
 			if (Full > 0.0f)
 			{
-				Band(0.0f, Full, 1.0f, Outer, Inner);
+				Band(0.0f, Full, Unit.bReady ? RingGold : FLinearColor(0.55f, 0.75f, 0.95f, 0.95f), GaugeOut, GaugeIn);
 			}
 			if (Unit.bReady)
 			{
-				// Its turn: a glow inside the ring as well.
-				Band(0.0f, 1.0f, 0.18f, Inner, Inner * 0.2f);
+				// Its turn: a thin gold edge round the whole.
+				Band(0.0f, 1.0f, RingGold, Size.X * 0.5f, Outer + Size.X * 0.008f);
 			}
 			Canvas->K2_DrawTriangle(nullptr, Triangles);
 		}
@@ -274,8 +303,8 @@ void ATMBattleDirector::AddOutlineToCamera()
 		return;
 	}
 	UMaterialInstanceDynamic* Mid = UMaterialInstanceDynamic::Create(Outline, this);
-	Mid->SetVectorParameterValue(TEXT("AllyColour"), SideColour(true));
-	Mid->SetVectorParameterValue(TEXT("EnemyColour"), SideColour(false));
+	Mid->SetVectorParameterValue(TEXT("AllyColour"), OutlineSideColour(true));
+	Mid->SetVectorParameterValue(TEXT("EnemyColour"), OutlineSideColour(false));
 	// What is under the pointer or in the aim: red, as League of Legends marks it.
 	Mid->SetVectorParameterValue(TEXT("HoverColour"), FLinearColor(1.0f, 0.08f, 0.05f, 1.0f));
 	OutlineMid = Mid;
@@ -324,7 +353,12 @@ UTextureRenderTarget2D* ATMBattleDirector::PortraitOf(int32 Side, const TMSim::F
 		Camera->FOVAngle = 28.0f;
 	}
 	FramePortrait(Camera, Index);
-	Camera->CaptureScene();
+	// Deferred (2026-10-01): a capture made now, in the middle of a tick, flushes
+	// every component's end-of-frame update first, and a burst effect that
+	// finishes then destroys itself mid-flush -- the engine's assertion
+	// "ComponentsThatNeedEndOfFrameUpdate_OnGameThread.IsValidIndex" (the
+	// v13 play-test crash). Deferred, it is drawn with the frame instead.
+	Camera->CaptureSceneDeferred();
 	return Film;
 }
 
@@ -385,16 +419,21 @@ void ATMBattleDirector::AdvanceCardPortraits()
 		Film->UpdateResourceImmediate(true);
 		CardFilms.Add(Film);
 	}
-	for (int32 k = 0; k < 2; ++k)
+	// One card a frame: a deferred capture draws the camera as it is at the end
+	// of the frame, so a second card set up now would take the first's place.
 	{
 		const int32 Index = CardNext++ % Count;
-		if (!UnitVisuals[Index] || !CardFilms[Index])
+		if (UnitVisuals[Index] && CardFilms[Index])
 		{
-			continue;
+			CardCamera->TextureTarget = CardFilms[Index];
+			FramePortrait(CardCamera, Index);
+			// Deferred (2026-10-01): a capture made now, in the middle of a tick, flushes
+			// every component's end-of-frame update first, and a burst effect that
+			// finishes then destroys itself mid-flush -- the engine's assertion
+			// "ComponentsThatNeedEndOfFrameUpdate_OnGameThread.IsValidIndex" (the
+			// v13 play-test crash). Deferred, it is drawn with the frame instead.
+			CardCamera->CaptureSceneDeferred();
 		}
-		CardCamera->TextureTarget = CardFilms[Index];
-		FramePortrait(CardCamera, Index);
-		CardCamera->CaptureScene();
 	}
 }
 

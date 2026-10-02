@@ -73,7 +73,7 @@
     {
       "id": "flame_warden_flame_ward",
       "name": "Flame Ward",
-      "desc": "Every ally within 4 m is shielded; AttDef +5, Power +5 for 2 turns. Always on, for allies nearby.",
+      "desc": "Every ally within 4 m is shielded; AttDef +5, Crit +10. Always on, for allies nearby.",
       "kind": "aura",
       "effect": "support",
       "scale": "mag",
@@ -125,5 +125,11 @@
         "scale": 1
       }
     }
-  ]
+  ],
+  "creator": {
+    "reworded": {
+      "on": "2026-10-02",
+      "why": "Descriptions say what the abilities do (2026-10-02): Stun not sleep, Crit not the old Power, turns not seconds"
+    }
+  }
 }

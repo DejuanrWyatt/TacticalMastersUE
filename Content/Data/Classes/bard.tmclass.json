@@ -70,7 +70,7 @@
     {
       "id": "bard_lullaby",
       "name": "Lullaby",
-      "desc": "Slow every enemy within 2.5 m of a point 2-8 m away for 5 s (1.5 s).",
+      "desc": "Slow every enemy within 2.5 m of a point 2-8 m away for 2 turns. (1.5 s)",
       "kind": "active",
       "effect": "support",
       "scale": "mag",
@@ -96,7 +96,7 @@
     {
       "id": "bard_hymn_of_life",
       "name": "Hymn of Life",
-      "desc": "ULTIMATE: Heal every ally within 4 m of you, with Regen for 8 s (2 s).",
+      "desc": "ULTIMATE: Heal every ally within 4 m of you, with Regen for 3 turns. (2 s)",
       "kind": "active",
       "effect": "heal",
       "scale": "mag",
@@ -119,5 +119,11 @@
         "scale": 1
       }
     }
-  ]
+  ],
+  "creator": {
+    "reworded": {
+      "on": "2026-10-02",
+      "why": "Descriptions say what the abilities do (2026-10-02): Stun not sleep, Crit not the old Power, turns not seconds"
+    }
+  }
 }

@@ -54,6 +54,17 @@ enum class ETMHudAction : uint8
 	OnlineJoin,
 	OnlineField,
 	OnlineBack,
+	// The lobby (TMBattleHudLobby.cpp). LobbySide's value is the side; LobbySlot's
+	// the slot code (team * 4 + slot); DraftChoose's the class's index, -1 to let a ban go.
+	LobbySide,
+	LobbyReady,
+	LobbyStart,
+	LobbySettings,
+	LobbyLeave,
+	LobbySlot,
+	DraftChoose,
+	DraftToggle,
+	DraftTimer,
 
 	// The setup screen. SetupClass's value is team * 4 + slot; the others' is the team.
 	SetupClass,
@@ -107,6 +118,7 @@ enum class ETMHudAction : uint8
 	DevReset,
 	DevResetAll,
 	OptionTurnSquares,
+	OptionAutoRecenter,
 
 	// Edit layout. LayoutGrab's value is the panel's place in this frame's list;
 	// LayoutCard's is the unit whose turn square is being dragged.
@@ -124,14 +136,22 @@ enum class ETMHudAction : uint8
 	Capture,
 
 	// Neutral camps (Docs/design/feat-neutral-camps.md): the setup screen's camps and boss rows;
-	// TakeOpen opens the picker for the cache in reach; Take's value is the item's place in it;
-	// Drop's the gear slot.
+	// TakeOpen opens the team items screen; Take's value is the item's place in the cache in reach;
+	// Drop's and EquipSlot's unit id x 4 + gear slot; StashPick's the item's place in the stash.
 	SetupCamps,
 	SetupBoss,
 	SetupElements,
+	SetupFriendlyFire,
+	SetupCampRespawn,
 	TakeOpen,
+	/** The combat log's tab: 0 All, 1 Combat, 2 Mine, 3 Key. */
+	LogTab,
+	/** Nothing: catches clicks on a panel's empty part so they don't reach what is under it. */
+	OverlayBlock,
 	Take,
 	Drop,
+	StashPick,
+	EquipSlot,
 
 	// The Unit Guide's list and class page. GuideStep's and GuideScroll's values are -1 or +1
 	// (a class, a page); GuideRole's the role's index (-1 for all); GuideTurn's which way to turn the hero.
@@ -150,6 +170,38 @@ enum class ETMHudAction : uint8
 	ItemTier,
 	ItemClose,
 	GuideTab,
+
+	// Queued orders (2026-10-01): the plan strip's Go (or Plan, or Done), Undo and Clear.
+	PlanGo,
+	PlanUndo,
+	PlanClear,
+	// Go To (2026-10-01): GoToMode's value 0 walks and ends each turn, 1 walks and waits.
+	GoToMode,
+	GoToCancel,
+
+	// Replays (TMBattleDirectorReplay.cpp). ReplayWatch's value is the replay's place in the list,
+	// -1 for the battle just played; ReplaySpeed's the speed's index; ReplayStep's -1 or +1;
+	// ReplaySeek's where on the timeline, in thousandths; ReplayView's -1 (all) or the side;
+	// ReplayPage's -1 or +1; ReplayDelete's the replay's place in the list.
+	TitleReplays,
+	ReplayWatch,
+	ReplayPlay,
+	ReplaySpeed,
+	ReplayStep,
+	ReplaySeek,
+	ReplayView,
+	ReplayLeave,
+	ReplayAgain,
+	ReplayPage,
+	ReplayDelete,
+	ReplayListBack,
+
+	// The battle report (TMBattleHudReport.cpp). ReportTab's value is the tab; ReportUnit's the unit id
+	// (-1 back to the tables); ReportMoment's the tick to watch the replay from.
+	ReportTab,
+	ReportUnit,
+	ReportHide,
+	ReportMoment,
 };
 
 /** Words shown when the pointer rests on part of the HUD: how a number is worked out. */
@@ -191,11 +243,25 @@ private:
 	void DrawLog(ATMBattleDirector& Director);
 	void DrawUnitCard(ATMBattleDirector& Director);
 	void DrawActionBar(ATMBattleDirector& Director);
+	/** Queued orders (2026-10-01): the selected unit's plan as steps, with Go, Undo and Clear, above Above. Returns the new top. */
+	float DrawPlanStrip(ATMBattleDirector& Director, const TMSim::FUnit& Unit, float Above);
+	/** A Go To's strip: turns left, how each ends, Keep going when stopped, Cancel. */
+	float DrawGoToStrip(ATMBattleDirector& Director, const TMSim::FUnit& Unit, float Above);
+	/** Each Go To's turn numbers on the ground, where each turn's walk ends. */
+	void DrawGoToMarks(ATMBattleDirector& Director);
 	void DrawBanners(ATMBattleDirector& Director);
 	void DrawTitle(ATMBattleDirector& Director);
+	/** The Replays screen, and the bar along the bottom while one is watched (TMBattleHudReplay.cpp). */
+	void DrawReplays(ATMBattleDirector& Director);
+	void DrawReplayBar(ATMBattleDirector& Director);
+	/** The battle report at the end of a battle: the MVP, each unit's numbers, the moments (TMBattleHudReport.cpp). */
+	void DrawBattleReport(ATMBattleDirector& Director, const FString& Line, const FLinearColor& Colour);
 	void DrawSetup(ATMBattleDirector& Director);
 	/** Host or join a match against another machine (main_menu.gd:79-230). */
 	void DrawOnline(ATMBattleDirector& From);
+	/** The online lobby and the draft (TMBattleHudLobby.cpp). */
+	void DrawLobby(ATMBattleDirector& From);
+	void DrawDraft(ATMBattleDirector& From);
 	/** A box to type in: click to type, and a caret while typing. */
 	void TextField(float X, float Y, float W, float H, const FString& Value, const FString& Placeholder, bool bTyping, int32 Field);
 	void DrawBattleMenu(ATMBattleDirector& Director);
@@ -230,6 +296,8 @@ private:
 	void DrawItemPicker(ATMBattleDirector& Director);
 	/** The items panel over the action bar: the cache in reach to take from, and the unit's own to leave. */
 	void DrawTakePicker(ATMBattleDirector& Director);
+	/** The team items screen: the side's units, what each wears, open slots, and the stash (TMBattleHudPanels.cpp). */
+	void DrawTeamItems(ATMBattleDirector& Director);
 	/** The Unit Guide's Items page: every item by tier, scrolled like the class list. */
 	void DrawGuideItems(ATMBattleDirector& Director, float PX, float PY, float PW, float PH, float Top);
 	/** The Codex's other pages (TMBattleHudCodex.cpp): how to play, keywords, statuses, ground, objectives, controls. */
@@ -259,6 +327,8 @@ private:
 	void DrawUnitPanel(ATMBattleDirector& Director, const TMSim::FUnit& Unit, bool bRight);
 	/** Each unit's name, health and statuses over its head. */
 	void DrawOverheads(ATMBattleDirector& Director);
+	/** One of ours just in a fight: its health over its head for a few seconds, the lost part draining. */
+	void PopBar(ATMBattleDirector& Director, const TMSim::FUnit& Unit, float CentreX, float Bottom);
 	/** A row of status chips. Returns the width used. Right to left from X when bLeftward. */
 	float StatusChips(const TMSim::FUnit& Unit, float X, float Y, float Size, bool bLeftward, bool bTips);
 	/** An ability's icon tile: coloured when it can be used, grey with the turns left when it cannot. */

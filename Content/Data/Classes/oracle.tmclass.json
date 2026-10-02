@@ -81,7 +81,7 @@
     {
       "id": "oracle_sleep",
       "name": "Sleep",
-      "desc": "Put an enemy 2-7 m away to sleep (Stun) for 3 s (2 s).",
+      "desc": "Lull an enemy 2-7 m away into a stupor; Stuns for 1 turn. (2 s)",
       "kind": "active",
       "effect": "support",
       "scale": "mag",
@@ -130,5 +130,11 @@
         "scale": 1
       }
     }
-  ]
+  ],
+  "creator": {
+    "reworded": {
+      "on": "2026-10-02",
+      "why": "Descriptions say what the abilities do (2026-10-02): Stun not sleep, Crit not the old Power, turns not seconds"
+    }
+  }
 }

@@ -7,7 +7,7 @@
   "icon": "cloak",
   "tier": "uncommon",
   "stats": {
-    "magdef": 2,
-    "meva": 6
+    "magdef": 3,
+    "meva": 5
   }
 }

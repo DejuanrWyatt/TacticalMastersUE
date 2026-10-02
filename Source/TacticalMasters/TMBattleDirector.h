@@ -145,6 +145,32 @@ struct FTMFloater
 
 	UPROPERTY()
 	float Age = 0.0f;
+
+	// How it is drawn (2026-10-01, the human's "Combat Text Mockups"): none of it is state.
+	/** Times the usual size: a crit half again as big, a tick smaller. */
+	float Scale = 1.0f;
+	/** Drawn twice, a hair apart: heavier. */
+	bool bBold = false;
+	/** Pops in at 140% and settles: a critical strike. */
+	bool bPop = false;
+	/** A pale ember edge and glow, so a burn's dark red still reads on a dark field. */
+	bool bEmber = false;
+	/** In exactly its colour; the older words (items, sleep, ability names) are lightened. */
+	bool bExact = false;
+	/** A small word after it, as "graze". */
+	FString Tag;
+	FColor TagTint = FColor::White;
+};
+
+/** How a floater looks, when it is not the plain kind. */
+struct FTMFloatLook
+{
+	float Scale = 1.0f;
+	bool bBold = false;
+	bool bPop = false;
+	bool bEmber = false;
+	FString Tag;
+	FColor TagTint = FColor::White;
 };
 
 UCLASS()
@@ -233,6 +259,8 @@ public:
 
 	// ---------------------------------------------- options and dev tools
 	bool bOptionsOpen = false;
+	/** How far the Options page is scrolled, in 1080p pixels (the HUD keeps it in range). */
+	float OptionsScroll = 0.0f;
 	bool bDevToolsOpen = false;
 	/** The action waiting for its new key, or -1. */
 	int32 CaptureAction = -1;
@@ -477,7 +505,7 @@ private:
 	// view, none of it is rules state: what it produces is a roster for each side,
 	// who plays each side, and a seed, and those are what BuildBattle starts from.
 
-	enum class EScreen : uint8 { Title, Setup, Battle, Online };
+	enum class EScreen : uint8 { Title, Setup, Battle, Online, Lobby, Draft, Replays };
 
 	/** What the next battle will be (game_config.gd: mode, rosters, ai_team, difficulties). */
 	struct FMatchSetup
@@ -529,10 +557,21 @@ private:
 		bool bRandomBoss = false;
 		/** Element hits leave their mark (Docs/design/feat-status-effects.md): off in Godot's battle, offered on. */
 		bool bElements = false;
+		/** Area blows hurt their caster's own side too (FTuning::FriendlyFire): off unless chosen. */
+		bool bFriendlyFire = false;
+		/** Cleared camps wake again later (FTuning::CampRespawn): off by default since 2026-10-01. */
+		bool bCampRespawn = false;
 		uint64 FixedSeed = 12345;
 		/** The map, by id (TMSim::FindMap), and the look it is dressed in: empty for the map's own. */
 		std::string MapId = "highlands";
 		FString ThemeId;
+		/**
+		 * Online: the classes are drafted, bans and all, rather than chosen in the
+		 * lobby (TMBattleDirectorDraft.cpp); and seconds for each choice, 0 for no
+		 * clock. Set by the host in the lobby.
+		 */
+		bool bDraft = false;
+		int32 DraftSeconds = 30;
 	};
 
 	FMatchSetup Setup;
@@ -542,6 +581,11 @@ private:
 	bool bOfferedItems = false;
 	bool bOfferedCamps = false;
 	bool bOfferedElements = false;
+	/** The last setup on this machine has been put back (OpenSetup; FTMSettings::LastSetup). */
+	bool bRestoredSetup = false;
+	/** The setup screen's choices into the settings file, and back. */
+	void SaveSetupChoices();
+	void RestoreSetupChoices();
 	/** Points a side has spent on items in the setup. */
 	int32 ItemPointsSpent(int32 Team) const;
 	/** Whether this side picks its own items: the computer does. */
@@ -660,6 +704,9 @@ private:
 	void SelectAbility(int32 Slot);
 	void CancelAim();
 
+	/** The rule numbers a battle in the game starts from: the rules' own, with the game's newer rules turned on. */
+	static TMSim::FTuning GameTuning();
+
 	/** Sends an order for the selected unit and takes the next step after it. */
 	void OrderSelected(const TMSim::FOrder& Order);
 
@@ -706,6 +753,10 @@ private:
 		int32 Serial = -1;
 		int32 Slot = -1;
 		TMSim::FVec2 Target;
+		/** A unit to aim at where it stands when the walk ends (a plan's), or -1 for Target. */
+		int32 Follow = -1;
+		/** Not before the walk ordered with it has been applied (online: the host's answer). */
+		bool bAfterWalk = false;
 	};
 	FPendingAbility PendingAbility;
 	/** The reachable spot this ability could be used from with the shortest walk; false if none. */
@@ -715,6 +766,150 @@ private:
 	void FirePendingAbility();
 	static constexpr const char* OutOfRange = "That target is out of range.";
 
+	// ---------------------------------------------- queued orders (2026-10-01)
+	// (TMBattleDirectorPlans.cpp; Docs/design/feat-move-queue.md) A plan is a
+	// walk, by waypoints if it has any, and an ability aimed from where that
+	// walk ends. Made for one of the player's units while it waits, it is
+	// carried out the moment its turn begins; made inside a turn (the plan key),
+	// on Go. It is this machine's alone: what leaves it is the same orders a
+	// person clicking would give, checked by the rules at that moment.
+	struct FTMPlan
+	{
+		/** The unit's serial when it was planned: a plan runs on a later one, or on Go. */
+		int32 Serial = -1;
+		/** Made inside the unit's turn: for that turn's Go only, dropped if the turn ends without it. */
+		bool bThisTurn = false;
+		bool bWalk = false;
+		bool bSprint = false;
+		std::vector<TMSim::FVec2> Via;
+		TMSim::FVec2 To;
+		/** The way drawn on the ground, and its length. */
+		std::vector<TMSim::FVec2> Path;
+		double Metres = 0.0;
+		int32 Slot = -1;
+		TMSim::FVec2 Target;
+		int32 Follow = -1;
+		bool HasAbility() const { return Slot >= 0; }
+		bool IsEmpty() const { return !bWalk && Slot < 0; }
+	};
+	TMap<int32, FTMPlan> Plans;
+	/** The selected unit is being planned, not ordered. */
+	bool bPlanMode = false;
+	/** Waypoints clicked so far for the walk being aimed, planned or not. */
+	std::vector<TMSim::FVec2> WayPoints;
+	/** Ready turns already noticed, as id and serial, so a new one is noticed once. */
+	TSet<int64> ReadySeen;
+
+	/** Whether this machine may plan this unit: one of its own, alive, played by a person. */
+	bool PlayerCanPlan(const TMSim::FUnit* Unit) const;
+	/** Whether the selected unit takes the aim keys and board clicks: ordered, or planned. */
+	bool PlayerCanCommand(const TMSim::FUnit* Unit) const;
+	bool IsPlanningSelected() const;
+	const FTMPlan* PlanOf(int32 UnitId) const { return Plans.Find(UnitId); }
+	void StartPlanning(int32 UnitId);
+	void StopPlanning();
+	/** The plan key: plan the selected ready unit's turn; with a plan, go; planning a waiting unit, done. */
+	void PlanKey();
+	/** The plan's last step back: a waypoint, then its ability, then its walk. */
+	void UndoPlanStep();
+	void ClearPlan(int32 UnitId);
+	void PlanWalk(const TMSim::FVec2& To);
+	void PlanAbility(int32 Slot, const TMSim::FVec2& Target, int32 Follow);
+	/** Out of range while planning: the walk to the nearest spot it can be used from, then it. */
+	bool PlanWalkIntoRange(const TMSim::FUnit& Unit, const TMSim::FVec2& Point);
+	/** Carries a plan out now. False, and the plan dropped with a word why, if the rules refuse it. */
+	bool RunPlan(int32 UnitId);
+	/** Each frame: a plan whose unit's turn has begun runs. */
+	void RunDuePlans();
+	/** Whether a key held for waypoints is down. */
+	bool WayPointHeld() const;
+	/** Adds a waypoint to the walk being aimed: false, with a word why, if it can't be. */
+	bool AddWayPoint(const TMSim::FVec2& Point);
+	/** The walk area for the walk being aimed: on from the last waypoint, with what is left. */
+	void RefreshReachable();
+	/** Where the walk being aimed starts from: the unit, or its last waypoint. */
+	TMSim::FVec2 WalkStart(const TMSim::FUnit& Unit) const;
+	/** A unit's name for a word on screen: its class, as the log has it. */
+	FString PlanName(const TMSim::FUnit& Unit) const;
+
+	// ------------------------------------------------- Go To (2026-10-01)
+	// (TMBattleDirectorPlans.cpp; Docs/design/feat-move-queue.md, "Go To") A
+	// click beyond the walk area sends the unit there over as many turns as it
+	// takes, as Civilization III's Go To does: each turn it walks as far as its
+	// move allows along the way, then ends the turn (or, asked to, hands it
+	// over), and the turn it arrives on is the player's. It stops, and hands
+	// the turn back, when an enemy comes into sight, when it has been hurt, or
+	// when there is no way left. This machine's only: each step is an ordinary
+	// walk, sent and checked as one.
+	struct FTMGoTo
+	{
+		TMSim::FVec2 Dest;
+		/** Waypoints still to pass, in order. */
+		std::vector<TMSim::FVec2> Via;
+		/** Walk, then the turn is the player's; false: walk and end the turn. */
+		bool bWaitForMe = false;
+		/** The turn it last walked on: one walk a turn. */
+		int32 LastSerial = -1;
+		/** Its health, and the enemies in sight, when it last walked or was told to go. */
+		int32 Hp = 0;
+		TSet<int32> Seen;
+		/** Stopped on its turn StoppedSerial, and why: the plan key carries on, anything else ends it. */
+		bool bStopped = false;
+		int32 StoppedSerial = -1;
+		FString Why;
+		/** The way left, and where each turn's walk will end (the last is Dest). */
+		std::vector<TMSim::FVec2> Route;
+		std::vector<TMSim::FVec2> Stops;
+	};
+	TMap<int32, FTMGoTo> GoTos;
+	/** A walk-and-end step: the turn is ended once its walk has been applied. */
+	int32 GoToEndUnit = -1;
+	int32 GoToEndSerial = -1;
+	/** Set while the Go To gives its own orders, which don't cancel it as a person's do. */
+	bool bGoToOrdering = false;
+	/** The way to the spot under the pointer, past the walk area: where each turn ends, and its length. */
+	std::vector<TMSim::FVec2> GoToHoverStops;
+	double GoToHoverMetres = 0.0;
+
+	const FTMGoTo* GoToOf(int32 UnitId) const { return GoTos.Find(UnitId); }
+	/** On its way and needing nobody: not stopped, walking and ending its turns. */
+	bool IsMarching(int32 UnitId) const { const FTMGoTo* G = GoTos.Find(UnitId); return G && !G->bStopped && !G->bWaitForMe; }
+	/** Sends the unit there; this turn's walk at once if it can. False, with a word why, if there's no way. */
+	bool SetGoTo(int32 UnitId, const TMSim::FVec2& Dest);
+	/** This turn's walk along the way, unless something stopped it (bResume: it was told to carry on). */
+	bool StepGoTo(int32 UnitId, bool bResume);
+	void StopGoTo(int32 UnitId, const FString& Why);
+	void CancelGoTo(int32 UnitId, bool bTell);
+	/** Each frame: the turn a walk-and-end step is ending, and Go Tos whose units' turns have begun. */
+	void RunDueGoTos();
+	/** The other side's units this side can see now. */
+	TSet<int32> EnemiesInSight(const TMSim::FUnit& Unit) const;
+	/** Where each turn's walk ends along the way, with the unit's move; the last is the end of the way. */
+	std::vector<TMSim::FVec2> SplitRoute(const TMSim::FUnit& Unit, const std::vector<TMSim::FVec2>& Route) const;
+
+	/**
+	 * While the selected unit is being planned, it stands for the length of
+	 * this where its planned walk ends and as at the start of a turn (ready,
+	 * cooldowns a turn on), so aiming, ranges, previews and the ability buttons
+	 * read as they will then. Put back exactly as it was when this goes out of
+	 * scope; nothing the rules keep is touched in between. Nests.
+	 */
+	class FPlanStandIn
+	{
+	public:
+		explicit FPlanStandIn(ATMBattleDirector& Director);
+		~FPlanStandIn();
+		FPlanStandIn(const FPlanStandIn&) = delete;
+		FPlanStandIn& operator=(const FPlanStandIn&) = delete;
+	private:
+		TMSim::FUnit* Unit = nullptr;
+		TMSim::FVec2 Pos;
+		bool bReady = false;
+		bool bMoved = false;
+		bool bActed = false;
+		int Cooldowns[TMSim::AbilitySlots] = {};
+	};
+
 	// ------------------------------------------------ indicators on the ground
 	// (TMBattleDirectorIndicators.cpp): the walk area and ability shapes painted
 	// into a picture that a decal lays on the board, under the units.
@@ -722,6 +917,10 @@ private:
 	void AdvanceIndicators();
 	void PaintMoveArea(void* Painter, const TMSim::FUnit& Unit);
 	void PaintAbility(void* Painter, const TMSim::FUnit& Unit, const FAim& Where);
+	/** The plans of this machine's units (dashed walks, ghosts, aims), and the waypoints being set. */
+	void PaintPlans(void* Painter);
+	/** What PaintPlans would paint, in a line, so the ground is painted again only when it changes. */
+	FString PlanSignature() const;
 	/** Whether the decal is up; without its material the HUD draws outlines instead. */
 	bool bIndicatorDecal = false;
 	/** Turns the picture on the board if a decal's axes come out otherwise. */
@@ -760,6 +959,16 @@ private:
 	TObjectPtr<class UDecalComponent> FogDecal = nullptr;
 	UPROPERTY()
 	TObjectPtr<class UTextureRenderTarget2D> FogFilm = nullptr;
+	/**
+	 * Films replaced when a battle on a board of another size was built: kept
+	 * a while, never resized in place. Resizing a render target that a decal or
+	 * the post-process is drawing with left the renderer reading a texture that
+	 * was gone, and crashed it (2026-10-01, SetShaderParameters, both DX11 and DX12).
+	 */
+	UPROPERTY()
+	TArray<TObjectPtr<class UTextureRenderTarget2D>> RetiredFilms;
+	/** A film of this size: the same one when it already is, else a new one (the old retired). */
+	class UTextureRenderTarget2D* FilmOfSize(class UTextureRenderTarget2D* Film, int32 W, int32 H, bool bClamp);
 	/** Things on the board that stay hidden until their cell has been seen: rocks, hazards, towers. */
 	TArray<TWeakObjectPtr<class USceneComponent>> FogProps;
 	TArray<int32> FogPropCell;
@@ -792,6 +1001,8 @@ private:
 	void CaptureTower();
 	/** The watchtower the selected unit could capture now, or -1; and why not, if not. */
 	int32 CapturableTower(const TMSim::FUnit& Unit, FString* WhyNot = nullptr) const;
+	/** The watchtower under the pointer (its index), or -1 (TMBattleDirectorIndicators.cpp). */
+	int32 HoveredTower() const;
 	/** The towers' roofs in the colour of whoever holds each. */
 	void RefreshTowers();
 
@@ -837,11 +1048,24 @@ private:
 	TArray<int32> CampRingTier;
 	/** The cache the selected unit could take from now, or -1; and why not, if not. */
 	int32 TakeableCache(const TMSim::FUnit& Unit, FString* WhyNot = nullptr) const;
-	/** Takes an item from the cache the items panel shows: Code is its place there x 4, plus 1 + the slot it goes over (0: the first empty one). */
+	/** Picks up an item lying within the selected unit's reach into its side's stash: Code is its place in the cache. */
 	void TakeItem(int32 Code);
-	/** Leaves the item in this slot on the ground. */
-	void DropItem(int32 GearSlot);
-	/** The items panel is open: the cache in reach it shows, -2 for none in reach, -1 closed. */
+	/** Takes a worn item off into the stash, spending that unit's turn: Code is unit id x 4 + slot. */
+	void DropItem(int32 Code);
+	/** Puts the stash item picked (StashPick) on a unit: Code is unit id x 4 + slot. */
+	void EquipItem(int32 Code);
+	/** The side whose items the team items screen shows and manages here. */
+	int32 ItemsTeam() const;
+	/** Whether this machine may put items on that side's units (its own side; offline, a side a person plays). */
+	bool MayManageItems(int32 Team) const;
+	/**
+	 * The team items screen (2026-10-01): every unit of the side, what each
+	 * wears and its open slots, and the side's stash, in one place. The
+	 * stash item picked to equip next, by its place in the stash, or -1.
+	 */
+	bool bTeamItemsOpen = false;
+	int32 StashPick = -1;
+	/** Kept for the old items panel's callers: -1 closed. Unused now. */
 	int32 TakePickerCache = -1;
 	/** A monster's name as the view says it, with what it is doing. */
 	FString MonsterLine(const TMSim::FUnit& Unit) const;
@@ -911,6 +1135,8 @@ private:
 	/** The log: shown or not, how many lines, and how far scrolled back. */
 	bool bShowLog = true;
 	bool bLogLarge = false;
+	/** The health and status bars over the units: shown, or hidden with Tab (ETMAction::StatusBars). */
+	bool bShowStatusBars = true;
 	int32 LogScroll = 0;
 
 	/** The list of every unit on the field (hud.gd:515-606). */
@@ -954,6 +1180,34 @@ private:
 	UPROPERTY()
 	TArray<FTMFloater> Floaters;
 
+	/**
+	 * One of this side's units that just took or dealt damage, or was healed: its
+	 * health bar shows over its head for HpPopSeconds, the part it lost draining
+	 * away, flashing, over HpDrainSeconds (2026-10-01, "Combat Text Mockups" B and C).
+	 * Kept in health as shown, which can trail the rules while a blow is in flight.
+	 */
+	struct FTMHpPop
+	{
+		double ShownAt = 0.0;
+		int32 Hp = 0;
+		int32 TrailFrom = 0;
+		double TrailAt = -1.0;
+		int32 HealFrom = 0;
+		double HealAt = -1.0;
+	};
+	TMap<int32, FTMHpPop> HpPops;
+	static constexpr double HpPopSeconds = 3.0;
+	static constexpr double HpDrainSeconds = 2.0;
+	static constexpr double HpHealGlowSeconds = 0.9;
+	/** Real seconds, so slowed time on a big hit does not hold the bar up. */
+	double PopClock() const;
+	/** Its health bar is up: its lost part draining, or just shown. Change < 0 lost, > 0 gained, 0 dealt a blow. */
+	void PopHealth(int32 UnitId, int32 Change);
+	/** Where the drained part has got to, in health. */
+	float PopTrail(const FTMHpPop& Pop, double Now) const;
+	/** A Critical or Grazed waits for the Hit after it: 1 critical, 2 graze. */
+	TMap<int32, uint8> BlowMarks;
+
 	TArray<FFlash> Flashes;
 
 	/** An ability's effect still playing, and for how long it has. */
@@ -975,6 +1229,56 @@ private:
 
 	UPROPERTY()
 	TArray<FString> Log;
+
+	/**
+	 * The combat log as the HUD draws it (2026-10-01, the human chose design A
+	 * with C's tabs): one entry per line, an action followed by what it did to
+	 * each unit, so names can wear their side's colour and numbers their own.
+	 * Log above keeps the same fight as plain text, for BattleLog() and the tests.
+	 */
+	struct FTMLogEntry
+	{
+		enum class EKind : uint8
+		{
+			/** A unit's action: Unit uses What. */
+			Action,
+			/** What an action did to one unit (Unit): Amount, Tags. */
+			Result,
+			/** A unit knocked out. */
+			Ko,
+			/** Anything else worth a line: Unit (or none) and Text. */
+			Note,
+			/** Turns coming round, gauges: shown only on the All tab. */
+			Turn,
+			/** Not about a unit: chat, players, the battle's start and end. */
+			System,
+		};
+		EKind Kind = EKind::Note;
+		float Seconds = 0.0f;
+		int32 Unit = -1;
+		/** Which action it belongs to: an Action starts one, its Results share it. */
+		int32 Group = 0;
+		FString Verb;
+		FString What;
+		/** Note and System: the whole line, after the unit's name if there is one. */
+		FString Text;
+		FString Amount;
+		/** 0 plain, 1 harm, 2 healing, 3 critical harm, 4 dim (a miss). */
+		uint8 Tone = 0;
+		TArray<FString> Tags;
+		/** A moment the Key tab keeps: a knockout, a crit, a capture, a camp, an item. */
+		bool bKey = false;
+	};
+	TArray<FTMLogEntry> LogEntries;
+	int32 LogGroup = 0;
+	/** The log's tab: 0 All, 1 Combat, 2 Mine, 3 Key moments. */
+	int32 LogTab = 1;
+	/** A line for the log that isn't a unit's doing: chat, players coming and going. */
+	void LogNote(const FString& Line);
+	/** One event of the rules as the log's entries (Narrate has written its plain line). */
+	void LogEvent(const TMSim::FEvent& Event, const FString& Plain);
+	/** A unit's name as the log shows it: its class, numbered only when its side has two of one. */
+	FString LogName(int32 UnitId) const;
 
 	/** The unit the battle is currently waiting on, or nullptr. */
 	const TMSim::FUnit* WaitingOn() const;
@@ -1093,7 +1397,16 @@ private:
 	/** An animation set by name, its clips loaded the first time it is asked for. */
 	const FTMAnimSet* SetOf(const FString& Name);
 	/** Puts a unit's mesh into the body: its mesh, its size, and whether its cloth moves. */
-	void WearBody(class USkeletalMeshComponent* Visual, const FTMBody& Body) const;
+	void WearBody(class USkeletalMeshComponent* Visual, const FTMBody& Body, bool bNoCloth = false) const;
+	/** When the guide's hero last changed body, in real seconds: changes come at most every quarter second. */
+	double ShowcaseSwappedAt = -1.0;
+	/**
+	 * Fullscreen, switched from Options: applied from Tick, at most once a
+	 * second, never in the middle of a click (2026-10-01: clicking it fast
+	 * crashed the renderer).
+	 */
+	bool bFullscreenPending = false;
+	float FullscreenCooldown = 0.0f;
 	/** Whether the body's mesh and clips are already in memory, so wearing it costs nothing. */
 	bool IsBodyLoaded(const FTMBody& Body) const;
 
@@ -1261,7 +1574,7 @@ private:
 	void ShowOne(const TMSim::FEvent& Event, const TMSim::FAbility* Ability, int32 CasterId, TArray<int32>* ShownOn);
 	void React(const TMSim::FEvent& Event, int32 CasterId);
 	void Jolt(int32 Index, const FVector& Dir, float Size);
-	void AddFloater(int32 UnitId, const FString& What, const FColor& Tint, bool bCount = true);
+	void AddFloater(int32 UnitId, const FString& What, const FColor& Tint, bool bCount = true, const FTMFloatLook* Look = nullptr);
 	/** Front, back, left or right of a unit, as seen from a point. */
 	FString SideOf(int32 Index, const FVector& From) const;
 	/** Glows, bobbing, slowing and freezing, from the statuses a unit carries. */
@@ -1382,11 +1695,11 @@ private:
 	bool bNetDesync = false;
 	bool bDesyncDone = false;
 	void AdvanceOnline(float DeltaSeconds);
-	void OnNetMessage(const FJsonObject& Message);
+	void OnNetMessage(const FJsonObject& Message, int32 From);
 	void StartOnlineAsHost();
 	FString StartOnlineFrom(const FJsonObject& Start);
 	/** The host's check on a joiner's order, on top of the rules' (battle.gd:634-646). "" to play it. */
-	FString RefereeCheck(const TMSim::FOrder& Order) const;
+	FString RefereeCheck(const TMSim::FOrder& Order, int32 Player) const;
 	void AfterOnlineApply(const TMSim::FOrder& Order);
 	void CheckHostSums();
 	void StopOnline(const FString& Why);
@@ -1394,6 +1707,99 @@ private:
 	void SendOnline(const TCHAR* Kind, TFunctionRef<void(FJsonObject&)> Fill);
 	void SendChat();
 	void TypedDone(bool bSubmit);
+
+	// ------------------------------------------------ the lobby (TMBattleDirectorLobby.cpp)
+	// Up to four players choose their sides and classes before an online battle
+	// (Docs/design/feat-lobby.md). The host keeps the lobby; the others ask it.
+
+	/** A player in an online match: the host, or one who joined. */
+	struct FTMOnlinePlayer
+	{
+		/** The connection it came by (FTMNet's peer id): -1 for the host itself. */
+		int32 Peer = -1;
+		FString Name;
+		/** 0 blue, 1 red. */
+		int32 Team = 0;
+		bool bReady = false;
+		/** Still connected: one who leaves mid-battle stays listed, and the computer plays their units. */
+		bool bPresent = true;
+	};
+	/** Everyone in the match, the host first, in order of joining. */
+	TArray<FTMOnlinePlayer> Players;
+	/** Which of Players this machine is. */
+	int32 LocalPlayer = 0;
+	/** By unit id (0-3 blue, 4-7 red): the player who orders it, -1 the computer (on the host). */
+	TArray<int32> UnitPlayer;
+	/** What a player who joined is told of the host's setup: the map's name and the rules in a line. */
+	FString LobbyMap;
+	FString LobbyRulesLine;
+	/** This machine's name, as the others see it. */
+	FString LocalName() const;
+	int32 PlayerOfPeer(int32 Peer) const;
+	/** The player who orders a side's slot: its players share the four in order of joining. -1 the computer. */
+	int32 SlotOwner(int32 Team, int32 Slot) const;
+	int32 UnitOwner(const TMSim::FUnit& Unit) const;
+	/** Whether the computer plays this unit on this machine: ComputerPlays, but online by who owns it. */
+	bool ComputerPlaysUnit(const TMSim::FUnit& Unit) const;
+	/** Who plays a side, in words: "you and Sam", "the computer". */
+	FString SideNames(int32 Team) const;
+	/** UnitPlayer from the lobby's sides, as a battle starts. */
+	void AssignUnits();
+	void OpenLobby();
+	/** The host opens its lobby, with itself as the first player. */
+	void StartLobby();
+	bool IsHostInLobby() const;
+	void LobbyArrive(int32 Peer, const FString& Name);
+	void LobbyDepart(int32 Peer, const FString& Why);
+	void BroadcastLobby();
+	void ApplyLobby(const FJsonObject& Message);
+	FString LobbyRules() const;
+	bool LobbyCanStart(FString* WhyNot = nullptr) const;
+	void LobbyStart();
+	/** After a battle: the host takes everyone back to the lobby. */
+	void BackToLobby();
+	void LobbySide(int32 Team);
+	void LobbyReady();
+	/** A class for a slot (team * 4 + slot): the host's own, or asked of it. */
+	void LobbyPick(int32 SlotCode, const std::string& JobId);
+	bool LobbyMayPick(int32 Player, int32 SlotCode) const;
+	void LobbyApplyPick(int32 Player, int32 SlotCode, const std::string& JobId);
+	/** The lobby's messages: true if it was one. */
+	bool OnLobbyMessage(const FString& Kind, const FJsonObject& Message, int32 From);
+
+	// ------------------------------------------------ the draft (TMBattleDirectorDraft.cpp)
+
+	struct FTMDraftState
+	{
+		/** The next step of the order (TMDraftOrder::Steps); past the end, done. */
+		int32 Step = 0;
+		/** Each side's bans, and picks in slot order, by class id. */
+		TArray<FString> Bans[2];
+		TArray<FString> Picks[2];
+		/** Seconds left for this choice; the computer's pause; the finished draft's showing. */
+		float Left = 0.0f;
+		float Computer = 0.0f;
+		float Show = 0.0f;
+	};
+	FTMDraftState Draft;
+	/** The draft has run for the battle about to start. */
+	bool bDraftDone = false;
+	int32 DraftSteps() const;
+	bool DraftStepIsBan(int32 Step) const;
+	int32 DraftStepTeam(int32 Step) const;
+	bool DraftDone() const;
+	bool DraftUsed(const FString& JobId) const;
+	/** Who makes this step's choice: a player, -2 any player on the side (a ban), -1 the computer. */
+	int32 DraftChooser(int32 Step) const;
+	bool DraftMayChoose(int32 Player) const;
+	void StartDraft();
+	void BroadcastDraft();
+	void DraftApply(int32 Player, int32 Step, const FString& JobId);
+	FString DraftComputerChoice(int32 Team) const;
+	void AdvanceDraft(float DeltaSeconds);
+	/** This machine's player chooses (a click on the draft screen). */
+	void DraftChoose(const FString& JobId);
+	bool OnDraftMessage(const FString& Kind, const FJsonObject& Message, int32 From);
 	void EndPlay(const EEndPlayReason::Type Reason) override;
 
 	// Sound (TMBattleDirectorSound.cpp; Content/Data/Sounds/sounds.json).
@@ -1662,4 +2068,192 @@ private:
 	float TickRemainder = 0.0f;
 
 	bool bBuilt = false;
+
+	// ------------------------------------------------ replays (TMBattleDirectorReplay.cpp)
+	// Every battle is kept as the orders that were applied to it, with what it
+	// started from: the same start and the same orders are the same battle
+	// (SimOrder.h). Saved under Saved/Replays when a battle is decided, and
+	// played back through Submit like any other order, at the speed asked for.
+	// Docs/design/feat-replays.md.
+
+public:
+	/** One moment worth marking on a replay's timeline: a fall, a revive, a tower, a cleared camp. */
+	struct FTMReplayMark
+	{
+		int32 Tick = 0;
+		/** "ko", "revive", "tower", "camp", "won". */
+		FString Kind;
+		int32 Unit = -1;
+		int32 Team = -1;
+	};
+	/** What a battle started from and every order applied to it. */
+	struct FTMReplay
+	{
+		FString MadeAt;
+		int32 Protocol = 0;
+		FString MapId;
+		FString ThemeId;
+		FString Mode;
+		FString Sides[2];
+		uint64 Seed = 0;
+		/** Every rule number, by its TuningKeys() key, as the battle started. */
+		TMap<FString, double> Tuning;
+		/** Units 0-7: class and the three items worn at the start. */
+		TArray<FString> Jobs;
+		TArray<FString> Gear;
+		FString BossJob;
+		uint64 StartSum = 0;
+		/**
+		 * The orders in the order applied: an order's text (TMSim::OrderToText),
+		 * or "a N" for N ticks of time passing (runs of Advance joined up).
+		 */
+		TArray<FString> Steps;
+		/** The battle's checksum at whole minutes of play, to say where a replay parted. */
+		TArray<TPair<int32, uint64>> Sums;
+		TArray<FTMReplayMark> Marks;
+		int32 Winner = -1;
+		int32 Ticks = 0;
+		uint64 FinalSum = 0;
+	};
+	/** A saved replay as the list shows it: read from its file's header. */
+	struct FTMReplayEntry
+	{
+		FString File;
+		FString MadeAt;
+		FString MapId;
+		FString Sides[2];
+		int32 Winner = -1;
+		int32 Ticks = 0;
+	};
+
+	/** A replay is being watched rather than a battle played. */
+	bool bReplaying = false;
+	/** Watching: playing (or paused by the replay's own button). */
+	bool bReplayPlaying = true;
+	/** Watching: 0.5, 1, 2 or 4 times as fast. */
+	float ReplaySpeed = 1.0f;
+	/** Watching: -1 sees everything, 0 or 1 through that side's fog. */
+	int32 ReplayView = -1;
+	/** The replay being watched, and the one recorded for the battle on the board. */
+	FTMReplay Watching;
+	FTMReplay Recording;
+	/** Where the last decided battle's replay was saved; empty until one was. */
+	FString LastReplayFile;
+	/** Saved replays, newest first, for the Replays screen. */
+	TArray<FTMReplayEntry> ReplayList;
+	int32 ReplayListPage = 0;
+	/** Said over a replay that could not be played, or stopped matching. */
+	FString ReplayProblem;
+
+	/** The Replays screen: reads Saved/Replays. */
+	void OpenReplays();
+	/** Watches a saved replay (a file under Saved/Replays), or the battle just played (empty). */
+	void WatchReplay(const FString& File);
+	/** Stops watching, back to the Replays screen (or the title). */
+	void LeaveReplay(bool bToList);
+	/** The whole battle's length in ticks, and where the replay is in it. */
+	int32 ReplayTotalTicks() const { return Watching.Ticks; }
+	/** Jumps to a tick: forward by playing on quietly, back by starting again. */
+	void SeekReplay(int32 ToTick);
+	/** To the previous or next order that wasn't time passing. */
+	void StepReplay(int32 Direction);
+	/** A HUD button of the replay bar or the Replays screen. */
+	bool PressReplayButton(const struct FTMHudButton& Button);
+	/** A key while watching. True when it was the replay's. */
+	bool ReplayKey(const FKey& Key);
+
+private:
+	/** Starts recording the battle just built (BuildBattle, after Battle.Start). */
+	void BeginRecording();
+	/** Notes an order Submit applied, and what it set off. */
+	void RecordApplied(const TMSim::FOrder& Order, const TMSim::FTickReport& Report);
+	/** Writes the decided battle to Saved/Replays and keeps the newest 50. */
+	void SaveRecording();
+	/** BuildBattle, while watching: the replay's rules, items, boss and seed, before the battle starts. */
+	void ApplyReplayStart();
+	/** Moves a replay on by real seconds (Tick). */
+	void AdvanceReplay(float RealSeconds);
+	/** Applies the replay's next step, or as much of its time as Budget allows. Returns ticks used. */
+	int32 PlayReplayStep(int32 Budget);
+	/** Builds the replay's battle afresh at its start. */
+	void RestartReplay();
+	static bool WriteReplay(const FTMReplay& Replay, const FString& File);
+	static bool ReadReplay(const FString& File, FTMReplay& Out, FString& Problem);
+	/** Where the replay is: the next step to apply, and ticks of it already played. */
+	int32 ReplayCursor = 0;
+	int32 ReplayCursorUsed = 0;
+	float ReplayRemainder = 0.0f;
+	/** Fast-forwarding to a point: the steps show no blows or effects. */
+	bool bReplayQuiet = false;
+	/** Applying one of the replay's own orders (Submit lets only these through while watching). */
+	bool bApplyingReplay = false;
+	/** The next checksum to compare, while watching. */
+	int32 ReplaySumNext = 0;
+	/** Whole minutes recorded so far, for Recording.Sums. */
+	int32 RecordedMinutes = 0;
+	/** The setup before watching, put back when the replay is left. */
+	FMatchSetup SetupBeforeReplay;
+	bool bComputerPlayedBeforeReplay[2] = { false, false };
+	/** The decided battle has been saved (once). */
+	bool bRecordingSaved = false;
+
+	// ------------------------------------------------ the battle report (TMBattleDirectorReport.cpp)
+	// Everything each unit did, tallied from the battle's events as they happen
+	// (so a replay tallies the same), scored for the MVP, and shown when the
+	// battle is decided ("Battle Report Mockups"; Docs/design/feat-battle-report.md).
+
+public:
+	struct FTMUnitTally
+	{
+		int32 Damage = 0;
+		int32 Taken = 0;
+		/** Damage that never landed: Armor or Resist's share, dodges and grazes, Protect or Shell, shields. */
+		int32 Mitigated = 0;
+		int32 Healing = 0;
+		int32 Kills = 0;
+		int32 Assists = 0;
+		int32 Deaths = 0;
+		int32 Monsters = 0;
+		int32 Bosses = 0;
+		int32 Buffs = 0;
+		int32 Debuffs = 0;
+		/** Enemy turns lost to Stun, Sleep, Taunt, Root, Charm and the like. */
+		int32 Control = 0;
+		int32 Revives = 0;
+		int32 Towers = 0;
+		int32 Biggest = 0;
+		int32 Crits = 0;
+		/** Damage taken in an ally's place (Guard). */
+		int32 Guarded = 0;
+		/** Damage dealt by each ability, by name; and damage taken from each unit, by id. */
+		TMap<FString, int32> ByAbility;
+		TMap<int32, int32> TakenFrom;
+	};
+	/** By unit id; the eight units of the two sides. */
+	TMap<int32, FTMUnitTally> Tallies;
+	/** A unit's points for the MVP, kept to the tenth. */
+	static double ScoreOf(const FTMUnitTally& Tally);
+	/** The MVP: the most points; a tie to fewer falls, then more damage. -1 before anything happened. */
+	int32 MvpId() const;
+	/** The report's tab: 0 overview, 1 damage, 2 support, 3 control; the unit opened in it, or -1. */
+	int32 ReportTab = 0;
+	int32 ReportUnit = -1;
+	/** The report is put away to look at the board. */
+	bool bReportHidden = false;
+
+private:
+	void ResetTallies();
+	/** Hp of every unit before an order is applied, so healing counts only what was missing. */
+	void SnapshotForTally();
+	void TallyEvents(const TMSim::FTickReport& Report);
+	TMap<int32, int32> TallyHp;
+	/** Who last hurt each unit (its killer when it falls), and who helped, with the tick. */
+	TMap<int32, int32> LastHurtBy;
+	TMap<int32, TMap<int32, int32>> HelpedAgainst;
+	/** Who put each status on each unit ("unit:status"), so a burn's ticks are its caster's. */
+	TMap<FString, int32> StatusFrom;
+	/** Within one report: shield soaked before the hit, a graze or a guard, per unit. */
+	TMap<int32, int32> PendingSoak;
+	TSet<int32> PendingGraze;
+	TSet<int32> PendingGuard;
 };

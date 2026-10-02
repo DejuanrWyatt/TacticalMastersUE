@@ -30,6 +30,9 @@ Unreal reads an Astra file, and nothing needs Astra to make a class.
   importer reads the Astra file it came from (`Tests/GodotClassTable.txt`, printed
   by the Godot project's `tests/dump_class_table.gd`). This runs only when that
   table is present.
+  A class whose creator notes carry `rebalanced` (changed on purpose) is left
+  out; one with `reworded` (its ability descriptions rewritten to say what the
+  abilities do, 2026-10-02) is compared on everything but those words.
 
 ## Particle effects
 
@@ -55,11 +58,20 @@ The creator shows these effects because the game films them:
 The creator's **Film again** button runs the same script. Run it again after
 installing more effects from Fab.
 
-## Not ported yet
+## Passive, toggle and aura abilities
 
-Passive, aura and toggle abilities load, but what they add to a unit's stats is
-not applied yet (`FUnit::Stat` says so where the gap is). Classes that rely on
-them play weaker in Unreal than in Godot until that is ported.
+They work: a passive's buffs, and a toggle's while it is on, are added in
+`FUnit::Stat`; an aura reaches every unit in its radius as a timed buff at the
+start of each turn (`FBattle::ApplyAuras`).
+
+## How strong a class is
+
+The class lab (`Tools/ClassLab`, built by its `Build.bat`) plays a class on the
+rules the game plays (`TMSim::GameTuning`) against the game's hard computer,
+standing in for the reference team's member with its first role, and four of it
+against that team. `TMClassLab tournament Content/Data/Classes` measures them
+all; the class creator shows the result in its Playtest tab ("Among every
+class"). A class as good at its job as the one it replaces wins half.
 
 ## Packaging
 

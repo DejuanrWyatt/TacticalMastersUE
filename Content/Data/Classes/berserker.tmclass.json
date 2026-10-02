@@ -48,7 +48,7 @@
     {
       "id": "berserker_rage",
       "name": "Rage",
-      "desc": "Switched on: AttPwr +8 but AttDef -4 while it lasts.",
+      "desc": "Switched on: Crit +10 but Armor -4 while it lasts.",
       "kind": "toggle",
       "effect": "support",
       "scale": "mag",
@@ -77,7 +77,7 @@
     {
       "id": "berserker_leap_smash",
       "name": "Leap Smash",
-      "desc": "Smash every enemy within 1.5 m of a point 2-5 m away, Stunning for 1 s (1 s).",
+      "desc": "Smash every enemy within 1.5 m of a point 2-5 m away; Stuns for 1 turn. (1 s)",
       "kind": "active",
       "effect": "damage",
       "scale": "att",
@@ -122,5 +122,15 @@
         "scale": 1
       }
     }
-  ]
+  ],
+  "creator": {
+    "rebalanced": {
+      "on": "2026-10-01",
+      "why": "Rage described as it plays (Crit, not the old AttPwr)"
+    },
+    "reworded": {
+      "on": "2026-10-02",
+      "why": "Descriptions say what the abilities do (2026-10-02): Stun not sleep, Crit not the old Power, turns not seconds"
+    }
+  }
 }

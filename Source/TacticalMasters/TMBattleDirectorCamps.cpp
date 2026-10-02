@@ -279,12 +279,11 @@ int32 ATMBattleDirector::TakeableCache(const TMSim::FUnit& Unit, FString* WhyNot
 		}
 		return -1;
 	}
-	// Whether the rules would take something from it now: into an empty slot, or over the first.
-	const bool bFull = Unit.Gear[0] && Unit.Gear[1] && Unit.Gear[2];
+	// Whether the rules would take something from it now, into the side's stash.
 	std::string Refused = "nothing there";
 	for (const TMSim::FItemDef* Item : Battle.Caches[static_cast<size_t>(Near)].Items)
 	{
-		Refused = Battle.ValidateTake(Unit.Id, Near, Item->Id, bFull ? 0 : -1);
+		Refused = Battle.ValidateTake(Unit.Id, Near, Item->Id, -1);
 		if (Refused.empty())
 		{
 			return Near;
@@ -299,37 +298,35 @@ int32 ATMBattleDirector::TakeableCache(const TMSim::FUnit& Unit, FString* WhyNot
 
 void ATMBattleDirector::TakeItem(int32 Code)
 {
-	// The panel's button: the item's place in the cache times four, and one
-	// more than the slot it goes over (nothing more for the first empty slot).
+	// One item lying within the selected unit's reach, into its side's stash: free.
 	const TMSim::FUnit* Unit = SelectedUnit();
-	if (!PlayerCanOrder(Unit) || TakePickerCache < 0 || TakePickerCache >= static_cast<int32>(Battle.Caches.size()))
+	if (!PlayerCanOrder(Unit))
 	{
 		return;
 	}
-	const int32 Index = Code / 4;
-	const int32 GearSlot = Code % 4 - 1;
-	const TMSim::FCache& Cache = Battle.Caches[static_cast<size_t>(TakePickerCache)];
-	if (Index < 0 || Index >= static_cast<int32>(Cache.Items.size()))
+	const int32 Near = Battle.CacheNear(Unit->Pos);
+	if (Near < 0 || Code < 0 || Code >= static_cast<int32>(Battle.Caches[static_cast<size_t>(Near)].Items.size()))
 	{
 		return;
 	}
-	const std::string ItemId = Cache.Items[static_cast<size_t>(Index)]->Id;
-	const std::string Refused = Battle.ValidateTake(Unit->Id, TakePickerCache, ItemId, GearSlot);
+	const std::string ItemId = Battle.Caches[static_cast<size_t>(Near)].Items[static_cast<size_t>(Code)]->Id;
+	const std::string Refused = Battle.ValidateTake(Unit->Id, Near, ItemId, -1);
 	if (!Refused.empty())
 	{
 		Tell(UTF8_TO_TCHAR(Refused.c_str()));
 		return;
 	}
-	const int32 From = TakePickerCache;
-	TakePickerCache = -1;
-	OrderSelected(TMSim::FOrder::MakeTake(Unit->Id, Unit->Serial, From, ItemId, GearSlot));
+	OrderSelected(TMSim::FOrder::MakeTake(Unit->Id, Unit->Serial, Near, ItemId, -1));
 }
 
-void ATMBattleDirector::DropItem(int32 GearSlot)
+void ATMBattleDirector::DropItem(int32 Code)
 {
-	const TMSim::FUnit* Unit = SelectedUnit();
-	if (!PlayerCanOrder(Unit))
+	// Taking an item off is that unit's whole turn: only on its turn, before it has done anything.
+	const TMSim::FUnit* Unit = Battle.FindUnit(Code / 4);
+	const int32 GearSlot = Code % 4;
+	if (!Unit || !PlayerCanOrder(Unit))
 	{
+		Tell(TEXT("An item comes off only on its wearer's turn, and takes the whole turn."));
 		return;
 	}
 	const std::string Refused = Battle.ValidateDrop(Unit->Id, GearSlot);
@@ -338,7 +335,76 @@ void ATMBattleDirector::DropItem(int32 GearSlot)
 		Tell(UTF8_TO_TCHAR(Refused.c_str()));
 		return;
 	}
+	if (Unit->Id != SelectedId)
+	{
+		SelectUnit(Unit->Id);
+	}
 	OrderSelected(TMSim::FOrder::MakeDrop(Unit->Id, Unit->Serial, GearSlot));
+	bTeamItemsOpen = false;
+}
+
+void ATMBattleDirector::EquipItem(int32 Code)
+{
+	const TMSim::FUnit* Unit = Battle.FindUnit(Code / 4);
+	const int32 GearSlot = Code % 4;
+	const int32 Team = ItemsTeam();
+	if (!Unit || Team < 0 || Unit->Team != Team || !MayManageItems(Team) || Battle.Winner != -1)
+	{
+		return;
+	}
+	const std::vector<TMSim::FBattle::FStashed>& Held = Battle.Stash[Team];
+	if (StashPick < 0 || StashPick >= static_cast<int32>(Held.size()) || !Held[static_cast<size_t>(StashPick)].Item)
+	{
+		Tell(Held.empty() ? TEXT("The stash is empty: walk onto items on the ground to pick them up.")
+			: TEXT("Choose an item from the stash first, then an open slot."));
+		return;
+	}
+	const std::string ItemId = Held[static_cast<size_t>(StashPick)].Item->Id;
+	const TMSim::FOrder Order = TMSim::FOrder::MakeEquip(Unit->Id, ItemId, GearSlot);
+	const std::string Refused = Battle.Validate(Order);
+	if (!Refused.empty())
+	{
+		Tell(UTF8_TO_TCHAR(Refused.c_str()));
+		return;
+	}
+	const FString Problem = Submit(Order);
+	if (!Problem.IsEmpty())
+	{
+		Tell(Problem);
+		return;
+	}
+	StashPick = -1;
+}
+
+int32 ATMBattleDirector::ItemsTeam() const
+{
+	if (bOnline)
+	{
+		return LocalTeam;
+	}
+	// One person against the computer: their side. Two at one screen: the side of the unit in hand.
+	if (ComputerPlays(0) != ComputerPlays(1))
+	{
+		return ComputerPlays(0) ? 1 : 0;
+	}
+	if (const TMSim::FUnit* Unit = SelectedUnit())
+	{
+		return Unit->Team == 0 || Unit->Team == 1 ? Unit->Team : 0;
+	}
+	return 0;
+}
+
+bool ATMBattleDirector::MayManageItems(int32 Team) const
+{
+	if (Team != 0 && Team != 1)
+	{
+		return false;
+	}
+	if (bOnline)
+	{
+		return Team == LocalTeam && OnlineStopped.IsEmpty() && !bWaitingForHost;
+	}
+	return !ComputerPlays(Team) && bPlayerInput;
 }
 
 FString ATMBattleDirector::MonsterLine(const TMSim::FUnit& Unit) const

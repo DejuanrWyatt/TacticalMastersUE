@@ -319,6 +319,24 @@ void ATMBattleHud::DrawHUD()
 		{
 			DrawOnline(*Found);
 		}
+		else if (Found->Screen == ATMBattleDirector::EScreen::Lobby)
+		{
+			DrawLobby(*Found);
+			if (Found->PickerSlot >= 0)
+			{
+				Buttons.Reset();
+				Tips.Reset();
+				DrawClassPicker(*Found);
+			}
+		}
+		else if (Found->Screen == ATMBattleDirector::EScreen::Draft)
+		{
+			DrawDraft(*Found);
+		}
+		else if (Found->Screen == ATMBattleDirector::EScreen::Replays)
+		{
+			DrawReplays(*Found);
+		}
 		else
 		{
 			DrawSetup(*Found);
@@ -350,7 +368,11 @@ void ATMBattleHud::DrawHUD()
 
 	// Under everything else, since it is drawn onto the board.
 	{ TM_SLOW("Hud BoardAids"); DrawBoardAids(*Found); }
-	{ TM_SLOW("Hud Overheads"); DrawOverheads(*Found); }
+	if (Found->bShowStatusBars)
+	{
+		TM_SLOW("Hud Overheads");
+		DrawOverheads(*Found);
+	}
 	{ TM_SLOW("Hud WorldWords"); DrawWorldWords(*Found); }
 	TM_SLOW("Hud rest");
 	if (FTMSettings::Get().bTurnSquares)
@@ -364,11 +386,14 @@ void ATMBattleHud::DrawHUD()
 	DrawLog(*Found);
 	DrawUnitCard(*Found);
 	DrawActionBar(*Found);
-	DrawTakePicker(*Found);
 	DrawField(*Found);
 	DrawInspectCard(*Found);
 	DrawCornerButtons(*Found);
+	// Watching a replay: its bar along the bottom (TMBattleHudReplay.cpp).
+	DrawReplayBar(*Found);
 	DrawBanners(*Found);
+	// Over the panels: the team items screen, while it is open.
+	DrawTeamItems(*Found);
 	// Over everything else, only the open overlay's buttons answer.
 	if (Found->bGuideOpen)
 	{
@@ -439,7 +464,9 @@ void ATMBattleHud::DrawBoardAids(ATMBattleDirector& From)
 		const TMSim::FVec2 Middle = From.Battle.CapturePoint();
 		for (const TMSim::FUnit& Unit : From.Battle.Units)
 		{
-			if (Unit.IsAlive() && static_cast<double>(Unit.Pos.DistanceTo(Middle)) <= TMSim::FBattle::CaptureRadius)
+			// Only the two sides count (the rules' TickCapture): a monster (team 2)
+			// standing here once wrote past the end of this array.
+			if (Unit.IsAlive() && (Unit.Team == 0 || Unit.Team == 1) && static_cast<double>(Unit.Pos.DistanceTo(Middle)) <= TMSim::FBattle::CaptureRadius)
 			{
 				++Standing[Unit.Team];
 			}
@@ -454,18 +481,21 @@ void ATMBattleHud::DrawBoardAids(ATMBattleDirector& From)
 		}
 	}
 
-	// The watchtowers: the ring a unit must stand in to take one, in the colour
-	// of whoever holds it (grey for nobody), and over it how far a side is into
-	// taking it. Always shown: a tower is part of the ground, not a unit.
+	// The watchtowers: over each, how far a side is into taking it. Their reach
+	// is shown only for the one under the pointer, as thin white lines painted on
+	// the ground (TMBattleDirectorIndicators.cpp); flat here only without that.
 	{
 		UFont* TowerFont = GEngine->GetMediumFont();
 		const int32 Needed = From.Battle.CaptureTurnsNeeded();
+		const int32 Hovered = From.bIndicatorDecal ? -1 : From.HoveredTower();
+		int32 TowerIndex = -1;
 		for (const TMSim::FWatchtower& Tower : From.Battle.Watchtowers)
 		{
-			const FLinearColor Ring = Tower.Owner >= 0 ? TeamColour(Tower.Owner) : FLinearColor(0.85f, 0.85f, 0.9f, 0.7f);
-			if (!From.bIndicatorDecal)
+			++TowerIndex;
+			if (TowerIndex == Hovered)
 			{
-				BoardRing(From, Tower.Pos, static_cast<float>(TMSim::Watchtower::Reach), Ring, 2.5f);
+				BoardRing(From, Tower.Pos, static_cast<float>(From.Battle.Tuning.WatchtowerSight), FLinearColor(1.0f, 1.0f, 1.0f, 0.9f), 1.0f);
+				BoardRing(From, Tower.Pos, static_cast<float>(TMSim::Watchtower::Reach), FLinearColor(1.0f, 1.0f, 1.0f, 0.55f), 1.0f);
 			}
 			if (Tower.Capturer >= 0 && Tower.Progress > 0)
 			{
@@ -516,7 +546,7 @@ void ATMBattleHud::DrawBoardAids(ATMBattleDirector& From)
 	}
 
 	const TMSim::FUnit* Unit = From.SelectedUnit();
-	if (!From.PlayerCanOrder(Unit))
+	if (!From.PlayerCanCommand(Unit))
 	{
 		return;
 	}
@@ -665,7 +695,13 @@ void ATMBattleHud::DrawBoardAids(ATMBattleDirector& From)
 		{
 			Line = FString::Printf(TEXT("-%d"), Hit.Amount);
 			const int32 Miss = From.Battle.EvadeChance(*Target, *Ability, Unit);
-			if (Miss > 0)
+			if (Miss > 0 && From.Battle.NewDefense())
+			{
+				// An evasion mostly grazes (2026-10-01): say for how much.
+				Line += FString::Printf(TEXT("  %d%% evade (graze -%d)"), Miss,
+					FMath::Max(TMSim::Combat::MinimumDamage, TMSim::RoundToInt(Hit.Amount * TMSim::Combat::GrazeDamage)));
+			}
+			else if (Miss > 0)
 			{
 				Line += FString::Printf(TEXT("  %d%% miss"), Miss);
 			}
@@ -717,7 +753,9 @@ void ATMBattleHud::DrawActionBar(ATMBattleDirector& From)
 	{
 		return;
 	}
-	const bool bControllable = From.PlayerCanOrder(Unit);
+	// A unit being planned: its buttons as they will be when its turn comes.
+	const ATMBattleDirector::FPlanStandIn Stand(From);
+	const bool bControllable = From.PlayerCanCommand(Unit);
 
 	UFont* Font = GEngine->GetMediumFont();
 	const float Tile = 100.0f * S;
@@ -727,7 +765,8 @@ void ATMBattleHud::DrawActionBar(ATMBattleDirector& From)
 	// with the neutral camps, or when anything lies on the ground or is carried;
 	// and one tile for each ability an item gives.
 	const bool bTowers = !From.Battle.Watchtowers.empty();
-	const bool bItems = !From.Battle.Camps.empty() || !From.Battle.Caches.empty() || Unit->HasItems();
+	const bool bItems = !From.Battle.Camps.empty() || !From.Battle.Caches.empty() || Unit->HasItems()
+		|| ((Unit->Team == 0 || Unit->Team == 1) && !From.Battle.Stash[Unit->Team].empty());
 	int32 ItemAbilities = 0;
 	for (int32 Slot = TMSim::ClassSlots; Slot < TMSim::AbilitySlots; ++Slot)
 	{
@@ -786,11 +825,12 @@ void ATMBattleHud::DrawActionBar(ATMBattleDirector& From)
 		FString WhyNot;
 		const int32 Near = From.TakeableCache(*Unit, &WhyNot);
 		const float TileX = X;
-		WordTile(TEXT("ITEMS"), Near >= 0 ? FString(TEXT("take")) : FString::Printf(TEXT("%d/3"), (Unit->Gear[0] ? 1 : 0) + (Unit->Gear[1] ? 1 : 0) + (Unit->Gear[2] ? 1 : 0)),
-			bControllable, From.TakePickerCache != -1, ETMHudAction::TakeOpen);
-		AddTip(TileX, Y + Tile - Small, Small, Small, Near >= 0
-			? FString(TEXT("Items lie within reach: take one with this unit's action, or leave one of its own."))
-			: FString(TEXT("What this unit carries, to leave on the ground for an ally. Stand next to items to take them.")));
+		const int32 Stashed = Unit->Team == 0 || Unit->Team == 1 ? static_cast<int32>(From.Battle.Stash[Unit->Team].size()) : 0;
+		WordTile(TEXT("ITEMS"), Near >= 0 ? FString(TEXT("pick up")) : Stashed > 0 ? FString::Printf(TEXT("stash %d"), Stashed)
+			: FString::Printf(TEXT("%d/3"), (Unit->Gear[0] ? 1 : 0) + (Unit->Gear[1] ? 1 : 0) + (Unit->Gear[2] ? 1 : 0)),
+			true, From.bTeamItemsOpen, ETMHudAction::TakeOpen);
+		AddTip(TileX, Y + Tile - Small, Small, Small,
+			TEXT("The team's items: each unit, what it wears and its open slots, and the stash. Items picked up go to the stash; equip them on any unit with an open slot. A worn item comes off only when its unit falls or spends a turn taking it off."));
 	}
 	if (bTowers)
 	{
@@ -914,21 +954,39 @@ void ATMBattleHud::DrawBanners(ATMBattleDirector& From)
 				Ability->Cooldown);
 		}
 	}
-	else if (From.PlayerCanOrder(Unit) && From.AimMode == ATMBattleDirector::EAimMode::Move && From.bHaveHover)
+	else if (From.PlayerCanCommand(Unit) && From.AimMode == ATMBattleDirector::EAimMode::Move && From.bHaveHover)
 	{
 		const TMSim::FNode Node = TMSim::FMap::NodeOf(From.HoverPoint);
+		const FTMSettings& Keys = FTMSettings::Get();
+		const int32 Ways = static_cast<int32>(From.WayPoints.size());
 		for (const std::pair<TMSim::FNode, double>& Entry : From.Reachable)
 		{
 			if (Entry.first == Node)
 			{
-				Preview = FString::Printf(TEXT("Walk here: %.1f m of %.1f m"),
-					Entry.second, From.Battle.MoveOf(*Unit, From.bSprinting));
+				// Planned or now, by any waypoints, and how to add one (2026-10-01).
+				Preview = FString::Printf(TEXT("%s: %.1f m of %.1f m%s   %s+click: waypoint%s"),
+					From.IsPlanningSelected() ? TEXT("Plan the walk here") : TEXT("Walk here"),
+					Entry.second, From.Battle.MoveOf(*Unit, From.bSprinting),
+					Ways > 0 ? *FString::Printf(TEXT(" by %d waypoint%s"), Ways, Ways == 1 ? TEXT("") : TEXT("s")) : TEXT(""),
+					*Keys.KeyName(ETMAction::Waypoint),
+					Ways > 0 ? *FString::Printf(TEXT("   %s: undo one"), *Keys.KeyName(ETMAction::PlanUndo)) : TEXT(""));
 				break;
 			}
 		}
+		if (Preview.IsEmpty() && !From.GoToHoverStops.empty())
+		{
+			// Beyond the walk area: a Go To, over as many turns as it takes.
+			const int32 Turns = static_cast<int32>(From.GoToHoverStops.size());
+			Preview = FString::Printf(TEXT("Go To: %d turn%s, %.1f m. Click to set: each turn it walks, then ends its turn."),
+				Turns, Turns == 1 ? TEXT("") : TEXT("s"), From.GoToHoverMetres);
+			PreviewColour = FLinearColor(0.55f, 0.75f, 1.0f);
+		}
 	}
-	else if (From.PlayerCanOrder(Unit) && From.AimMode == ATMBattleDirector::EAimMode::Ability)
+	else if (From.PlayerCanCommand(Unit) && From.AimMode == ATMBattleDirector::EAimMode::Ability)
 	{
+		// A unit being planned aims from where its planned walk ends.
+		const ATMBattleDirector::FPlanStandIn Stand(From);
+		const bool bPlanned = From.IsPlanningSelected();
 		const ATMBattleDirector::FAim Where = From.Aim();
 		TMSim::FVec2 Spot;
 		double Walk = 0.0;
@@ -940,8 +998,10 @@ void ATMBattleHud::DrawBanners(ATMBattleDirector& From)
 			if (From.ClosestSpotInRange(*Unit, From.AimSlot, Where.Point, Spot, Walk))
 			{
 				const TMSim::FUnit* Target = From.Battle.FindUnit(Where.Follow);
-				Preview = FString::Printf(TEXT("%hs: out of range. Click to walk %.1f m and use it where %s is standing now."),
-					Aimed->Name.c_str(), Walk, Target ? *JobName(*Target) : TEXT("the target"));
+				Preview = bPlanned
+					? FString::Printf(TEXT("%hs: out of range. Click to plan a walk of %.1f m, then it."), Aimed->Name.c_str(), Walk)
+					: FString::Printf(TEXT("%hs: out of range. Click to walk %.1f m and use it where %s is standing now."),
+						Aimed->Name.c_str(), Walk, Target ? *JobName(*Target) : TEXT("the target"));
 				PreviewColour = FLinearColor(1.0f, 0.9f, 0.35f);
 			}
 			else
@@ -959,7 +1019,8 @@ void ATMBattleHud::DrawBanners(ATMBattleDirector& From)
 		{
 			const TMSim::FAbility* Ability = Unit->Ability(From.AimSlot);
 			const int32 Hits = static_cast<int32>(From.Battle.Preview(*Unit, From.AimSlot, Unit->Pos, Where.Point).size());
-			Preview = FString::Printf(TEXT("%hs: click to use. Reaches %d."), Ability ? Ability->Name.c_str() : "", Hits);
+			Preview = FString::Printf(TEXT("%hs: click to %s. Reaches %d%s."), Ability ? Ability->Name.c_str() : "",
+				bPlanned ? TEXT("plan it") : TEXT("use"), Hits, bPlanned ? TEXT(" as things stand now") : TEXT(""));
 			PreviewColour = FLinearColor(0.55f, 1.0f, 0.6f);
 		}
 	}
@@ -972,6 +1033,17 @@ void ATMBattleHud::DrawBanners(ATMBattleDirector& From)
 		Panel(CentreX - Size.X * 0.5f - 10.0f * S, Above - 4.0f * S, Size.X + 20.0f * S, Size.Y + 8.0f * S, PanelFill);
 		Text(Preview, CentreX - Size.X * 0.5f, Above, PreviewColour, Font, Scale);
 		Above -= 8.0f * S;
+	}
+
+	// Queued orders (2026-10-01): the plan being made, as steps, with its buttons.
+	if (Unit && From.GoToOf(Unit->Id) && From.PlayerCanCommand(Unit))
+	{
+		// A Go To (2026-10-01): its turns, how each ends, and its buttons.
+		Above = DrawGoToStrip(From, *Unit, Above);
+	}
+	else if (Unit && From.IsPlanningSelected())
+	{
+		Above = DrawPlanStrip(From, *Unit, Above);
 	}
 
 	// Why the last thing did not work, for a few seconds.
@@ -992,7 +1064,7 @@ void ATMBattleHud::DrawBanners(ATMBattleDirector& From)
 		int32 Soonest = 0;
 		for (const TMSim::FUnit& Candidate : From.Battle.Units)
 		{
-			if (!Candidate.IsAlive() || From.ComputerPlays(Candidate.Team))
+			if (!Candidate.IsAlive() || (From.bOnline ? From.UnitOwner(Candidate) != From.LocalPlayer : From.ComputerPlays(Candidate.Team)))
 			{
 				continue;
 			}
@@ -1005,7 +1077,8 @@ void ATMBattleHud::DrawBanners(ATMBattleDirector& From)
 		}
 		if (Next)
 		{
-			const FString Line = FString::Printf(TEXT("Waiting: %s %d is up in %.1fs"), *JobName(*Next), Next->Id, Soonest / Tps);
+			const FString Line = FString::Printf(TEXT("Waiting: %s %d is up in %.1fs   Click one of yours to plan its turn"),
+				*JobName(*Next), Next->Id, Soonest / Tps);
 			const float Scale = 0.72f * S;
 			const FVector2D Size = TextSize(Line, Font, Scale);
 			const float Y = Canvas->ClipY - Size.Y - 30.0f * S;
@@ -1059,9 +1132,14 @@ void ATMBattleHud::DrawBanners(ATMBattleDirector& From)
 			Line = From.HowWon().IsEmpty() ? TEXT("Nobody is left standing") : TEXT("A draw");
 			Colour = Dim;
 		}
+		else if (From.bReplaying)
+		{
+			Line = From.Battle.Winner == 0 ? TEXT("Blue wins") : TEXT("Red wins");
+			Colour = TeamColour(From.Battle.Winner);
+		}
 		else if (From.bOnline)
 		{
-			Line = From.Battle.Winner == From.LocalTeam ? TEXT("You win!") : TEXT("Your opponent wins");
+			Line = From.Battle.Winner == From.LocalTeam ? TEXT("Your side wins!") : TEXT("Your side is beaten");
 			Colour = From.Battle.Winner == From.LocalTeam ? Gold : Urgent;
 		}
 		else if (From.ComputerPlays(0) == From.ComputerPlays(1))
@@ -1075,11 +1153,25 @@ void ATMBattleHud::DrawBanners(ATMBattleDirector& From)
 			Line = From.ComputerPlays(From.Battle.Winner) ? TEXT("The computer wins") : TEXT("You win!");
 			Colour = From.ComputerPlays(From.Battle.Winner) ? Urgent : Gold;
 		}
+		// The battle report: the MVP, every unit's numbers, the moments (TMBattleHudReport.cpp);
+		// or, put away to look at the board, a button to bring it back.
+		if (From.Tallies.Num() > 0)
+		{
+			if (!From.bReportHidden)
+			{
+				DrawBattleReport(From, Line, Colour);
+			}
+			else
+			{
+				MenuButton(CentreX - 120.0f * S, 70.0f * S, 240.0f * S, 48.0f * S, TEXT("Battle report"), ETMHudAction::ReportHide, -1, true);
+			}
+			return;
+		}
 		const FString How = From.HowWon();
 		const FString Time = FString::Printf(TEXT("%safter %.0f seconds   seed %llu"),
 			How.IsEmpty() ? TEXT("") : *(How + TEXT("   ")), From.Battle.TickCount / Tps, From.BattleSeed);
 		const FVector2D Size = TextSize(Line, Big, 1.0f * S);
-		const float PW = FMath::Max(Size.X + 80.0f * S, 560.0f * S);
+		const float PW = FMath::Max(Size.X + 80.0f * S, 760.0f * S);  // four buttons fit
 		const float PH = 190.0f * S;
 		const float PX = CentreX - PW * 0.5f;
 		const float PY = Canvas->ClipY * 0.32f;
@@ -1094,20 +1186,39 @@ void ATMBattleHud::DrawBanners(ATMBattleDirector& From)
 			const float BH = 44.0f * S;
 			const float Gap = 10.0f * S;
 			const float BY = PY + PH - BH - 20.0f * S;
-			if (From.bOnline)
+			if (From.bReplaying)
 			{
-				// Online, a rematch starts once both have asked (net.gd:139-143).
-				const FString Again = From.bWantRematch ? TEXT("Waiting for opponent...")
-					: From.bOpponentWantsRematch ? TEXT("Accept rematch  (R)") : TEXT("Rematch  (R)");
+				// The end of a replay: again, the other replays, or the title.
+				float BX = CentreX - (3.0f * BW + 2.0f * Gap) * 0.5f;
+				MenuButton(BX, BY, BW, BH, TEXT("Watch again"), ETMHudAction::ReplayAgain, -1, true);
+				BX += BW + Gap;
+				MenuButton(BX, BY, BW, BH, TEXT("Replays"), ETMHudAction::ReplayLeave);
+				BX += BW + Gap;
+				MenuButton(BX, BY, BW, BH, TEXT("Main menu"), ETMHudAction::MenuTitle);
+			}
+			else if (From.bOnline)
+			{
+				// Online, the host takes everyone back to the lobby for the next one.
+				const bool bHost = From.Net.IsValid() && From.Net->IsHost();
 				float BX = CentreX - (2.0f * BW + Gap) * 0.5f - 20.0f * S;
-				MenuButton(BX, BY, BW + 40.0f * S, BH, Again, ETMHudAction::NewBattle, -1, !From.bWantRematch);
+				if (bHost)
+				{
+					MenuButton(BX, BY, BW + 40.0f * S, BH, TEXT("Back to lobby  (R)"), ETMHudAction::NewBattle, -1, true);
+				}
+				else
+				{
+					ChoiceButton(BX, BY, BW + 40.0f * S, BH, TEXT("Waiting for the host..."), ETMHudAction::NewBattle, -1, false);
+				}
 				BX += BW + 40.0f * S + Gap;
 				MenuButton(BX, BY, BW, BH, TEXT("Main menu"), ETMHudAction::MenuTitle);
 			}
 			else
 			{
-				float BX = CentreX - (3.0f * BW + 2.0f * Gap) * 0.5f;
+				// And the battle just played, from the start (TMBattleDirectorReplay.cpp).
+				float BX = CentreX - (4.0f * BW + 3.0f * Gap) * 0.5f;
 				MenuButton(BX, BY, BW, BH, TEXT("Rematch  (R)"), ETMHudAction::NewBattle, -1, true);
+				BX += BW + Gap;
+				MenuButton(BX, BY, BW, BH, TEXT("Watch replay"), ETMHudAction::ReplayWatch, -1);
 				BX += BW + Gap;
 				MenuButton(BX, BY, BW, BH, TEXT("Change setup"), ETMHudAction::MenuSetup);
 				BX += BW + Gap;
@@ -1129,6 +1240,146 @@ FVector2D ATMBattleHud::MousePoint() const
 		return FVector2D(MX, MY);
 	}
 	return FVector2D(-1.0f, -1.0f);
+}
+
+float ATMBattleHud::DrawGoToStrip(ATMBattleDirector& From, const TMSim::FUnit& Unit, float Above)
+{
+	// "Multi-Turn Move Mockups" A and B: where it is going and in how many turns,
+	// how each turn on the road ends, and, stopped, why and Keep going.
+	const ATMBattleDirector::FTMGoTo* Order = From.GoToOf(Unit.Id);
+	if (!Order)
+	{
+		return Above;
+	}
+	UFont* Font = GEngine->GetMediumFont();
+	const FTMSettings& Keys = FTMSettings::Get();
+	const float Scale = 0.6f * S;
+	const float ChipH = 34.0f * S;
+	const float Gap = 8.0f * S;
+	const FLinearColor Blue(0.44f, 0.66f, 1.0f);
+	const int32 Turns = static_cast<int32>(Order->Stops.size());
+	const FString Lead = Order->bStopped
+		? FString::Printf(TEXT("Stopped: %s."), *Order->Why)
+		: FString::Printf(TEXT("Go To: %d turn%s left"), Turns, Turns == 1 ? TEXT("") : TEXT("s"));
+	const FString EndLabel = TEXT("Walk and end");
+	const FString WaitLabel = TEXT("Walk, wait for me");
+	const FString GoLabel = FString::Printf(TEXT("Keep going (%s)"), *Keys.KeyName(ETMAction::PlanTurn));
+	const FString CancelLabel = FString::Printf(TEXT("Cancel (%s)"), *Keys.KeyName(ETMAction::PlanUndo));
+	auto Width = [&](const FString& Label) { return TextSize(Label, Font, Scale).X + 24.0f * S; };
+	float W = TextSize(Lead, Font, Scale).X + Gap + Width(EndLabel) + Gap + Width(WaitLabel) + Gap + Width(CancelLabel);
+	if (Order->bStopped)
+	{
+		W += Width(GoLabel) + Gap;
+	}
+	const float PadX = 12.0f * S;
+	const float H = ChipH + 16.0f * S;
+	const float X0 = Canvas->ClipX * 0.5f - (W + 2.0f * PadX) * 0.5f;
+	const float Y0 = Above - H - 8.0f * S;
+	Panel(X0, Y0, W + 2.0f * PadX, H, PanelFill,
+		Order->bStopped ? FLinearColor(1.0f, 0.54f, 0.48f, 0.6f) : FLinearColor(Blue.R, Blue.G, Blue.B, 0.6f), 1.0f);
+	float X = X0 + PadX;
+	const float Y = Y0 + 8.0f * S;
+	Text(Lead, X, Y + (ChipH - TextSize(Lead, Font, Scale).Y) * 0.5f, Order->bStopped ? FLinearColor(1.0f, 0.68f, 0.62f) : FLinearColor(0.81f, 0.88f, 1.0f), Font, Scale);
+	X += TextSize(Lead, Font, Scale).X + Gap;
+	if (Order->bStopped)
+	{
+		MenuButton(X, Y, Width(GoLabel), ChipH, GoLabel, ETMHudAction::PlanGo, -1, true);
+		X += Width(GoLabel) + Gap;
+	}
+	// The two ways a turn on the road ends; the one chosen is lit.
+	MenuButton(X, Y, Width(EndLabel), ChipH, EndLabel, ETMHudAction::GoToMode, 0, !Order->bWaitForMe);
+	X += Width(EndLabel) + Gap;
+	MenuButton(X, Y, Width(WaitLabel), ChipH, WaitLabel, ETMHudAction::GoToMode, 1, Order->bWaitForMe);
+	X += Width(WaitLabel) + Gap;
+	MenuButton(X, Y, Width(CancelLabel), ChipH, CancelLabel, ETMHudAction::GoToCancel);
+	return Y0 - 8.0f * S;
+}
+
+float ATMBattleHud::DrawPlanStrip(ATMBattleDirector& From, const TMSim::FUnit& Unit, float Above)
+{
+	// The plan as the steps it will take -- walk, ability, end of turn -- and
+	// its buttons: Go inside a turn, Done for a unit still waiting, Undo, Clear
+	// (Docs/design/feat-move-queue.md, B).
+	UFont* Font = GEngine->GetMediumFont();
+	const FTMSettings& Keys = FTMSettings::Get();
+	const ATMBattleDirector::FTMPlan* Plan = From.PlanOf(Unit.Id);
+	const float Scale = 0.6f * S;
+	const float ChipH = 34.0f * S;
+	const float Gap = 8.0f * S;
+	const FLinearColor WalkFill(0.43f, 0.66f, 1.0f, 0.2f);
+	const FLinearColor AimFill(0.82f, 0.65f, 1.0f, 0.2f);
+	struct FChip { FString Label; FLinearColor Fill; FLinearColor Ink; };
+	TArray<FChip> Chips;
+	if (Plan && Plan->bWalk)
+	{
+		const int32 Ways = static_cast<int32>(Plan->Via.size());
+		Chips.Add({ FString::Printf(TEXT("%s %.1f m%s"), Plan->bSprint ? TEXT("Sprint") : TEXT("Walk"), Plan->Metres,
+			Ways > 0 ? *FString::Printf(TEXT(", %d waypoint%s"), Ways, Ways == 1 ? TEXT("") : TEXT("s")) : TEXT("")),
+			WalkFill, FLinearColor(0.81f, 0.88f, 1.0f) });
+	}
+	if (Plan && Plan->HasAbility())
+	{
+		const TMSim::FAbility* Ability = Unit.Ability(Plan->Slot);
+		Chips.Add({ FString(UTF8_TO_TCHAR(Ability ? Ability->Name.c_str() : "Ability")), AimFill, FLinearColor(0.92f, 0.87f, 1.0f) });
+	}
+	if (Plan && Plan->bWalk && (Plan->HasAbility() || Plan->bSprint))
+	{
+		Chips.Add({ TEXT("End turn"), FLinearColor(1.0f, 1.0f, 1.0f, 0.06f), Dim });
+	}
+	const FString Lead = Unit.bReady ? TEXT("This turn:") : TEXT("Next turn:");
+	const FString Empty = TEXT("Nothing yet: click where it walks, or pick an ability");
+	const bool bGo = Unit.bReady && Plan && !Plan->IsEmpty();
+	const FString GoLabel = FString::Printf(TEXT("%s (%s)"), bGo ? TEXT("Go") : TEXT("Done"), *Keys.KeyName(ETMAction::PlanTurn));
+	const FString UndoLabel = FString::Printf(TEXT("Undo (%s)"), *Keys.KeyName(ETMAction::PlanUndo));
+	const FString ClearLabel = TEXT("Clear");
+	auto Width = [&](const FString& Label) { return TextSize(Label, Font, Scale).X + 24.0f * S; };
+	const float Arrow = 18.0f * S;
+	float W = Width(Lead) + Gap;
+	if (Chips.Num() == 0)
+	{
+		W += TextSize(Empty, Font, Scale).X + Gap;
+	}
+	for (const FChip& Chip : Chips)
+	{
+		W += Width(Chip.Label) + Arrow;
+	}
+	W += Width(GoLabel) + Gap + Width(UndoLabel) + Gap + Width(ClearLabel);
+	const float PadX = 12.0f * S;
+	const float H = ChipH + 16.0f * S;
+	const float X0 = Canvas->ClipX * 0.5f - (W + 2.0f * PadX) * 0.5f;
+	const float Y0 = Above - H - 8.0f * S;
+	Panel(X0, Y0, W + 2.0f * PadX, H, PanelFill, FLinearColor(Gold.R, Gold.G, Gold.B, 0.55f), 1.0f);
+	float X = X0 + PadX;
+	const float Y = Y0 + 8.0f * S;
+	auto Middle = [&](const FString& Label) { return Y + (ChipH - TextSize(Label, Font, Scale).Y) * 0.5f; };
+	Text(Lead, X, Middle(Lead), Dim, Font, Scale);
+	X += Width(Lead) - 12.0f * S + Gap;
+	if (Chips.Num() == 0)
+	{
+		Text(Empty, X, Middle(Empty), Dim, Font, Scale);
+		X += TextSize(Empty, Font, Scale).X + Gap;
+	}
+	for (int32 i = 0; i < Chips.Num(); ++i)
+	{
+		const FChip& Chip = Chips[i];
+		const float CW = Width(Chip.Label);
+		Panel(X, Y, CW, ChipH, Chip.Fill);
+		const FString Numbered = Chip.Label;
+		Text(Numbered, X + 12.0f * S, Middle(Numbered), Chip.Ink, Font, Scale);
+		X += CW;
+		if (i + 1 < Chips.Num())
+		{
+			const FString To = TEXT(">");
+			Text(To, X + (Arrow - TextSize(To, Font, Scale).X) * 0.5f, Middle(To), Dim, Font, Scale);
+		}
+		X += Arrow;
+	}
+	MenuButton(X, Y, Width(GoLabel), ChipH, GoLabel, ETMHudAction::PlanGo, -1, true);
+	X += Width(GoLabel) + Gap;
+	MenuButton(X, Y, Width(UndoLabel), ChipH, UndoLabel, ETMHudAction::PlanUndo);
+	X += Width(UndoLabel) + Gap;
+	MenuButton(X, Y, Width(ClearLabel), ChipH, ClearLabel, ETMHudAction::PlanClear);
+	return Y0 - 8.0f * S;
 }
 
 void ATMBattleHud::MenuButton(float X, float Y, float W, float H, const FString& Label, ETMHudAction Action, int32 Value,
@@ -1185,6 +1436,8 @@ void ATMBattleHud::DrawTitle(ATMBattleDirector& From)
 	Y += H + Gap;
 	MenuButton(X, Y, W, H, TEXT("Play Online"), ETMHudAction::TitleOnline, -1, false, TEXT("host a battle, or join one"));
 	Y += H + Gap * 3.0f;
+	MenuButton(X, Y, W, 44.0f * S, TEXT("Replays"), ETMHudAction::TitleReplays);
+	Y += 44.0f * S + Gap;
 	MenuButton(X, Y, W, 44.0f * S, FString::Printf(TEXT("Codex  (%s)"), *FTMSettings::Get().KeyName(ETMAction::UnitGuide)), ETMHudAction::ToggleGuide);
 	Y += 44.0f * S + Gap;
 	MenuButton(X, Y, W, 44.0f * S, TEXT("Options"), ETMHudAction::OpenOptions);
@@ -1211,7 +1464,7 @@ void ATMBattleHud::DrawSetup(ATMBattleDirector& From)
 	// The whole screen always fits, whatever the UI scale: shrunk to the
 	// window if it would run off it, so Start is never out of reach.
 	const float WasS = S;
-	S = FMath::Min(S, FMath::Min((Canvas->ClipY - 16.0f) / 940.0f, (Canvas->ClipX - 16.0f) / 1180.0f));
+	S = FMath::Min(S, FMath::Min((Canvas->ClipY - 16.0f) / 980.0f, (Canvas->ClipX - 16.0f) / 1180.0f));
 	ON_SCOPE_EXIT
 	{
 		S = WasS;
@@ -1221,8 +1474,9 @@ void ATMBattleHud::DrawSetup(ATMBattleDirector& From)
 	const bool bHosting = Setup.Mode == TEXT("online");
 
 	const float PW = 1180.0f * S;
-	// Tall enough for the right column's seven rules and the notes under them.
-	const float PH = 940.0f * S;
+	// Tall enough for the right column's ten rules with Back and Start below
+	// them, not over the last (2026-10-01: Start covered Friendly fire).
+	const float PH = 980.0f * S;
 	const float PX = (Canvas->ClipX - PW) * 0.5f;
 	const float PY = FMath::Max(8.0f * S, (Canvas->ClipY - PH) * 0.5f);
 	Panel(PX, PY, PW, PH, FLinearColor(0.05f, 0.06f, 0.1f, 0.94f), FLinearColor(0.4f, 0.45f, 0.55f, 0.8f), 1.5f);
@@ -1380,9 +1634,13 @@ void ATMBattleHud::DrawSetup(ATMBattleDirector& From)
 		static const TCHAR* CampWords[] = { TEXT("Off"), TEXT("Light"), TEXT("Standard"), TEXT("Wild") };
 		Row(TEXT("Neutral camps"), CampWords[FMath::Clamp(Setup.CampLevel, 0, 3)], ETMHudAction::SetupCamps, -1);
 		AddTip(RowX, Y - 46.0f * S, LabelW + ValueW, 38.0f * S,
-			TEXT("Monster camps in mirrored pairs, waking over time: easy ones at once, harder ones later, and the map's boss in the middle (Standard and Wild). Their temperament shows over the camp. Beaten camps leave items on the ground to take, and come back a while later. Monsters never fight each other."));
+			TEXT("Monster camps in mirrored pairs, waking over time: easy ones at once, harder ones later, and the map's boss in the middle (Standard and Wild). Their temperament shows over the camp. Beaten camps leave items on the ground to take; with Camp respawns on, they come back a while later. Monsters never fight each other."));
 		const TMSim::FMapDef& BossMap = TMSim::FindMap(Setup.MapId);
 		const TMSim::FJobDef* Boss = TMSim::FindJob(BossMap.Boss);
+		Row(TEXT("Camp respawns"), Setup.bCampRespawn ? FString(TEXT("On: cleared camps come back")) : FString(TEXT("Off: cleared stays cleared")),
+			ETMHudAction::SetupCampRespawn, -1);
+		AddTip(RowX, Y - 46.0f * S, LabelW + ValueW, 38.0f * S,
+			TEXT("On, a cleared camp wakes again a while later (easy after 60 s, up to 5 minutes for the boss). Off, each camp can be cleared once."));
 		Row(TEXT("Boss"), Setup.bRandomBoss ? FString(TEXT("Random each battle"))
 			: FString::Printf(TEXT("%hs (the map's own)"), Boss ? Boss->Name.c_str() : "none"), ETMHudAction::SetupBoss, -1);
 		AddTip(RowX, Y - 46.0f * S, LabelW + ValueW, 38.0f * S,
@@ -1390,22 +1648,12 @@ void ATMBattleHud::DrawSetup(ATMBattleDirector& From)
 		Row(TEXT("Elements"), Setup.bElements ? FString(TEXT("Reactions on")) : FString(TEXT("Off")), ETMHudAction::SetupElements, -1);
 		AddTip(RowX, Y - 46.0f * S, LabelW + ValueW, 38.0f * S,
 			TEXT("Water abilities leave their target Wet and ice abilities Chill it. Lightning then stuns the Wet (and the Wet near them), ice freezes them, and fire sets the Oiled burning. Off, only abilities that say so apply Wet or Chilled; the reactions still happen."));
+		Row(TEXT("Friendly fire"), Setup.bFriendlyFire ? FString(TEXT("On: area blows hit allies")) : FString(TEXT("Off")),
+			ETMHudAction::SetupFriendlyFire, -1);
+		AddTip(RowX, Y - 46.0f * S, LabelW + ValueW, 38.0f * S,
+			TEXT("On: cones, lines, charges and blasts aimed at the enemy also hurt your own units standing in them (never the caster, never a single-target blow). Aim with care."));
 		RowX = LeftRowX;
 		Y = LeftY;
-	}
-
-	// What the Godot setup offers that is not here yet, said where it would be.
-	float NoteY = ColumnTop + 36.0f * S + 4.0f * 64.0f * S + 64.0f * S + 8.0f * 46.0f * S + 10.0f * S;
-	const TCHAR* Notes[] =
-	{
-		TEXT("Not ported yet:"),
-		TEXT("  Godot's other four maps, and saved teams"),
-
-	};
-	for (const TCHAR* Note : Notes)
-	{
-		Text(Note, NoteX, NoteY, Dim, Font, 0.5f * S);
-		NoteY += 20.0f * S;
 	}
 
 	// Back, and start.
@@ -1418,8 +1666,12 @@ void ATMBattleHud::DrawSetup(ATMBattleDirector& From)
 		MenuButton(PX + PW - BW - 30.0f * S, BY, BW, BH, TEXT("Start Battle"), ETMHudAction::SetupStart, -1, true);
 		return;
 	}
-	// Hosting: the battle starts when an opponent joins. What is happening, over the buttons.
-	if (From.IsWaitingOnline())
+	// Hosting: the lobby is open, and this screen changed its rules.
+	if (From.Net.IsValid() && From.Net->IsHost())
+	{
+		MenuButton(PX + PW - BW - 30.0f * S, BY, BW, BH, TEXT("Back to lobby"), ETMHudAction::SetupStart, -1, true);
+	}
+	else if (From.IsWaitingOnline())
 	{
 		Panel(PX + PW - BW - 30.0f * S, BY, BW, BH, FLinearColor(0.1f, 0.12f, 0.18f, 0.95f), Gold, 1.0f);
 		const FString Waiting = TEXT("Waiting for an opponent...");
@@ -1560,4 +1812,4 @@ void ATMBattleHud::DrawBattleMenu(ATMBattleDirector& From)
 	MenuButton(X, Y, W, H, TEXT("Change setup"), ETMHudAction::MenuSetup);
 	Y += H + Gap;
 	MenuButton(X, Y, W, H, TEXT("Main menu"), ETMHudAction::MenuTitle);
-}
+}

@@ -24,7 +24,7 @@
     {
       "id": "frost_hexer_hex",
       "name": "Hex",
-      "desc": "A curse-bolt at an enemy 1-7 m away",
+      "desc": "A curse-bolt at an enemy 1-7 m away; Chills it for 2 turns.",
       "kind": "active",
       "effect": "damage",
       "scale": "mag",
@@ -41,12 +41,17 @@
         "system": "/Game/ParagonAurora/FX/Particles/Abilities/Primary/FX/P_Aurora_Melee_SucessfulImpact.P_Aurora_Melee_SucessfulImpact",
         "at": "targets",
         "scale": 1
-      }
+      },
+      "status": {
+        "id": "chilled",
+        "turns": 2
+      },
+      "element": "ice"
     },
     {
       "id": "frost_hexer_curse",
       "name": "Curse",
-      "desc": "Weaken an enemy 2-8 m away for 2 turns",
+      "desc": "Weaken an enemy 2-8 m away for 2 turns: Armor -6, and Marked.",
       "kind": "active",
       "effect": "support",
       "scale": "mag",
@@ -70,7 +75,12 @@
         "system": "/Game/ParagonAurora/FX/Particles/Abilities/Leap/FX/P_Aurora_Decoy_Explode_Fragments.P_Aurora_Decoy_Explode_Fragments",
         "at": "targets",
         "scale": 1
-      }
+      },
+      "status": {
+        "id": "marked",
+        "turns": 2
+      },
+      "element": "ice"
     },
     {
       "id": "frost_hexer_slumber",
@@ -96,12 +106,13 @@
         "system": "/Game/TorchFire/FX/NS_TorchFire_Ice.NS_TorchFire_Ice",
         "at": "targets",
         "scale": 1
-      }
+      },
+      "element": "ice"
     },
     {
       "id": "frost_hexer_doom",
       "name": "Doom",
-      "desc": "ULTIMATE: Every enemy within 3.5 m of a point 3-10 m away",
+      "desc": "ULTIMATE: Every enemy within 3.5 m of a point 3-10 m away, Chilled for 2 turns.",
       "kind": "active",
       "effect": "damage",
       "scale": "mag",
@@ -114,7 +125,7 @@
       "cooldown": 0,
       "cast": 2.5,
       "status": {
-        "id": "slow",
+        "id": "chilled",
         "turns": 2
       },
       "fx": "meteor",
@@ -122,7 +133,8 @@
         "system": "/Game/ParagonAurora/FX/Particles/Abilities/Ultimate/FX/P_Aurora_Ultimate_Explode.P_Aurora_Ultimate_Explode",
         "at": "point",
         "scale": 1
-      }
+      },
+      "element": "ice"
     }
   ],
   "creator": {
@@ -155,6 +167,10 @@
       }
     ],
     "description": "Weakens and disables enemies",
-    "measured": -50
+    "measured": -50,
+    "rebalanced": {
+      "on": "2026-10-01",
+      "why": "Split from the Frost Witch: the Hexer controls (Chill, Mark, sleep)"
+    }
   }
 }

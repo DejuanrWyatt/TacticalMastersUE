@@ -72,7 +72,7 @@ namespace TMSim
 		CacheAppeared,
 		/** Unit took item Id from cache Slot. */
 		ItemTaken,
-		/** Unit left item Id in cache Slot. */
+		/** Unit left item Id in cache Slot; or, Slot -1, took it off into its side's stash. */
 		ItemDropped,
 		/** A monster (Unit) is set off, and fights from its next turn. By is who set it off, or -1. */
 		MonsterAlert,
@@ -99,6 +99,11 @@ namespace TMSim
 		Fled,
 		/** Unit is back on its own side (Charmed wore off). */
 		CharmEnded,
+		/**
+		 * Defense model 1: Unit half got out of the way of By's blow, which lands
+		 * for half; the Hit follows. Not Godot's.
+		 */
+		Grazed,
 	};
 
 	/**
@@ -349,6 +354,17 @@ namespace TMSim
 		/** Chance in % the target gets out of the way. Friendly abilities never are. */
 		TMSIM_API int EvadeChance(const FUnit& Target, const FAbility& Ability, const FUnit* Attacker) const;
 
+		/** Defense model 1 (FTuning::DefenseModel): whether it is in play. */
+		bool NewDefense() const { return Tuning.DefenseModel >= 0.5; }
+		/**
+		 * Defense model 1: the unit's one Evasion -- the higher of its class's
+		 * A-Eva and M-Eva, plus everything its items, buffs and passives add to
+		 * either (a bonus to both counted once).
+		 */
+		TMSIM_API int EvasionOf(const FUnit& Unit) const;
+		/** Defense model 1: the % a defense of this much takes off a hit. */
+		TMSIM_API int DefenseShare(int Defense) const;
+
 		/** Chance in % that this unit's abilities land a critical hit. */
 		TMSIM_API int CritChance(const FUnit& User) const;
 
@@ -367,11 +383,32 @@ namespace TMSim
 		/** The way there, both ends included, or empty if there is no way. */
 		TMSIM_API std::vector<FVec2> PathTo(const FUnit& Unit, const FNode& To, bool bSprint = false);
 
-		/** "" if the unit may walk there now, otherwise why not. */
-		TMSIM_API std::string ValidateMove(int UnitId, const FVec2& To, bool bSprint = false);
+		/**
+		 * Waypoints (2026-10-01). The walk by Via, in order: the metres it has
+		 * left at the last of them (false if one cannot be reached, with what is
+		 * left of its move), and the nodes it could then go on to, each with the
+		 * metres of the whole walk, by the same rules as ReachableNodes.
+		 */
+		TMSIM_API bool WalkVia(const FUnit& Unit, const std::vector<FVec2>& Via, bool bSprint, double& OutLeft);
+		TMSIM_API std::vector<std::pair<FNode, double>> ReachableVia(const FUnit& Unit, const std::vector<FVec2>& Via, bool bSprint = false);
+		/** The way there by Via, both ends and each waypoint included, or empty if there is no way. */
+		TMSIM_API std::vector<FVec2> PathVia(const FUnit& Unit, const std::vector<FVec2>& Via, const FNode& To, bool bSprint = false);
 
-		/** Walks the unit there. It faces the way it last stepped. */
-		TMSIM_API bool ApplyMove(int UnitId, const FVec2& To, bool bSprint, FTickReport& Report);
+		/**
+		 * Go To (2026-10-01): the shortest way there by Via, however many turns
+		 * it takes -- no move limit, but enemies block and breaking away costs, as
+		 * for a walk now. Both ends included; empty if there is no way. OutCost,
+		 * when given, is its length in the metres a walk would spend.
+		 */
+		TMSIM_API std::vector<FVec2> RouteTo(const FUnit& Unit, const std::vector<FVec2>& Via, const FNode& To, double* OutCost = nullptr);
+
+		/** "" if the unit may walk there now (by Via, when it has any), otherwise why not. */
+		TMSIM_API std::string ValidateMove(int UnitId, const FVec2& To, bool bSprint = false,
+			const std::vector<FVec2>& Via = std::vector<FVec2>());
+
+		/** Walks the unit there, by Via. It faces the way it last stepped. */
+		TMSIM_API bool ApplyMove(int UnitId, const FVec2& To, bool bSprint, FTickReport& Report,
+			const std::vector<FVec2>& Via = std::vector<FVec2>());
 
 		/**
 		 * Ends a unit's turn the way giving no further orders would. What it
@@ -574,6 +611,18 @@ namespace TMSim
 		std::vector<FCamp> Camps;
 		/** Items lying on the ground. */
 		std::vector<FCache> Caches;
+		/**
+		 * Each side's stash (2026-10-01): items its units picked up, waiting to
+		 * be equipped (EOrderType::Equip), and what its fallen and its unequipped
+		 * left. Index 0 blue, 1 red.
+		 */
+		struct FStashed
+		{
+			const FItemDef* Item = nullptr;
+			/** Its ability's cooldown, which stays with the item. */
+			int Cooldown = 0;
+		};
+		std::vector<FStashed> Stash[2];
 		/** The camps' own generators: where they stand, and what they drop. The battle's dice never move for them. */
 		FSimRandom CampRng;
 		FSimRandom LootRng;
@@ -586,6 +635,8 @@ namespace TMSim
 		TMSIM_API std::string ValidateTake(int UnitId, int Cache, const std::string& ItemId, int GearSlot) const;
 		/** Why it cannot drop what is in that slot now, or empty. */
 		TMSIM_API std::string ValidateDrop(int UnitId, int GearSlot) const;
+		/** Why that item can't go from its side's stash into that unit's slot now, or empty if it can. */
+		TMSIM_API std::string ValidateEquip(int UnitId, const std::string& ItemId, int GearSlot) const;
 		/** The cache within reach of this spot nearest to it that holds anything, or -1. */
 		TMSIM_API int CacheNear(const FVec2& Point) const;
 		/** A unit that is not a monster, or a monster on a side's side (tamed): someone a wild monster fights. */
@@ -666,6 +717,11 @@ namespace TMSim
 		/** A side's unit that ends a move by items takes, free, what fits its empty slots: best tier first. */
 		void PickUpAt(FUnit& Unit, FTickReport& Report);
 		void ApplyDrop(FUnit& Unit, int GearSlot, FTickReport& Report);
+		void ApplyEquip(FUnit& Unit, const std::string& ItemId, int GearSlot, FTickReport& Report);
+		/** One of the two sides' own units, rather than a monster: its items go by its side's stash. */
+		static bool UsesStash(const FUnit& Unit) { return !Unit.bMonster && (Unit.HomeTeam() == 0 || Unit.HomeTeam() == 1); }
+		/** Puts an item in a side's stash. */
+		void ToStash(int Team, const FItemDef* Item, int Cooldown);
 		/** Sets an item into a slot, with what it does to health. */
 		void PutInSlot(FUnit& Unit, int Slot, const FItemDef* Item, int Cooldown);
 		/** An ability's special (FAbility::Special) on whoever it reached. */

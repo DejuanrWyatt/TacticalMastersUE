@@ -33,6 +33,7 @@
 
 #include <algorithm>
 #include <map>
+#include <set>
 #include <chrono>
 #include <cstdio>
 #include <filesystem>
@@ -101,6 +102,10 @@ namespace
 	}
 
 	// ------------------------------------------------------------ MATCH
+
+	// Classes whose ability descriptions were reworded on purpose (2026-10-02,
+	// creator.reworded): every number still matches Godot; the words do not.
+	std::set<std::string> Reworded;
 
 	void CompareWithGodot(const FJson& Godot)
 	{
@@ -176,7 +181,7 @@ namespace
 
 			if (A->Id != GText("id", "")) { Fail(Where + ".id: " + A->Id + " vs Godot's " + GText("id", "")); }
 			if (A->Name != GText("name", "")) { Fail(Where + ".name differs"); }
-			if (A->Desc != GText("desc", "")) { Fail(Where + ".desc differs"); }
+			if (!Reworded.count(Id) && A->Desc != GText("desc", "")) { Fail(Where + ".desc differs"); }
 			if (A->Kind != GText("kind", "active")) { Fail(Where + ".kind differs"); }
 			if (EffectName(A->Effect) != GText("effect", "")) { Fail(Where + ".effect differs"); }
 			if ((A->Scale == EScale::Att ? "att" : "mag") != GText("scale", "")) { Fail(Where + ".scale differs"); }
@@ -327,6 +332,9 @@ int main(int ArgCount, char** Args)
 	std::sort(Files.begin(), Files.end());
 	std::vector<std::string> Loaded;
 	std::string AnyValid;
+	// Classes rebalanced on purpose since the port (2026-10-01): their creator
+	// notes say so ("rebalanced"), and they are no longer meant to match Godot.
+	std::map<std::string, std::string> Rebalanced;
 	for (const std::filesystem::path& File : Files)
 	{
 		const std::string Text = ReadAll(File);
@@ -345,6 +353,23 @@ int main(int ArgCount, char** Args)
 			continue;
 		}
 		Loaded.push_back(Job.Id);
+		{
+			FJson Whole;
+			if (ParseJson(Text, Whole).empty())
+			{
+				const FJson* Notes = Whole.Find("creator");
+				const FJson* Mark = Notes ? Notes->Find("rebalanced") : nullptr;
+				if (Mark)
+				{
+					const FJson* Why = Mark->Find("why");
+					Rebalanced[Job.Id] = Why && Why->IsString() ? Why->String : std::string("rebalanced");
+				}
+				if (Notes && Notes->Find("reworded"))
+				{
+					Reworded.insert(Job.Id);
+				}
+			}
+		}
 		if (AnyValid.empty())
 		{
 			AnyValid = Text;
@@ -480,6 +505,12 @@ int main(int ArgCount, char** Args)
 				Fail("a line of the Godot table is not JSON: " + Bad);
 				continue;
 			}
+			const FJson* GodotId = Godot.Find("id");
+			if (GodotId && Rebalanced.count(GodotId->String))
+			{
+				++Matched;
+				continue;
+			}
 			CompareWithGodot(Godot);
 			++Matched;
 		}
@@ -490,8 +521,21 @@ int main(int ArgCount, char** Args)
 		{
 			Fail("the Godot table has " + std::to_string(Matched) + " classes, more than the files' " + std::to_string(Loaded.size()));
 		}
-		std::printf("compared %d classes with what Godot made of them: %s\n", Matched,
+		std::printf("compared %d classes with what Godot made of them: %s\n", Matched - static_cast<int>(Rebalanced.size()),
 			Failures == Before ? "every field agrees" : "they differ");
+		if (!Rebalanced.empty())
+		{
+			std::printf("%d rebalanced on purpose since, and not compared:", static_cast<int>(Rebalanced.size()));
+			for (const auto& Each : Rebalanced)
+			{
+				std::printf(" %s", Each.first.c_str());
+			}
+			std::printf("\n");
+		}
+		if (!Reworded.empty())
+		{
+			std::printf("%d with descriptions reworded on purpose (their numbers still compared)\n", static_cast<int>(Reworded.size()));
+		}
 		std::printf("%d more made in the class creator, with no Godot counterpart\n",
 			static_cast<int>(Loaded.size()) - Matched);
 	}

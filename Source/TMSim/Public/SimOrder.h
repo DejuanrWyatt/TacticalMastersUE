@@ -22,6 +22,9 @@
 
 namespace TMSim
 {
+	/** The most waypoints one walk may have. */
+	constexpr int MaxWaypoints = 4;
+
 	enum class EOrderType : uint8_t
 	{
 		/** Time passing. The only one nobody issues. */
@@ -51,8 +54,19 @@ namespace TMSim
 		 * item already there is left in the cache in its place.
 		 */
 		Take,
-		/** Leaves the item in GearSlot on the ground at the unit's feet. Free. */
+		/**
+		 * Unequips the item in GearSlot into the side's stash. The unit's whole
+		 * turn (2026-10-01: an item once worn comes off only when its wearer
+		 * dies or spends a turn taking it off). A monster's still leaves it on
+		 * the ground, free. Called "drop" in the order text, as it always was.
+		 */
 		Drop,
+		/**
+		 * Puts an item from the side's stash into an open slot of one of its
+		 * units (GearSlot, or the first open one for -1). Any time, free, and
+		 * not tied to a turn: no serial. Not Godot's; added last.
+		 */
+		Equip,
 	};
 
 	struct FOrder
@@ -72,6 +86,12 @@ namespace TMSim
 		/** Move: where to walk to, in metres. */
 		FVec2 To;
 		bool bSprint = false;
+		/**
+		 * Move: the spots it walks by on the way, in order, each a node centre
+		 * (2026-10-01, waypoints). Empty for the shortest way, as every move was
+		 * before. Still one walk: the whole length counts against its move.
+		 */
+		std::vector<FVec2> Via;
 
 		/** UseAbility: which of the four, and where it is aimed. */
 		int Slot = -1;
@@ -119,7 +139,18 @@ namespace TMSim
 			return Order;
 		}
 
-		static FOrder MakeMove(int InUnitId, int InSerial, const FVec2& InTo, bool bInSprint = false)
+		static FOrder MakeEquip(int InUnitId, const std::string& InItemId, int InGearSlot = -1)
+		{
+			FOrder Order;
+			Order.Type = EOrderType::Equip;
+			Order.UnitId = InUnitId;
+			Order.ItemId = InItemId;
+			Order.GearSlot = InGearSlot;
+			return Order;
+		}
+
+		static FOrder MakeMove(int InUnitId, int InSerial, const FVec2& InTo, bool bInSprint = false,
+			const std::vector<FVec2>& InVia = std::vector<FVec2>())
 		{
 			FOrder Order;
 			Order.Type = EOrderType::Move;
@@ -127,6 +158,7 @@ namespace TMSim
 			Order.Serial = InSerial;
 			Order.To = InTo;
 			Order.bSprint = bInSprint;
+			Order.Via = InVia;
 			return Order;
 		}
 

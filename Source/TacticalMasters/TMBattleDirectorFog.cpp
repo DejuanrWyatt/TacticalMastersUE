@@ -118,6 +118,36 @@ void ATMBattleDirector::MarkFogged(int32 From, const FVector& Where)
 	}
 }
 
+UTextureRenderTarget2D* ATMBattleDirector::FilmOfSize(UTextureRenderTarget2D* Film, int32 W, int32 H, bool bClamp)
+{
+	W = FMath::Max(1, W);
+	H = FMath::Max(1, H);
+	if (Film && Film->SizeX == W && Film->SizeY == H)
+	{
+		return Film;
+	}
+	if (Film)
+	{
+		RetiredFilms.Add(Film);
+		// Long out of use by the time a ninth replacement comes.
+		while (RetiredFilms.Num() > 8)
+		{
+			RetiredFilms.RemoveAt(0);
+		}
+	}
+	UTextureRenderTarget2D* Made = NewObject<UTextureRenderTarget2D>(this);
+	Made->RenderTargetFormat = RTF_RGBA8;
+	Made->ClearColor = FLinearColor::Transparent;
+	if (bClamp)
+	{
+		Made->AddressX = TA_Clamp;
+		Made->AddressY = TA_Clamp;
+	}
+	Made->InitAutoFormat(W, H);
+	Made->UpdateResourceImmediate(true);
+	return Made;
+}
+
 void ATMBattleDirector::BuildFog()
 {
 	const TMSim::FVec2 Size = Battle.Map.SizeMeters();
@@ -136,17 +166,15 @@ void ATMBattleDirector::BuildFog()
 		bFogPost = false;
 		return;
 	}
-	if (!FogFilm)
+	// Off the board reads as its nearest edge, not as the far side (clamped).
+	FogFilm = FilmOfSize(FogFilm, FMath::CeilToInt(Size.X * FogPpm), FMath::CeilToInt(Size.Y * FogPpm), true);
+	if (FogDecal)
 	{
-		FogFilm = NewObject<UTextureRenderTarget2D>(this);
-		FogFilm->RenderTargetFormat = RTF_RGBA8;
-		FogFilm->ClearColor = FLinearColor::Transparent;
-		// Off the board reads as its nearest edge, not as the far side.
-		FogFilm->AddressX = TA_Clamp;
-		FogFilm->AddressY = TA_Clamp;
+		if (UMaterialInstanceDynamic* Mid = Cast<UMaterialInstanceDynamic>(FogDecal->GetDecalMaterial()))
+		{
+			Mid->SetTextureParameterValue(TEXT("Paint"), FogFilm);
+		}
 	}
-	FogFilm->InitAutoFormat(FMath::CeilToInt(Size.X * FogPpm), FMath::CeilToInt(Size.Y * FogPpm));
-	FogFilm->UpdateResourceImmediate(true);
 
 	// Over everything, when the post-process is there: the ground, trees, rocks
 	// and walls all go dark out of sight, not only the ground under them.

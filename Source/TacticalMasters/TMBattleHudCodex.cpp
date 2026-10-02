@@ -76,7 +76,7 @@ namespace TMCodex
 		Out.Add(Heading(TEXT("Turns")));
 		Out.Add(Row(TEXT("Turn Gauge"), TEXT("There are no rounds. Every unit's gauge fills as time passes, faster the more Speed it has. A full gauge makes the unit READY. The timeline at the top shows who comes next.")));
 		Out.Add(Row(TEXT("Placing"), TEXT("If the setup gives a planning phase, place your units near your start before the clock runs. Press Ready to begin sooner.")));
-		Out.Add(Row(TEXT("A unit's turn"), TEXT("One move and one action, in either order. The action is an ability, capturing a watchtower, or taking an item. Flipping a toggle, dropping an item and ending the turn are free.")));
+		Out.Add(Row(TEXT("A unit's turn"), TEXT("One move and one action, in either order. The action is an ability or capturing a watchtower. Flipping a toggle, picking up or equipping items and ending the turn are free; taking an item off is the whole turn.")));
 		Out.Add(Row(TEXT("Sprint"), TEXT("Walk a quarter further instead of using the action. Not after acting.")));
 		Out.Add(Row(TEXT("Countdown"), TEXT("A READY unit has 8 seconds, plus 2 for each point of Patience, to take its turn. When the time runs out, the turn is lost.")));
 		Out.Add(Row(TEXT("Doing less"), TEXT("A turn that did less brings the next one sooner. Moved and acted: the gauge starts empty. Only one of the two: 20% full. Neither: 40%. A turn with no ability also fills the gauge 25% faster until the next one.")));
@@ -86,14 +86,20 @@ namespace TMCodex
 		Out.Add(Row(TEXT("Other units"), TEXT("Walk through your allies but not your enemies, and don't stop on anyone.")));
 		Out.Add(Row(TEXT("Engaged"), TEXT("Within 1.8 m of an enemy a unit is engaged. Stepping away from it costs an extra metre of the move.")));
 		Out.Add(Row(TEXT("Facing"), TEXT("A unit faces the way it last walked or aimed. A hit from the side does 10% more, and from behind 25% more.")));
+		Out.Add(Row(TEXT("Waypoints"), TEXT("Hold the waypoint key (Ctrl) and click to steer a walk round fire, out of a tower's sight, or over an item, which it picks up on the way. Up to 4. Still one walk: its whole length counts against the move.")));
+		Out.Add(Row(TEXT("Tanks hold the line"), TEXT("A unit whose first role is tank holds the ground around it: an enemy that walks within 1.8 m of it has to stop there, so nobody walks past a tank to the back line. A unit that starts its walk beside one can still walk away, paying to break off as usual. The walk area shows where a walk would end.")));
+		Out.Add(Row(TEXT("Go To"), TEXT("Click beyond the walk area to send a unit there over several turns. Each turn it walks as far as it can, then ends its turn (or waits for you, if you pick that on its strip); the turn it arrives on is yours. It stops and hands you the turn if an enemy comes into sight, it is hurt, or the way is blocked: Keep going (G) carries on, Backspace cancels, any other order replaces it. Numbers on the ground mark where each turn ends.")));
+		Out.Add(Row(TEXT("Planning ahead"), TEXT("Click one of your units while it waits to plan its next turn: a walk, then an ability aimed from where the walk ends. It runs the moment the turn begins. If the spot is taken or the target gone by then, the plan is dropped and the turn is yours.")));
+		Out.Add(Row(TEXT("Plan a turn"), TEXT("In a unit's turn, the plan key (G) sets its walk and ability without doing them, so you can see what the ability will reach from the new spot. G again does both.")));
 		Out.Add(Heading(TEXT("Seeing")));
 		Out.Add(Row(TEXT("Fog of war"), TEXT("You see what your units see: anything within their Sight that nothing hides. You also see everything near a watchtower you hold. The rest is in fog.")));
 		Out.Add(Row(TEXT("Line of sight"), TEXT("Rock, ruins and rising ground block the view. Every ability must see the spot it aims at, and ranged ones need a clear line to it.")));
 		Out.Add(Row(TEXT("High ground"), TEXT("Damage is 10% more for each level above the target, and 10% less for each level below it, up to 3 levels.")));
 		Out.Add(Heading(TEXT("Health")));
-		Out.Add(Row(TEXT("Damage"), TEXT("An ability's number is its power. Height, flanking and statuses such as Marked multiply it. Then the target's AttDef (physical) or MagDef (magic) is taken off, and what is left is halved. A hit always does at least 1.")));
-		Out.Add(Row(TEXT("Dodge and crit"), TEXT("A damaging hit can be evaded (A-Eva against physical, M-Eva against magic) and can crit for 50% more. Heals and support never miss.")));
-		Out.Add(Row(TEXT("Knocked out"), TEXT("At 0 HP a unit is knocked out: its statuses end and any cast it was making fizzles. An ally can revive it within 12 seconds. After that it is gone, and its items drop where it fell.")));
+		Out.Add(Row(TEXT("Damage"), TEXT("An ability's number is its power. Height, flanking and statuses such as Marked multiply it, then it is halved. The target's Armor (against physical) or Resist (against magic) takes a share off: 30 / (30 + it), so 10 takes a quarter and 30 takes half. A hit always does at least 1.")));
+		Out.Add(Row(TEXT("Numbers over units"), TEXT("Red: damage. Big and bold with a \"!\": a critical strike. Dark red with an ember glow: burn. Crimson: bleed. Green: healing; pale green: regen. A status's name rises in its own colour. Your own units' health bars show for 3 seconds whenever they deal or take damage or are healed, the health just lost flashing as it drains away.")));
+		Out.Add(Row(TEXT("Evasion and crit"), TEXT("A damaging hit can be evaded, by the target's Evasion % against any kind of hit. One evasion in ten dodges it outright; the other nine graze, taking half and never critical. A hit that lands can crit for 50% more. Heals and support never miss.")));
+		Out.Add(Row(TEXT("Knocked out"), TEXT("At 0 HP a unit is knocked out: its statuses end and any cast it was making fizzles. An ally can revive it within 12 seconds. After that it is gone, and what it wore goes back to its team's stash.")));
 		Out.Add(Row(TEXT("Resting"), TEXT("A unit that goes two of its turns without taking damage heals 5% of its max HP at the start of each turn after that.")));
 	}
 
@@ -101,9 +107,9 @@ namespace TMCodex
 	{
 		Out.Add(Heading(TEXT("Stats")));
 		Out.Add(Row(TEXT("HP"), TEXT("Health. At 0 the unit is knocked out.")));
-		Out.Add(Row(TEXT("AttDef"), TEXT("Taken off physical damage.")));
-		Out.Add(Row(TEXT("MagDef"), TEXT("Taken off magic damage.")));
-		Out.Add(Row(TEXT("A-Eva / M-Eva"), TEXT("The % chance to evade a physical / magic hit.")));
+		Out.Add(Row(TEXT("Armor"), TEXT("Takes a share off physical damage: 30 / (30 + Armor). The unit's card shows the share.")));
+		Out.Add(Row(TEXT("Resist"), TEXT("The same against magic damage.")));
+		Out.Add(Row(TEXT("Evasion"), TEXT("The % chance to evade any hit: 1 in 10 of those dodge it, the rest graze for half. A class's Evasion is the higher of its old physical and magic evasion; items and buffs to either add to it.")));
 		Out.Add(Row(TEXT("Crit"), TEXT("The % chance for a damaging hit to do 50% more.")));
 		Out.Add(Row(TEXT("Speed"), TEXT("How fast the Turn Gauge fills.")));
 		Out.Add(Row(TEXT("Move"), TEXT("How many metres the unit walks in a turn.")));
@@ -117,8 +123,8 @@ namespace TMCodex
 		Out.Add(Row(TEXT("Aura"), TEXT("Always on. At the start of each unit's turn, a unit in its area gets its effect for 2 turns. An ally aura reaches allies (and its owner); an enemy aura reaches enemies.")));
 		Out.Add(Row(TEXT("Channeled"), TEXT("Goes off now, and again at the start of each of the next few turns, which are spent on it. Losing a turn to the countdown cancels it.")));
 		Out.Add(Heading(TEXT("What abilities do")));
-		Out.Add(Row(TEXT("Physical"), TEXT("Damage that AttDef reduces, A-Eva evades and Protect softens.")));
-		Out.Add(Row(TEXT("Magic"), TEXT("Damage that MagDef reduces, M-Eva evades and Shell softens.")));
+		Out.Add(Row(TEXT("Physical"), TEXT("Damage that Armor reduces and Protect softens.")));
+		Out.Add(Row(TEXT("Magic"), TEXT("Damage that Resist reduces and Shell softens.")));
 		Out.Add(Row(TEXT("Heal"), TEXT("Gives back health, up to the unit's max. Never misses.")));
 		Out.Add(Row(TEXT("Revive"), TEXT("Brings back a knocked-out ally with a share of its health.")));
 		Out.Add(Row(TEXT("Support"), TEXT("Does no damage or healing: only its status, buffs or gauge change.")));
@@ -204,7 +210,7 @@ namespace TMCodex
 		Out.Add(Heading(TEXT("The middle")));
 		Out.Add(Row(TEXT("Hold the middle"), TEXT("If the setup turns it on: a ring marks 4 m round the map's centre. Stand in it with no enemy there for the set time in all to win.")));
 		Out.Add(Heading(TEXT("Neutral camps")));
-		Out.Add(Row(TEXT("Camps"), TEXT("If the setup turns them on, monsters wait in camps, in mirrored pairs. They fight both sides. They wake at set times, with a warning a few seconds before, and come back a while after they are cleared.")));
+		Out.Add(Row(TEXT("Camps"), TEXT("If the setup turns them on, monsters wait in camps, in mirrored pairs. They fight both sides. They wake at set times, with a warning a few seconds before. With Camp respawns on (the setup screen), they come back a while after they are cleared; off, once cleared they are gone.")));
 		Out.Add(Row(TEXT("Loot"), TEXT("Clearing a camp leaves a chest. Easy camps leave a common item, medium ones uncommon, hard ones rare. The boss in the middle leaves an epic, a rare and an epic only it has.")));
 		Out.Add(Row(TEXT("Temperaments"), TEXT("Docile monsters never start a fight. Skittish ones flee, and may escape off the map with their loot. Territorial and aggressive ones attack whoever comes near or into view. Patrols walk a route.")));
 		Out.Add(Row(TEXT("Ambush"), TEXT("Hidden until a unit comes within 3 m.")));
@@ -219,8 +225,10 @@ namespace TMCodex
 		Out.Add(Heading(TEXT("Items")));
 		Out.Add(Row(TEXT("Carrying"), TEXT("Each unit carries up to 3 items, never two the same. An item's ability becomes the unit's ability 5, 6 or 7.")));
 		Out.Add(Row(TEXT("Buying"), TEXT("With an item budget set, each side buys items before the battle: common 1 point, uncommon 2, rare 3. Epic items can only be found.")));
-		Out.Add(Row(TEXT("Picking up"), TEXT("Walk onto a chest or dropped items (end a move within 1.5 m) to take them into empty slots, best first. With full slots, Take swaps one for the action. Dropping is free.")));
-		Out.Add(Row(TEXT("Lost items"), TEXT("A unit gone for good drops its items where it fell.")));
+		Out.Add(Row(TEXT("Picking up"), TEXT("Walk onto a chest or dropped items (end a move within 1.5 m): everything there goes into your team's stash. Free.")));
+		Out.Add(Row(TEXT("Equipping"), TEXT("Open Items (the action bar or the top right): pick an item in the stash, then an open slot on any of your units. Free, any time.")));
+		Out.Add(Row(TEXT("Taking off"), TEXT("A worn item stays on. It comes off only on its wearer's turn, before it moves or acts, and that is the whole turn; it goes back to the stash.")));
+		Out.Add(Row(TEXT("Lost items"), TEXT("A unit gone for good sends what it wore back to its team's stash. A monster's items fall where it fell.")));
 		Out.Add(Row(TEXT("Common"), TEXT("The cheapest; easy camps."), Tiers[0]));
 		Out.Add(Row(TEXT("Uncommon"), TEXT("Medium camps."), Tiers[1]));
 		Out.Add(Row(TEXT("Rare"), TEXT("Hard camps and bosses."), Tiers[2]));
@@ -240,7 +248,10 @@ namespace TMCodex
 		Out.Add(Row(TEXT("End turn"), Key(ETMAction::EndTurn)));
 		Out.Add(Row(TEXT("Cancel"), Key(ETMAction::Cancel) + TEXT(", or a right click")));
 		Out.Add(Row(TEXT("Next ready unit"), Key(ETMAction::NextUnit)));
-		Out.Add(Row(TEXT("Mouse"), TEXT("Left click to select, aim and confirm. Items, Take and Capture are buttons on the screen.")));
+		Out.Add(Row(TEXT("Waypoint"), Key(ETMAction::Waypoint) + TEXT(" held while clicking a walk")));
+		Out.Add(Row(TEXT("Plan a turn / go"), Key(ETMAction::PlanTurn)));
+		Out.Add(Row(TEXT("Undo plan step"), Key(ETMAction::PlanUndo)));
+		Out.Add(Row(TEXT("Mouse"), TEXT("Left click to select, aim and confirm; click one of your waiting units to plan its turn. Items, Take and Capture are buttons on the screen.")));
 		Out.Add(Heading(TEXT("Camera")));
 		Out.Add(Row(TEXT("Pan"), FString::Printf(TEXT("%s %s %s %s, or drag with the middle button"), *Key(ETMAction::CamForward), *Key(ETMAction::CamLeft),
 			*Key(ETMAction::CamBack), *Key(ETMAction::CamRight))));

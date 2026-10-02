@@ -1,8 +1,9 @@
-// Online play: two players, each on their own machine, one battle between them
-// (Docs/design/feat-online.md, after the Godot game's net.gd and battle.gd).
+// Online play: two to four players, each on their own machine, one battle
+// between them (Docs/design/feat-online.md, after the Godot game's net.gd and
+// battle.gd; the lobby before it, Docs/design/feat-lobby.md).
 //
-// The host plays blue and is the referee. Its own orders are checked, sent to
-// the joiner, then applied; the joiner's come to it as requests, which it
+// The host is the referee. Its own orders are checked, sent to every other
+// player, then applied; the others' come to it as requests, which it
 // checks like its own (and a little more) before doing the same. Only the host
 // moves time. So both machines apply exactly the same orders in exactly the
 // same order, and since the rules are deterministic the two battles are the
@@ -115,7 +116,7 @@ void ATMBattleDirector::HostOnline()
 		Net.Reset();
 		return;
 	}
-	OnlineStatus = FString::Printf(TEXT("Hosting %hs on port %d. Waiting for an opponent..."), TMSim::FindMap(Setup.MapId).Name.c_str(), Port);
+	OnlineStatus = FString::Printf(TEXT("Hosting on port %d. Waiting for players..."), Port);
 	// The addresses a player on the same network would type (main_menu.gd:204-210).
 	TArray<FString> Near;
 	TArray<TSharedPtr<FInternetAddr>> Mine;
@@ -135,6 +136,7 @@ void ATMBattleDirector::HostOnline()
 	Upnp = MakeUnique<FTMUpnp>();
 	Upnp->Start(Port);
 	UE_LOG(LogTemp, Log, TEXT("ONLINE: hosting on port %d"), Port);
+	StartLobby();
 }
 
 void ATMBattleDirector::JoinOnline()
@@ -183,6 +185,11 @@ void ATMBattleDirector::LeaveOnline()
 	OnlineAddresses.Reset();
 	OnlineRouter.Reset();
 	HostSums.Reset();
+	Players.Reset();
+	UnitPlayer.Reset();
+	LocalPlayer = 0;
+	Draft = FTMDraftState();
+	bDraftDone = false;
 	if (bWasOnline)
 	{
 		Setup = OfflineSetup;
@@ -246,12 +253,18 @@ void ATMBattleDirector::TypedDone(bool bSubmit)
 void ATMBattleDirector::SendChat()
 {
 	const FString Said = ChatLine.TrimStartAndEnd().Left(MaxChat);
-	if (Said.IsEmpty() || !bOnline)
+	if (Said.IsEmpty() || !Net.IsValid() || !Net->IsConnected())
 	{
 		return;
 	}
-	SendOnline(TEXT("chat"), [&Said](FJsonObject& Message) { Message.SetStringField(TEXT("text"), Said); });
-	Log.Add(TEXT("You: ") + Said);
+	// The host passes every line on to the others, with who said it.
+	const FString Name = Players.IsValidIndex(LocalPlayer) ? Players[LocalPlayer].Name : LocalName();
+	SendOnline(TEXT("chat"), [&Said, &Name](FJsonObject& Message)
+	{
+		Message.SetStringField(TEXT("text"), Said);
+		Message.SetStringField(TEXT("name"), Name);
+	});
+	LogNote(TEXT("You: ") + Said);
 }
 
 // ---------------------------------------------------------------- messages
@@ -295,29 +308,47 @@ void ATMBattleDirector::AdvanceOnline(float DeltaSeconds)
 	Net->Poll(DeltaSeconds);
 	if (Net->bJustConnected)
 	{
+		// net.gd:168-170: say hello with this build's version, and a name.
 		Net->bJustConnected = false;
-		if (Net->IsHost())
+		OnlineStatus = TEXT("Connected! Checking versions...");
+		const FString Name = LocalName();
+		SendOnline(TEXT("hello"), [&Name](FJsonObject& Message)
 		{
-			OnlineStatus = TEXT("An opponent is connecting...");
-		}
-		else
+			Message.SetNumberField(TEXT("version"), FTMNet::ProtocolVersion);
+			Message.SetStringField(TEXT("name"), Name);
+		});
+	}
+	if (Net->Arrived.Num() > 0)
+	{
+		Net->Arrived.Reset();
+		if (Screen == EScreen::Lobby)
 		{
-			// net.gd:168-170: say hello with this build's version.
-			OnlineStatus = TEXT("Connected! Checking versions...");
-			SendOnline(TEXT("hello"), [](FJsonObject& Message) { Message.SetNumberField(TEXT("version"), FTMNet::ProtocolVersion); });
+			OnlineStatus = TEXT("A player is connecting...");
 		}
 	}
-	TArray<TSharedPtr<FJsonObject>> Arrived = MoveTemp(Net->Received);
+	TArray<FTMNet::FArrival> Came = MoveTemp(Net->Received);
 	Net->Received.Reset();
-	for (const TSharedPtr<FJsonObject>& Message : Arrived)
+	for (const FTMNet::FArrival& Arrival : Came)
 	{
 		if (!Net.IsValid())
 		{
 			break;  // a refusal closed it
 		}
-		OnNetMessage(*Message);
+		if (Arrival.Message.IsValid())
+		{
+			OnNetMessage(*Arrival.Message, Arrival.From);
+		}
 	}
-	if (Net.IsValid() && !Net->Lost.IsEmpty())
+	if (Net.IsValid() && Net->IsHost() && Net->Departed.Num() > 0)
+	{
+		TArray<TPair<int32, FString>> Gone = MoveTemp(Net->Departed);
+		Net->Departed.Reset();
+		for (const TPair<int32, FString>& Left : Gone)
+		{
+			LobbyDepart(Left.Key, Left.Value);
+		}
+	}
+	if (Net.IsValid() && !Net->IsHost() && !Net->Lost.IsEmpty())
 	{
 		const FString Why = Net->Lost;
 		Net->Lost.Reset();
@@ -326,22 +357,21 @@ void ATMBattleDirector::AdvanceOnline(float DeltaSeconds)
 			if (Battle.Winner == -1)
 			{
 				// battle.gd:691-694.
-				StopOnline(TEXT("Opponent disconnected"));
+				StopOnline(TEXT("The host disconnected"));
 			}
 			else
 			{
-				Log.Add(TEXT("Your opponent left."));
-				bOpponentWantsRematch = false;
+				LogNote(TEXT("The host left."));
 			}
 		}
 		else
 		{
+			// From the lobby or the draft: back to where an address is typed.
 			OnlineStatus = Why;
+			Screen = EScreen::Online;
+			Players.Reset();
 		}
-		if (!Net->IsHost())
-		{
-			Net.Reset();
-		}
+		Net.Reset();
 	}
 
 	// -tmnetdesync: the joiner's game made to differ, once, to prove the split is caught.
@@ -353,7 +383,7 @@ void ATMBattleDirector::AdvanceOnline(float DeltaSeconds)
 	}
 }
 
-void ATMBattleDirector::OnNetMessage(const FJsonObject& Message)
+void ATMBattleDirector::OnNetMessage(const FJsonObject& Message, int32 From)
 {
 	FString Kind;
 	Message.TryGetStringField(TEXT("t"), Kind);
@@ -366,14 +396,26 @@ void ATMBattleDirector::OnNetMessage(const FJsonObject& Message)
 		Message.TryGetNumberField(TEXT("version"), Version);
 		if (Version != FTMNet::ProtocolVersion)
 		{
-			Net->Kick(FString::Printf(TEXT("Version mismatch: the host runs version %d, you run %d. Both players need the same build."),
+			Net->Kick(From, FString::Printf(TEXT("Version mismatch: the host runs version %d, you run %d. Every player needs the same build."),
 				FTMNet::ProtocolVersion, Version));
 			OnlineStatus = FString::Printf(TEXT("Refused a player on a different version (%d)."), Version);
 			return;
 		}
-		StartOnlineAsHost();
+		if (Screen != EScreen::Lobby || PlayerOfPeer(From) >= 0)
+		{
+			Net->Kick(From, Net->BusyReason);
+			return;
+		}
+		FString Name;
+		Message.TryGetStringField(TEXT("name"), Name);
+		LobbyArrive(From, Name);
+		return;
 	}
-	else if (Kind == TEXT("refuse") && !bHost)
+	if (OnLobbyMessage(Kind, Message, From) || OnDraftMessage(Kind, Message, From))
+	{
+		return;
+	}
+	if (Kind == TEXT("refuse") && !bHost)
 	{
 		FString Reason;
 		Message.TryGetStringField(TEXT("reason"), Reason);
@@ -425,7 +467,7 @@ void ATMBattleDirector::OnNetMessage(const FJsonObject& Message)
 		Message.TryGetStringField(TEXT("o"), Line);
 		TMSim::FOrder Order;
 		const std::string Unreadable = TMSim::OrderFromText(TCHAR_TO_UTF8(*Line), Order);
-		FString Refused = Unreadable.empty() ? RefereeCheck(Order) : FString(TEXT("That order couldn't be read."));
+		FString Refused = Unreadable.empty() ? RefereeCheck(Order, PlayerOfPeer(From)) : FString(TEXT("That order couldn't be read."));
 		if (Refused.IsEmpty())
 		{
 			// Checked, sent back, applied: Submit does all three on the host.
@@ -433,7 +475,10 @@ void ATMBattleDirector::OnNetMessage(const FJsonObject& Message)
 		}
 		if (!Refused.IsEmpty())
 		{
-			SendOnline(TEXT("reject"), [&Refused](FJsonObject& Out) { Out.SetStringField(TEXT("reason"), Refused); });
+			TSharedRef<FJsonObject> Out = MakeShared<FJsonObject>();
+			Out->SetStringField(TEXT("t"), TEXT("reject"));
+			Out->SetStringField(TEXT("reason"), Refused);
+			Net->SendTo(From, Out);
 		}
 	}
 	else if (Kind == TEXT("reject") && !bHost)
@@ -442,7 +487,7 @@ void ATMBattleDirector::OnNetMessage(const FJsonObject& Message)
 		Message.TryGetStringField(TEXT("reason"), Reason);
 		bWaitingForHost = false;
 		Tell(Reason);
-		Log.Add(Reason);
+		LogNote(Reason);
 	}
 	else if (Kind == TEXT("sum") && !bHost && bOnline)
 	{
@@ -457,24 +502,50 @@ void ATMBattleDirector::OnNetMessage(const FJsonObject& Message)
 	{
 		FString Detail;
 		Message.TryGetStringField(TEXT("detail"), Detail);
-		StopOnline(TEXT("Out of sync: ") + Detail.Left(200));
+		if (bHost)
+		{
+			// One player's game split from the host's: everyone stops, told why.
+			ReportOutOfSync(Detail.Left(200));
+		}
+		else
+		{
+			StopOnline(TEXT("Out of sync: ") + Detail.Left(200));
+		}
 	}
-	else if (Kind == TEXT("chat") && bOnline)
+	else if (Kind == TEXT("chat"))
 	{
 		FString Said;
+		FString Name;
 		Message.TryGetStringField(TEXT("text"), Said);
 		Said = Said.Left(MaxChat);
-		Log.Add(TEXT("Opponent: ") + Said);
-		Tell(TEXT("Opponent: ") + Said);
-	}
-	else if (Kind == TEXT("rematch") && bOnline)
-	{
-		bOpponentWantsRematch = true;
-		Log.Add(TEXT("Your opponent wants a rematch: press Rematch to accept."));
-		if (bOnlineHost && bWantRematch)
+		if (bHost)
 		{
-			StartOnlineAsHost();
+			// From a player: the host knows who, and passes it on to the rest.
+			const int32 Player = PlayerOfPeer(From);
+			if (Player < 0)
+			{
+				return;
+			}
+			Name = Players[Player].Name;
+			TSharedRef<FJsonObject> Out = MakeShared<FJsonObject>();
+			Out->SetStringField(TEXT("t"), TEXT("chat"));
+			Out->SetStringField(TEXT("text"), Said);
+			Out->SetStringField(TEXT("name"), Name);
+			for (int32 i = 1; i < Players.Num(); ++i)
+			{
+				if (i != Player && Players[i].bPresent)
+				{
+					Net->SendTo(Players[i].Peer, Out);
+				}
+			}
 		}
+		else
+		{
+			Message.TryGetStringField(TEXT("name"), Name);
+		}
+		const FString Line = (Name.IsEmpty() ? FString(TEXT("Player")) : Name.Left(20)) + TEXT(": ") + Said;
+		LogNote(Line);
+		Tell(Line);
 	}
 }
 
@@ -492,7 +563,13 @@ void ATMBattleDirector::StartOnlineAsHost()
 	bOpponentWantsRematch = false;
 	bOnline = true;
 	bOnlineHost = true;
-	LocalTeam = 0;
+	LocalPlayer = 0;
+	LocalTeam = Players.IsValidIndex(0) ? Players[0].Team : 0;
+	AssignUnits();
+	if (Net.IsValid())
+	{
+		Net->bAccepting = false;
+	}
 	bWaitingForHost = false;
 	OnlineStopped.Reset();
 	HostSums.Reset();
@@ -502,9 +579,27 @@ void ATMBattleDirector::StartOnlineAsHost()
 	StartMatch(true);
 	LastSumTick = Battle.TickCount;
 
-	SendOnline(TEXT("start"), [this](FJsonObject& Message)
+	TSharedRef<FJsonObject> Start = MakeShared<FJsonObject>();
+	Start->SetStringField(TEXT("t"), TEXT("start"));
+	auto Fill = [this](FJsonObject& Message)
 	{
-		Message.SetNumberField(TEXT("team"), 1);
+		// Who is in the battle, on which side, and who orders which unit.
+		TArray<TSharedPtr<FJsonValue>> List;
+		for (const FTMOnlinePlayer& Player : Players)
+		{
+			TSharedRef<FJsonObject> Entry = MakeShared<FJsonObject>();
+			Entry->SetStringField(TEXT("name"), Player.Name);
+			Entry->SetNumberField(TEXT("team"), Player.Team);
+			Entry->SetBoolField(TEXT("present"), Player.bPresent);
+			List.Add(MakeShared<FJsonValueObject>(Entry));
+		}
+		Message.SetArrayField(TEXT("players"), List);
+		TArray<TSharedPtr<FJsonValue>> Owners;
+		for (const int32 Holder : UnitPlayer)
+		{
+			Owners.Add(MakeShared<FJsonValueNumber>(Holder));
+		}
+		Message.SetArrayField(TEXT("owners"), Owners);
 		Message.SetStringField(TEXT("seed"), FString::Printf(TEXT("%llu"), BattleSeed));
 		const FString MapId = UTF8_TO_TCHAR(Setup.MapId.c_str());
 		Message.SetStringField(TEXT("map"), MapId);
@@ -554,6 +649,10 @@ void ATMBattleDirector::StartOnlineAsHost()
 		Message.SetBoolField(TEXT("random_boss"), Setup.bRandomBoss);
 		// Element reactions (protocol 5).
 		Message.SetBoolField(TEXT("elements"), Setup.bElements);
+		// Friendly fire (protocol 9).
+		Message.SetBoolField(TEXT("friendly_fire"), Setup.bFriendlyFire);
+		// Camp respawns (protocol 11).
+		Message.SetBoolField(TEXT("camp_respawn"), Setup.bCampRespawn);
 		Message.SetStringField(TEXT("camp_files"), FString::Printf(TEXT("%08x-%08x"), FolderPrint(TEXT("Monsters")), FolderPrint(TEXT("Items"))));
 		TArray<TSharedPtr<FJsonValue>> Carried;
 		for (int32 Team = 0; Team < 2; ++Team)
@@ -567,8 +666,18 @@ void ATMBattleDirector::StartOnlineAsHost()
 			}
 		}
 		Message.SetArrayField(TEXT("items"), Carried);
-	});
-	UE_LOG(LogTemp, Log, TEXT("ONLINE: started as host, seed %llu"), BattleSeed);
+	};
+	Fill(*Start);
+	// Each player is told which of the list they are.
+	for (int32 i = 1; i < Players.Num(); ++i)
+	{
+		if (Players[i].bPresent && Net.IsValid())
+		{
+			Start->SetNumberField(TEXT("you"), i);
+			Net->SendTo(Players[i].Peer, Start);
+		}
+	}
+	UE_LOG(LogTemp, Log, TEXT("ONLINE: started as host, seed %llu, %d players"), BattleSeed, Players.Num());
 }
 
 FString ATMBattleDirector::StartOnlineFrom(const FJsonObject& Start)
@@ -576,14 +685,38 @@ FString ATMBattleDirector::StartOnlineFrom(const FJsonObject& Start)
 	// net.gd:224-247. Everything the host sends is checked before it reaches
 	// the rules: a class or map file goes through the same reader a file on
 	// disk does.
-	int32 Team = 1;
-	Start.TryGetNumberField(TEXT("team"), Team);
+	int32 You = -1;
+	Start.TryGetNumberField(TEXT("you"), You);
 	FString SeedText;
 	Start.TryGetStringField(TEXT("seed"), SeedText);
-	if (Team != 1 || !SeedText.IsNumeric())
+	const TArray<TSharedPtr<FJsonValue>>* List = nullptr;
+	const TArray<TSharedPtr<FJsonValue>>* Owners = nullptr;
+	if (!SeedText.IsNumeric() || !Start.TryGetArrayField(TEXT("players"), List) || !List->IsValidIndex(You) || You < 1
+		|| !Start.TryGetArrayField(TEXT("owners"), Owners) || Owners->Num() != 8)
 	{
 		return TEXT("The host's battle couldn't be read.");
 	}
+	TArray<FTMOnlinePlayer> NextPlayers;
+	for (const TSharedPtr<FJsonValue>& Value : *List)
+	{
+		FTMOnlinePlayer Player;
+		const TSharedPtr<FJsonObject>* Entry = nullptr;
+		if (Value->TryGetObject(Entry))
+		{
+			(*Entry)->TryGetStringField(TEXT("name"), Player.Name);
+			(*Entry)->TryGetNumberField(TEXT("team"), Player.Team);
+			(*Entry)->TryGetBoolField(TEXT("present"), Player.bPresent);
+		}
+		Player.Team = FMath::Clamp(Player.Team, 0, 1);
+		NextPlayers.Add(Player);
+	}
+	TArray<int32> NextOwners;
+	for (const TSharedPtr<FJsonValue>& Value : *Owners)
+	{
+		const int32 Holder = static_cast<int32>(Value->AsNumber());
+		NextOwners.Add(NextPlayers.IsValidIndex(Holder) ? Holder : -1);
+	}
+	const int32 Team = NextPlayers[You].Team;
 
 	FString MapId;
 	Start.TryGetStringField(TEXT("map"), MapId);
@@ -685,6 +818,10 @@ FString ATMBattleDirector::StartOnlineFrom(const FJsonObject& Start)
 	Next.bRandomBoss = Start.TryGetBoolField(TEXT("random_boss"), bRandomBoss) && bRandomBoss;
 	bool bElements = false;
 	Next.bElements = Start.TryGetBoolField(TEXT("elements"), bElements) && bElements;
+	bool bFriendlyFire = false;
+	Next.bFriendlyFire = Start.TryGetBoolField(TEXT("friendly_fire"), bFriendlyFire) && bFriendlyFire;
+	bool bCampRespawn = false;
+	Next.bCampRespawn = Start.TryGetBoolField(TEXT("camp_respawn"), bCampRespawn) && bCampRespawn;
 	if (Next.CampLevel > 0)
 	{
 		FString Theirs;
@@ -724,6 +861,9 @@ FString ATMBattleDirector::StartOnlineFrom(const FJsonObject& Start)
 	Setup = Next;
 	bOnline = true;
 	bOnlineHost = false;
+	Players = MoveTemp(NextPlayers);
+	UnitPlayer = MoveTemp(NextOwners);
+	LocalPlayer = You;
 	LocalTeam = Team;
 	bWaitingForHost = false;
 	bWantRematch = false;
@@ -731,16 +871,20 @@ FString ATMBattleDirector::StartOnlineFrom(const FJsonObject& Start)
 	OnlineStopped.Reset();
 	HostSums.Reset();
 	StartMatch(false);
-	Log.Add(FString::Printf(TEXT("Press %s to chat with your opponent."), *FTMSettings::Get().KeyName(ETMAction::Chat)));
+	LogNote(FString::Printf(TEXT("Press %s to chat."), *FTMSettings::Get().KeyName(ETMAction::Chat)));
 	UE_LOG(LogTemp, Log, TEXT("ONLINE: started as joiner, seed %llu"), BattleSeed);
 	return FString();
 }
 
 // ---------------------------------------------------------------- playing
 
-FString ATMBattleDirector::RefereeCheck(const TMSim::FOrder& Order) const
+FString ATMBattleDirector::RefereeCheck(const TMSim::FOrder& Order, int32 Player) const
 {
 	// battle.gd:634-646: the host's own checks on top of the rules'.
+	if (!Players.IsValidIndex(Player) || Player == 0)
+	{
+		return TEXT("You aren't in this battle.");
+	}
 	if (Order.Type == TMSim::EOrderType::Advance || Order.Type == TMSim::EOrderType::Tune)
 	{
 		return TEXT("Only the host moves time forward or changes the rules.");
@@ -752,11 +896,17 @@ FString ATMBattleDirector::RefereeCheck(const TMSim::FOrder& Order) const
 	}
 	if (Order.Type == TMSim::EOrderType::Ready)
 	{
-		return Order.Team == LocalTeam ? TEXT("That isn't your side.") : TEXT("");
+		return Order.Team != Players[Player].Team ? TEXT("That isn't your side.") : TEXT("");
 	}
-	// Only the opponent's own units: not the host's, and not the monsters, which the host plays.
+	// The side's stash is shared: any of its players may put an item on any of its units.
+	if (Order.Type == TMSim::EOrderType::Equip)
+	{
+		const TMSim::FUnit* Wearer = const_cast<TMSim::FBattle&>(Battle).FindUnit(Order.UnitId);
+		return !Wearer || Wearer->Team != Players[Player].Team ? TEXT("That isn't your side's unit.") : TEXT("");
+	}
+	// Only the player's own units: not a teammate's, the other side's, or the monsters, which the host plays.
 	const TMSim::FUnit* Unit = const_cast<TMSim::FBattle&>(Battle).FindUnit(Order.UnitId);
-	return !Unit || Unit->Team != 1 - LocalTeam ? TEXT("That isn't your unit.") : TEXT("");
+	return !Unit || UnitOwner(*Unit) != Player ? TEXT("That isn't your unit.") : TEXT("");
 }
 
 void ATMBattleDirector::AfterOnlineApply(const TMSim::FOrder& Order)
@@ -817,7 +967,7 @@ void ATMBattleDirector::StopOnline(const FString& Why)
 		return;
 	}
 	OnlineStopped = Why;
-	Log.Add(Why);
+	LogNote(Why);
 	CancelAim();
 	DecidedFor = 0.0f;
 	UE_LOG(LogTemp, Log, TEXT("ONLINE STOPPED: %s"), *Why);
@@ -825,17 +975,17 @@ void ATMBattleDirector::StopOnline(const FString& Why)
 
 void ATMBattleDirector::RequestRematch()
 {
-	// net.gd:139-143, 283-287: it starts once both have asked.
-	if (!bOnline || !Net.IsValid() || !Net->IsConnected())
+	// With up to four players, a rematch is the lobby again: the host takes
+	// everyone back to change sides, classes or rules, then starts once more.
+	if (!Net.IsValid())
 	{
-		Tell(TEXT("Your opponent has left."));
+		Tell(TEXT("The host has left."));
 		return;
 	}
-	bWantRematch = true;
-	SendOnline(TEXT("rematch"), [](FJsonObject&) {});
-	Log.Add(TEXT("Rematch requested: waiting for your opponent to accept..."));
-	if (bOnlineHost && bOpponentWantsRematch)
+	if (Net->IsHost())
 	{
-		StartOnlineAsHost();
+		BackToLobby();
+		return;
 	}
+	Tell(TEXT("The host takes everyone back to the lobby."));
 }

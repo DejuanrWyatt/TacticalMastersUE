@@ -70,7 +70,7 @@
     {
       "id": "samurai_meditate",
       "name": "Meditate",
-      "desc": "AttPwr +6 and MagDef +4 for 2 turns.",
+      "desc": "Crit +10 and Resist +4 for 2 turns.",
       "kind": "active",
       "effect": "support",
       "scale": "mag",
@@ -104,7 +104,7 @@
     {
       "id": "samurai_masamune",
       "name": "Masamune",
-      "desc": "ULTIMATE: Every ally within 4 m of you heals and gains Regen for 8 s.",
+      "desc": "ULTIMATE: Every ally within 4 m of you heals and gains Regen for 3 turns.",
       "kind": "active",
       "effect": "heal",
       "scale": "mag",
@@ -127,5 +127,15 @@
         "scale": 1
       }
     }
-  ]
+  ],
+  "creator": {
+    "rebalanced": {
+      "on": "2026-10-01",
+      "why": "Meditate described as it plays (Crit, not the old AttPwr)"
+    },
+    "reworded": {
+      "on": "2026-10-02",
+      "why": "Descriptions say what the abilities do (2026-10-02): Stun not sleep, Crit not the old Power, turns not seconds"
+    }
+  }
 }

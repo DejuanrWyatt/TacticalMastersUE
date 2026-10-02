@@ -270,3 +270,36 @@ checksum mixes the ids, not the numbers (as it does for classes).
   makes it matter more.
 - **Consumables** (a potion used once) fit the same file with `"uses": 1`, but are left out of this
   version.
+
+## 13. Retuned for the new defense rules (2026-10-02)
+
+The items were sized when AttDef and MagDef were subtracted from each hit and A-Eva and M-Eva were separate
+chances to miss. In the game's rules now (defense model 1) Armor and Resist take a share off, 30 / (30 + it),
+and one Evasion -- the higher of A-Eva and M-Eva, plus anything added to either -- is evaded 1 in 10 outright
+and grazed for half otherwise. The same +2 AttDef protects less than it did, and an M-Eva item now helps
+against weapons too.
+
+Each item's defensive numbers were rescaled so it takes off about the same share of the damage its holder
+takes as before: worked out over every class in the game as the holder against every damaging ability of every
+class, on the class files' own numbers. One point of Armor or Resist is worth about 0.6 of an old
+point; A-Eva points are worth about the same; M-Eva points about 1.25 old ones.
+
+| Item | Before | After |
+|---|---|---|
+| Padded Vest, Chain Vest | AttDef 2 | Armor 3 |
+| Hide Wrap | AttDef 1 | unchanged (1 is the nearest) |
+| Bulwark Plate | AttDef 4 | Armor 6 |
+| Warden's Plate | AttDef 4, MagDef 4 | Armor 6, Resist 6 |
+| Aegis of Dawn | AttDef 5, MagDef 5 | Armor 8, Resist 8 |
+| Leaden Mantle | AttDef 6, MagDef 6 | Armor 10, Resist 10 |
+| Warded Sash | MagDef 2 | Resist 3 |
+| Skink Scale | MagDef 3 | Resist 4 |
+| Mirror Cloak | MagDef 2, M-Eva 6 | Resist 3, Evasion (M) 5 |
+| Spirit Bangle | M-Eva 4 | Evasion (M) 3 |
+| Duelist's Ribbon, Deserter's Boots | A-Eva 4, 3 | unchanged |
+| Anchor Stone | +4 both defences when still | +6 Armor and Resist |
+| Last Stand Band | +8 A-Eva below 30% | +9 Evasion |
+| Nightcloak | +8 A-Eva and M-Eva while unseen | +15 Evasion (the cap) |
+
+Protect and Shell (Warding and Spellward Talismans) cut the hit itself and were not changed; their words say
+"weapon" and "spell" damage rather than the old stat names.

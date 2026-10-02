@@ -169,7 +169,20 @@ namespace TMSim
 			{ "camps", "Neutral camps", "0 = off, 1 light, 2 standard, 3 wild. Monster camps that wake around the map and drop items.", 0.0, 3.0, 1.0, &FTuning::CampLevel },
 			{ "random_boss", "Random boss", "0 = the map's own boss, 1 = a boss drawn at random, at the map's boss spot.", 0.0, 1.0, 1.0, &FTuning::RandomBoss },
 			{ "elements", "Element reactions", "0 = off, 1 = on. Water abilities leave their target Wet and ice abilities Chill it; lightning stuns the Wet, ice freezes them, fire ignites the Oiled.", 0.0, 1.0, 1.0, &FTuning::Elements },
+			{ "friendly_fire", "Friendly fire", "0 = off, 1 = on. Area damage -- cones, lines, charges, blasts -- hurts the caster's own side as well as the enemy's. Never the caster itself, and never a single-target blow.", 0.0, 1.0, 1.0, &FTuning::FriendlyFire },
+			{ "camp_respawn", "Camps respawn", "0 = off, 1 = on. A cleared camp wakes again a while later; off, it stays cleared.", 0.0, 1.0, 1.0, &FTuning::CampRespawn },
+			{ "defense_model", "Defense rules", "0 = classic: AttDef / MagDef taken off each hit, A-Eva / M-Eva to miss. 1 = Armor / Resist take a share off each hit, and one Evasion: 1 in 10 evasions dodge, the rest graze for half.", 0.0, 1.0, 1.0, &FTuning::DefenseModel },
+			{ "defense_scale", "Defense for half damage", "Defense rules 1: the Armor or Resist that halves a hit. Higher makes each point worth less.", 10.0, 100.0, 1.0, &FTuning::DefenseScale },
+			{ "zone_of_control", "Tanks hold the line", "0 = off, 1 = on. An enemy that walks next to a unit whose first role is tank has to stop there.", 0.0, 1.0, 1.0, &FTuning::ZoneOfControl },
 		};
 		return Keys;
+	}
+
+	FTuning GameTuning()
+	{
+		FTuning Tuning;
+		Tuning.DefenseModel = 1.0;
+		Tuning.ZoneOfControl = 1.0;
+		return Tuning;
 	}
 }
