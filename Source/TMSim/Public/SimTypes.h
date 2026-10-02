@@ -127,6 +127,8 @@ namespace TMSim
 		bool bLured = false;
 		/** Remembers who put it there (FStatus::By): the suppressor, guardian, charmer, or what it fears. */
 		bool bSourced = false;
+		/** Added to the percent of healing its holder receives (Wounded: -50), from any source. */
+		int HealTakenPercent = 0;
 	};
 
 	/** Every status, in the order the Godot table lists them. */

@@ -97,6 +97,8 @@ namespace TMSim
 		{ "charmed",    "Charmed",       "CHM",  0.0f,  1.0f, 1.0f, 1.0f, 0 , true , false, false, false, false, false, false, false, false, false, false, false, false, false, false, 0,  false, false, true  },
 		{ "terrified",  "Terrified",     "TRF",  0.0f,  1.0f, 1.0f, 1.0f, 0 , true , false, false, false, false, false, false, false, false, false, false, false, false, false, false, 0,  false, false, true  },
 		{ "decay",      "Decay",         "DCY",  0.0f,  1.0f, 1.0f, 1.0f, 0 , true , false, false, false, false, false, false, false, false, false, false, false, false, false, false, 0,  false, false, false },
+		// 2026-10-02, the human's ask: healing it receives is halved (Decay turns it to harm).
+		{ "wounded",    "Wounded",       "WND",  0.0f,  1.0f, 1.0f, 1.0f, 0 , true , false, false, false, false, false, false, false, false, false, false, false, false, false, false, 0,  false, false, false, -50 },
 	};
 
 	const FStatusDef* AllStatuses(int& OutCount)

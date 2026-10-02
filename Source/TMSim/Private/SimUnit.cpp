@@ -109,6 +109,19 @@ namespace TMSim
 		return Value;
 	}
 
+	int FUnit::HealReceived(int Amount) const
+	{
+		int Change = 0;
+		for (const FStatus& Status : Statuses)
+		{
+			if (const FStatusDef* Def = FindStatus(Status.Id))
+			{
+				Change += Def->HealTakenPercent;
+			}
+		}
+		return Change == 0 || Amount <= 0 ? Amount : std::max(0, RoundToInt(Amount * (1.0 + Change / 100.0)));
+	}
+
 	bool FUnit::HasStatus(const std::string& StatusId) const
 	{
 		for (const FStatus& Status : Statuses)

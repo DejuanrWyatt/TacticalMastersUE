@@ -112,6 +112,10 @@ struct FTMTower
 	int32 Holder = -2;
 	float Phase = 0.0f;
 	float LightBase = 0.0f;
+	/** TowerClock when it was taken: its fire grows from embers and its sight spreads over TowerKindleSeconds. Long ago: lit. */
+	float KindledAt = -100.0f;
+	/** How far its flames have run, in cycles: kept, so a change of speed as it catches doesn't make them jump. */
+	float FlameTime = 0.0f;
 };
 
 /** A moving part of a hazard ground (TMBattleDirectorHazards.cpp): a flame, an ember, a wisp of steam, a mote. */
@@ -943,6 +947,9 @@ private:
 	/** The board's cells (FogCell metres across) this side can see now, and has ever seen. */
 	TArray<uint8> FogSeen;
 	TArray<uint8> FogExplored;
+	/** FogSeen without the towers still catching, kept while only their spread changes (it is the slow part). */
+	TArray<uint8> FogSteadySeen;
+	FString FogSteadySignature;
 	int32 FogCellsX = 0;
 	int32 FogCellsY = 0;
 	/** The side the explored cells belong to; a change of side starts them again. */
@@ -1040,6 +1047,18 @@ private:
 	void MakeTower(const FVector& Foot, int32 Seed);
 	/** The fire in the holder's colour, or embers for nobody. */
 	void PaintTower(int32 Index, int32 Holder);
+	/** The fire's colour and light at Kindle (0 embers .. 1 fully caught). */
+	void LightTower(FTMTower& Tower, float Kindle);
+	/** How long a taken tower's fire takes to catch, and its sight to spread (the human's ask, 2026-10-02). */
+	static constexpr float TowerKindleSeconds = 2.0f;
+	/** 0 just taken .. 1 caught (eased), for tower Index; 1 for a tower nobody holds or long held. */
+	float TowerKindle(int32 Index) const;
+	/** Whether any tower this side holds is still catching. */
+	bool AnyTowerKindling(int32 Team) const;
+	/** What the side sees from its units and its towers that have caught, leaving out the ones still catching. */
+	bool SeenWithoutKindling(int32 Team, const TMSim::FVec2& Point) const;
+	/** Whether the spreading sight of a tower this side is still catching reaches Point yet. */
+	bool KindlingReaches(int32 Team, const TMSim::FVec2& Point) const;
 	/** The flames rise and sway, the light flickers. */
 	void AdvanceTowers(float DeltaSeconds);
 	/** An unlit colour, for what glows (the chests' runes and crystals). */

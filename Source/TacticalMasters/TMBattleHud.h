@@ -256,6 +256,8 @@ private:
 	void DrawReplayBar(ATMBattleDirector& Director);
 	/** The battle report at the end of a battle: the MVP, each unit's numbers, the moments (TMBattleHudReport.cpp). */
 	void DrawBattleReport(ATMBattleDirector& Director, const FString& Line, const FLinearColor& Colour);
+	/** What a unit carried at the end, as item badges with their tips (the battle report). */
+	void ReportGear(const TMSim::FUnit& Unit, float X, float Y, float Size);
 	void DrawSetup(ATMBattleDirector& Director);
 	/** Host or join a match against another machine (main_menu.gd:79-230). */
 	void DrawOnline(ATMBattleDirector& From);
@@ -327,6 +329,8 @@ private:
 	void DrawUnitPanel(ATMBattleDirector& Director, const TMSim::FUnit& Unit, bool bRight);
 	/** Each unit's name, health and statuses over its head. */
 	void DrawOverheads(ATMBattleDirector& Director);
+	/** What is left of a unit's turn, two joined round tokens in front of its ring: the move and the action. */
+	void TurnPips(const TMSim::FUnit& Unit, float CX, float Top, float Zoom);
 	/** One of ours just in a fight: its health over its head for a few seconds, the lost part draining. */
 	void PopBar(ATMBattleDirector& Director, const TMSim::FUnit& Unit, float CentreX, float Bottom);
 	/** A row of status chips. Returns the width used. Right to left from X when bLeftward. */

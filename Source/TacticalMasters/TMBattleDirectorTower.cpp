@@ -148,50 +148,135 @@ void ATMBattleDirector::MakeTower(const FVector& Foot, int32 Seed)
 
 void ATMBattleDirector::PaintTower(int32 Index, int32 Holder)
 {
-	using namespace TMTowerLook;
 	if (!Beacons.IsValidIndex(Index))
 	{
 		return;
 	}
 	FTMTower& Tower = Beacons[Index];
-	Tower.Holder = Holder;
+	// Taken during the battle: the fire catches over two seconds, and the side's
+	// sight spreads from it with the flames (the human's ask, 2026-10-02). The
+	// first painting, as the board is built, is lit at once.
 	const bool bHeld = Holder == 0 || Holder == 1;
-	const FLinearColor Colour = HolderColour(Holder);
+	Tower.KindledAt = bHeld && Tower.Holder != -2 && Tower.Holder != Holder ? TowerClock : -100.0f;
+	Tower.Holder = Holder;
+	LightTower(Tower, TowerKindle(Index));
+}
+
+void ATMBattleDirector::LightTower(FTMTower& Tower, float Kindle)
+{
+	using namespace TMTowerLook;
+	const bool bHeld = Tower.Holder == 0 || Tower.Holder == 1;
+	const float K = bHeld ? Kindle : 0.0f;
+	const FLinearColor Colour = HolderColour(Tower.Holder);
 	if (Tower.Fire)
 	{
-		const float K = bHeld ? 3.0f : 1.2f;
-		Tower.Fire->SetVectorParameterValue(TEXT("TintColorAndOpacity"), FLinearColor(Colour.R * K, Colour.G * K, Colour.B * K, 1.0f));
+		const float Glow = FMath::Lerp(1.2f, 3.0f, K);
+		Tower.Fire->SetVectorParameterValue(TEXT("TintColorAndOpacity"), FLinearColor(Colour.R * Glow, Colour.G * Glow, Colour.B * Glow, 1.0f));
 	}
 	if (Tower.Core)
 	{
-		const FLinearColor Hot = FMath::Lerp(Colour, FLinearColor::White, 0.65f) * (bHeld ? 4.0f : 1.4f);
+		const FLinearColor Hot = FMath::Lerp(Colour, FLinearColor::White, 0.65f) * FMath::Lerp(1.4f, 4.0f, K);
 		Tower.Core->SetVectorParameterValue(TEXT("TintColorAndOpacity"), FLinearColor(Hot.R, Hot.G, Hot.B, 1.0f));
 	}
 	if (Tower.Light)
 	{
 		Tower.Light->SetLightColor(Colour);
-		Tower.LightBase = bHeld ? 14000.0f : 2500.0f;
+		// A flare as it catches, settling to the held fire's light.
+		Tower.LightBase = FMath::Lerp(2500.0f, 14000.0f, K) * (1.0f + 0.5f * FMath::Sin(K * PI));
 		Tower.Light->SetIntensity(Tower.LightBase);
-		Tower.Light->SetAttenuationRadius(bHeld ? 700.0f : 260.0f);
+		Tower.Light->SetAttenuationRadius(FMath::Lerp(260.0f, 700.0f, K));
 	}
+}
+
+float ATMBattleDirector::TowerKindle(int32 Index) const
+{
+	if (!Beacons.IsValidIndex(Index))
+	{
+		return 1.0f;
+	}
+	const FTMTower& Tower = Beacons[Index];
+	if (Tower.Holder != 0 && Tower.Holder != 1)
+	{
+		return 1.0f;
+	}
+	const float Part = FMath::Clamp((TowerClock - Tower.KindledAt) / TowerKindleSeconds, 0.0f, 1.0f);
+	return Part * Part * (3.0f - 2.0f * Part);  // eased in and out
+}
+
+bool ATMBattleDirector::AnyTowerKindling(int32 Team) const
+{
+	for (int32 i = 0; i < Beacons.Num() && i < static_cast<int32>(Battle.Watchtowers.size()); ++i)
+	{
+		if (Battle.Watchtowers[static_cast<size_t>(i)].Owner == Team && TowerKindle(i) < 1.0f)
+		{
+			return true;
+		}
+	}
+	return false;
+}
+
+bool ATMBattleDirector::SeenWithoutKindling(int32 Team, const TMSim::FVec2& Point) const
+{
+	// As FBattle::CanSee, the towers still catching left out.
+	for (const TMSim::FUnit& Unit : Battle.Units)
+	{
+		if (Unit.IsAlive() && Unit.Team == Team && Unit.Pos.DistanceTo(Point) <= Battle.SightOf(Unit) && Battle.HasLineOfSight(Unit.Pos, Point))
+		{
+			return true;
+		}
+	}
+	for (int32 i = 0; i < static_cast<int32>(Battle.Watchtowers.size()); ++i)
+	{
+		const TMSim::FWatchtower& Tower = Battle.Watchtowers[static_cast<size_t>(i)];
+		if (Tower.Owner == Team && TowerKindle(i) >= 1.0f && Battle.TowerSees(Tower, Point))
+		{
+			return true;
+		}
+	}
+	return false;
+}
+
+bool ATMBattleDirector::KindlingReaches(int32 Team, const TMSim::FVec2& Point) const
+{
+	for (int32 i = 0; i < static_cast<int32>(Battle.Watchtowers.size()); ++i)
+	{
+		const TMSim::FWatchtower& Tower = Battle.Watchtowers[static_cast<size_t>(i)];
+		const float Kindle = TowerKindle(i);
+		if (Tower.Owner == Team && Kindle < 1.0f && Battle.TowerSees(Tower, Point)
+			&& static_cast<double>(Tower.Pos.DistanceTo(Point)) <= Battle.Tuning.WatchtowerSight * Kindle)
+		{
+			return true;
+		}
+	}
+	return false;
 }
 
 void ATMBattleDirector::AdvanceTowers(float DeltaSeconds)
 {
 	using namespace TMTowerLook;
 	TowerClock += DeltaSeconds;
-	for (FTMTower& Tower : Beacons)
+	for (int32 Index = 0; Index < Beacons.Num(); ++Index)
 	{
+		FTMTower& Tower = Beacons[Index];
 		if (!Tower.Root)
 		{
 			continue;
 		}
 		const bool bHeld = Tower.Holder == 0 || Tower.Holder == 1;
 		const float T = TowerClock + Tower.Phase;
-		// Held: tall flames, quick. Nobody's: low embers, slow.
-		const float Rise = bHeld ? 1.25f : 0.22f;
-		const float Speed = bHeld ? 0.9f : 0.35f;
-		const float Width = bHeld ? 1.0f : 0.45f;
+		// Held: tall flames, quick. Nobody's: low embers, slow. Just taken: the
+		// embers grow into the held fire over two seconds, in step with the
+		// side's sight spreading from it (AdvanceFog).
+		const float Kindle = bHeld ? TowerKindle(Index) : 0.0f;
+		const bool bCatching = bHeld && TowerClock - Tower.KindledAt < TowerKindleSeconds + 0.5f;
+		if (bCatching)
+		{
+			LightTower(Tower, Kindle);
+		}
+		const float Rise = FMath::Lerp(0.22f, 1.25f, Kindle);
+		const float Speed = FMath::Lerp(0.35f, 0.9f, Kindle);
+		const float Width = FMath::Lerp(0.45f, 1.0f, Kindle);
+		Tower.FlameTime = FMath::Fmod(Tower.FlameTime + DeltaSeconds * Speed, 1000.0f);
 		for (int32 i = 0; i < Tower.Flames.Num(); ++i)
 		{
 			UStaticMeshComponent* Flame = Tower.Flames[i];
@@ -200,7 +285,7 @@ void ATMBattleDirector::AdvanceTowers(float DeltaSeconds)
 				continue;
 			}
 			// Each flame lives a moment from the coals up, then begins again.
-			const float Life = FMath::Fmod(T * Speed + i / static_cast<float>(Flames), 1.0f);
+			const float Life = FMath::Fmod(Tower.FlameTime + Tower.Phase + i / static_cast<float>(Flames), 1.0f);
 			const bool bHeart = i % 3 == 0;
 			const float Angle = i * 2.4f;
 			const float Out = (bHeart ? 0.08f : 0.18f + (i % 4) * 0.08f) * Across * Width;
@@ -210,7 +295,7 @@ void ATMBattleDirector::AdvanceTowers(float DeltaSeconds)
 			// Fat at the coals, a thin tongue as it rises, gone at the top.
 			const float Fade = FMath::Sin(FMath::Min(1.0f, Life * 1.15f) * PI);
 			const float Thick = (bHeart ? 0.22f : 0.3f) * Across * Width * (1.0f - 0.55f * Life) * Fade;
-			const float Tall = Thick * (bHeld ? 2.6f : 1.4f);
+			const float Tall = Thick * FMath::Lerp(1.4f, 2.6f, Kindle);
 			Flame->SetRelativeScale3D(FVector(Thick, Thick, Tall) * 2.0f / 100.0f);
 		}
 		if (Tower.Light)

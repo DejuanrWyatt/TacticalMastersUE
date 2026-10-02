@@ -389,6 +389,8 @@ namespace TMSim
 				const int Change = GearSum(Target, &FItemDef::HealTakenPercent);
 				Full = Change != 0 ? std::max(0, RoundToInt(Full * (1.0 + Change / 100.0))) : Full;
 			}
+			// Wounded: less of it lands, whoever heals.
+			Full = Target.HealReceived(Full);
 			// Never more than it is short of: overhealing is not a thing here.
 			const int Missing = Target.MaxHp() - Target.Hp;
 			return std::min(Full, Missing);
@@ -529,7 +531,7 @@ namespace TMSim
 				}
 				else
 				{
-					const int Healed = std::min(Amount, Unit.MaxHp() - Unit.Hp);
+					const int Healed = std::min(Unit.HealReceived(Amount), Unit.MaxHp() - Unit.Hp);
 					if (Healed > 0)
 					{
 						Unit.Hp += Healed;
@@ -616,7 +618,7 @@ namespace TMSim
 			}
 			return;
 		}
-		const int Healed = std::min(Amount, Unit.MaxHp() - Unit.Hp);
+		const int Healed = std::min(Unit.HealReceived(Amount), Unit.MaxHp() - Unit.Hp);
 		if (Healed > 0)
 		{
 			Unit.Hp += Healed;
@@ -642,7 +644,7 @@ namespace TMSim
 			return;
 		}
 		const int Amount = std::min(
-			std::max(1, RoundToInt(Unit.MaxHp() * Tuning.RegenPercent * 0.01)),
+			Unit.HealReceived(std::max(1, RoundToInt(Unit.MaxHp() * Tuning.RegenPercent * 0.01))),
 			Unit.MaxHp() - Unit.Hp);
 		if (Amount <= 0)
 		{

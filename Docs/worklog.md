@@ -58,6 +58,49 @@ How to write here:
 
 ## Log
 
+- 2026-10-02 15:15 (lobby and items session) Built and tested clean at 15:11 (every test passed). Packaging v17 at the
+  human's word ("Start v17 release"): `E:\Builds\TacticalMasters-2026-10-02-v17` (protocol 14) by
+  `E:\Builds\agent-release-build.bat`; "Play with crash details.bat" copied in from v16. Packaged 15:31: BUILD READY,
+  `E:\Builds\TacticalMasters-2026-10-02-v17\Windows\TacticalMasters.exe`. Not committed (not asked).
+- 2026-10-02 14:55 (lobby and items session) Not built, not committed: "Turn Left Indicator Mockups" A + D, the
+  human's pick with flashing borders: ATMBattleHud::TurnPips (round joined tokens in front of the ring, for our own
+  ready units with half a turn or more left; statuses stay beside the ring as rounded squares); the action bar's
+  Move tile and usable ability tiles flash (a pulsing edge) once the other half is spent; spent halves read "moved"
+  / "acted" (WordTile's under-line, AbilityTile's effect band).
+- 2026-10-02 14:40 (lobby and items session) Not built, not committed: a tower just taken catches over
+  ATMBattleDirector::TowerKindleSeconds (2 s): FTMTower::KindledAt/FlameTime, LightTower (colour, light and a flare by
+  the catch), AdvanceTowers' flames eased from embers; AdvanceFog spreads the tower's sight with it in 16 steps (the
+  rest of the side's sight cached in FogSteadySeen, so only the spread is worked out again), and IsSeen/IsPointSeen
+  agree. Presentation only: the rules still see the whole circle at once (no protocol change).
+- 2026-10-02 14:25 (lobby and items session) Not built, not committed: the action bar, "Action Bar Mockups" B (the
+  human's pick): WordTile (TMBattleHud.cpp) draws a stroke icon beside each word (EGlyph: Move, Sprint, Items,
+  Capture, End), small tiles 64 -> 74 px; AbilityTile (TMBattleHudPanels.cpp) shows a cooling ability on the bar as
+  an hourglass badge with the turns left and a step bar per cooldown turn (the enemy panel keeps the large number).
+- 2026-10-02 14:10 (lobby and items session) Not built, not committed: the Wounded status ("wounded", WND):
+  FStatusDef::HealTakenPercent (new, last field; Wounded -50), FUnit::HealReceived applied to heal abilities
+  (CalcAmount), Regen, springs, undamaged mending and lifesteal; the HUD's look and words (TMBattleHudStyle.h), its
+  combat-text colour (Blows), its icon (Tools/StatusIcons, Content/Data/Icons/statuses/wounded.png), a test in
+  SimStatusTest (passes here, with every other status test), and the class creator's vocabulary. No ability or item
+  uses it yet. Go To stops drawn as rings on the ground (DrawGoToMarks, "Go To Marker Options" B). Mockups: "Action
+  Bar Mockups" (icons on Move/Sprint/Items/Capture/End, two cooldown displays).
+- 2026-10-02 13:45 (lobby and items session) v16 crashed again on DirectX 11 (-dx11): the same access violation in
+  SetShaderParameters, base pass, breadcrumbs "SceneRender - BattleDirector" (likely one of the director's scene
+  captures: the turn-card portraits, every frame). A Narbash body (piper) was on the field both times, but a 24-minute
+  -dx11 match with two Narbash bodies ended cleanly, so that is not proven. Added "Play with crash details.bat" to the v16
+  folder (-ExecCmds r.EmitMeshDrawEvents 1, r.ShowMaterialDrawEvents 1) so the next crash log names the mesh and
+  material being drawn.
+- 2026-10-02 13:20 (lobby and items session) Not built, not committed: the battle report shows each unit's items
+  (ATMBattleHud::ReportGear in TMBattleHudReport.cpp, declared in TMBattleHud.h: an Items column in the tables, beside
+  the name on a unit's page, "Carried" on the MVP card); the MVP summary is two short lines (it ran out of the card);
+  moments name the class and side, not the unit id. Chest mockups ("Treasure Chest Mockups"): no beam through fog,
+  the human's call.
+- 2026-10-02 12:40 (lobby and items session) Committed `8180d91` (this session's work since `3ab5f9e`: Source, Tests,
+  Docs, Content/Data, Config, Tools; never the Fab packs) and the class creator `fcb5908`. Release
+  `E:\Builds\TacticalMasters-2026-10-02-v16` (protocol 14), by Saved/agent-v16.bat. v16 then crashed in play: D3D12
+  SetShaderParameters in the base pass, the first tested battle with Narbash bodies (war_drummer, dirge_singer). The v14
+  guard (TMDrawable) had never caught a material in v15 or v16: at run time the four cook-broken Fab materials still
+  report a shader map. TMDrawable.cpp now refuses them by name too (Narbash's legs drawn with the default surface).
+  Not built, not committed, no release: waits on build-and-test and the human's OK. Meanwhile "Play on DirectX 11.bat".
 - 2026-10-02 10:50 (lobby and items session) Class creator (E:\TacticsClassCreator): a "Game roster" page
   (app/roster.mjs, sidebar button, #roster): all 101 game classes as cards grouped by role, a sortable table of
   every stat (tinted above/below the role's usual), or a map of budget against win rate; filters for role, rule

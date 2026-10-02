@@ -38,7 +38,27 @@ namespace TMDrawable
 		// The platform the game is drawing for (SM6 on DirectX 12, SM5 on 11).
 		(void)World;
 		const FMaterialResource* Resource = Material->GetMaterialResource(GMaxRHIShaderPlatform);
-		const bool bOk = Resource != nullptr && Resource->GetGameThreadShaderMap() != nullptr;
+		bool bOk = Resource != nullptr && Resource->GetGameThreadShaderMap() != nullptr;
+		// 2026-10-02: v16 crashed the same way (SetShaderParameters, the base pass) in
+		// the first battle with Narbash bodies on the field, and this check had never
+		// caught anything: at run time these four still report a shader map. They are
+		// the ones the cook leaves without shaders (package.log, "Shadermap pointer is
+		// null"), so they are refused by name, along with every instance of them.
+		static const TCHAR* const Broken[] = {
+			TEXT("M_Narbash_Legs_Drumsticks"), TEXT("M_Bug_Mesh"), TEXT("M_Bug_ParticleSubUV_Trans"), TEXT("M_Rock_To_Throw")};
+		if (bOk)
+		{
+			const UMaterial* Base = const_cast<UMaterialInterface*>(Material)->GetMaterial();
+			const FString BaseName = Base ? Base->GetName() : FString();
+			for (const TCHAR* Name : Broken)
+			{
+				if (BaseName == Name || Material->GetName() == Name)
+				{
+					bOk = false;
+					break;
+				}
+			}
+		}
 		if (!bOk)
 		{
 			const FString Name = Material->GetPathName();

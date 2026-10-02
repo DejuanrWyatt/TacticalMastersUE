@@ -191,11 +191,15 @@ void ATMBattleHud::DrawBattleReport(ATMBattleDirector& From, const FString& Line
 		{
 			Most = FMath::Max(Most, FMath::Abs(Part.Points));
 		}
-		const FString Said = FString::Printf(TEXT("%s damage, %s taken and %s mitigated, %s healed; %d knock-outs, %d assists."),
-			*Number(T.Damage), *Number(T.Taken), *Number(T.Mitigated), *Number(T.Healing), T.Kills, T.Assists);
-		Text(Said, CX + 18.0f * S, Top + 108.0f * S, TextColour, Font, 0.5f * S);
-		float RY = Top + 140.0f * S;
-		for (int32 Index = 0; Index < FMath::Min(Parts.Num(), 9); ++Index)
+		// Two short lines (2026-10-02: one long line ran out of the card).
+		const FString SaidDamage = FString::Printf(TEXT("%s damage   %s taken   %s mitigated   %s healed"),
+			*Number(T.Damage), *Number(T.Taken), *Number(T.Mitigated), *Number(T.Healing));
+		const FString SaidFights = FString::Printf(TEXT("%d knock-out%s   %d assist%s   %d fell"),
+			T.Kills, T.Kills == 1 ? TEXT("") : TEXT("s"), T.Assists, T.Assists == 1 ? TEXT("") : TEXT("s"), T.Deaths);
+		Text(SaidDamage, CX + 18.0f * S, Top + 106.0f * S, TextColour, Font, 0.48f * S);
+		Text(SaidFights, CX + 18.0f * S, Top + 128.0f * S, TextColour, Font, 0.48f * S);
+		float RY = Top + 162.0f * S;
+		for (int32 Index = 0; Index < FMath::Min(Parts.Num(), 7); ++Index)
 		{
 			const FPart& Part = Parts[Index];
 			Text(Part.Label, CX + 18.0f * S, RY, Dim, Font, 0.5f * S);
@@ -206,7 +210,13 @@ void ATMBattleHud::DrawBattleReport(ATMBattleDirector& From, const FString& Line
 			Text(FString::Printf(TEXT("%+.0f"), Part.Points), CX + LeftW - 56.0f * S, RY, TextColour, Font, 0.5f * S);
 			RY += 30.0f * S;
 		}
-		AddTip(CX, Top, LeftW, CH, TEXT("Points: 1 per 10 damage, 0.4 per 10 taken, 0.3 per 10 mitigated, 1 per 10 healed; 12 a knock-out, 5 an assist (help in the minute before), -10 knocked out; 4 a monster, 15 a boss; 2 a buff or debuff, 3 a turn of control, 10 a revive, 8 a tower."));
+		if (Star)
+		{
+			const float GearY = Top + CH - 50.0f * S;
+			Text(TEXT("Carried"), CX + 18.0f * S, GearY + 8.0f * S, Dim, Font, 0.5f * S);
+			ReportGear(*Star, CX + 140.0f * S, GearY, 34.0f * S);
+		}
+		AddTip(CX, Top, LeftW, CH - 56.0f * S, TEXT("Points: 1 per 10 damage, 0.4 per 10 taken, 0.3 per 10 mitigated, 1 per 10 healed; 12 a knock-out, 5 an assist (help in the minute before), -10 knocked out; 4 a monster, 15 a boss; 2 a buff or debuff, 3 a turn of control, 10 a revive, 8 a tower."));
 	}
 
 	// ---- the moments, to watch again
@@ -224,7 +234,8 @@ void ATMBattleHud::DrawBattleReport(ATMBattleDirector& From, const FString& Line
 			{
 				continue;
 			}
-			const FString Who = Mark.Unit >= 0 ? From.NameOf(Mark.Unit) : FString();
+			const TMSim::FUnit* Marked = Mark.Unit >= 0 ? From.Battle.FindUnit(Mark.Unit) : nullptr;
+			const FString Who = Marked ? FString::Printf(TEXT("%s (%s)"), *JobName(*Marked), Marked->Team == 0 ? TEXT("Blue") : TEXT("Red")) : FString(TEXT("A unit"));
 			const FString What = Mark.Kind == TEXT("ko") ? FString::Printf(TEXT("%s falls"), *Who)
 				: Mark.Kind == TEXT("revive") ? FString::Printf(TEXT("%s is raised"), *Who)
 				: Mark.Kind == TEXT("tower") ? FString(TEXT("A watchtower is taken")) : FString(TEXT("A camp is cleared"));
@@ -265,6 +276,10 @@ void ATMBattleHud::DrawBattleReport(ATMBattleDirector& From, const FString& Line
 		const double Points = ATMBattleDirector::ScoreOf(T);
 		const FString G = Grade(Points, Best, From.ReportUnit == Mvp);
 		Text(Name, RX + 20.0f * S, UY + 16.0f * S, Unit ? TeamColour(Unit->Team) : TextColour, Big, 0.7f * S);
+		if (Unit)
+		{
+			ReportGear(*Unit, RX + 40.0f * S + TextSize(Name, Big, 0.7f * S).X, UY + 16.0f * S, 36.0f * S);
+		}
 		Text(FString::Printf(TEXT("%s   %.1f points"), *G, Points), RX + 20.0f * S, UY + 54.0f * S, GradeColour(G), Font, 0.58f * S);
 		MenuButton(RX + RW - 180.0f * S, UY + 16.0f * S, 160.0f * S, 40.0f * S, TEXT("Back to the tables"), ETMHudAction::ReportUnit, -1);
 		// Tiles: the numbers that matter.
@@ -382,7 +397,8 @@ void ATMBattleHud::DrawBattleReport(ATMBattleDirector& From, const FString& Line
 	}
 
 	const float NameW = 230.0f * S;
-	const float ColW = (RW - NameW - 40.0f * S) / Columns.Num();
+	const float GearW = 96.0f * S;
+	const float ColW = (RW - NameW - GearW - 40.0f * S) / Columns.Num();
 	const float RowH = 50.0f * S;
 	float Y = Top + 56.0f * S;
 	for (int32 Team = 0; Team < 2; ++Team)
@@ -403,7 +419,8 @@ void ATMBattleHud::DrawBattleReport(ATMBattleDirector& From, const FString& Line
 		const FString Sum = FString::Printf(TEXT("%s damage   %s healing   %d knock-outs   %d monsters"), *Number(Damage), *Number(Healing), Kills, Monsters);
 		Text(Sum, RX + RW - 16.0f * S - TextSize(Sum, Font, 0.5f * S).X, Y + 14.0f * S, Dim, Font, 0.5f * S);
 		// The headings.
-		float CX = RX + 16.0f * S + NameW;
+		Text(TEXT("Items"), RX + 16.0f * S + NameW, Y + 44.0f * S, Dim, Font, 0.44f * S);
+		float CX = RX + 16.0f * S + NameW + GearW;
 		for (const FColumn& Column : Columns)
 		{
 			Text(Column.Heading, CX, Y + 44.0f * S, Dim, Font, 0.44f * S);
@@ -424,7 +441,8 @@ void ATMBattleHud::DrawBattleReport(ATMBattleDirector& From, const FString& Line
 			Text(G, RX + 16.0f * S, RowY + 10.0f * S, GradeColour(G), Big, 0.6f * S);
 			Text(JobName(*Unit), RX + 50.0f * S, RowY + 6.0f * S, TextColour, Font, 0.6f * S);
 			Text(RoleWord(*Unit) + (Unit->IsAlive() ? FString() : FString(TEXT("   down"))), RX + 50.0f * S, RowY + 28.0f * S, Dim, Font, 0.44f * S);
-			CX = RX + 16.0f * S + NameW;
+			ReportGear(*Unit, RX + 16.0f * S + NameW, RowY + 11.0f * S, 26.0f * S);
+			CX = RX + 16.0f * S + NameW + GearW;
 			for (int32 Index = 0; Index < Columns.Num(); ++Index)
 			{
 				const FColumn& Column = Columns[Index];
@@ -446,5 +464,23 @@ void ATMBattleHud::DrawBattleReport(ATMBattleDirector& From, const FString& Line
 			RowY += RowH;
 		}
 		Y += TH + 14.0f * S;
+	}
+}
+
+void ATMBattleHud::ReportGear(const TMSim::FUnit& Unit, float X, float Y, float Size)
+{
+	// Its items at the end of the battle, each with its tip; a dash when it had none.
+	float Across = 0.0f;
+	for (const TMSim::FItemDef* Carried : Unit.Gear)
+	{
+		if (Carried)
+		{
+			ItemBadge(Carried, X + Across, Y, Size, true);
+			Across += Size + 4.0f * S;
+		}
+	}
+	if (Across == 0.0f)
+	{
+		Text(TEXT("-"), X, Y + Size * 0.15f, Dim, GEngine->GetMediumFont(), 0.5f * S);
 	}
 }

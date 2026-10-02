@@ -447,6 +447,18 @@ int main(int ArgCount, char** Args)
 		Battle.ResolveAbility(Mage, 4, Knight.Pos, Report);
 		Check(Knight.Hp < Rotting, "healing a Decaying unit should hurt it");
 
+		// Wounded (2026-10-02): the same heal lands at half, and so does anything else that mends it.
+		Battle.RemoveStatus(Knight, "decay");
+		Knight.Hp = 1;
+		const int FullHeal = Amount(Battle, Mage, 4, Knight);
+		Battle.AddStatus(Knight, "wounded", 2);
+		const int HalfHeal = Amount(Battle, Mage, 4, Knight);
+		const int WoundedBefore = Knight.Hp;
+		Battle.ResolveAbility(Mage, 4, Knight.Pos, Report);
+		Check(FullHeal > 1 && HalfHeal == RoundToInt(FullHeal * 0.5) && Knight.Hp - WoundedBefore == HalfHeal,
+			"a heal on the Wounded should land at half: " + std::to_string(FullHeal) + " -> " + std::to_string(Knight.Hp - WoundedBefore));
+		Check(Knight.HealReceived(10) == 5 && Mage.HealReceived(10) == 10, "Wounded should halve Regen, springs and mending as well, and only on its holder");
+
 		// Reraise: down, then up again three seconds later with a quarter of its health.
 		FUnit& Far = Battle.Units[3];
 		Battle.AddStatus(Far, "reraise", 3);
@@ -457,7 +469,7 @@ int main(int ArgCount, char** Args)
 		Check(Far.IsAlive() && Far.Hp == std::max(1, Far.MaxHp() / 4), "Reraise should stand it up with a quarter of its health");
 		if (Failures == Before)
 		{
-			std::printf("Suppressed draws a free blow when it walks and ends when its suppressor is hurt; Guarded sends single-target hits to a guardian within 3 m; Reflect bounces one spell; Decay turns heals to harm; Reraise stands up once\n");
+			std::printf("Suppressed draws a free blow when it walks and ends when its suppressor is hurt; Guarded sends single-target hits to a guardian within 3 m; Reflect bounces one spell; Decay turns heals to harm; Wounded halves them; Reraise stands up once\n");
 		}
 	}
 

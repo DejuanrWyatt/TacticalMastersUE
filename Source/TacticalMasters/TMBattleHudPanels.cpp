@@ -1538,22 +1538,47 @@ void ATMBattleHud::DrawGoToMarks(ATMBattleDirector& From)
 		return;
 	}
 	UFont* Font = GEngine->GetMediumFont();
-	const float Scale = 0.36f * S;
+	// "Go To Marker Options" B (the human's pick, 2026-10-02): a ring lying on the
+	// board where the turn ends, the number standing on it, the last ring gold
+	// and glowing -- part of the ground rather than a box stuck on the screen.
 	auto Mark = [&](const TMSim::FVec2& Point, const FString& Label, float Strength, bool bEnd)
 	{
 		const int Level = From.Battle.Map.NodeLevel(TMSim::FMap::NodeOf(Point));
-		const FVector World = From.GetActorTransform().TransformPosition(From.WorldFromMetres(Point, Level) + FVector(0.0f, 0.0f, 12.0f));
+		const FVector Local = From.WorldFromMetres(Point, Level) + FVector(0.0f, 0.0f, 6.0f);
+		const FTransform& Board = From.GetActorTransform();
 		FVector2D At;
-		if (!PlayerOwner->ProjectWorldLocationToScreen(World, At))
+		if (!PlayerOwner->ProjectWorldLocationToScreen(Board.TransformPosition(Local), At))
 		{
 			return;
 		}
+		const FLinearColor Colour = bEnd ? FLinearColor(0.91f, 0.75f, 0.35f) : FLinearColor(0.47f, 0.67f, 1.0f);
+		const float Radius = (bEnd ? 0.34f : 0.28f) * From.TileSize;
+		constexpr int32 Sides = 28;
+		FVector2D Ring[Sides];
+		for (int32 k = 0; k < Sides; ++k)
+		{
+			const float Angle = 2.0f * PI * k / Sides;
+			const FVector Round = Local + FVector(FMath::Cos(Angle) * Radius, FMath::Sin(Angle) * Radius, 0.0f);
+			if (!PlayerOwner->ProjectWorldLocationToScreen(Board.TransformPosition(Round), Ring[k]))
+			{
+				return;
+			}
+		}
+		for (int32 k = 0; k < Sides; ++k)
+		{
+			const FVector2D& A = Ring[k];
+			const FVector2D& B = Ring[(k + 1) % Sides];
+			if (bEnd)
+			{
+				// The last stop's glow: a wide faint stroke under the ring.
+				DrawLine(A.X, A.Y, B.X, B.Y, Colour * FLinearColor(1.0f, 1.0f, 1.0f, 0.22f * Strength), 7.0f * S);
+			}
+			DrawLine(A.X, A.Y, B.X, B.Y, Colour * FLinearColor(1.0f, 1.0f, 1.0f, (bEnd ? 0.85f : 0.6f) * Strength), 2.0f * S);
+		}
+		const float Scale = (bEnd ? 0.42f : 0.38f) * S;
 		const FVector2D Size = TextSize(Label, Font, Scale);
-		const float Box = FMath::Max(Size.X + 8.0f * S, 18.0f * S);
-		const FLinearColor Edge = bEnd ? FLinearColor(Gold.R, Gold.G, Gold.B, Strength) : FLinearColor(0.44f, 0.66f, 1.0f, Strength);
-		DrawRect(Edge, At.X - Box * 0.5f - 1.5f * S, At.Y - 9.0f * S - 1.5f * S, Box + 3.0f * S, 18.0f * S + 3.0f * S);
-		DrawRect(FLinearColor(0.07f, 0.09f, 0.13f, 0.92f * Strength), At.X - Box * 0.5f, At.Y - 9.0f * S, Box, 18.0f * S);
-		Text(Label, At.X - Size.X * 0.5f, At.Y - Size.Y * 0.5f, FLinearColor(0.95f, 0.96f, 0.98f, Strength), Font, Scale, false);
+		const FLinearColor Ink = bEnd ? FLinearColor(1.0f, 0.88f, 0.63f, Strength) : FLinearColor(0.95f, 0.96f, 0.99f, 0.92f * Strength);
+		OutlinedText(Label, At.X - Size.X * 0.5f, At.Y - Size.Y - 4.0f * S, Ink, Font, Scale, 1.5f * S);
 	};
 	for (const TPair<int32, ATMBattleDirector::FTMGoTo>& Pair : From.GoTos)
 	{
@@ -1575,6 +1600,57 @@ void ATMBattleHud::DrawGoToMarks(ATMBattleDirector& From)
 		Mark(From.GoToHoverStops[static_cast<size_t>(i)], i + 1 == Hovered ? FString::Printf(TEXT("%d turn%s"), Hovered, Hovered == 1 ? TEXT("") : TEXT("s"))
 			: FString::FromInt(i + 1), 0.85f, i + 1 == Hovered);
 	}
+}
+
+void ATMBattleHud::TurnPips(const TMSim::FUnit& Unit, float CX, float Top, float Zoom)
+{
+	const float R = 7.5f * S * Zoom;
+	const float Y0 = Top + R + 3.0f * S;
+	const FLinearColor Ink(0.03f, 0.04f, 0.07f, 0.92f);
+	const FLinearColor Spent(0.52f, 0.55f, 0.62f, 0.75f);
+	auto Circle = [&](float PX, float PY, float Radius, const FLinearColor& Colour, float Thick)
+	{
+		constexpr int32 Sides = 18;
+		for (int32 k = 0; k < Sides; ++k)
+		{
+			const float A0 = 2.0f * PI * k / Sides;
+			const float A1 = 2.0f * PI * (k + 1) / Sides;
+			DrawLine(PX + FMath::Cos(A0) * Radius, PY + FMath::Sin(A0) * Radius, PX + FMath::Cos(A1) * Radius, PY + FMath::Sin(A1) * Radius, Colour, Thick);
+		}
+	};
+	auto Token = [&](float PX, bool bLeft, const FLinearColor& Colour, bool bMove)
+	{
+		// A dark disc (rings drawn inward), its rim, its glyph.
+		for (float Radius = R; Radius > 0.5f; Radius -= 1.5f)
+		{
+			Circle(PX, Y0, Radius, Ink, 2.0f);
+		}
+		const FLinearColor Shade = bLeft ? Colour : Spent;
+		Circle(PX, Y0, R, Shade, bLeft ? 2.2f * S : 1.2f * S);
+		const float G = R * 0.55f;
+		if (bMove)
+		{
+			Circle(PX - G * 0.38f, Y0 - G * 0.2f, G * 0.3f, Shade, 1.4f * S);
+			Circle(PX + G * 0.38f, Y0 + G * 0.25f, G * 0.3f, Shade, 1.4f * S);
+		}
+		else
+		{
+			DrawLine(PX, Y0 - G, PX, Y0 + G, Shade, 1.6f * S);
+			DrawLine(PX - G, Y0, PX + G, Y0, Shade, 1.6f * S);
+			DrawLine(PX - G * 0.45f, Y0 - G * 0.45f, PX + G * 0.45f, Y0 + G * 0.45f, Shade, 1.2f * S);
+			DrawLine(PX - G * 0.45f, Y0 + G * 0.45f, PX + G * 0.45f, Y0 - G * 0.45f, Shade, 1.2f * S);
+		}
+		if (!bLeft)
+		{
+			// Spent: struck through.
+			DrawLine(PX - R * 0.75f, Y0 + R * 0.75f, PX + R * 0.75f, Y0 - R * 0.75f, Spent, 1.6f * S);
+		}
+	};
+	const float Apart = R + 2.0f * S;
+	// The bar that joins them, so the two read as one mark.
+	DrawLine(CX - Apart, Y0, CX + Apart, Y0, Ink, 3.0f * S);
+	Token(CX - Apart, !Unit.bMoved, FLinearColor(0.56f, 0.72f, 1.0f, 1.0f), true);
+	Token(CX + Apart, !Unit.bActed, FLinearColor(0.94f, 0.81f, 0.45f, 1.0f), false);
 }
 
 void ATMBattleHud::DrawOverheads(ATMBattleDirector& From)
@@ -1638,6 +1714,16 @@ void ATMBattleHud::DrawOverheads(ATMBattleDirector& From)
 			const FVector2D DownSize = TextSize(Down, Font, 0.34f * S * O);
 			OutlinedText(Down, Head.At.X - DownSize.X * 0.5f, Head.At.Y, Urgent, Font, 0.34f * S * O, 1.0f * S);
 			continue;
+		}
+
+		// What is left of its turn ("Turn Left Indicator Mockups" A, 2026-10-02): two
+		// round tokens joined, in front of its ring -- a footprint for the move, a star
+		// for the action, ringed while still to use, grey and struck through once spent.
+		// Round and paired, under the ring, so never taken for its statuses (rounded
+		// squares beside the ring).
+		if (bFriend && Unit.bReady && !(Unit.bMoved && Unit.bActed) && From.PlayerCanCommand(&Unit))
+		{
+			TurnPips(Unit, Head.Foot.X, Head.Foot.Y + Head.Ring * 0.42f, O);
 		}
 
 		if (!bHovered)
@@ -1766,8 +1852,17 @@ void ATMBattleHud::AbilityTile(ATMBattleDirector& From, const TMSim::FUnit& Unit
 	// The frame: gold for the ultimate, bright while aiming it.
 	const FLinearColor Edge = bAiming ? Gold : (Slot == 3 ? Gold * FLinearColor(1, 1, 1, bColour ? 0.95f : 0.45f)
 		: FLinearColor(0.55f, 0.62f, 0.75f, bColour ? 0.9f : 0.4f));
+	// A unit that has moved but not acted: its abilities are what is left, and their
+	// edges flash ("Turn Left Indicator Mockups" D, with flashing borders, 2026-10-02).
+	const bool bFlash = bButton && bColour && Unit.bReady && Unit.bMoved && !Unit.bActed && From.PlayerCanCommand(&Unit);
+	const float Pulse = bFlash ? 0.5f + 0.5f * FMath::Sin((GetWorld() ? GetWorld()->GetRealTimeSeconds() : 0.0f) * 2.0f * PI * 1.1f) : 0.0f;
+	const FLinearColor Flash(1.0f, 0.93f, 0.62f, 1.0f);
+	if (bFlash)
+	{
+		DrawRect(Flash * FLinearColor(1.0f, 1.0f, 1.0f, 0.35f * Pulse), X - 6.0f * S, Y - 6.0f * S, Size + 12.0f * S, Size + 12.0f * S);
+	}
 	DrawRect(FLinearColor(0.0f, 0.0f, 0.0f, 0.75f), X - 3.0f * S, Y - 3.0f * S, Size + 6.0f * S, Size + 6.0f * S);
-	DrawRect(Edge, X - 2.0f * S, Y - 2.0f * S, Size + 4.0f * S, Size + 4.0f * S);
+	DrawRect(bFlash ? FMath::Lerp(Edge, Flash, Pulse) : Edge, X - 2.0f * S, Y - 2.0f * S, Size + 4.0f * S, Size + 4.0f * S);
 	DrawRect(bColour && bOver && bButton ? FLinearColor(0.16f, 0.2f, 0.3f, 1.0f) : FLinearColor(0.06f, 0.07f, 0.1f, 1.0f), X, Y, Size, Size);
 	const float Inset = Size * 0.08f;
 	Picture(AbilityIcon(*Ability, !bColour), X + Inset, Y + Inset, Size - 2.0f * Inset, Size - 2.0f * Inset,
@@ -1782,9 +1877,56 @@ void ATMBattleHud::AbilityTile(ATMBattleDirector& From, const TMSim::FUnit& Unit
 		const FVector2D PctSize = TextSize(Pct, Font, Size / 170.0f);
 		Text(Pct, X + (Size - PctSize.X) * 0.5f, Y + (Size - PctSize.Y) * 0.5f, Gold, Font, Size / 170.0f);
 	}
+	else if (bCooling && bButton)
+	{
+		// "Action Bar Mockups" B (2026-10-02): the icon greyed (above), an
+		// hourglass badge with the turns left, and a step bar that fills as they pass.
+		const int32 Left = Unit.Cooldowns[Slot];
+		const int32 Whole = FMath::Max(Left, Ability->Cooldown);
+		DrawRect(FLinearColor(0.0f, 0.0f, 0.0f, 0.3f), X, Y, Size, Size);
+		const FString Turns = FString::FromInt(Left);
+		const float BadgeScale = Size / 200.0f;
+		const FVector2D TurnSize = TextSize(Turns, Font, BadgeScale);
+		const float Glass = 10.0f * S * Size / (100.0f * S);
+		const float BadgeH = FMath::Max(TurnSize.Y, Glass) + 5.0f * S;
+		const float BadgeW = Glass + TurnSize.X + 13.0f * S;
+		const float BadgeX = X + Size - BadgeW - 4.0f * S;
+		const float BadgeY = Y + Size * 0.21f;
+		Panel(BadgeX, BadgeY, BadgeW, BadgeH, FLinearColor(0.05f, 0.06f, 0.1f, 0.92f), FLinearColor(0.56f, 0.64f, 0.77f, 1.0f), 1.0f);
+		const float GX = BadgeX + 5.0f * S;
+		const float GY = BadgeY + (BadgeH - Glass) * 0.5f;
+		const FLinearColor Sand(0.81f, 0.85f, 0.92f, 1.0f);
+		DrawLine(GX, GY, GX + Glass, GY, Sand, 1.5f * S);
+		DrawLine(GX, GY + Glass, GX + Glass, GY + Glass, Sand, 1.5f * S);
+		DrawLine(GX + Glass * 0.15f, GY, GX + Glass * 0.85f, GY + Glass, Sand, 1.5f * S);
+		DrawLine(GX + Glass * 0.85f, GY, GX + Glass * 0.15f, GY + Glass, Sand, 1.5f * S);
+		Text(Turns, GX + Glass + 4.0f * S, BadgeY + (BadgeH - TurnSize.Y) * 0.5f, FLinearColor::White, Font, BadgeScale, false);
+		// One step for each turn of the cooldown, lit as each passes (a plain bar past six).
+		const float BarX = X + 6.0f * S;
+		const float BarW = Size - 12.0f * S;
+		const float BarY = Y + Size * 0.8f - 9.0f * S;
+		const float BarH = 4.0f * S;
+		const FLinearColor Lit(0.56f, 0.72f, 1.0f, 1.0f);
+		const FLinearColor Unlit(1.0f, 1.0f, 1.0f, 0.18f);
+		const int32 Done = Whole - Left;
+		if (Whole <= 6)
+		{
+			const float Step = 3.0f * S;
+			const float Each = (BarW - Step * (Whole - 1)) / Whole;
+			for (int32 Part = 0; Part < Whole; ++Part)
+			{
+				DrawRect(Part < Done ? Lit : Unlit, BarX + Part * (Each + Step), BarY, Each, BarH);
+			}
+		}
+		else
+		{
+			DrawRect(Unlit, BarX, BarY, BarW, BarH);
+			DrawRect(Lit, BarX, BarY, BarW * Done / Whole, BarH);
+		}
+	}
 	else if (bCooling)
 	{
-		// Turns until it can be used again, large enough to read at a glance.
+		// Too small for the badge (the enemy panel): the turns until it can be used, large.
 		DrawRect(FLinearColor(0.0f, 0.0f, 0.0f, 0.35f), X, Y, Size, Size);
 		const FString Turns = FString::FromInt(Unit.Cooldowns[Slot]);
 		const FVector2D TurnSize = TextSize(Turns, Big, Size / 110.0f);
@@ -1817,6 +1959,12 @@ void ATMBattleHud::AbilityTile(ATMBattleDirector& From, const TMSim::FUnit& Unit
 			: TileEffect(Unit, Slot, *Ability, EffectColour);
 		if (bPassive)
 		{
+			EffectColour = Dim;
+		}
+		else if (Unit.bReady && Unit.bActed && !bCooling)
+		{
+			// Its action spent this turn.
+			Effect = TEXT("acted");
 			EffectColour = Dim;
 		}
 		Fitted(Effect, Y + Size - Band, EffectColour * FLinearColor(1, 1, 1, Fade));

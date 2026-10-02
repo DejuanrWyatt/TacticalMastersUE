@@ -4629,13 +4629,30 @@ int32 ATMBattleDirector::ViewerTeam() const
 bool ATMBattleDirector::IsSeen(const TMSim::FUnit& Unit) const
 {
 	const int32 Viewer = ViewerTeam();
-	return Viewer < 0 || Battle.Winner != -1 || Unit.Team == Viewer || Battle.CanSeeUnit(Viewer, Unit);
+	if (Viewer < 0 || Battle.Winner != -1 || Unit.Team == Viewer)
+	{
+		return true;
+	}
+	// While a tower just taken is catching, its spreading sight, not all of it at once.
+	if (AnyTowerKindling(Viewer))
+	{
+		return (SeenWithoutKindling(Viewer, Unit.Pos) || KindlingReaches(Viewer, Unit.Pos)) && !Battle.Hidden(Viewer, Unit);
+	}
+	return Battle.CanSeeUnit(Viewer, Unit);
 }
 
 bool ATMBattleDirector::IsPointSeen(const TMSim::FVec2& Point) const
 {
 	const int32 Viewer = ViewerTeam();
-	return Viewer < 0 || Battle.Winner != -1 || Battle.CanSee(Viewer, Point);
+	if (Viewer < 0 || Battle.Winner != -1)
+	{
+		return true;
+	}
+	if (AnyTowerKindling(Viewer))
+	{
+		return SeenWithoutKindling(Viewer, Point) || KindlingReaches(Viewer, Point);
+	}
+	return Battle.CanSee(Viewer, Point);
 }
 
 void ATMBattleDirector::UpdateThreat()

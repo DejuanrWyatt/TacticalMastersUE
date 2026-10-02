@@ -253,6 +253,9 @@ namespace TMSim
 
 		TMSIM_API bool HasStatus(const std::string& StatusId) const;
 
+		/** Healing it is about to receive, after its statuses (Wounded halves it); never below 0. */
+		TMSIM_API int HealReceived(int Amount) const;
+
 		/** How fast the gauge fills compared with normal: Slow halves it. */
 		TMSIM_API float TgFactor() const;
 

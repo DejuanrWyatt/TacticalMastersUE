@@ -144,6 +144,7 @@ namespace
 		{ "bleed",     FLinearColor(0.8f, 0.05f, 0.05f), 1.0f, false, 1.0f },
 		{ "marked",    FLinearColor(1.0f, 0.3f, 0.3f),   2.0f, false, 1.0f },
 		{ "decay",     FLinearColor(0.56f, 0.68f, 0.28f), 0.8f, false, 1.0f },
+		{ "wounded",   FLinearColor(0.75f, 0.32f, 0.36f), 0.8f, false, 1.0f },
 		{ "reflect",   FLinearColor(0.85f, 0.94f, 1.0f), 0.0f, false, 1.0f },
 		{ "invuln",    FLinearColor(1.0f, 0.85f, 0.3f),  0.0f, false, 1.0f },
 		{ "shield",    FLinearColor(0.5f, 0.75f, 1.0f),  0.0f, false, 1.0f },

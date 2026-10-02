@@ -276,11 +276,31 @@ void ATMBattleDirector::AdvanceFog()
 			Signature += FString::Printf(TEXT("|t%d"), Tower.Owner);
 		}
 	}
+	// A tower just taken spreads its sight over TowerKindleSeconds, with its fire
+	// (2026-10-02): sixteen steps, each redrawing only the spread on top of what
+	// the side otherwise sees, which is kept from the step before.
+	FString Steady = Signature;
+	for (int32 i = 0; bFog && i < static_cast<int32>(Battle.Watchtowers.size()); ++i)
+	{
+		const float Kindle = TowerKindle(i);
+		if (Battle.Watchtowers[static_cast<size_t>(i)].Owner == Viewer && Kindle < 1.0f)
+		{
+			Steady += FString::Printf(TEXT("|c%d"), i);
+			Signature += FString::Printf(TEXT("|c%d:%d"), i, FMath::FloorToInt(Kindle * 16.0f));
+		}
+	}
 	if (Signature == FogSignature)
 	{
 		return;
 	}
 	FogSignature = Signature;
+	const bool bSteadyAgain = Steady != FogSteadySignature || FogSteadySeen.Num() != Cells;
+	FogSteadySignature = Steady;
+	if (bSteadyAgain)
+	{
+		FogSteadySeen.Init(0, Cells);
+	}
+	const bool bKindling = bFog && AnyTowerKindling(Viewer);
 
 	// No fog: two people at one screen, nobody playing, or the battle is over.
 	if (!bFog)
@@ -316,7 +336,12 @@ void ATMBattleDirector::AdvanceFog()
 		{
 			const int32 Index = Y * FogCellsX + X;
 			const TMSim::FVec2 Middle((X + 0.5f) * FogCell, (Y + 0.5f) * FogCell);
-			const bool bSees = Battle.InBounds(Middle) && Battle.CanSee(Viewer, Middle);
+			if (bSteadyAgain)
+			{
+				FogSteadySeen[Index] = Battle.InBounds(Middle)
+					&& (bKindling ? SeenWithoutKindling(Viewer, Middle) : Battle.CanSee(Viewer, Middle)) ? 1 : 0;
+			}
+			const bool bSees = FogSteadySeen[Index] || (bKindling && Battle.InBounds(Middle) && KindlingReaches(Viewer, Middle));
 			FogSeen[Index] = bSees ? 1 : 0;
 			FogExplored[Index] |= FogSeen[Index];
 		}

@@ -3,6 +3,30 @@
 Newest first. Each version lists what changed since the one before it. Both players in an online match need the
 same version (the online protocol number must match).
 
+## v17 (2026-10-02, protocol 14)
+
+New
+- A new status, Wounded: a Wounded unit receives only half of any healing (heal abilities, Regen, healing
+  springs, mending when left alone, lifesteal). Nothing applies it yet; abilities and items can now use it.
+- Go To marks each turn's stop with a ring on the ground and its number, the last ring gold, in place of the
+  boxes that sat on the screen.
+- The action bar: Move, Sprint, Items, Capture and End have an icon beside their word. An ability cooling down
+  is greyed, with an hourglass badge for the turns left and a step bar that fills as they pass.
+- Taking a watchtower: its fire grows from embers to full flame over two seconds, and what it reveals spreads
+  out from it with the flames instead of appearing all at once. Enemies in its reach show as the light reaches them.
+- What is left of a unit's turn: two round tokens in front of its ring, a footprint for the move and a star for
+  the action, ringed while still to use and grey and struck through once spent. On the action bar, what is left
+  flashes once half the turn is spent (Move after acting, the abilities after moving), and the spent half says
+  "moved" or "acted".
+- The battle report shows the items each unit carried: in the tables, on each unit's page and on the MVP card.
+  Point at one to see what it does.
+
+Fixed
+- The battle report: the MVP's summary no longer runs out of its card, and the moments name the class
+  ("War Drummer (Blue) falls") rather than its internal name.
+- A crash when Narbash's units (War Drummer, Dirge Singer, Cantor, Piper, Gale Minstrel, Winter Skald) were on
+  the field: the one part of their outfit the game can't draw (the legs and drumsticks) is drawn plain instead.
+
 ## v16 (2026-10-02, protocol 14)
 
 New

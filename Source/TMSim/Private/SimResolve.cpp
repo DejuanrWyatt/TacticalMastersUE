@@ -561,7 +561,7 @@ namespace TMSim
 					const int Steal = GearSum(User, &FItemDef::LifestealPercent);
 					if (Steal > 0 && User.IsAlive())
 					{
-						User.Hp = std::min(User.MaxHp(), User.Hp + std::max(1, RoundToInt(Amount * Steal / 100.0)));
+						User.Hp = std::min(User.MaxHp(), User.Hp + User.HealReceived(std::max(1, RoundToInt(Amount * Steal / 100.0))));
 					}
 				}
 				if (Struck->HasItems() && Struck->Id != User.Id && Ability->MaxRange <= Ground::MeleeRange && User.IsAlive())

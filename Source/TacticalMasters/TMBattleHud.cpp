@@ -759,7 +759,8 @@ void ATMBattleHud::DrawActionBar(ATMBattleDirector& From)
 
 	UFont* Font = GEngine->GetMediumFont();
 	const float Tile = 100.0f * S;
-	const float Small = 64.0f * S;
+	// Wide enough for an icon beside the longest word, CAPTURE ("Action Bar Mockups" B).
+	const float Small = 74.0f * S;
 	const float Gap = 10.0f * S;
 	// A fourth small tile, Capture, when the battle has watchtowers; and ITEMS
 	// with the neutral camps, or when anything lies on the ground or is carried;
@@ -783,16 +784,86 @@ void ATMBattleHud::DrawActionBar(ATMBattleDirector& From)
 	Slant(X - 26.0f * S, Y - 10.0f * S, Total + 40.0f * S, Tile + 20.0f * S, FLinearColor(0.02f, 0.03f, 0.05f, 0.72f), 18.0f * S);
 
 	const FVector2D Mouse = MousePoint();
-	// Move, Sprint and End Turn: smaller tiles, a word and a key.
-	auto WordTile = [&](const FString& Word, const FString& Under, bool bEnabled, bool bPressed, ETMHudAction Action)
+	// Move, Sprint, Items, Capture and End Turn: smaller tiles, an icon beside the
+	// word and the key or count under it ("Action Bar Mockups" B, 2026-10-02).
+	// The icons are drawn as strokes in a 24-unit square, so they need no art.
+	enum class EGlyph : uint8 { Move, Sprint, Items, Capture, End };
+	auto Glyph = [&](EGlyph Kind, float GX, float GY, float Box, const FLinearColor& Colour)
+	{
+		const float U = Box / 24.0f;
+		const float Thick = FMath::Max(1.0f, 1.9f * U);
+		auto P = [&](float PX, float PY) { return FVector2D(GX + PX * U, GY + PY * U); };
+		auto Seg = [&](float AX, float AY, float BX, float BY)
+		{
+			const FVector2D A = P(AX, AY), B = P(BX, BY);
+			DrawLine(A.X, A.Y, B.X, B.Y, Colour, Thick);
+		};
+		auto Oval = [&](float CX, float CY, float RX, float RY)
+		{
+			constexpr int32 Steps = 14;
+			for (int32 k = 0; k < Steps; ++k)
+			{
+				const float A0 = 2.0f * PI * k / Steps, A1 = 2.0f * PI * (k + 1) / Steps;
+				Seg(CX + FMath::Cos(A0) * RX, CY + FMath::Sin(A0) * RY, CX + FMath::Cos(A1) * RX, CY + FMath::Sin(A1) * RY);
+			}
+		};
+		switch (Kind)
+		{
+		case EGlyph::Move:  // two footprints, one ahead of the other
+			Oval(8.0f, 8.5f, 2.6f, 4.2f); Oval(8.0f, 16.5f, 2.0f, 1.6f);
+			Oval(16.0f, 12.5f, 2.6f, 4.2f); Oval(16.0f, 20.5f, 2.0f, 1.6f);
+			break;
+		case EGlyph::Sprint:  // speed lines and a double chevron
+			Seg(2.0f, 8.0f, 7.0f, 8.0f); Seg(1.0f, 12.0f, 7.0f, 12.0f); Seg(2.0f, 16.0f, 7.0f, 16.0f);
+			Seg(10.0f, 5.0f, 16.0f, 12.0f); Seg(16.0f, 12.0f, 10.0f, 19.0f);
+			Seg(15.0f, 5.0f, 21.0f, 12.0f); Seg(21.0f, 12.0f, 15.0f, 19.0f);
+			break;
+		case EGlyph::Items:  // a satchel with its handle
+			Seg(5.5f, 9.0f, 18.5f, 9.0f); Seg(18.5f, 9.0f, 17.3f, 20.0f); Seg(17.3f, 20.0f, 6.7f, 20.0f); Seg(6.7f, 20.0f, 5.5f, 9.0f);
+			Seg(9.0f, 9.0f, 9.0f, 6.5f); Seg(9.0f, 6.5f, 12.0f, 4.0f); Seg(12.0f, 4.0f, 15.0f, 6.5f); Seg(15.0f, 6.5f, 15.0f, 9.0f);
+			Seg(10.0f, 13.0f, 14.0f, 13.0f);
+			break;
+		case EGlyph::Capture:  // a flag on its pole
+			Seg(6.0f, 21.0f, 6.0f, 3.5f); Seg(6.0f, 4.0f, 17.0f, 4.0f); Seg(17.0f, 4.0f, 14.5f, 8.0f); Seg(14.5f, 8.0f, 17.0f, 12.0f); Seg(17.0f, 12.0f, 6.0f, 12.0f);
+			break;
+		case EGlyph::End:  // skip to the end
+			Seg(6.0f, 5.0f, 14.0f, 12.0f); Seg(14.0f, 12.0f, 6.0f, 19.0f); Seg(6.0f, 19.0f, 6.0f, 5.0f); Seg(18.0f, 5.0f, 18.0f, 19.0f);
+			break;
+		}
+	};
+	// What is left of a turn half spent flashes ("Turn Left Indicator Mockups" D,
+	// the human's pick with flashing borders, 2026-10-02): its edge pulses.
+	const float Pulse = 0.5f + 0.5f * FMath::Sin((GetWorld() ? GetWorld()->GetRealTimeSeconds() : 0.0f) * 2.0f * PI * 1.1f);
+	const FLinearColor Flash(1.0f, 0.93f, 0.62f, 1.0f);
+	auto WordTile = [&](EGlyph Kind, const FString& Word, const FString& Under, bool bEnabled, bool bPressed, ETMHudAction Action, bool bFlash = false)
 	{
 		const float TY = Y + Tile - Small;
 		const bool bOver = FBox2D(FVector2D(X, TY), FVector2D(X + Small, TY + Small)).IsInside(Mouse);
+		if (bFlash)
+		{
+			DrawRect(Flash * FLinearColor(1.0f, 1.0f, 1.0f, 0.35f * Pulse), X - 6.0f * S, TY - 6.0f * S, Small + 12.0f * S, Small + 12.0f * S);
+		}
 		DrawRect(FLinearColor(0.0f, 0.0f, 0.0f, 0.75f), X - 3.0f * S, TY - 3.0f * S, Small + 6.0f * S, Small + 6.0f * S);
-		DrawRect(bPressed ? Gold : FLinearColor(0.55f, 0.62f, 0.75f, bEnabled ? 0.8f : 0.3f), X - 2.0f * S, TY - 2.0f * S, Small + 4.0f * S, Small + 4.0f * S);
+		const FLinearColor Rim = bPressed ? Gold : FLinearColor(0.55f, 0.62f, 0.75f, bEnabled ? 0.8f : 0.3f);
+		DrawRect(bFlash ? FMath::Lerp(Rim, Flash, Pulse) : Rim, X - 2.0f * S, TY - 2.0f * S, Small + 4.0f * S, Small + 4.0f * S);
 		DrawRect(bEnabled && bOver ? FLinearColor(0.16f, 0.2f, 0.3f, 1.0f) : FLinearColor(0.06f, 0.07f, 0.1f, 1.0f), X, TY, Small, Small);
-		const FVector2D WordSize = TextSize(Word, Font, 0.42f * S);
-		Text(Word, X + (Small - WordSize.X) * 0.5f, TY + Small * 0.22f, bEnabled ? TextColour : Dim, Font, 0.42f * S);
+		// The icon and the word side by side, centred, the word made smaller if they would not fit.
+		const float IconBox = 15.0f * S;
+		const float Between = 4.0f * S;
+		float WordScale = 0.42f * S;
+		FVector2D WordSize = TextSize(Word, Font, WordScale);
+		const float Room = Small - 8.0f * S;
+		if (IconBox + Between + WordSize.X > Room)
+		{
+			WordScale *= (Room - IconBox - Between) / FMath::Max(1.0f, WordSize.X);
+			WordSize = TextSize(Word, Font, WordScale);
+		}
+		const float RowW = IconBox + Between + WordSize.X;
+		const float RowX = X + (Small - RowW) * 0.5f;
+		const float RowY = TY + Small * 0.2f;
+		const FLinearColor Ink = bPressed ? Gold : bEnabled ? TextColour : Dim;
+		Glyph(Kind, RowX, RowY + (WordSize.Y - IconBox) * 0.5f, IconBox, Ink);
+		Text(Word, RowX + IconBox + Between, RowY, bEnabled ? TextColour : Dim, Font, WordScale);
 		const FVector2D UnderSize = TextSize(Under, Font, 0.32f * S);
 		Text(Under, X + (Small - UnderSize.X) * 0.5f, TY + Small * 0.6f, Dim, Font, 0.32f * S);
 		AddButton(X, TY, Small, Small, Action, -1);
@@ -800,9 +871,12 @@ void ATMBattleHud::DrawActionBar(ATMBattleDirector& From)
 	};
 
 	const bool bMoving = From.AimMode == ATMBattleDirector::EAimMode::Move;
-	WordTile(TEXT("MOVE"), FTMSettings::Get().KeyName(ETMAction::Move),
-		bControllable && !Unit->bMoved && !Unit->IsCasting(), bMoving && !From.bSprinting, ETMHudAction::Move);
-	WordTile(TEXT("SPRINT"), FString::Printf(TEXT("%s  %.1fm"), *FTMSettings::Get().KeyName(ETMAction::Sprint), From.Battle.MoveOf(*Unit, true)),
+	// A unit that has acted but not moved: its move is what is left, and flashes.
+	const bool bMoveLeft = bControllable && Unit->bReady && Unit->bActed && !Unit->bMoved && !Unit->IsCasting();
+	WordTile(EGlyph::Move, TEXT("MOVE"), Unit->bMoved ? FString(TEXT("moved")) : FTMSettings::Get().KeyName(ETMAction::Move),
+		bControllable && !Unit->bMoved && !Unit->IsCasting(), bMoving && !From.bSprinting, ETMHudAction::Move, bMoveLeft);
+	WordTile(EGlyph::Sprint, TEXT("SPRINT"), Unit->bMoved ? FString(TEXT("moved")) : Unit->bActed ? FString(TEXT("acted"))
+		: FString::Printf(TEXT("%s  %.1fm"), *FTMSettings::Get().KeyName(ETMAction::Sprint), From.Battle.MoveOf(*Unit, true)),
 		bControllable && !Unit->bMoved && !Unit->bActed && !Unit->IsCasting(), bMoving && From.bSprinting, ETMHudAction::Sprint);
 	X += 10.0f * S;
 	for (int32 Slot = 0; Slot < 4; ++Slot)
@@ -826,7 +900,7 @@ void ATMBattleHud::DrawActionBar(ATMBattleDirector& From)
 		const int32 Near = From.TakeableCache(*Unit, &WhyNot);
 		const float TileX = X;
 		const int32 Stashed = Unit->Team == 0 || Unit->Team == 1 ? static_cast<int32>(From.Battle.Stash[Unit->Team].size()) : 0;
-		WordTile(TEXT("ITEMS"), Near >= 0 ? FString(TEXT("pick up")) : Stashed > 0 ? FString::Printf(TEXT("stash %d"), Stashed)
+		WordTile(EGlyph::Items, TEXT("ITEMS"), Near >= 0 ? FString(TEXT("pick up")) : Stashed > 0 ? FString::Printf(TEXT("stash %d"), Stashed)
 			: FString::Printf(TEXT("%d/3"), (Unit->Gear[0] ? 1 : 0) + (Unit->Gear[1] ? 1 : 0) + (Unit->Gear[2] ? 1 : 0)),
 			true, From.bTeamItemsOpen, ETMHudAction::TakeOpen);
 		AddTip(TileX, Y + Tile - Small, Small, Small,
@@ -838,13 +912,13 @@ void ATMBattleHud::DrawActionBar(ATMBattleDirector& From)
 		FString WhyNot;
 		const bool bCan = bControllable && From.CapturableTower(*Unit, &WhyNot) >= 0;
 		const float TileX = X;
-		WordTile(TEXT("CAPTURE"), FString::Printf(TEXT("%d turn%s"), From.Battle.CaptureTurnsNeeded(),
+		WordTile(EGlyph::Capture, TEXT("CAPTURE"), FString::Printf(TEXT("%d turn%s"), From.Battle.CaptureTurnsNeeded(),
 			From.Battle.CaptureTurnsNeeded() == 1 ? TEXT("") : TEXT("s")), bCan, false, ETMHudAction::Capture);
 		AddTip(TileX, Y + Tile - Small, Small, Small, bCan
 			? FString(TEXT("Spend this unit's whole turn taking the watchtower it stands next to."))
 			: WhyNot);
 	}
-	WordTile(TEXT("END"), FTMSettings::Get().KeyName(ETMAction::EndTurn), bControllable, false, ETMHudAction::EndTurn);
+	WordTile(EGlyph::End, TEXT("END"), FTMSettings::Get().KeyName(ETMAction::EndTurn), bControllable, false, ETMHudAction::EndTurn);
 }
 
 void ATMBattleHud::DrawBanners(ATMBattleDirector& From)

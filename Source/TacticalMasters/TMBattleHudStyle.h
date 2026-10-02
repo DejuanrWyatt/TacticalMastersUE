@@ -113,6 +113,7 @@ namespace TMHudStyle
 			{ "charmed", FLinearColor(1.0f, 0.5f, 0.76f), TEXT("Fights for the other side on its next turn. Any damage brings it back to its senses.") },
 			{ "terrified", FLinearColor(0.65f, 0.5f, 0.85f), TEXT("On its turn it first runs its full move away from what it fears, then may act.") },
 			{ "decay", FLinearColor(0.56f, 0.68f, 0.28f), TEXT("Healing on it deals damage instead; Regen and springs hurt it.") },
+			{ "wounded", FLinearColor(0.75f, 0.32f, 0.36f), TEXT("Receives only half of any healing: abilities, Regen, springs, mending and lifesteal.") },
 		};
 		for (const FStatusLook& Look : Looks)
 		{
@@ -186,4 +187,4 @@ namespace TMHudStyle
 		default: return TEXT("?");
 		}
 	}
-}
+}
