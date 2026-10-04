@@ -287,7 +287,7 @@ void ATMBattleHud::DrawBattleReport(ATMBattleDirector& From, const FString& Line
 		const FTile Tiles[8] = {
 			{ Number(T.Damage), TEXT("damage") }, { FString::Printf(TEXT("%d / %d / %d"), T.Kills, T.Assists, T.Deaths), TEXT("knock-outs / assists / fell") },
 			{ Number(T.Taken), TEXT("damage taken") }, { Number(T.Mitigated), TEXT("damage mitigated") },
-			{ Number(T.Healing), TEXT("healing") }, { FString::Printf(TEXT("%d / %d"), T.Buffs, T.Debuffs), TEXT("buffs / debuffs") },
+			{ FString::Printf(TEXT("%s / %s"), *Number(T.Healing), *Number(T.HealingReceived)), TEXT("healing done / received") }, { FString::Printf(TEXT("%d / %d"), T.Buffs, T.Debuffs), TEXT("buffs / debuffs") },
 			{ FString::Printf(TEXT("%d"), T.Control), TEXT("turns of control") }, { FString::Printf(TEXT("%d + %d"), T.Monsters, T.Bosses), TEXT("monsters + bosses") } };
 		const float TW = (RW - 40.0f * S - 3.0f * 10.0f * S) / 4.0f;
 		for (int32 Index = 0; Index < 8; ++Index)
@@ -363,7 +363,7 @@ void ATMBattleHud::DrawBattleReport(ATMBattleDirector& From, const FString& Line
 			{ TEXT("Buffs on allies"), [Int](const FTally& T, double) { return Int(T.Buffs); }, [](const FTally& T) { return T.Buffs; } },
 			{ TEXT("Taken for allies"), [Int](const FTally& T, double) { return Int(T.Guarded); }, [](const FTally& T) { return T.Guarded; } },
 			{ TEXT("Towers"), [Int](const FTally& T, double) { return Int(T.Towers); }, [](const FTally&) { return -1; } },
-			{ TEXT("Assists"), [Int](const FTally& T, double) { return Int(T.Assists); }, [](const FTally&) { return -1; } } };
+			{ TEXT("Healing received"), [Int](const FTally& T, double) { return Int(T.HealingReceived); }, [](const FTally& T) { return T.HealingReceived; } } };
 		break;
 	case 3:
 		Columns = {

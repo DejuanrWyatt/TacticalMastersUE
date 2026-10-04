@@ -99,6 +99,9 @@ namespace TMSim
 		{ "decay",      "Decay",         "DCY",  0.0f,  1.0f, 1.0f, 1.0f, 0 , true , false, false, false, false, false, false, false, false, false, false, false, false, false, false, 0,  false, false, false },
 		// 2026-10-02, the human's ask: healing it receives is halved (Decay turns it to harm).
 		{ "wounded",    "Wounded",       "WND",  0.0f,  1.0f, 1.0f, 1.0f, 0 , true , false, false, false, false, false, false, false, false, false, false, false, false, false, false, 0,  false, false, false, -50 },
+		// 2026-10-02 ("Camps and Bosses Mockups" C, D): a boss's prey (By is the boss), and the boon of a claimed boss.
+		{ "hunted",     "Hunted",        "HNT",  0.0f,  1.0f, 1.0f, 1.0f, 0 , false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, 0,  false, false, true,  0 },
+		{ "boon",       "Boss's Boon",   "BON",  0.0f,  1.0f, 1.0f, 1.0f, 0 , false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, 10, false, false, false, 0 },
 	};
 
 	const FStatusDef* AllStatuses(int& OutCount)
@@ -157,7 +160,7 @@ namespace TMSim
 			{ "engage_radius", "Engagement radius (m)", "How close an enemy has to be to engage a unit. Walking in is free; breaking away costs extra movement.", 0.0, 6.0, 0.2, &FTuning::EngageRadius },
 			{ "engage_cost", "Breaking away costs (m)", "Movement spent to step out of an enemy's engagement radius.", 0.0, 6.0, 0.5, &FTuning::EngageCost },
 			{ "hustle_bonus", "Held-back turn bonus (%)", "How much faster the Turn Gauge fills for a unit that ended its turn without using an ability.", 0.0, 100.0, 5.0, &FTuning::HustleBonus },
-			{ "hazard_percent", "Hazard ground (% max HP)", "Health lost on burning ground, or gained on a spring, when a unit's turn comes round.", 0.0, 40.0, 1.0, &FTuning::HazardPercent },
+			{ "hazard_percent", "Burning ground (% max HP)", "Health lost on burning ground when a unit's turn comes round.", 0.0, 40.0, 1.0, &FTuning::HazardPercent },
 			{ "stun_tg_percent", "Stun gauge kept (%)", "Turn Gauge a unit is left with after a Stun takes its turn. Higher is a weaker Stun.", 0.0, 100.0, 5.0, &FTuning::StunTgPercent },
 			{ "regen_percent", "Undamaged regen (% max HP)", "0 = off. Health a unit regains at the start of each of its turns once it has gone long enough without being hurt.", 0.0, 25.0, 1.0, &FTuning::RegenPercent },
 			{ "regen_after_turns", "Regen after (turns)", "How many of its own turns a unit must go through without taking damage before it starts mending.", 1.0, 10.0, 1.0, &FTuning::RegenAfterTurns },
@@ -166,7 +169,7 @@ namespace TMSim
 			// at the end so every older rule keeps its index in a Tune order.
 			{ "watchtower_count", "Watchtowers", "0 = none. How many watchtowers the battle starts with, placed at random in mirrored pairs; an odd one stands in the middle. Read when the battle starts.", 0.0, 8.0, 1.0, &FTuning::WatchtowerCount },
 			{ "watchtower_turns", "Watchtower capture (turns)", "How many turns a side must spend standing at a watchtower to take it. Each turn spent capturing is that unit's whole turn.", 1.0, 6.0, 1.0, &FTuning::WatchtowerTurns },
-			{ "watchtower_sight", "Watchtower sight (m)", "How far a held watchtower lets its side see, from the top of the tower.", 4.0, 30.0, 1.0, &FTuning::WatchtowerSight },
+			{ "watchtower_sight", "Watchtower sight (m)", "How far a held watchtower lets its side see, from the top of the tower.", 4.0, 60.0, 1.0, &FTuning::WatchtowerSight },
 			{ "item_budget", "Item points", "0 = none. Points each side may spend on items on the setup screen.", 0.0, 20.0, 1.0, &FTuning::ItemBudget },
 			{ "camps", "Neutral camps", "0 = off, 1 light, 2 standard, 3 wild. Monster camps that wake around the map and drop items.", 0.0, 3.0, 1.0, &FTuning::CampLevel },
 			{ "random_boss", "Random boss", "0 = the map's own boss, 1 = a boss drawn at random, at the map's boss spot.", 0.0, 1.0, 1.0, &FTuning::RandomBoss },
@@ -176,6 +179,12 @@ namespace TMSim
 			{ "defense_model", "Defense rules", "0 = classic: AttDef / MagDef taken off each hit, A-Eva / M-Eva to miss. 1 = Armor / Resist take a share off each hit, and one Evasion: 1 in 10 evasions dodge, the rest graze for half.", 0.0, 1.0, 1.0, &FTuning::DefenseModel },
 			{ "defense_scale", "Defense for half damage", "Defense rules 1: the Armor or Resist that halves a hit. Higher makes each point worth less.", 10.0, 100.0, 1.0, &FTuning::DefenseScale },
 			{ "zone_of_control", "Tanks hold the line", "0 = off, 1 = on. An enemy that walks next to a unit whose first role is tank has to stop there.", 0.0, 1.0, 1.0, &FTuning::ZoneOfControl },
+			// 2026-10-02 ("Camps and Bosses Mockups" C and D): setup options, off by default.
+			{ "boss_hunt", "Bosses hunt", "0 = off, 1 = on. A boss remembers who hurt it most and goes for them, until they fall or it loses sight of them for 3 of its turns.", 0.0, 1.0, 1.0, &FTuning::BossHunt },
+			{ "boss_claim", "Claim the boss", "0 = off, 1 = on. The side that lands a boss's last blow gets its boon (+10% damage for 3 turns); the other side, if it dealt 30% of the boss's health, a rare item in its stash.", 0.0, 1.0, 1.0, &FTuning::BossClaim },
+			// 2026-10-04 (v19 play test): the springs (wells) have their own numbers.
+			{ "spring_percent", "Spring healing (% max HP)", "Health a healing spring (well) mends when a unit's turn comes round on it.", 0.0, 40.0, 1.0, &FTuning::SpringPercent },
+			{ "spring_rest_turns", "Spring rest (turns)", "0 = never. Once a spring has mended a unit, it runs dry for this many of that unit's turns before it mends anyone again.", 0.0, 10.0, 1.0, &FTuning::SpringRestTurns },
 		};
 		return Keys;
 	}
@@ -185,6 +194,8 @@ namespace TMSim
 		FTuning Tuning;
 		Tuning.DefenseModel = 1.0;
 		Tuning.ZoneOfControl = 1.0;
+		// A well is used, then rests (v19 play test, 2026-10-04).
+		Tuning.SpringRestTurns = 3.0;
 		return Tuning;
 	}
 }

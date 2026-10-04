@@ -197,6 +197,20 @@ void ATMBattleDirector::RefreshCamps(float DeltaSeconds)
 		if (Camp.State == TMSim::ECampState::Waiting)
 		{
 			Line += FString::Printf(TEXT("\nwakes in %s"), *Clock(Camp.Timer));
+			// The noise of fights near it (2026-10-02, "Camps and Bosses Mockups" A).
+			if (Camp.bNoiseWake)
+			{
+				Line += TEXT("\nroused by the noise!");
+			}
+			else if (Camp.Noise > 0)
+			{
+				FString Meter;
+				for (int32 Step = 0; Step < TMSim::Camp::NoiseFull; ++Step)
+				{
+					Meter += Step < Camp.Noise ? TEXT("#") : TEXT("-");
+				}
+				Line += FString::Printf(TEXT("\nnoise [%s]"), *Meter);
+			}
 		}
 		else
 		{

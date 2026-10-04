@@ -9,7 +9,7 @@
     "damage"
   ],
   "stats": {
-    "hp": 84,
+    "hp": 97,
     "attdef": 8,
     "magdef": 8,
     "aeva": 18,
@@ -30,7 +30,7 @@
       "scale": "att",
       "target": "enemy",
       "shape": "unit",
-      "power": 32,
+      "power": 42,
       "min_range": 0,
       "max_range": 1.8,
       "aoe": 0,
@@ -52,7 +52,7 @@
       "scale": "att",
       "target": "enemy",
       "shape": "unit",
-      "power": 46.7,
+      "power": 61,
       "min_range": 0,
       "max_range": 1.8,
       "aoe": 0,
@@ -103,7 +103,7 @@
       "scale": "att",
       "target": "enemy",
       "shape": "self",
-      "power": 52.2,
+      "power": 68,
       "min_range": 0,
       "max_range": 0,
       "aoe": 2.5,
@@ -116,5 +116,11 @@
         "scale": 1
       }
     }
-  ]
+  ],
+  "creator": {
+    "rebalanced": {
+      "on": "2026-10-03",
+      "why": "Tuning pass 2026-10-03 (lab 25% in place of the Black Mage): HP 84->97, power +31%"
+    }
+  }
 }

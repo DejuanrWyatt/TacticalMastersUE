@@ -15,6 +15,9 @@
 #include "Particles/ParticleModuleRequired.h"
 #include "Particles/ParticleSystem.h"
 #include "Particles/TypeData/ParticleModuleTypeDataMesh.h"
+#include "UObject/ObjectKey.h"
+#include "UObject/UObjectGlobals.h"
+#include "UObject/UObjectIterator.h"
 
 namespace TMDrawable
 {
@@ -25,6 +28,12 @@ namespace TMDrawable
 
 		/** Remembered per effect: an effect's materials don't change while the game runs. */
 		TMap<FString, bool> Effects;
+
+		/** Materials already looked at by KeepBrokenLoaded, so each is checked once. */
+		TSet<FObjectKey> Checked;
+
+		/** Whether KeepBrokenLoaded runs before each garbage collection yet. */
+		bool bWatching = false;
 	}
 
 	bool MaterialUsable(const UMaterialInterface* Material, const UWorld* World)
@@ -128,6 +137,46 @@ namespace TMDrawable
 		}
 		Effects.Add(Key, bOk);
 		return bOk;
+	}
+
+	void KeepBrokenLoaded()
+	{
+		if (!FPlatformProperties::RequiresCookedData() || !IsInGameThread())
+		{
+			return;
+		}
+		for (TObjectIterator<UMaterialInterface> It; It; ++It)
+		{
+			UMaterialInterface* Material = *It;
+			// Only whole, live materials: one still being read is looked at next time.
+			if (!IsValid(Material) || Material->IsUnreachable() || Material->IsRooted()
+				|| Material->HasAnyFlags(RF_ClassDefaultObject | RF_NeedLoad | RF_NeedPostLoad | RF_BeginDestroyed))
+			{
+				continue;
+			}
+			const FObjectKey Key(Material);
+			if (Checked.Contains(Key))
+			{
+				continue;
+			}
+			Checked.Add(Key);
+			if (!MaterialUsable(Material, nullptr))
+			{
+				Material->AddToRoot();
+				UE_LOG(LogTemp, Log, TEXT("material cooked without shaders kept loaded for good: %s"), *Material->GetPathName());
+			}
+		}
+	}
+
+	void WatchBrokenMaterials()
+	{
+		if (bWatching)
+		{
+			return;
+		}
+		bWatching = true;
+		FCoreUObjectDelegates::GetPreGarbageCollectDelegate().AddStatic(&KeepBrokenLoaded);
+		KeepBrokenLoaded();
 	}
 
 	void MendBody(USkeletalMeshComponent* Body)

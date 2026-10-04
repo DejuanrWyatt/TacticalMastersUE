@@ -11,7 +11,7 @@
     "support"
   ],
   "stats": {
-    "hp": 85,
+    "hp": 95,
     "attdef": 9,
     "magdef": 8,
     "aeva": 14,
@@ -32,7 +32,7 @@
       "scale": "att",
       "target": "enemy",
       "shape": "unit",
-      "power": 37,
+      "power": 43,
       "min_range": 0,
       "max_range": 1.8,
       "aoe": 0,
@@ -54,7 +54,7 @@
       "scale": "att",
       "target": "enemy",
       "shape": "self",
-      "power": 32,
+      "power": 37,
       "min_range": 0,
       "max_range": 0,
       "aoe": 2,
@@ -110,7 +110,7 @@
       "scale": "mag",
       "target": "ally",
       "shape": "self",
-      "power": 26,
+      "power": 30,
       "min_range": 0,
       "max_range": 0,
       "aoe": 4,
@@ -130,8 +130,8 @@
   ],
   "creator": {
     "rebalanced": {
-      "on": "2026-10-01",
-      "why": "Meditate described as it plays (Crit, not the old AttPwr)"
+      "on": "2026-10-04",
+      "why": "Held buffs 2026-10-04 (lab 38%): HP 85->95, Iaido Slash 37->43, Draw Out 32->37, Masamune 26->30; now 48%. Before that (2026-10-01): Meditate described as it plays (Crit, not the old AttPwr)"
     },
     "reworded": {
       "on": "2026-10-02",

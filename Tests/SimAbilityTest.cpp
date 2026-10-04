@@ -1,4 +1,5 @@
-// Checks what abilities do against the Godot game.
+// Checks what abilities do against their recorded baseline
+// (Baselines/AbilityTable.txt, first recorded from the Godot version).
 //
 // Three sections, because an ability can be wrong in three different ways.
 //
@@ -18,11 +19,12 @@
 // at somebody follows them and one aimed at the ground does not. Tick by tick,
 // because a cast resolving one tick early is invisible in anything coarser.
 //
-// Regenerate with tests/dump_ability_table.gd in the Godot project; the table's
-// first line records which script and which Godot build produced it. Never edit
-// the table to make this pass -- if the two disagree, one of them is wrong about
-// the rules, and the table is the one that was measured.
+// When abilities are changed on purpose, write the table again from the rules
+// with --rebaseline (Baseline.h). Never edit the table by hand to make this pass.
+//
+//   SimAbilityTest [Baselines/AbilityTable.txt] [--rebaseline]
 
+#include "Baseline.h"
 #include "SimAbility.h"
 #include "SimBattle.h"
 
@@ -248,7 +250,11 @@ namespace
 
 int main(int argc, char** argv)
 {
-	const std::string Path = argc > 1 ? argv[1] : "GodotAbilityTable.txt";
+	const std::vector<std::string> Args = TMBaseline::Paths(argc, argv);
+	const std::string Path = Args.empty() ? std::string("Baselines/AbilityTable.txt") : Args[0];
+	TMBaseline::FWriter Writer;
+	Writer.bOn = TMBaseline::Asked(argc, argv);
+	Writer.Path = Path;
 	std::ifstream File(Path);
 	if (!File)
 	{
@@ -257,22 +263,39 @@ int main(int argc, char** argv)
 	}
 
 	std::vector<std::string> Lines;
+	// Where each of those is in the table as written, and how it was indented.
+	std::vector<size_t> LineAt;
+	std::vector<std::string> Indent;
 	std::string Read;
 	while (std::getline(File, Read))
 	{
-		Read = Trimmed(Read);
-		if (!Read.empty())
+		if (!Read.empty() && Read.back() == '\r')
 		{
-			Lines.push_back(Read);
+			Read.pop_back();
+		}
+		const size_t RawAt = Writer.Next();
+		Writer.Read(Read);
+		const std::string Kept = Trimmed(Read);
+		if (!Kept.empty())
+		{
+			Lines.push_back(Kept);
+			LineAt.push_back(RawAt);
+			Indent.push_back(Read.substr(0, Read.find_first_not_of(" \t")));
 		}
 	}
+	// What the rules make of line k of Lines, written back in its place (--rebaseline).
+	const auto Rewrite = [&](size_t k, const std::string& Now) { Writer.SetAt(LineAt[k], Indent[k] + Now); };
+	const auto Bit = [](bool b) { return std::string(b ? "1" : "0"); };
+	const auto Fixed2 = [](double v) { char B[32]; std::snprintf(B, sizeof(B), "%.2f", v); return std::string(B); };
 
 	// ------------------------------------------------ the settings and the board
 	FBoard Board;
+	std::vector<size_t> UnitLineK;
 	FBattle Base;
 	std::string Section;
-	for (const std::string& Line : Lines)
+	for (size_t k = 0; k < Lines.size(); ++k)
 	{
+		const std::string& Line = Lines[k];
 		if (Line.rfind("TUNING", 0) == 0)
 		{
 			Base.Tuning.DamageMultiplier = ValueOf(Line, "damage_multiplier");
@@ -298,8 +321,23 @@ int main(int argc, char** argv)
 		}
 		if (Line.rfind("CONSTANTS", 0) == 0)
 		{
-			// Numbers baked into both versions. A difference here would make every
+			// Numbers baked into the rules. A difference here would make every
 			// case below wrong in a way that looks like arithmetic.
+			if (Writer.bOn)
+			{
+				std::string Now = TMBaseline::WithValue(Line, "tg_max", std::to_string(Pace::TgMax));
+				Now = TMBaseline::WithValue(Now, "ult_max", std::to_string(Pace::UltMax));
+				Now = TMBaseline::WithValue(Now, "hit_radius", Fixed2(Ground::HitRadius));
+				Now = TMBaseline::WithValue(Now, "melee_range", Fixed2(Ground::MeleeRange));
+				Now = TMBaseline::WithValue(Now, "ticks_per_second", std::to_string(Pace::TicksPerSecond));
+				if (Pace::TgMax != static_cast<int>(ValueOf(Line, "tg_max")) || Pace::UltMax != static_cast<int>(ValueOf(Line, "ult_max"))
+					|| std::fabs(Ground::HitRadius - ValueOf(Line, "hit_radius")) > 0.001 || std::fabs(Ground::MeleeRange - ValueOf(Line, "melee_range")) > 0.001
+					|| Pace::TicksPerSecond != static_cast<int>(ValueOf(Line, "ticks_per_second")))
+				{
+					Rewrite(k, Now);
+				}
+				continue;
+			}
 			if (Pace::TgMax != static_cast<int>(ValueOf(Line, "tg_max")))
 			{
 				Fail("a full gauge is a different number here");
@@ -330,18 +368,20 @@ int main(int argc, char** argv)
 		if (Section == "UNITS")
 		{
 			Board.UnitLines.push_back(Line);
+			UnitLineK.push_back(k);
 		}
 	}
 
 	if (Board.UnitLines.empty())
 	{
-		std::printf("THE REFERENCE HAS NO BOARD IN IT\n");
+		std::printf("THE BASELINE HAS NO BOARD IN IT\n");
 		return 1;
 	}
 
 	Furnish(Base, Board);
-	for (const std::string& Line : Board.UnitLines)
+	for (size_t u = 0; u < Board.UnitLines.size(); ++u)
 	{
+		const std::string& Line = Board.UnitLines[u];
 		int Id = -1;
 		std::istringstream(Line) >> Id;
 		const FUnit* Unit = Base.FindUnit(Id);
@@ -352,17 +392,25 @@ int main(int argc, char** argv)
 		}
 		// The class each one is came out of the dump; what the class is worth comes
 		// out of the ported job table, so that is what is checked.
-		if (Unit->MaxHp() != static_cast<int>(ValueOf(Line, "maxhp")))
+		if (Writer.bOn)
+		{
+			if (Unit->MaxHp() != static_cast<int>(ValueOf(Line, "maxhp")))
+			{
+				Rewrite(UnitLineK[u], TMBaseline::WithValue(Line, "maxhp", std::to_string(Unit->MaxHp())));
+			}
+		}
+		else if (Unit->MaxHp() != static_cast<int>(ValueOf(Line, "maxhp")))
 		{
 			Fail("unit " + std::to_string(Id) + " has " + std::to_string(Unit->MaxHp())
-				+ " health at most, Godot says " + std::to_string(static_cast<int>(ValueOf(Line, "maxhp"))));
+				+ " health at most, the baseline says " + std::to_string(static_cast<int>(ValueOf(Line, "maxhp"))));
 		}
 	}
 
 	// -------------------------------------------------------------- the forecast
 	Section.clear();
-	for (const std::string& Line : Lines)
+	for (size_t k = 0; k < Lines.size(); ++k)
 	{
+		const std::string& Line = Lines[k];
 		if (Line == "UNITS" || Line == "PREVIEW" || Line == "RESOLVE" || Line == "USE" || Line == "TRACE")
 		{
 			Section = Line;
@@ -390,14 +438,36 @@ int main(int argc, char** argv)
 			+ std::to_string(Slot) + " at " + Text(At);
 
 		const bool bInRange = Base.InAbilityRange(*Caster, Slot, Caster->Pos, At);
+		if (Writer.bOn)
+		{
+			const bool bLine = Base.HasLineOfSight(Caster->Pos, At);
+			std::string Reach;
+			for (const FHit& Hit : Base.Preview(*Caster, Slot, Caster->Pos, At))
+			{
+				char Buffer[64];
+				std::snprintf(Buffer, sizeof(Buffer), "%s%d:%d:%.2f", Reach.empty() ? "" : "|", Hit.UnitId, Hit.Amount, Hit.Flank);
+				Reach += Buffer;
+			}
+			if (Reach.empty())
+			{
+				Reach = "-";
+			}
+			if (bInRange != (ValueOf(Line, "inrange") != 0.0) || bLine != (ValueOf(Line, "los") != 0.0) || Reach != TextOf(Line, "hits"))
+			{
+				Rewrite(k, TMBaseline::WithValue(TMBaseline::WithValue(TMBaseline::WithValue(Line, "inrange", Bit(bInRange)),
+					"los", Bit(bLine)), "hits", Reach));
+			}
+			++Previews;
+			continue;
+		}
 		if (bInRange != (ValueOf(Line, "inrange") != 0.0))
 		{
-			Fail(Where + (bInRange ? " is in range" : " is out of range") + ", Godot disagrees");
+			Fail(Where + (bInRange ? " is in range" : " is out of range") + ", the baseline disagrees");
 		}
 		const bool bSees = Base.HasLineOfSight(Caster->Pos, At);
 		if (bSees != (ValueOf(Line, "los") != 0.0))
 		{
-			Fail(Where + (bSees ? " has a clear line" : " has no line") + ", Godot disagrees");
+			Fail(Where + (bSees ? " has a clear line" : " has no line") + ", the baseline disagrees");
 		}
 
 		// Who it reaches, for how much, and from which side -- in order, because
@@ -416,7 +486,7 @@ int main(int argc, char** argv)
 		const std::string Want = TextOf(Line, "hits");
 		if ((Got.empty() ? "-" : Got) != Want)
 		{
-			Fail(Where + " reaches " + (Got.empty() ? "nobody" : Got) + ", Godot says " + Want);
+			Fail(Where + " reaches " + (Got.empty() ? "nobody" : Got) + ", the baseline says " + Want);
 		}
 		++Previews;
 	}
@@ -430,8 +500,9 @@ int main(int argc, char** argv)
 	int CaseNumber = -1;
 	FBattle Work;
 	bool bInCase = false;
-	for (const std::string& Line : Lines)
+	for (size_t k = 0; k < Lines.size(); ++k)
 	{
+		const std::string& Line = Lines[k];
 		if (Line == "UNITS" || Line == "PREVIEW" || Line == "RESOLVE" || Line == "USE" || Line == "TRACE")
 		{
 			Section = Line;
@@ -451,8 +522,8 @@ int main(int argc, char** argv)
 			CaseAim = PointOf(Line, "aim");
 			CaseSeed = static_cast<int>(ValueOf(Line, "seed"));
 
-			// A clean board each time, and the generator put exactly where Godot
-			// put it, so the case answers for itself.
+			// A clean board each time, and the generator put exactly where the
+			// baseline put it, so the case answers for itself.
 			Work = Base;
 			Work.Rng.Seed(static_cast<uint64_t>(CaseSeed));
 			bInCase = true;
@@ -471,7 +542,7 @@ int main(int argc, char** argv)
 				bInCase = false;
 				continue;
 			}
-			// Godot skipped the cases it would refuse; so does this.
+			// The baseline skips the cases the rules refuse; so does this.
 			if (!Work.AbilityBlockedReason(*Caster, CaseSlot).empty())
 			{
 				bInCase = false;
@@ -487,7 +558,7 @@ int main(int argc, char** argv)
 			std::string Evaded;
 			std::string Crits;
 			// One pass, in the order the events came, because that is the order the
-			// targets were taken in and the order the dice were thrown in. Godot
+			// targets were taken in and the order the dice were thrown in. The baseline
 			// lists a target that dodged among the struck with nothing taken off,
 			// in its own place rather than at either end.
 			for (const FEvent& Event : Report.Events)
@@ -511,25 +582,39 @@ int main(int argc, char** argv)
 				}
 			}
 
+			if (Writer.bOn)
+			{
+				const std::string S = Struck.empty() ? "-" : Struck;
+				const std::string E = Evaded.empty() ? "-" : Evaded;
+				const std::string C = Crits.empty() ? "-" : Crits;
+				if (S != TextOf(Line, "struck") || E != TextOf(Line, "evaded") || C != TextOf(Line, "crits")
+					|| Work.Winner != static_cast<int>(ValueOf(Line, "winner", -1)))
+				{
+					Rewrite(k, TMBaseline::WithValue(TMBaseline::WithValue(TMBaseline::WithValue(TMBaseline::WithValue(Line,
+						"struck", S), "evaded", E), "crits", C), "winner", std::to_string(Work.Winner)));
+				}
+				++Resolves;
+				continue;
+			}
 			if ((Struck.empty() ? "-" : Struck) != TextOf(Line, "struck"))
 			{
 				Fail(Where + " strikes " + (Struck.empty() ? "nobody" : Struck)
-					+ ", Godot says " + TextOf(Line, "struck"));
+					+ ", the baseline says " + TextOf(Line, "struck"));
 			}
 			if ((Evaded.empty() ? "-" : Evaded) != TextOf(Line, "evaded"))
 			{
 				Fail(Where + ": dodged by " + (Evaded.empty() ? "nobody" : Evaded)
-					+ ", Godot says " + TextOf(Line, "evaded"));
+					+ ", the baseline says " + TextOf(Line, "evaded"));
 			}
 			if ((Crits.empty() ? "-" : Crits) != TextOf(Line, "crits"))
 			{
 				Fail(Where + ": critical on " + (Crits.empty() ? "nobody" : Crits)
-					+ ", Godot says " + TextOf(Line, "crits"));
+					+ ", the baseline says " + TextOf(Line, "crits"));
 			}
 			if (Work.Winner != static_cast<int>(ValueOf(Line, "winner", -1)))
 			{
 				Fail(Where + " ends with winner " + std::to_string(Work.Winner)
-					+ ", Godot says " + std::to_string(static_cast<int>(ValueOf(Line, "winner", -1))));
+					+ ", the baseline says " + std::to_string(static_cast<int>(ValueOf(Line, "winner", -1))));
 			}
 			++Resolves;
 			continue;
@@ -549,10 +634,18 @@ int main(int argc, char** argv)
 			const size_t Space = Line.find(' ');
 			const std::string Want = Space == std::string::npos ? "" : Line.substr(Space + 1);
 			const std::string Got = StateOf(*Unit);
+			if (Writer.bOn)
+			{
+				if (Got != Want)
+				{
+					Rewrite(k, std::to_string(Id) + " " + Got);
+				}
+				continue;
+			}
 			if (Got != Want)
 			{
 				Fail("case " + std::to_string(CaseNumber) + " leaves unit " + std::to_string(Id)
-					+ "\n      as " + Got + "\n      Godot says " + Want);
+					+ "\n      as " + Got + "\n      the baseline says " + Want);
 			}
 		}
 	}
@@ -568,8 +661,9 @@ int main(int argc, char** argv)
 	int UseCaster = -1;
 	int UseSlot = -1;
 	int UseNumber = -1;
-	for (const std::string& Line : Lines)
+	for (size_t k = 0; k < Lines.size(); ++k)
 	{
+		const std::string& Line = Lines[k];
 		if (Line == "UNITS" || Line == "PREVIEW" || Line == "RESOLVE" || Line == "USE" || Line == "TRACE")
 		{
 			Section = Line;
@@ -598,11 +692,15 @@ int main(int argc, char** argv)
 				continue;
 			}
 			const bool bBlocked = !Using.AbilityBlockedReason(*Caster, UseSlot).empty();
-			if (bBlocked != bWantBlocked)
+			if (Writer.bOn && bBlocked != bWantBlocked)
+			{
+				Rewrite(k, TMBaseline::WithValue(Line, "blocked", bBlocked ? "yes" : "no"));
+			}
+			else if (bBlocked != bWantBlocked)
 			{
 				Fail("case " + std::to_string(UseNumber) + ": unit " + std::to_string(UseCaster)
 					+ " slot " + std::to_string(UseSlot)
-					+ (bBlocked ? " is refused" : " is allowed") + ", Godot disagrees");
+					+ (bBlocked ? " is refused" : " is allowed") + ", the baseline disagrees");
 			}
 			if (bBlocked)
 			{
@@ -623,31 +721,49 @@ int main(int argc, char** argv)
 			const FUnit* Caster = Using.FindUnit(UseCaster);
 			const std::string Where = "case " + std::to_string(UseNumber) + " (unit "
 				+ std::to_string(UseCaster) + " slot " + std::to_string(UseSlot) + ")";
+			if (Writer.bOn)
+			{
+				const int Left = Caster->IsCasting() ? Caster->Casting.Ticks : 0;
+				const FVec2 WasFacing = PointOf(Line, "facing");
+				if ((Caster->IsCasting() ? 1 : 0) != static_cast<int>(ValueOf(Line, "casting")) || Left != static_cast<int>(ValueOf(Line, "castticks"))
+					|| (Caster->IsChanneling() ? 1 : 0) != static_cast<int>(ValueOf(Line, "channeling"))
+					|| std::fabs(Caster->Facing.X - WasFacing.X) > 0.01f || std::fabs(Caster->Facing.Y - WasFacing.Y) > 0.01f
+					|| (Caster->Toggled[UseSlot] ? 1 : 0) != static_cast<int>(ValueOf(Line, "toggled")))
+				{
+					std::string Now = TMBaseline::WithValue(Line, "casting", Bit(Caster->IsCasting()));
+					Now = TMBaseline::WithValue(Now, "castticks", std::to_string(Left));
+					Now = TMBaseline::WithValue(Now, "channeling", Bit(Caster->IsChanneling()));
+					Now = TMBaseline::WithValue(Now, "facing", Text(Caster->Facing));
+					Now = TMBaseline::WithValue(Now, "toggled", Bit(Caster->Toggled[UseSlot]));
+					Rewrite(k, Now);
+				}
+				continue;
+			}
 			if ((Caster->IsCasting() ? 1 : 0) != static_cast<int>(ValueOf(Line, "casting")))
 			{
 				Fail(Where + (Caster->IsCasting() ? " is casting" : " is not casting")
-					+ ", Godot disagrees");
+					+ ", the baseline disagrees");
 			}
 			const int Ticks_ = Caster->IsCasting() ? Caster->Casting.Ticks : 0;
 			if (Ticks_ != static_cast<int>(ValueOf(Line, "castticks")))
 			{
-				Fail(Where + " casts for " + std::to_string(Ticks_) + " ticks, Godot says "
+				Fail(Where + " casts for " + std::to_string(Ticks_) + " ticks, the baseline says "
 					+ std::to_string(static_cast<int>(ValueOf(Line, "castticks"))));
 			}
 			if ((Caster->IsChanneling() ? 1 : 0) != static_cast<int>(ValueOf(Line, "channeling")))
 			{
 				Fail(Where + (Caster->IsChanneling() ? " is channelling" : " is not channelling")
-					+ ", Godot disagrees");
+					+ ", the baseline disagrees");
 			}
 			const FVec2 Facing = PointOf(Line, "facing");
 			if (std::fabs(Caster->Facing.X - Facing.X) > 0.01f
 				|| std::fabs(Caster->Facing.Y - Facing.Y) > 0.01f)
 			{
-				Fail(Where + " faces " + Text(Caster->Facing) + ", Godot says " + Text(Facing));
+				Fail(Where + " faces " + Text(Caster->Facing) + ", the baseline says " + Text(Facing));
 			}
 			if ((Caster->Toggled[UseSlot] ? 1 : 0) != static_cast<int>(ValueOf(Line, "toggled")))
 			{
-				Fail(Where + ": the toggle is the other way round from Godot's");
+				Fail(Where + ": the toggle is the other way round from the baseline's");
 			}
 			continue;
 		}
@@ -664,10 +780,18 @@ int main(int argc, char** argv)
 				const size_t Space = Line.find(' ');
 				const std::string Want = Space == std::string::npos ? "" : Line.substr(Space + 1);
 				const std::string Got = StateOf(*Unit);
+				if (Writer.bOn)
+				{
+					if (Got != Want)
+					{
+						Rewrite(k, std::to_string(Id) + " " + Got);
+					}
+					continue;
+				}
 				if (Got != Want)
 				{
 					Fail("case " + std::to_string(UseNumber) + " leaves the caster"
-						+ "\n      as " + Got + "\n      Godot says " + Want);
+						+ "\n      as " + Got + "\n      the baseline says " + Want);
 				}
 			}
 		}
@@ -738,16 +862,25 @@ int main(int argc, char** argv)
 		{
 			const FUnit* Caster = Scene.FindUnit(SceneCaster);
 			const bool bCasting = Caster && Caster->IsCasting();
+			if (Writer.bOn)
+			{
+				const int Left = bCasting ? Caster->Casting.Ticks : 0;
+				if (bCasting != (ValueOf(Line, "casting") != 0.0) || Left != static_cast<int>(ValueOf(Line, "ticks")))
+				{
+					Rewrite(i, TMBaseline::WithValue(TMBaseline::WithValue(Line, "casting", Bit(bCasting)), "ticks", std::to_string(Left)));
+				}
+				continue;
+			}
 			if (bCasting != (ValueOf(Line, "casting") != 0.0))
 			{
 				Fail(SceneName + ": the caster " + (bCasting ? "is" : "is not")
-					+ " casting, Godot disagrees");
+					+ " casting, the baseline disagrees");
 			}
 			const int Left = bCasting ? Caster->Casting.Ticks : 0;
 			if (Left != static_cast<int>(ValueOf(Line, "ticks")))
 			{
 				Fail(SceneName + ": the cast takes " + std::to_string(Left)
-					+ " ticks, Godot says " + std::to_string(static_cast<int>(ValueOf(Line, "ticks"))));
+					+ " ticks, the baseline says " + std::to_string(static_cast<int>(ValueOf(Line, "ticks"))));
 			}
 			continue;
 		}
@@ -783,10 +916,31 @@ int main(int argc, char** argv)
 
 			const FUnit* Caster = Scene.FindUnit(SceneCaster);
 			const int Casting = (Caster && Caster->IsCasting()) ? Caster->Casting.Ticks : -1;
+			if (Writer.bOn)
+			{
+				int WentOff = 0;
+				for (const FEvent& Event : Report.Events)
+				{
+					WentOff += Event.Kind == EEventKind::Resolved ? 1 : 0;
+				}
+				std::string Health;
+				for (const FUnit& Unit : Scene.Units)
+				{
+					Health += (Health.empty() ? "" : ",") + std::to_string(Unit.Hp);
+				}
+				if (Casting != static_cast<int>(ValueOf(Line, "cast", -1)) || WentOff != static_cast<int>(ValueOf(Line, "resolved"))
+					|| Health != TextOf(Line, "hp"))
+				{
+					Rewrite(i, TMBaseline::WithValue(TMBaseline::WithValue(TMBaseline::WithValue(Line, "cast", std::to_string(Casting)),
+						"resolved", std::to_string(WentOff)), "hp", Health));
+				}
+				++Ticks;
+				continue;
+			}
 			if (Casting != static_cast<int>(ValueOf(Line, "cast", -1)))
 			{
 				Fail(SceneName + " at tick " + std::to_string(Scene.TickCount) + ": cast has "
-					+ std::to_string(Casting) + " left, Godot says "
+					+ std::to_string(Casting) + " left, the baseline says "
 					+ std::to_string(static_cast<int>(ValueOf(Line, "cast", -1))));
 			}
 			int Resolved = 0;
@@ -800,7 +954,7 @@ int main(int argc, char** argv)
 			if (Resolved != static_cast<int>(ValueOf(Line, "resolved")))
 			{
 				Fail(SceneName + " at tick " + std::to_string(Scene.TickCount) + ": "
-					+ std::to_string(Resolved) + " abilities went off, Godot says "
+					+ std::to_string(Resolved) + " abilities went off, the baseline says "
 					+ std::to_string(static_cast<int>(ValueOf(Line, "resolved"))));
 			}
 			std::string Health;
@@ -813,7 +967,7 @@ int main(int argc, char** argv)
 			if (Health != WantHealth)
 			{
 				Fail(SceneName + " at tick " + std::to_string(Scene.TickCount) + ": health is "
-					+ Health + ", Godot says " + WantHealth);
+					+ Health + ", the baseline says " + WantHealth);
 			}
 			++Ticks;
 			continue;
@@ -826,14 +980,18 @@ int main(int argc, char** argv)
 	// A reference that came out empty would pass every check in it.
 	if (Previews < 300 || Resolves < 100 || Uses < 20 || Ticks < 100)
 	{
-		std::printf("THE REFERENCE IS SHORT -- re-dump it from the Godot game\n");
+		std::printf("THE BASELINE IS SHORT -- it has lost situations; restore it from git\n");
 		return 1;
+	}
+	if (Writer.bOn)
+	{
+		return Writer.Finish() ? 0 : 1;
 	}
 	if (Failures > 0)
 	{
 		std::printf("ABILITIES DO SOMETHING ELSE HERE (%d)\n", Failures);
 		return 1;
 	}
-	std::printf("ABILITIES DO IN UNREAL WHAT THEY DO IN GODOT\n");
+	std::printf("ABILITIES DO WHAT THEIR BASELINE SAYS\n");
 	return 0;
 }

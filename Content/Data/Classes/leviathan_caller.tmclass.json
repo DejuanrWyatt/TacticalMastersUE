@@ -25,15 +25,15 @@
     {
       "id": "leviathan_caller_tide_rod",
       "name": "Tide Rod",
-      "desc": "Strike an adjacent enemy.",
+      "desc": "Strikes an enemy 1-7 m away.",
       "kind": "active",
       "effect": "damage",
       "scale": "att",
       "target": "enemy",
       "shape": "unit",
-      "power": 34,
-      "min_range": 0,
-      "max_range": 1.8,
+      "power": 28.9,
+      "min_range": 1,
+      "max_range": 7,
       "aoe": 0,
       "cooldown": 0,
       "cast": 0,
@@ -42,12 +42,13 @@
         "system": "/Game/ParagonGideon/FX/Particles/Gideon/Abilities/Primary/FX/P_Gideon_Primary_HitCharacter.P_Gideon_Primary_HitCharacter",
         "at": "targets",
         "scale": 1
-      }
+      },
+      "anim": "bolt"
     },
     {
       "id": "leviathan_caller_summon_leviathan",
       "name": "Summon Leviathan",
-      "desc": "The Leviathan strikes every enemy within 2 m of a point 3-9 m away; Slows for 2 turns. (2 s)",
+      "desc": "Strikes every enemy within 2 m of a point 3-9 m away; Slows for 2 turns, and calls up the Leviathan there to fight for 3 of its turns. (1 s)",
       "kind": "active",
       "effect": "damage",
       "scale": "mag",
@@ -57,8 +58,8 @@
       "min_range": 3,
       "max_range": 9,
       "aoe": 2,
-      "cooldown": 2,
-      "cast": 2,
+      "cooldown": 3,
+      "cast": 1,
       "status": {
         "id": "slow",
         "turns": 2
@@ -68,6 +69,11 @@
         "system": "/Game/ParagonGideon/FX/Particles/Gideon/Abilities/ProjectileMeteor/FX/P_Gideon_RMB_Proj.P_Gideon_RMB_Proj",
         "at": "point",
         "scale": 1
+      },
+      "special": "pet",
+      "pet": {
+        "job": "leviathan_pet",
+        "turns": 3
       }
     },
     {
@@ -102,7 +108,7 @@
     {
       "id": "leviathan_caller_leviathan_ascendant",
       "name": "Leviathan Ascendant",
-      "desc": "ULTIMATE: Every enemy within 4 m of a point 4-11 m away; Slows for 2 turns. (4 s)",
+      "desc": "ULTIMATE: Every enemy within 4 m of a point 4-11 m away; Slows for 2 turns. (3 s)",
       "kind": "active",
       "effect": "damage",
       "scale": "mag",
@@ -113,7 +119,7 @@
       "max_range": 11,
       "aoe": 4,
       "cooldown": 0,
-      "cast": 4,
+      "cast": 3,
       "status": {
         "id": "slow",
         "turns": 2
@@ -125,5 +131,12 @@
         "scale": 1
       }
     }
-  ]
+  ],
+  "creator": {
+    "rebalanced": {
+      "on": "2026-10-02",
+      "why": "Balance audit 2026-10-02: rod reaches 1-7 m (power -15%); the summon casts in 1 s, every 3 turns, and calls up a computer-played pet for 3 turns; ultimate 1 s quicker"
+    },
+    "changedAt": "2026-10-03T03:45:00.000Z"
+  }
 }

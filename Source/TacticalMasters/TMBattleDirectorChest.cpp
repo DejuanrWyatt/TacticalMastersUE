@@ -207,6 +207,35 @@ USceneComponent* ATMBattleDirector::MakeChest(const FVector& Foot, int32 Tier, f
 			Made.Sparks.Add(Part);
 		}
 	}
+	// The beam: a wide faint column round a narrow bright core, as tall as a tower.
+	if (UStaticMesh* Rod = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cylinder.Cylinder")))
+	{
+		const float Tall = 1400.0f;
+		Made.BeamColour = Look.Accent * (1.6f + Look.Glow);
+		const float Widths[2] = { 0.26f, 0.08f };
+		const float Opacities[2] = { 0.16f, 0.5f };
+		for (int32 k = 0; k < 2; ++k)
+		{
+			UStaticMeshComponent* Part = NewObject<UStaticMeshComponent>(this, NAME_None, RF_Transient);
+			Part->SetMobility(EComponentMobility::Movable);
+			Part->SetupAttachment(Root);
+			Part->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+			Part->RegisterComponent();
+			Part->SetStaticMesh(Rod);
+			UMaterialInstanceDynamic* Mid = GlowPaint(Made.BeamColour);
+			Mid->SetVectorParameterValue(TEXT("TintColorAndOpacity"),
+				FLinearColor(Made.BeamColour.R, Made.BeamColour.G, Made.BeamColour.B, Opacities[k]));
+			Part->SetMaterial(0, Mid);
+			Part->SetCastShadow(false);
+			Part->SetReceivesDecals(false);
+			// The basic cylinder is a metre across and a metre tall about its middle.
+			Part->SetRelativeLocation(FVector(0.0f, 0.0f, Tall * 0.5f + 0.4f * Unit));
+			Part->SetRelativeScale3D(FVector(Widths[k], Widths[k], Tall / 100.0f));
+			BoardProps.Add(Part);
+			Made.Beam.Add(Part);
+			Made.BeamPaint.Add(Mid);
+		}
+	}
 	Chests.Add(Made);
 	return Root;
 }
@@ -234,6 +263,17 @@ void ATMBattleDirector::AdvanceChests(float DeltaSeconds)
 			// A slow breath of light; the epic chest's quicker and deeper.
 			const float Depth = Chest.Tier >= 3 ? 0.35f : 0.15f;
 			Chest.Light->SetIntensity(Chest.LightBase * (1.0f - Depth + Depth * (0.5f + 0.5f * FMath::Sin(T * (Chest.Tier >= 3 ? 3.2f : 1.8f)))));
+		}
+		// The beam breathes, the core more than the haze round it.
+		for (int32 k = 0; k < Chest.BeamPaint.Num(); ++k)
+		{
+			if (UMaterialInstanceDynamic* Mid = Chest.BeamPaint[k])
+			{
+				const float Base = k == 0 ? 0.16f : 0.5f;
+				const float Breath = 0.8f + 0.2f * FMath::Sin(T * 1.6f + k);
+				Mid->SetVectorParameterValue(TEXT("TintColorAndOpacity"),
+					FLinearColor(Chest.BeamColour.R, Chest.BeamColour.G, Chest.BeamColour.B, Base * Breath));
+			}
 		}
 		for (int32 i = 0; i < Chest.Sparks.Num(); ++i)
 		{

@@ -31,11 +31,13 @@ namespace TMTowerLook
 {
 	using namespace TMProp;
 
-	/** Mockup metres across into centimetres here: half as wide (see above). */
-	constexpr float Across = 50.0f;
+	/** Mockup metres across into centimetres here: half as wide (see above);
+	 *  stouter since the v19 play test, with the units half as big again (2026-10-04). */
+	constexpr float Across = 72.0f;
 	/** Mockup metres up into centimetres here: taller than the mockup, so the
-	 *  beacon stands well over the trees and reads from across the board (2026-09-30). */
-	constexpr float Up = 150.0f;
+	 *  beacon stands well over the trees and reads from across the board (2026-09-30).
+	 *  v19 play test: still missed, so 60% taller again (2026-10-04). */
+	constexpr float Up = 240.0f;
 	/** How many flames burn in one bowl. */
 	constexpr int32 Flames = 14;
 	const FColor Iron(62, 63, 68);
@@ -140,7 +142,7 @@ void ATMBattleDirector::MakeTower(const FVector& Foot, int32 Seed)
 	Light->RegisterComponent();
 	Light->SetRelativeLocation(FVector(0, 0, Z(5.0f)));
 	Light->SetCastShadows(false);
-	Light->SetAttenuationRadius(650.0f);
+	Light->SetAttenuationRadius(1000.0f);
 	BoardProps.Add(Light);
 	Made.Light = Light;
 	Beacons.Add(Made);
@@ -184,7 +186,7 @@ void ATMBattleDirector::LightTower(FTMTower& Tower, float Kindle)
 		// A flare as it catches, settling to the held fire's light.
 		Tower.LightBase = FMath::Lerp(2500.0f, 14000.0f, K) * (1.0f + 0.5f * FMath::Sin(K * PI));
 		Tower.Light->SetIntensity(Tower.LightBase);
-		Tower.Light->SetAttenuationRadius(FMath::Lerp(260.0f, 700.0f, K));
+		Tower.Light->SetAttenuationRadius(FMath::Lerp(400.0f, 1100.0f, K));
 	}
 }
 

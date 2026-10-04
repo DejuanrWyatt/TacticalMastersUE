@@ -70,6 +70,13 @@ namespace TMSim
 
 		std::string StatusId;
 		int StatusTurns = 0;
+		/**
+		 * A status the user gives itself as the ability goes off, whoever else it
+		 * reaches (2026-10-03): the Ninja's Smoke Bomb Slows the enemies round it
+		 * and leaves the Ninja Vanished. Empty for none.
+		 */
+		std::string SelfStatusId;
+		int SelfStatusTurns = 0;
 		std::vector<FBuff> Buffs;
 
 		/** What it does, in words, for the guide and tooltips. Never read by the rules. */
@@ -100,9 +107,26 @@ namespace TMSim
 		 * "blink" moves the user to the aim point, "swap" trades places with the
 		 * ally hit, "tame" brings a hurt monster over to the user's side,
 		 * "summon" wakes the user's camp's reserves, "rewind" gives back the
-		 * last hit the user took. Empty for none.
+		 * last hit the user took, "pet" calls up the user's pet (below). Empty
+		 * for none.
+		 *
+		 * Movement skills (2026-10-03), done before anything is hit, so the blow
+		 * lands from where the user ends up: "leap" carries the user through the
+		 * air to the aim point (or the free spot nearest it within 1.5 m, or the
+		 * ability's area if wider) -- the Berserker's Leap Smash; "behind" puts
+		 * the user on the free spot behind the unit aimed at, as near as can be
+		 * to straight behind it -- the Ninja's Shadow Step. With nowhere to land
+		 * the ability can't be used (FBattle::LandingFor).
 		 */
 		std::string Special;
+		/**
+		 * "pet" (2026-10-02): the class of the pet it calls up -- a monster file,
+		 * waiting off the board from the start -- and how many of the pet's own
+		 * turns it stays before it leaves. The computer plays it, for the side
+		 * that called it.
+		 */
+		std::string PetJob;
+		int PetTurns = 0;
 		/**
 		 * "fire", "ice", "lightning" or "water" for the reactions with Wet,
 		 * Oiled and Chilled (Docs/design/feat-status-effects.md); empty to be

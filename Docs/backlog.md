@@ -87,6 +87,26 @@ Not yet broken down; run `/plan-milestone` to split it into slices.
 | camera-options-devtools | Godot's free camera, Options (camera speed, UI scale, fullscreen, colour-blind colours, rebindable keys) and Developer Tools (every rule number) | – | unreal-engineer | Done: camera in the director, `TMSettings` (saved to `Saved/TacticalMasters/settings.json`), `TMBattleHudOptions.cpp`. Rule numbers reach a running battle only as a `Tune` order (in the checksum, clamped as Godot's clean_tuning). Turn order as fixed squares is the default (Options toggles the bars back). Edit layout (F2 or the Layout button) moves every panel and reorders the squares, kept per machine. Not yet: sound volumes |
 | character-setup | Paragon heroes (and later Tripo/Blender characters) animated and worn by classes | unit-animation | human | Todo: steps in `Docs/CharacterSetup.md` (IK Rigs, a retargeter from the mannequin, copied clips, a set and a body in the character map) |
 
+## v19 play test (2026-10-04)
+| id | goal | depends on | owner | status |
+|----|------|-----------|-------|--------|
+| fix-v19-crash | The SetShaderParameters crash (every v19 crash, both PCs): broken-material assets unloaded by the garbage collector | – | unreal-engineer | Done, not built: TMDrawable KeepBrokenLoaded; check with gc.CollectGarbageEveryFrame 1 |
+| look-ready-mark | No light under a ready unit (it hid the ground); a READY tag over its health bar ("Battle Indicator Alternatives" Ready D, chosen) | – | unreal-engineer | Done, not built |
+| look-tank-shields | The tank zone as three shields on a turning broken ring, on hover and for enemy tanks in sight (Tank B, chosen) | – | unreal-engineer | Done, not built |
+| feat-unique-classes | Setup option: one of each class in the battle; host's online | – | unreal-engineer | Done, not built |
+| ui-class-card | Class details (stats, four abilities) in the class picker and the draft | – | unreal-engineer | Done, not built |
+| look-cast-card | Casting: a big card over the caster, every caster's target area, a sigil under it, an enemy-cast banner (Cast A and B, chosen) | – | unreal-engineer | Done, not built |
+| feat-tall-grass | Terrain that hides units: map "grass" tiles, hidden beyond 3 m until they strike or are struck | – | sim-engineer | Done, not built; patches placed on the 8 maps by a script, worth a look |
+| look-towers-taller | Watchtowers 60% taller, stouter, wider light | – | unreal-engineer | Done, not built |
+| feat-spring-rest | Wells (springs): own heal number and a rest after use, both in Developer Tools | – | sim-engineer | Done, not built |
+| look-chest-beam | A column of light over every chest, in its tier's colour, hidden in fog | – | unreal-engineer | Done, not built |
+| ui-ground-item-tip | Pointer on a chest: every item in it, with its numbers and text | – | unreal-engineer | Done, not built |
+| look-vanish-ghost | Vanished units drawn as an outline only (to the side that sees them) | – | unreal-engineer | Done, not built |
+| ui-healing-received | Healing received, per unit, in the battle report (support tab, and the unit page) | – | unreal-engineer | Done, not built |
+| look-units-bigger | Units half as big again (UnitSize 1.5), overheads raised with them | – | unreal-engineer | Done, not built |
+| ui-double-click-centre | Double click a turn chip or a left-panel portrait: the camera goes to that unit | – | unreal-engineer | Done, not built |
+| look-summons | Pets wear bodies like their names (characters.json "classes"), and the summoner's guide page shows each pet in full | – | unreal-engineer | Done, not built |
+
 ## Objectives and items (proposed 2026-09-29, specs Draft)
 | id | goal | depends on | owner | status |
 |----|------|-----------|-------|--------|

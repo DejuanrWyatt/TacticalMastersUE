@@ -19,6 +19,7 @@
 #include "Components/InputComponent.h"
 #include "TMBattleHud.h"
 #include "TMVfxStudio.h"
+#include "TMSoundStudio.h"
 #include "TMAnimStudio.h"
 #include "TMRobotPlayer.h"
 #include "TMSettings.h"
@@ -52,6 +53,10 @@ void ATMBattleDirector::BeginPlay()
 {
 	Super::BeginPlay();
 
+	// Nothing that can't be drawn is ever unloaded: unloading one crashed the
+	// renderer (TMDrawable.h, KeepBrokenLoaded).
+	TMDrawable::WatchBrokenMaterials();
+
 	// -tmvfxcatalog: no battle at all. The studio films every effect in the
 	// project for the class creator, then ends the run itself.
 	if (FParse::Param(FCommandLine::Get(), TEXT("tmvfxcatalog")))
@@ -64,11 +69,25 @@ void ATMBattleDirector::BeginPlay()
 		return;
 	}
 
+	// -tmsoundcatalog: the same, for the sounds: each copied out as a .wav the
+	// creator can play (TMSoundStudio.h).
+	if (FParse::Param(FCommandLine::Get(), TEXT("tmsoundcatalog")))
+	{
+		if (UWorld* World = GetWorld())
+		{
+			World->SpawnActor<ATMSoundStudio>();
+		}
+		SetActorTickEnabled(false);
+		return;
+	}
+
 	// -tmanimcatalog: the same, for the animation clips the character map
 	// names, filmed on the bodies that wear them (TMAnimStudio.h).
 	if (FParse::Param(FCommandLine::Get(), TEXT("tmanimcatalog")))
 	{
 		LoadCharacterMap();
+		// Cast Studio's published picks are filmed too, so the creator can show them.
+		LoadCastAnimation();
 		if (UWorld* World = GetWorld())
 		{
 			if (ATMAnimStudio* Studio = World->SpawnActor<ATMAnimStudio>())
@@ -256,6 +275,13 @@ void ATMBattleDirector::BeginPlay()
 
 void ATMBattleDirector::ClearBattle()
 {
+	// What the feel kept from the last battle (TMBattleDirectorFeel.cpp).
+	PredictedWalks.Reset();
+	ClickMarks.Reset();
+	QuickSlot = -1;
+	BufferedKey = FKey();
+	CloseUpUntil = 0.0;
+	WalkPress = FTMWalkPress();
 	for (TObjectPtr<USkeletalMeshComponent>& Visual : UnitVisuals)
 	{
 		if (Visual)
@@ -318,6 +344,12 @@ void ATMBattleDirector::ClearBattle()
 	ReadySeen.Reset();
 	bPlanMode = false;
 	WayPoints.clear();
+	// The camera rules' notes were about that battle's units (ids are used again).
+	ReadyToastId = -1;
+	PendingFollowId = -1;
+	FollowArmedUntil = 0.0;
+	bSnapToNext = false;
+	CameraHeldWhy.Reset();
 }
 
 namespace
@@ -469,7 +501,7 @@ void ATMBattleDirector::BuildBattle()
 	// The map first: units stand on it, and the pathfinder needs it before
 	// anything can be asked about where a unit could walk.
 	const TMSim::FMapDef& MapDef = TMSim::FindMap(Setup.MapId);
-	Battle.Map.BuildMirrored(MapDef.Top);
+	Battle.Map.BuildMirrored(MapDef.Top, MapDef.Grass);
 
 	// Where the map puts the two sides, in metres. Blue as written, red at the
 	// mirrored spots, which is how a symmetric map is laid out; the first of
@@ -553,6 +585,8 @@ void ATMBattleDirector::BuildBattle()
 	Battle.Tuning.Elements = Setup.bElements ? 1.0 : 0.0;
 	Battle.Tuning.FriendlyFire = Setup.bFriendlyFire ? 1.0 : 0.0;
 	Battle.Tuning.CampRespawn = Setup.bCampRespawn ? 1.0 : 0.0;
+	Battle.Tuning.BossHunt = Setup.bBossHunt ? 1.0 : 0.0;
+	Battle.Tuning.BossClaim = Setup.bBossClaim ? 1.0 : 0.0;
 	Battle.BossJob = MapDef.Boss;
 	const std::string Loadout = Battle.LoadoutProblem();
 	if (!Loadout.empty())
@@ -621,9 +655,10 @@ void ATMBattleDirector::BuildBattle()
 		USkeletalMeshComponent* Visual = NewObject<USkeletalMeshComponent>(
 			this, Fresh(USkeletalMeshComponent::StaticClass(), TEXT("Unit"), Battle.Units[i].Id), RF_Transient);
 		Visual->SetupAttachment(RootComponent);
-		// No cloth or morph targets on any unit body (see WearBody).
+		// No cloth, morph targets or material curves on any unit body (see WearBody).
 		Visual->bDisableClothSimulation = true;
 		Visual->bDisableMorphTarget = true;
+		Visual->SetAllowAnimCurveEvaluation(false);
 		// Its pose kept up to date even while the fog hides it, and no blur per
 		// bone: a body shown again with no pose from the frame before tripped the
 		// engine's skinning check (crash 2026-09-30, GPUSkinVertexFactory bPrevious).
@@ -741,7 +776,7 @@ void ATMBattleDirector::RefreshPlates()
 				Plate->SetText(FText::FromString(FString::Printf(TEXT("%hs  down %.0fs"),
 					Unit.Job.c_str(), Unit.KoTicks / float(TMSim::Pace::TicksPerSecond))));
 				Plate->SetTextRenderColor(FColor(140, 140, 150));
-				Plate->SetRelativeLocation(WorldFor(Unit) + FVector(0.0f, 0.0f, 150.0f));
+				Plate->SetRelativeLocation(WorldFor(Unit) + FVector(0.0f, 0.0f, 150.0f * UnitSize));
 			}
 			continue;
 		}
@@ -769,7 +804,7 @@ void ATMBattleDirector::RefreshPlates()
 			: (FTMSettings::Get().bColorblind ? FColor(255, 185, 80) : FColor(255, 130, 120)));
 		// Fog of war: what this side cannot see, this screen does not show.
 		Plate->SetVisibility(IsSeen(Unit));
-		Plate->SetRelativeLocation(WorldFor(Unit) + FVector(0.0f, 0.0f, 150.0f));
+		Plate->SetRelativeLocation(WorldFor(Unit) + FVector(0.0f, 0.0f, 150.0f * UnitSize));
 	}
 }
 
@@ -802,11 +837,24 @@ void ATMBattleDirector::RefreshVisuals()
 		const bool bCanFall = Motions.IsValidIndex(i) && Motions[i].Body && Motions[i].Body->Animations;
 		const bool bStillFalling = Motions.IsValidIndex(i) && Motions[i].HeldBlows > 0;
 		UnitVisuals[i]->SetVisibility((Unit.IsAlive() || bStillFalling || (bCanFall && Unit.IsKo())) && IsSeen(Unit));
+		// Vanished (Smoke Bomb, Shadow Step): to the side that still sees it, only
+		// its outline is drawn, a ghost of itself (v19 play test). The outline is
+		// the custom-depth pass (ApplyOutlines), which needs no main pass.
+		const bool bGhost = Unit.IsAlive() && Unit.HasStatus("veil");
+		if (UnitVisuals[i]->bRenderInMainPass == bGhost)
+		{
+			UnitVisuals[i]->SetRenderInMainPass(!bGhost);
+		}
 
 		if (ReadyLights.IsValidIndex(i) && ReadyLights[i])
 		{
+			// Lit only while it flares from a blow (StepTicks): a light at the feet
+			// whenever a turn was up washed out the very ground the unit would cross
+			// (v19 play test), so readiness is shown without one (Indicators).
 			ReadyLights[i]->SetRelativeLocation((bMoving ? Motions[i].Shown : Where) + FVector(0.0f, 0.0f, 55.0f));
-			ReadyLights[i]->SetVisibility(Unit.bReady && Unit.IsAlive() && IsSeen(Unit));
+			const int32 Index = i;
+			ReadyLights[i]->SetVisibility(Unit.IsAlive() && IsSeen(Unit)
+				&& Flashes.ContainsByPredicate([Index](const FFlash& Flash) { return Flash.UnitId == Index; }));
 		}
 	}
 }
@@ -935,6 +983,11 @@ FString ATMBattleDirector::Submit(const TMSim::FOrder& Order)
 		const std::string Line = TMSim::OrderToText(Order);
 		bWaitingForHost = true;
 		SendOnline(TEXT("req"), [&Line](FJsonObject& Message) { Message.SetStringField(TEXT("o"), UTF8_TO_TCHAR(Line.c_str())); });
+		// A walk sets off now, on screen only, while the host's answer is on its way (2026-10-03).
+		if (Order.Type == TMSim::EOrderType::Move)
+		{
+			PredictWalk(Order);
+		}
 		return FString();
 	}
 	// Watching a replay: only the replay's own orders go in.
@@ -993,8 +1046,8 @@ FString ATMBattleDirector::NameOf(int32 UnitId) const
 {
 	if (const TMSim::FUnit* Unit = const_cast<TMSim::FBattle&>(Battle).FindUnit(UnitId))
 	{
-		// A monster by its name: there is only ever a handful of each.
-		if (Unit->bMonster)
+		// A monster or a pet by its name: there is only ever a handful of each.
+		if (Unit->bMonster || Unit->PetOf >= 0)
 		{
 			const TMSim::FJobDef* Job = TMSim::FindJob(Unit->Job);
 			return FString::Printf(TEXT("%hs"), Job ? Job->Name.c_str() : Unit->Job.c_str());
@@ -1013,6 +1066,9 @@ void ATMBattleDirector::ShowEvents(const TMSim::FTickReport& Report)
 	{
 		return;
 	}
+	// Statuses that have just ended play their expire first, before the hits
+	// this tick brings (Cast Studio, TMBattleDirectorCast.cpp).
+	CastNoticeEnds();
 	AnimateEvents(Report);
 	// What an ability did waits until it lands; the rest shows now
 	// (TMBattleDirectorBlows.cpp).
@@ -1232,18 +1288,17 @@ void ATMBattleDirector::AdvanceFloaters(float DeltaSeconds)
 		UPointLightComponent* Light = ReadyLights[Index];
 		if (Flash.Age >= FlashSeconds)
 		{
-			// Back to whose turn it is, which is what the light is normally for.
-			const TMSim::FUnit* Unit = Battle.FindUnit(Index);
+			// Out again: the light is only for the flare.
 			Light->SetLightColor(ReadyColour);
 			Light->SetIntensity(ReadyLightBrightness);
-			Light->SetVisibility(Unit && Unit->bReady && Unit->IsAlive() && IsSeen(*Unit));
+			Light->SetVisibility(false);
 			Flashes.RemoveAt(i);
 			continue;
 		}
 		const float Left = 1.0f - Flash.Age / FlashSeconds;
 		Light->SetVisibility(true);
 		Light->SetLightColor(Flash.Colour);
-		Light->SetIntensity(ReadyLightBrightness * (1.0f + 2.5f * Left));
+		Light->SetIntensity(ReadyLightBrightness * (1.0f + 2.5f * Flash.Strength * Left * Left));
 	}
 }
 
@@ -1397,10 +1452,45 @@ void ATMBattleDirector::Narrate(const TMSim::FTickReport& Report)
 		case TMSim::EEventKind::Staggered:
 			Line = FString::Printf(TEXT("    %s is staggered!"), *NameOf(Event.Unit));
 			break;
+		// Camps and bosses (2026-10-02, "Camps and Bosses Mockups").
+		case TMSim::EEventKind::CampNoise:
+			Line = Event.Amount >= TMSim::Camp::NoiseFull
+				? FString::Printf(TEXT("%s's fighting rouses a camp: it wakes soon, and comes for them"), *NameOf(Event.Unit))
+				: FString::Printf(TEXT("A camp stirs at the noise (%d of %d)"), Event.Amount, TMSim::Camp::NoiseFull);
+			break;
+		case TMSim::EEventKind::CleanKill:
+			Line = FString::Printf(TEXT("    %s: a clean kill, +%d%% gauge"), *NameOf(Event.Unit), Event.Amount);
+			if (const TMSim::FUnit* Killer = Battle.FindUnit(Event.Unit))
+			{
+				if (IsSeen(*Killer))
+				{
+					AddFloater(Event.Unit, FString::Printf(TEXT("Clean kill  +%d%% gauge"), Event.Amount), FColor(240, 207, 114), false);
+				}
+			}
+			break;
+		case TMSim::EEventKind::Hunting:
+			Line = FString::Printf(TEXT("%s hunts %s!"), *NameOf(Event.Unit), *NameOf(Event.By));
+			BossNews = Line;
+			BossNewsAt = GetWorld() ? GetWorld()->GetRealTimeSeconds() : 0.0f;
+			break;
+		case TMSim::EEventKind::BossClaimed:
+			Line = FString::Printf(TEXT("%s claims %s: the Boss's Boon, +10%% damage for %d turns"),
+				Event.Amount == 0 ? TEXT("Blue") : TEXT("Red"), *NameOf(Event.Unit), TMSim::Camp::BoonTurns);
+			BossNews = Line;
+			BossNewsAt = GetWorld() ? GetWorld()->GetRealTimeSeconds() : 0.0f;
+			break;
+		case TMSim::EEventKind::ClaimShare:
+		{
+			const TMSim::FItemDef* Prize = TMSim::FindItem(Event.Id);
+			Line = FString::Printf(TEXT("%s's share of %s earns the %hs (in its stash)"),
+				Event.Amount == 0 ? TEXT("Blue") : TEXT("Red"), *NameOf(Event.Unit), Prize ? Prize->Name.c_str() : Event.Id.c_str());
+			break;
+		}
 		case TMSim::EEventKind::Teleported:
 			// Shown at once where it went, not walked there (AdvanceMotion).
 			SnapUnits.Add(Event.Unit);
-			Line = FString::Printf(TEXT("%s blinks away"), *NameOf(Event.Unit));
+			Line = Event.Id == "pet" ? FString::Printf(TEXT("%s calls up the %s"), *NameOf(Event.By), *NameOf(Event.Unit))
+				: FString::Printf(TEXT("%s blinks away"), *NameOf(Event.Unit));
 			break;
 		case TMSim::EEventKind::ShrineUsed:
 			Line = FString::Printf(TEXT("%s draws power from the shrine"), *NameOf(Event.Unit));
@@ -1622,7 +1712,9 @@ void ATMBattleDirector::LogEvent(const TMSim::FEvent& Event, const FString& Plai
 		}
 		Entry.bKey = Event.Kind == TMSim::EEventKind::Captured || Event.Kind == TMSim::EEventKind::ItemTaken
 			|| Event.Kind == TMSim::EEventKind::Revived || Event.Kind == TMSim::EEventKind::PhaseChanged
-			|| Event.Kind == TMSim::EEventKind::Escaped || Event.Kind == TMSim::EEventKind::Tamed;
+			|| Event.Kind == TMSim::EEventKind::Escaped || Event.Kind == TMSim::EEventKind::Tamed
+			|| Event.Kind == TMSim::EEventKind::Hunting || Event.Kind == TMSim::EEventKind::BossClaimed
+			|| Event.Kind == TMSim::EEventKind::ClaimShare;
 		break;
 	}
 	}
@@ -1807,22 +1899,34 @@ void ATMBattleDirector::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
 
-	// An ultimate slows the world for a beat (UltimateBeat). Only the look of it:
+	// An ultimate slows the world for a beat (UltimateBeat), a heavy blow holds
+	// it still for an instant (TMBattleDirectorFeel.cpp). Only the look of it:
 	// the battle's clock below is given real time, so the beat costs nobody a
-	// moment of their turn.
+	// moment of their turn. Fast-forward is the one exception, and gives the
+	// clock its share (ClockShare).
 	float RealDelta = DeltaSeconds;
+	float ClockShare = 1.0f;
 	if (GetWorld() && GetWorld()->GetWorldSettings())
 	{
 		const float Dilation = GetWorld()->GetWorldSettings()->GetEffectiveTimeDilation();
-		if (Dilation > 0.01f)
+		if (Dilation > 0.001f)
 		{
 			RealDelta = DeltaSeconds / Dilation;
 		}
-		if (SlowUntil > 0.0 && FPlatformTime::Seconds() >= SlowUntil)
+		if (GetWorld()->IsGameWorld())
 		{
-			SlowUntil = 0.0;
-			UGameplayStatics::SetGlobalTimeDilation(this, 1.0f);
+			ClockShare = UpdateDilation();
 		}
+	}
+	// A close-up on an ultimate goes back to where the camera was.
+	if (CloseUpUntil > 0.0 && FPlatformTime::Seconds() >= CloseUpUntil)
+	{
+		EndCloseUp();
+	}
+	// Click rings that have faded.
+	while (ClickMarks.Num() > 0 && FPlatformTime::Seconds() - ClickMarks[0].Born > ClickMarkSeconds)
+	{
+		ClickMarks.RemoveAt(0);
 	}
 
 	// How smoothly it runs, every ten seconds of play: the average frame rate
@@ -1848,6 +1952,7 @@ void ATMBattleDirector::Tick(float DeltaSeconds)
 	{ TM_SLOW("Floaters"); AdvanceFloaters(DeltaSeconds); }
 	{ TM_SLOW("Vfx"); AdvanceVfx(DeltaSeconds); }
 	{ TM_SLOW("Looks"); AdvanceLooks(DeltaSeconds); }
+	{ TM_SLOW("Cast"); AdvanceCast(DeltaSeconds); }
 	if (GetWorld() && GetWorld()->IsGameWorld())
 	{
 		{ TM_SLOW("Motion"); AdvanceMotion(DeltaSeconds); }
@@ -1860,7 +1965,8 @@ void ATMBattleDirector::Tick(float DeltaSeconds)
 		{ TM_SLOW("Camps"); RefreshCamps(DeltaSeconds); }
 		{ TM_SLOW("Towers"); AdvanceTowers(DeltaSeconds); }
 		{ TM_SLOW("Hazards"); AdvanceHazards(DeltaSeconds); }
-		{ TM_SLOW("Camera"); UpdateCamera(DeltaSeconds); }
+		// The camera on real time: as quick in a slow beat or a fast-forward as ever.
+		{ TM_SLOW("Camera"); UpdateCamera(RealDelta); }
 		if (TunePendingFor >= 0.0f && DragSlider < 0)
 		{
 			TunePendingFor -= DeltaSeconds;
@@ -1890,6 +1996,11 @@ void ATMBattleDirector::Tick(float DeltaSeconds)
 	AdvanceOnline(DeltaSeconds);
 	AdvanceDraft(DeltaSeconds);
 
+	// The pointer says what a click would do, on every screen (TMBattleDirectorFeel.cpp).
+	if (bPlayerInput)
+	{
+		UpdateCursor();
+	}
 	// On the title and setup screens the board stands behind the menu with its
 	// clock stopped; a battle begins only when one is started.
 	if (Screen != EScreen::Battle)
@@ -1977,12 +2088,29 @@ void ATMBattleDirector::Tick(float DeltaSeconds)
 			PlaceId = -1;
 			TM_SLOW("Selection");
 			MaintainSelection();
-			// Plans whose units' turns have begun, and Go Tos (TMBattleDirectorPlans.cpp).
+			// Plans whose units' turns have begun, and Go Tos (TMBattleDirectorPlans.cpp);
+			// first, any queued unit that has just seen an enemy is handed back.
+			CancelQueuesOnSight();
 			RunDuePlans();
 			RunDueGoTos();
+			// Online: walks shown before the host answered that it refused go back.
+			if (PredictedWalks.Num() > 0)
+			{
+				SettlePredictions();
+			}
+			bHostRefused = false;
+			// Online: what was pressed while the last order was with the host, now it has answered.
+			if (bWasWaitingForHost && !bWaitingForHost)
+			{
+				ReplayBuffered();
+			}
+			bWasWaitingForHost = bWaitingForHost;
 		}
 		{ TM_SLOW("PickUnderCursor"); PickUnderCursor(); }
+		UpdateWalkPress();
 		{ TM_SLOW("HoverPath"); UpdateHoverPath(); }
+		// The camera's own moves, by its rules (TMBattleDirectorFeel.cpp).
+		UpdateFollow();
 	}
 	{ TM_SLOW("Threat"); UpdateThreat(); }
 
@@ -2083,7 +2211,7 @@ void ATMBattleDirector::Tick(float DeltaSeconds)
 	// not a detail: the same battle has to play out the same way on both
 	// machines in an online match, and on a replay.
 	const float SecondsPerTick = 1.0f / static_cast<float>(TMSim::Pace::TicksPerSecond);
-	TickRemainder += RealDelta;
+	TickRemainder += RealDelta * ClockShare;
 	int32 Steps = 0;
 	while (TickRemainder >= SecondsPerTick && Steps < 30)
 	{
@@ -2172,7 +2300,9 @@ void ATMBattleDirector::Tick(float DeltaSeconds)
 		ThinkingAbout = Unit->Id;
 		ThinkRemainder = ThinkSeconds(Unit->Team, true);
 	}
-	ThinkRemainder -= DeltaSeconds;
+	// On the clock's time: a slow beat or a hit-stop is only the look, and costs
+	// the computer nothing; fast-forward hurries it as it hurries the clock.
+	ThinkRemainder -= RealDelta * ClockShare;
 	if (ThinkRemainder <= 0.0f)
 	{
 		TM_SLOW("ComputerTurn");
@@ -2272,9 +2402,17 @@ void ATMBattleDirector::SetUpPlayerInput()
 		}
 		InputComponent->BindKey(Key, IE_Pressed, this, &ATMBattleDirector::OnKey);
 	}
-	for (const FKey& Button : { EKeys::LeftMouseButton, EKeys::RightMouseButton, EKeys::MiddleMouseButton })
+	// Let go too: the mouse's buttons end drags, and a Quick Cast key uses its
+	// ability when it is let go (2026-10-03).
+	for (const FKey& Key : Every)
 	{
-		InputComponent->BindKey(Button, IE_Released, this, &ATMBattleDirector::OnKeyUp);
+		if (!Key.IsValid() || Key == EKeys::AnyKey || Key.IsGamepadKey() || Key.IsTouch() || Key.IsAxis1D()
+			|| Key.IsAxis2D() || Key.IsAxis3D() || Key == EKeys::MouseScrollUp || Key == EKeys::MouseScrollDown
+			|| (Key.IsMouseButton() && Key != EKeys::LeftMouseButton && Key != EKeys::RightMouseButton && Key != EKeys::MiddleMouseButton))
+		{
+			continue;
+		}
+		InputComponent->BindKey(Key, IE_Released, this, &ATMBattleDirector::OnKeyUp);
 	}
 	bPlayerInput = true;
 	// Typed text -- the address to join, chat -- goes past the key bindings (TMTextInput.h).
@@ -2299,6 +2437,10 @@ void ATMBattleDirector::OnKey(FKey Key)
 	const FTMSettings& Keys = FTMSettings::Get();
 	auto Is = [&Keys, &Key](ETMAction Action) { return Keys.Is(Key, Action); };
 	const TMSim::FUnit* Sel = SelectedUnit();
+	// Any key or click ends an ultimate's close-up at once (2026-10-03), and
+	// holds the camera's own moves for a moment (camera rules A).
+	EndCloseUp();
+	LastInputAt = FPlatformTime::Seconds();
 
 	// Options is waiting for a new key: this one is it, unless it is Esc.
 	if (CaptureAction >= 0)
@@ -2317,10 +2459,17 @@ void ATMBattleDirector::OnKey(FKey Key)
 	if (Key == EKeys::LeftMouseButton)
 	{
 		OnClick();
+		// The robot playtester clicks without letting go: a walk it pressed goes at once.
+		if (bRobotDriving && WalkPress.bActive)
+		{
+			ReleaseWalk();
+		}
 		return;
 	}
 	if (Key == EKeys::RightMouseButton)
 	{
+		// A right click calls off a walk being pressed.
+		WalkPress.bActive = false;
 		bRightHeld = true;
 		RightDragged = 0.0f;
 		return;
@@ -2412,8 +2561,8 @@ void ATMBattleDirector::OnKey(FKey Key)
 		}
 		else if (!bGuideOpen && PickerSlot < 0)
 		{
-			// Far enough out to see the whole of a big map (80 tiles, 160 m).
-			CamWantDistance = FMath::Clamp(CamWantDistance * (Key == EKeys::MouseScrollUp ? 0.9f : 1.1f), 400.0f, 16000.0f);
+			// Toward the pointer, unless Options says the middle (TMBattleDirectorFeel.cpp).
+			ZoomCamera(Key == EKeys::MouseScrollUp);
 		}
 		return;
 	}
@@ -2507,7 +2656,11 @@ void ATMBattleDirector::OnKey(FKey Key)
 	{
 		// Cancel drops an aim first; with nothing to drop it opens the menu
 		// (battle.gd:1039-1051 pauses the game while a menu is open).
-		if (bTeamItemsOpen)
+		if (WalkPress.bActive)
+		{
+			WalkPress.bActive = false;
+		}
+		else if (bTeamItemsOpen)
 		{
 			bTeamItemsOpen = false;
 			StashPick = -1;
@@ -2536,10 +2689,40 @@ void ATMBattleDirector::OnKey(FKey Key)
 	{
 		return;
 	}
-	if (Is(ETMAction::Ability1)) { SelectAbility(0); }
-	else if (Is(ETMAction::Ability2)) { SelectAbility(1); }
-	else if (Is(ETMAction::Ability3)) { SelectAbility(2); }
-	else if (Is(ETMAction::Ability4)) { SelectAbility(3); }
+	// Online, with the last order still out with the host: an order key is kept
+	// and pressed again the moment the answer comes (TMBattleDirectorFeel.cpp).
+	const bool bOrderKey = Is(ETMAction::Ability1) || Is(ETMAction::Ability2) || Is(ETMAction::Ability3) || Is(ETMAction::Ability4)
+		|| Key == EKeys::Five || Key == EKeys::Six || Key == EKeys::Seven || Is(ETMAction::Move) || Is(ETMAction::Sprint)
+		|| Is(ETMAction::EndTurn) || Is(ETMAction::PlanTurn);
+	if (bOrderKey && BufferWhileWaiting(Key, false))
+	{
+		return;
+	}
+	// An ability key: aims it. With Quick Cast on for it (Options), held it
+	// aims, and letting go uses it where the pointer is (OnKeyUp); pressed
+	// again while aiming it, it keeps the aim rather than dropping it.
+	auto AbilityKey = [this, &Key](int32 Slot)
+	{
+		if (!FTMSettings::Get().bQuickCast[Slot])
+		{
+			SelectAbility(Slot);
+			return;
+		}
+		QuickSlot = -1;
+		if (!(AimMode == EAimMode::Ability && AimSlot == Slot))
+		{
+			SelectAbility(Slot);
+		}
+		if (AimMode == EAimMode::Ability && AimSlot == Slot)
+		{
+			QuickSlot = Slot;
+			QuickKey = Key;
+		}
+	};
+	if (Is(ETMAction::Ability1)) { AbilityKey(0); }
+	else if (Is(ETMAction::Ability2)) { AbilityKey(1); }
+	else if (Is(ETMAction::Ability3)) { AbilityKey(2); }
+	else if (Is(ETMAction::Ability4)) { AbilityKey(3); }
 	// The items' abilities, on the keys after the class's four.
 	else if (Key == EKeys::Five) { SelectAbility(4); }
 	else if (Key == EKeys::Six) { SelectAbility(5); }
@@ -2547,6 +2730,8 @@ void ATMBattleDirector::OnKey(FKey Key)
 	// Queued orders (TMBattleDirectorPlans.cpp). The waypoint key is only held
 	// while clicking: pressed alone it does nothing.
 	else if (Is(ETMAction::Waypoint)) {}
+	// Fast-forward is read while held (WantsFastForward), not pressed.
+	else if (Is(ETMAction::FastForward)) {}
 	else if (Is(ETMAction::PlanTurn)) { PlanKey(); }
 	else if (Is(ETMAction::PlanUndo)) { UndoPlanStep(); }
 	else if (Is(ETMAction::Move))
@@ -2559,6 +2744,10 @@ void ATMBattleDirector::OnKey(FKey Key)
 		if (AimMode == EAimMode::Move && !bSprinting)
 		{
 			CancelAim();
+		}
+		else if (Sel->bMoved && !IsPlanningSelected())
+		{
+			Deny(TEXT("noMove"), FString::Printf(TEXT("%s has no movement left this turn."), *LogName(Sel->Id)));
 		}
 		else
 		{
@@ -2580,7 +2769,12 @@ void ATMBattleDirector::OnKey(FKey Key)
 		}
 		if (Sel->bActed)
 		{
-			Tell(TEXT("Already used an ability this turn: no sprinting."));
+			Deny(TEXT("noAction"), TEXT("Already used an ability this turn: no sprinting."));
+			return;
+		}
+		if (Sel->bMoved && !IsPlanningSelected())
+		{
+			Deny(TEXT("noMove"), FString::Printf(TEXT("%s has no movement left this turn."), *LogName(Sel->Id)));
 			return;
 		}
 		EnterMoveMode(true);
@@ -2616,10 +2810,14 @@ void ATMBattleDirector::OnKey(FKey Key)
 	}
 	else if (Is(ETMAction::AutoRecenter))
 	{
+		// Round the three ways the camera may follow (2026-10-03).
 		FTMSettings& Settings = FTMSettings::Get();
-		Settings.bAutoRecenter = !Settings.bAutoRecenter;
+		Settings.CameraFollow = (Settings.CameraFollow + 1) % 3;
+		Settings.bAutoRecenter = Settings.CameraFollow != 2;
 		Settings.Save();
-		Tell(FString::Printf(TEXT("Auto-recenter %s (%s)."), Settings.bAutoRecenter ? TEXT("on") : TEXT("off"), *Settings.KeyName(ETMAction::AutoRecenter)));
+		static const TCHAR* const Ways[3] = { TEXT("always"), TEXT("when you're idle"), TEXT("never") };
+		Tell(FString::Printf(TEXT("The camera follows to the next ready unit: %s (%s)."), Ways[Settings.CameraFollow],
+			*Settings.KeyName(ETMAction::AutoRecenter)));
 	}
 	else if (Is(ETMAction::StatusBars))
 	{
@@ -2669,6 +2867,19 @@ void ATMBattleDirector::OnKey(FKey Key)
 
 void ATMBattleDirector::OnKeyUp(FKey Key)
 {
+	LastInputAt = FPlatformTime::Seconds();
+	// A Quick Cast key let go: its ability is used where the pointer is.
+	if (QuickSlot >= 0 && Key == QuickKey)
+	{
+		QuickRelease();
+		return;
+	}
+	// A walk pressed and now let go: walked, facing the way it was dragged.
+	if (Key == EKeys::LeftMouseButton && WalkPress.bActive)
+	{
+		ReleaseWalk();
+		return;
+	}
 	if (Key == EKeys::RightMouseButton)
 	{
 		bRightHeld = false;
@@ -2798,6 +3009,19 @@ void ATMBattleDirector::CycleReady()
 			Next = (i + 1) % Ready.size();
 		}
 	}
+	// A unit pointed out as ready (2026-10-03, ReadyToastId) is the one N goes to.
+	for (size_t i = 0; i < Ready.size(); ++i)
+	{
+		if (Ready[i]->Id == ReadyToastId && ReadyToastId != SelectedId)
+		{
+			Next = i;
+		}
+	}
+	ReadyToastId = -1;
+	if (bPlanMode)
+	{
+		StopPlanning();
+	}
 	SelectUnit(Ready[Next]->Id);
 	// Tab goes to the unit: the camera slides onto it, wherever it stands.
 	CenterCamera();
@@ -2816,6 +3040,7 @@ void ATMBattleDirector::EnterMoveMode(bool bSprint)
 	AimSlot = -1;
 	WayPoints.clear();
 	Reachable = Battle.ReachableNodes(*Unit, bSprint);
+	RefreshZoneShadow();
 	PathNode = TMSim::FNode{ -9999, -9999 };
 	PathShown.clear();
 }
@@ -2843,7 +3068,7 @@ void ATMBattleDirector::SelectAbility(int32 Slot)
 	const FPlanStandIn Stand(*this);
 	if (Unit->bActed)
 	{
-		Tell(TEXT("Already used an ability this turn."));
+		Deny(TEXT("noAction"), TEXT("Already used an ability this turn."));
 		return;
 	}
 	const std::string Blocked = Battle.AbilityBlockedReason(*Unit, Slot);
@@ -2866,7 +3091,7 @@ void ATMBattleDirector::CancelAim()
 	WayPoints.clear();
 }
 
-void ATMBattleDirector::OrderSelected(const TMSim::FOrder& Order)
+bool ATMBattleDirector::OrderSelected(const TMSim::FOrder& Order)
 {
 	// battle.gd:389-395, then what it does after the order lands (:468-485).
 	// A person's own order for a unit on a Go To ends the Go To.
@@ -2878,7 +3103,7 @@ void ATMBattleDirector::OrderSelected(const TMSim::FOrder& Order)
 	if (!Refused.IsEmpty())
 	{
 		Tell(Refused);
-		return;
+		return false;
 	}
 	// The waypoints were for this walk (2026-10-01).
 	if (Order.Type == TMSim::EOrderType::Move && Order.UnitId == SelectedId)
@@ -2888,20 +3113,47 @@ void ATMBattleDirector::OrderSelected(const TMSim::FOrder& Order)
 	const TMSim::FUnit* Unit = SelectedUnit();
 	if (!Unit || Order.UnitId != Unit->Id)
 	{
-		return;
+		return true;
 	}
 	if (!Unit->IsAlive() || !Unit->bReady || Battle.Winner != -1)
 	{
+		// The turn is over: the next ready unit is taken up, and the camera may
+		// follow to it, by the camera rules (RequestFollow, 2026-10-03).
 		Deselect();
 		AutoSelect();
-		return;
+		if (Battle.Winner == -1 && SelectedId != -1)
+		{
+			RequestFollow(SelectedId);
+		}
+		bSnapToNext = false;
+		FollowArmedUntil = 0.0;
+		return true;
 	}
 	// Acted, and walked or started a cast: nothing is left to do with the turn,
 	// so it is ended rather than left to run out.
 	if (Unit->bActed && (Unit->bMoved || Unit->IsCasting()))
 	{
 		OrderSelected(TMSim::FOrder::MakeEndTurn(Unit->Id, Unit->Serial));
-		return;
+		return true;
+	}
+	// Walked, and no ability it could use now (Options, 2026-10-03): ended too.
+	// Not for a unit on a Go To, which hands the turn back on purpose.
+	// Nor for a plan's walk (its ability follows), nor beside a cache or a tower it could take.
+	if (FTMSettings::Get().bAutoEndTurn && Order.Type == TMSim::EOrderType::Move && Unit->bMoved && !Unit->bActed
+		&& !Unit->IsCasting() && !bGoToOrdering && PendingAbility.UnitId != Unit->Id && !Plans.Contains(Unit->Id)
+		&& Battle.CacheNear(Unit->Pos) < 0 && CapturableTower(*Unit, nullptr) < 0)
+	{
+		bool bAnyUsable = false;
+		for (int32 Slot = 0; Slot < TMSim::AbilitySlots && !bAnyUsable; ++Slot)
+		{
+			bAnyUsable = Unit->Ability(Slot) != nullptr && Battle.AbilityBlockedReason(*Unit, Slot).empty();
+		}
+		if (!bAnyUsable)
+		{
+			Tell(FString::Printf(TEXT("%s has nothing left to use: turn ended."), *LogName(Unit->Id)));
+			OrderSelected(TMSim::FOrder::MakeEndTurn(Unit->Id, Unit->Serial));
+			return true;
+		}
 	}
 	AimMode = EAimMode::None;
 	AimSlot = -1;
@@ -2910,6 +3162,7 @@ void ATMBattleDirector::OrderSelected(const TMSim::FOrder& Order)
 	{
 		EnterMoveMode(false);
 	}
+	return true;
 }
 
 void ATMBattleDirector::MaintainSelection()
@@ -2941,8 +3194,10 @@ void ATMBattleDirector::MaintainSelection()
 	}
 	else if (Unit && (!Unit->IsAlive() || !Unit->bReady || ComputerPlaysUnit(*Unit) || Battle.Winner != -1))
 	{
-		// Its turn used (or lost): the next one ready gets the camera (2026-09-30).
+		// Its turn used (or lost): the next one ready may get the camera, if it is
+		// ready at once (2026-10-03, camera rules C: within 1.5 s, not whenever).
 		bSnapToNext = Battle.Winner == -1;
+		FollowArmedUntil = bSnapToNext ? FPlatformTime::Seconds() + 1.5 : 0.0;
 		Deselect();
 		Unit = nullptr;
 	}
@@ -2952,9 +3207,11 @@ void ATMBattleDirector::MaintainSelection()
 		SelectUnit(Unit->Id);
 		Unit = SelectedUnit();
 	}
-	// A turn of the player's began while they plan a waiting unit: that turn
-	// comes first, since its clock is running. Noticed once per turn; a unit
-	// with a plan of its own is left to it.
+	// A turn of the player's began while they are busy with another unit --
+	// ordering one, or planning a waiting one. Until 2026-10-03 it took the
+	// selection and the camera; now it is pointed out (a word at the top and an
+	// arrow at the edge of the screen, PointOut) and N or a click goes to it.
+	// Noticed once per turn; a unit with a plan or a Go To of its own is left to it.
 	int32 NewReady = -1;
 	for (const TMSim::FUnit& Each : Battle.Units)
 	{
@@ -2968,29 +3225,29 @@ void ATMBattleDirector::MaintainSelection()
 			}
 		}
 	}
-	if (NewReady >= 0 && bPlanMode && Unit && !Unit->bReady)
+	if (NewReady >= 0 && Unit && Unit->Id != NewReady)
 	{
-		StopPlanning();
-		SelectUnit(NewReady);
-		Unit = SelectedUnit();
-		if (Unit)
-		{
-			Tell(FString::Printf(TEXT("%s's turn: planning put by (what was planned is kept)."), *PlanName(*Unit)));
-			if (FTMSettings::Get().bAutoRecenter)
-			{
-				CenterCamera();
-			}
-		}
+		PointOut(NewReady);
 	}
 	if (SelectedId == -1 && !bPaused)
 	{
 		AutoSelect();
 		Unit = SelectedUnit();
-		if (Unit && bSnapToNext && FTMSettings::Get().bAutoRecenter)
+		if (Unit)
 		{
-			// As Tab does: the camera slides onto it, wherever it stands.
+			// Right after one of yours ended its turn: the camera may follow (by
+			// the rules, RequestFollow). Ready later, it is taken up but the
+			// camera stays; off screen, it is pointed out.
+			if (bSnapToNext && FPlatformTime::Seconds() <= FollowArmedUntil)
+			{
+				RequestFollow(Unit->Id);
+			}
+			else if (!OnScreenNow(*Unit))
+			{
+				PointOut(Unit->Id);
+			}
 			bSnapToNext = false;
-			CenterCamera();
+			FollowArmedUntil = 0.0;
 		}
 	}
 	// Somebody else moved or fell, so the ground this unit can reach has changed
@@ -3001,6 +3258,7 @@ void ATMBattleDirector::MaintainSelection()
 		if (Unit && AimMode == EAimMode::Move)
 		{
 			Reachable = Battle.ReachableVia(*Unit, WayPoints, bSprinting);
+			RefreshZoneShadow();
 			PathNode = TMSim::FNode{ -9999, -9999 };
 		}
 	}
@@ -3054,7 +3312,7 @@ void ATMBattleDirector::PickUnderCursor()
 				bOnBody = false;
 				if (Unit.IsAlive()
 					&& Player->ProjectWorldLocationToScreen(GetActorTransform().TransformPosition(Drawn), Feet)
-					&& Player->ProjectWorldLocationToScreen(GetActorTransform().TransformPosition(Drawn + FVector(0.0f, 0.0f, 180.0f)), Head))
+					&& Player->ProjectWorldLocationToScreen(GetActorTransform().TransformPosition(Drawn + FVector(0.0f, 0.0f, UnitHeadCm)), Head))
 				{
 					const FVector2D Along = Head - Feet;
 					const double Length = Along.Size();
@@ -3289,11 +3547,22 @@ void ATMBattleDirector::OnClick()
 	{
 		return;
 	}
+	// Online, with the last order still out with the host: kept, and clicked
+	// again the moment the answer comes (TMBattleDirectorFeel.cpp).
+	if (!Battle.IsPlanning() && BufferWhileWaiting(EKeys::LeftMouseButton, true))
+	{
+		return;
+	}
 	PickUnderCursor();
 	if (!bHaveHover)
 	{
 		return;
 	}
+	// Where a click is taken, a ring and a tick (TMBattleDirectorFeel.cpp): gold
+	// for a walk, orange for a Go To, violet for an ability, red refused.
+	const FLinearColor WalkGold(0.95f, 0.78f, 0.35f);
+	const FLinearColor GoToOrange(1.0f, 0.6f, 0.2f);
+	const FLinearColor RefusedRed(1.0f, 0.3f, 0.25f);
 	// While planning a click puts the picked-up unit down instead of ordering
 	// it; a click on another of this side's units picks that one up instead
 	// (battle.gd:771-781).
@@ -3333,17 +3602,23 @@ void ATMBattleDirector::OnClick()
 			{
 				// Held: a waypoint on the way (2026-10-01). Planning: the plan's
 				// walk. Otherwise the walk, now, by any waypoints set.
+				const TMSim::FVec2 To = TMSim::FMap::NodePos(Node);
 				if (WayPointHeld())
 				{
-					AddWayPoint(TMSim::FMap::NodePos(Node));
-				}
-				else if (bPlanning)
-				{
-					PlanWalk(TMSim::FMap::NodePos(Node));
+					AddWayPoint(To);
+					Acknowledge(To, WalkGold);
 				}
 				else
 				{
-					OrderSelected(TMSim::FOrder::MakeMove(Unit->Id, Unit->Serial, TMSim::FMap::NodePos(Node), bSprinting, WayPoints));
+					// Pressed here; walked when let go, facing the way it was dragged
+					// meanwhile (2026-10-03, ReleaseWalk in TMBattleDirectorFeel.cpp).
+					WalkPress = FTMWalkPress();
+					WalkPress.bActive = true;
+					WalkPress.To = To;
+					WalkPress.Mouse = FVector2D(MouseX, MouseY);
+					WalkPress.UnitId = Unit->Id;
+					WalkPress.Serial = Unit->Serial;
+					WalkPress.bPlanning = bPlanning;
 				}
 				return;
 			}
@@ -3351,33 +3626,21 @@ void ATMBattleDirector::OnClick()
 			// turns as it takes (2026-10-01, TMBattleDirectorPlans.cpp).
 			if (!bReachable && HoverUnitId < 0 && !WayPointHeld() && Battle.Map.NodeLevel(Node) > 0)
 			{
-				SetGoTo(Unit->Id, TMSim::FMap::NodePos(Node));
+				const bool bSet = SetGoTo(Unit->Id, TMSim::FMap::NodePos(Node));
+				Acknowledge(TMSim::FMap::NodePos(Node), bSet ? GoToOrange : RefusedRed, bSet);
 				return;
 			}
 		}
+		else if (AimMode == EAimMode::None && bHaveHover && Unit->bMoved && Unit->bReady && !bPlanning && HoverUnitId < 0 && Battle.Map.NodeLevel(TMSim::FMap::NodeOf(HoverPoint)) > 0)
+		{
+			// Clicked on open ground with its walk spent (2026-10-03): heard, and said.
+			Deny(TEXT("noMove"), FString::Printf(TEXT("%s has no movement left this turn."), *LogName(Unit->Id)));
+			Acknowledge(HoverPoint, RefusedRed, false);
+			return;
+		}
 		else if (AimMode == EAimMode::Ability)
 		{
-			const FAim Where = Aim();
-			if (Where.bOk && bPlanning)
-			{
-				PlanAbility(AimSlot, Where.Point, Where.Follow);
-			}
-			else if (Where.bOk)
-			{
-				OrderSelected(TMSim::FOrder::MakeUseAbility(Unit->Id, Unit->Serial, AimSlot, Where.Point, Where.Follow));
-			}
-			else if (Where.Why == UTF8_TO_TCHAR(OutOfRange) && bPlanning && PlanWalkIntoRange(*Unit, Where.Point))
-			{
-				// Planned: the walk into range, then it.
-			}
-			else if (Where.Why == UTF8_TO_TCHAR(OutOfRange) && !bPlanning && WalkIntoRange(*Unit, Where.Point))
-			{
-				// Walking there first; the ability goes off on arrival (battle.gd:791).
-			}
-			else if (!Where.Why.IsEmpty())
-			{
-				Tell(Where.Why);
-			}
+			ClickAbility(*Unit, bPlanning);
 			return;
 		}
 	}
@@ -3401,6 +3664,18 @@ void ATMBattleDirector::OnClick()
 	{
 		InspectedId = -1;
 	}
+}
+
+void ATMBattleDirector::Deny(const TCHAR* Event, const FString& Why)
+{
+	// One a quarter-second at most: a held key or quick clicks are one refusal.
+	const float Now = GetWorld() ? GetWorld()->GetRealTimeSeconds() : 0.0f;
+	if (Now - LastDenyAt >= 0.25f)
+	{
+		LastDenyAt = Now;
+		PlayEventSound(Event, nullptr, 0.8f);
+	}
+	Tell(Why);
 }
 
 void ATMBattleDirector::Tell(const FString& What)
@@ -3592,12 +3867,18 @@ void ATMBattleDirector::UpdateHoverPath()
 {
 	// The HUD draws the way there; it is worked out here, and only when the spot
 	// under the pointer changes, because it is a search over the whole grid.
+	// While a walk is pressed and dragged for its facing, the way stays put.
+	if (WalkPress.bActive)
+	{
+		return;
+	}
 	const TMSim::FUnit* Unit = SelectedUnit();
 	const FTMPlan* Planned = Unit && IsPlanningSelected() ? PlanOf(Unit->Id) : nullptr;
-	if (PlayerCanCommand(Unit) && AimMode == EAimMode::Ability && bHaveHover && !Unit->bMoved && !(Planned && Planned->bWalk))
+	if (PlayerCanCommand(Unit) && AimMode == EAimMode::Ability && bHaveHover && !(Planned && Planned->bWalk))
 	{
 		// Out of range, but usable from somewhere it can walk: show that walk
-		// (battle.gd:1438-1447).
+		// (battle.gd:1438-1447). Beyond this turn's reach (2026-10-03): the way
+		// into range, turn by turn, as a Go To shows it.
 		const TMSim::FNode Node = TMSim::FMap::NodeOf(HoverPoint);
 		if (Node == PathNode)
 		{
@@ -3605,20 +3886,37 @@ void ATMBattleDirector::UpdateHoverPath()
 		}
 		PathNode = Node;
 		PathShown.clear();
+		GoToHoverStops.clear();
+		GoToHoverMetres = 0.0;
+		bAbilityHoverGoTo = false;
 		const FAim Where = Aim();
 		TMSim::FVec2 Spot;
 		double Walk = 0.0;
-		if (!Where.bOk && Where.Why == UTF8_TO_TCHAR(OutOfRange) && ClosestSpotInRange(*Unit, AimSlot, Where.Point, Spot, Walk))
+		if (!Where.bOk && Where.Why == UTF8_TO_TCHAR(OutOfRange))
 		{
-			PathShown = Battle.PathTo(*Unit, TMSim::FMap::NodeOf(Spot), false);
+			if (!Unit->bMoved && !Unit->IsCasting() && ClosestSpotInRange(*Unit, AimSlot, Where.Point, Spot, Walk))
+			{
+				PathShown = Battle.PathTo(*Unit, TMSim::FMap::NodeOf(Spot), false);
+			}
+			else
+			{
+				PathShown = ApproachRoute(*Unit, AimSlot, Where.Point, &GoToHoverMetres);
+				GoToHoverStops = SplitRoute(*Unit, PathShown);
+				bAbilityHoverGoTo = !GoToHoverStops.empty();
+			}
 		}
 		return;
 	}
+	bAbilityHoverGoTo = false;
 	if (!PlayerCanCommand(Unit) || AimMode != EAimMode::Move || !bHaveHover)
 	{
 		GoToHoverStops.clear();
 		PathShown.clear();
 		PathNode = TMSim::FNode{ -9999, -9999 };
+		ZoneStopBy = -1;
+		ZoneGhost.clear();
+		TankLanes.clear();
+		TankLanesFor = -1;
 		return;
 	}
 	const TMSim::FNode Node = TMSim::FMap::NodeOf(HoverPoint);
@@ -3628,6 +3926,10 @@ void ATMBattleDirector::UpdateHoverPath()
 	}
 	PathNode = Node;
 	PathShown.clear();
+	ZoneStopBy = -1;
+	ZoneGhost.clear();
+	TankLanes.clear();
+	TankLanesFor = -1;
 	const bool bReachable = std::any_of(Reachable.begin(), Reachable.end(),
 		[&Node](const std::pair<TMSim::FNode, double>& Entry) { return Entry.first == Node; });
 	GoToHoverStops.clear();
@@ -3635,6 +3937,61 @@ void ATMBattleDirector::UpdateHoverPath()
 	if (bReachable)
 	{
 		PathShown = Battle.PathVia(*Unit, WayPoints, Node, bSprinting);
+		// A tank's walk ("Zone of Control Mockups" D): which ways to the back line
+		// it would cut standing there, against the enemies this side can see.
+		if (Battle.Tuning.ZoneOfControl >= 1.0 && TMSim::FBattle::HoldsTheLine(*Unit))
+		{
+			std::vector<int> Enemies;
+			std::vector<int> BackLine;
+			for (const TMSim::FUnit& Each : Battle.Units)
+			{
+				if (!Each.IsAlive())
+				{
+					continue;
+				}
+				if (Each.Team != Unit->Team && IsSeen(Each))
+				{
+					Enemies.push_back(Each.Id);
+				}
+				else if (Each.Team == Unit->Team && Each.Id != Unit->Id && !TMSim::FBattle::HoldsTheLine(Each))
+				{
+					BackLine.push_back(Each.Id);
+				}
+			}
+			if (!Enemies.empty() && !BackLine.empty())
+			{
+				TankLanes = Battle.TankLanes(Unit->Id, TMSim::FMap::NodePos(Node), Enemies, BackLine);
+				TankLanesFor = Unit->Id;
+			}
+		}
+	}
+	else if (std::any_of(ZoneShadow.begin(), ZoneShadow.end(), [&Node](const TMSim::FNode& Each) { return Each == Node; }))
+	{
+		// Ground a tank's zone takes away ("Zone of Control Mockups" B): where a
+		// walk that way would end, and which tank ends it. A click still makes the
+		// Go To, which goes round.
+		const std::vector<TMSim::FVec2> Ghost = Battle.PathIgnoringZones(*Unit, WayPoints, Node, bSprinting);
+		const TMSim::FVec2 Start = WalkStart(*Unit);
+		for (size_t i = 1; i < Ghost.size() && ZoneStopBy < 0; ++i)
+		{
+			for (const TMSim::FUnit& Tank : Battle.Units)
+			{
+				if (Tank.IsAlive() && Tank.Team != Unit->Team && TMSim::FBattle::HoldsTheLine(Tank)
+					&& static_cast<double>(Start.DistanceTo(Tank.Pos)) >= Battle.Tuning.EngageRadius
+					&& static_cast<double>(Ghost[i].DistanceTo(Tank.Pos)) < Battle.Tuning.EngageRadius)
+				{
+					ZoneStopBy = Tank.Id;
+					ZoneStopAt = Ghost[i];
+					ZoneGhost.assign(Ghost.begin() + static_cast<std::ptrdiff_t>(i), Ghost.end());
+					break;
+				}
+			}
+		}
+		if (HoverUnitId < 0 && Battle.Map.NodeLevel(Node) > 0)
+		{
+			PathShown = Battle.RouteTo(*Unit, WayPoints, Node, &GoToHoverMetres);
+			GoToHoverStops = SplitRoute(*Unit, PathShown);
+		}
 	}
 	else if (HoverUnitId < 0 && Battle.Map.NodeLevel(Node) > 0)
 	{
@@ -3728,11 +4085,44 @@ void ATMBattleDirector::PressHudButton(const FTMHudButton& Button)
 	case ETMHudAction::EquipSlot:
 		EquipItem(Button.Value);
 		break;
+	case ETMHudAction::ReadyGo:
+	{
+		// The "is ready" note's Go: that unit, and the camera to it, as N does.
+		const TMSim::FUnit* Ready = FindIn(Battle, Button.Value);
+		ReadyToastId = -1;
+		if (Ready && PlayerCanOrder(Ready))
+		{
+			if (bPlanMode)
+			{
+				StopPlanning();
+			}
+			if (Ready->Id != SelectedId)
+			{
+				SelectUnit(Ready->Id);
+			}
+			CenterCamera();
+		}
+		break;
+	}
 	case ETMHudAction::PickUnit:
 	{
 		// A chip on the turn order: take that unit up if it can be ordered
 		// (battle.gd:902-910, _on_chip_pressed).
 		const TMSim::FUnit* Picked = FindIn(Battle, Button.Value);
+		// Twice in quick succession: the camera goes to it (v19 play test). The
+		// first click has already done what one click does.
+		const double ClickAt = FPlatformTime::Seconds();
+		const bool bDouble = Button.Value == LastPickId && ClickAt - LastPickAt < 0.4;
+		LastPickId = Button.Value;
+		LastPickAt = bDouble ? -1.0 : ClickAt;
+		if (bDouble)
+		{
+			if (Picked && (Picked->IsAlive() || Picked->IsKo()) && IsSeen(*Picked))
+			{
+				CenterCameraOn(*Picked);
+			}
+			break;
+		}
 		if (Picked && PlayerCanOrder(Picked) && Picked->Id != SelectedId)
 		{
 			SelectUnit(Picked->Id);
@@ -3851,7 +4241,10 @@ void ATMBattleDirector::SaveSetupChoices()
 	Number(TEXT("random_boss"), Setup.bRandomBoss ? 1 : 0);
 	Number(TEXT("elements"), Setup.bElements ? 1 : 0);
 	Number(TEXT("friendly_fire"), Setup.bFriendlyFire ? 1 : 0);
+	Number(TEXT("unique_classes"), Setup.bUniqueClasses ? 1 : 0);
 	Number(TEXT("camp_respawn"), Setup.bCampRespawn ? 1 : 0);
+	Number(TEXT("boss_hunt"), Setup.bBossHunt ? 1 : 0);
+	Number(TEXT("boss_claim"), Setup.bBossClaim ? 1 : 0);
 	Out.Add(TEXT("map"), UTF8_TO_TCHAR(Setup.MapId.c_str()));
 	Out.Add(TEXT("theme"), Setup.ThemeId);
 	FTMSettings::Get().Save();
@@ -3905,7 +4298,10 @@ void ATMBattleDirector::RestoreSetupChoices()
 	Setup.bRandomBoss = Number(TEXT("random_boss"), 0) != 0.0;
 	Setup.bElements = Number(TEXT("elements"), 1) != 0.0;
 	Setup.bFriendlyFire = Number(TEXT("friendly_fire"), 0) != 0.0;
+	Setup.bUniqueClasses = Number(TEXT("unique_classes"), 0) != 0.0;
 	Setup.bCampRespawn = Number(TEXT("camp_respawn"), 0) != 0.0;
+	Setup.bBossHunt = Number(TEXT("boss_hunt"), 0) != 0.0;
+	Setup.bBossClaim = Number(TEXT("boss_claim"), 0) != 0.0;
 	if (const FString* Map = In.Find(TEXT("map")))
 	{
 		const std::string Id = TCHAR_TO_UTF8(**Map);
@@ -4066,6 +4462,7 @@ void ATMBattleDirector::RandomTeam(int32 Team)
 	{
 		Setup.Rosters[Team][Slot] = NextRandom[Team][Slot];
 	}
+	DedupeRosters();
 	// Built before the next is rolled: rolling lets go of this team's early
 	// load, and by then the battle holds its heroes itself.
 	BuildBattle();
@@ -4132,7 +4529,8 @@ void ATMBattleDirector::PressMenuButton(const FTMHudButton& Button)
 		{
 			LobbyPick(PickerSlot, Jobs[Button.Value]->Id);
 		}
-		else if (PickerSlot >= 0 && Button.Value >= 0 && Button.Value < static_cast<int32>(Jobs.size()))
+		else if (PickerSlot >= 0 && Button.Value >= 0 && Button.Value < static_cast<int32>(Jobs.size())
+			&& !(Setup.bUniqueClasses && ClassTaken(Jobs[Button.Value]->Id, PickerSlot / 4, PickerSlot % 4)))
 		{
 			Setup.Rosters[PickerSlot / 4][PickerSlot % 4] = Jobs[Button.Value]->Id;
 			BuildBattle();
@@ -4187,6 +4585,7 @@ void ATMBattleDirector::PressMenuButton(const FTMHudButton& Button)
 		{
 			Setup.Rosters[Button.Value][Slot] = Default[Slot];
 		}
+		DedupeRosters();
 		BuildBattle();
 		break;
 	}
@@ -4303,9 +4702,26 @@ void ATMBattleDirector::PressMenuButton(const FTMHudButton& Button)
 		Setup.bCampRespawn = !Setup.bCampRespawn;
 		BuildBattle();
 		break;
+	case ETMHudAction::SetupBossHunt:
+		Setup.bBossHunt = !Setup.bBossHunt;
+		BuildBattle();
+		break;
+	case ETMHudAction::SetupBossClaim:
+		Setup.bBossClaim = !Setup.bBossClaim;
+		BuildBattle();
+		break;
 	case ETMHudAction::SetupFriendlyFire:
 		Setup.bFriendlyFire = !Setup.bFriendlyFire;
 		BuildBattle();
+		break;
+	case ETMHudAction::SetupUniqueClasses:
+		Setup.bUniqueClasses = !Setup.bUniqueClasses;
+		DedupeRosters();
+		BuildBattle();
+		if (Screen == EScreen::Lobby && Net.IsValid() && Net->IsHost())
+		{
+			BroadcastLobby();
+		}
 		break;
 	case ETMHudAction::PlanningReady:
 		ReadyToFight();
@@ -4371,11 +4787,34 @@ void ATMBattleDirector::PressMenuButton(const FTMHudButton& Button)
 		FTMSettings::Get().ResetLayout();
 		break;
 	case ETMHudAction::OptionAutoRecenter:
-		FTMSettings::Get().bAutoRecenter = !FTMSettings::Get().bAutoRecenter;
-		FTMSettings::Get().Save();
+	{
+		// Always, When I'm idle, Never (2026-10-03); with no way given, the next.
+		FTMSettings& Settings = FTMSettings::Get();
+		Settings.CameraFollow = Button.Value >= 0 && Button.Value <= 2 ? Button.Value : (Settings.CameraFollow + 1) % 3;
+		Settings.bAutoRecenter = Settings.CameraFollow != 2;
+		Settings.Save();
+		break;
+	}
+	case ETMHudAction::OptionQuickCast:
+		if (Button.Value >= 0 && Button.Value < 4)
+		{
+			FTMSettings::Get().bQuickCast[Button.Value] = !FTMSettings::Get().bQuickCast[Button.Value];
+			FTMSettings::Get().Save();
+		}
+		break;
+	case ETMHudAction::OptionFeel:
+		if (bool* On = ATMBattleHud::FeelOption(Button.Value))
+		{
+			*On = !*On;
+			FTMSettings::Get().Save();
+		}
 		break;
 	case ETMHudAction::OptionTurnSquares:
 		FTMSettings::Get().bTurnSquares = !FTMSettings::Get().bTurnSquares;
+		FTMSettings::Get().Save();
+		break;
+	case ETMHudAction::OptionSquadStrip:
+		FTMSettings::Get().bSquadStrip = !FTMSettings::Get().bSquadStrip;
 		FTMSettings::Get().Save();
 		break;
 	case ETMHudAction::OpenOptions:
@@ -4916,6 +5355,39 @@ void ATMBattleDirector::UpdateCamera(float DeltaSeconds)
 			const float K = CamDistance * 0.0015f;
 			CamWantTarget += (-Right * static_cast<float>(Moved.X) + Forward * static_cast<float>(Moved.Y)) * K;
 		}
+		// The pointer resting at the edge of the window pans that way (Options;
+		// 2026-10-03), gently at first and up to the keys' speed over a third of a
+		// second. Not while dragging, nor in Edit layout.
+		int32 ViewW = 0;
+		int32 ViewH = 0;
+		Player->GetViewportSize(ViewW, ViewH);
+		FVector2D Edge = FVector2D::ZeroVector;
+		FTMHudButton EdgeButton;
+		const ATMBattleHud* EdgeHud = Cast<ATMBattleHud>(Player->GetHUD());
+		if (Settings.bEdgePan && bHaveCursor && !bRightHeld && !bMiddleHeld && !bEditingLayout && DragCard < 0 && ViewW > 0 && ViewH > 0
+			&& X >= 0.0f && Y >= 0.0f && X < ViewW && Y < ViewH && !(EdgeHud && EdgeHud->ButtonAt(Cursor, EdgeButton)))
+		{
+			constexpr float Margin = 8.0f;
+			Edge.X = X <= Margin ? -1.0 : (X >= ViewW - 1 - Margin ? 1.0 : 0.0);
+			Edge.Y = Y <= Margin ? -1.0 : (Y >= ViewH - 1 - Margin ? 1.0 : 0.0);
+		}
+		// Moving the camera yourself is your hands on the controls (camera rules A).
+		if (!Pan.IsZero() || !Edge.IsZero() || Held(ETMAction::CamUp) || Held(ETMAction::CamDown)
+			|| Held(ETMAction::CamRotateLeft) || Held(ETMAction::CamRotateRight))
+		{
+			LastInputAt = FPlatformTime::Seconds();
+		}
+		if (!Edge.IsZero())
+		{
+			EdgeHeld = FMath::Min(EdgeHeld + DeltaSeconds, 1.0f);
+			const float Ease = FMath::InterpEaseInOut(0.15f, 1.0f, FMath::Clamp(EdgeHeld / 0.35f, 0.0f, 1.0f), 2.0f);
+			const FVector Way = (Right * static_cast<float>(Edge.X) - Forward * static_cast<float>(Edge.Y)).GetSafeNormal();
+			CamWantTarget += Way * 800.0f * Settings.CameraSpeed * DeltaSeconds * (CamDistance / 2200.0f) * Ease;
+		}
+		else
+		{
+			EdgeHeld = 0.0f;
+		}
 		// Not so far off the board that it is lost.
 		const TMSim::FVec2 Size = Battle.Map.SizeMeters();
 		CamWantTarget.X = FMath::Clamp(CamWantTarget.X, -400.0, Size.X * TileSize + 400.0);
@@ -4954,8 +5426,20 @@ void ATMBattleDirector::CenterCamera()
 	}
 	if (On)
 	{
-		CamWantTarget = GetActorTransform().TransformPosition(ShownAt(*On));
+		CenterCameraOn(*On);
 	}
+}
+
+void ATMBattleDirector::CenterCameraOn(const TMSim::FUnit& Unit)
+{
+	const FVector Where = GetActorTransform().TransformPosition(ShownAt(Unit));
+	// During an ultimate's close-up, this is where the camera goes back to.
+	if (CloseUpUntil > 0.0)
+	{
+		CloseUpReturnTarget = Where;
+		return;
+	}
+	CamWantTarget = Where;
 }
 
 bool ATMBattleDirector::OnSetupScreen(int32 TuningIndex)
@@ -4966,7 +5450,7 @@ bool ATMBattleDirector::OnSetupScreen(int32 TuningIndex)
 	// and respawn joined them; they are kept between sessions with the setup).
 	return Key == "capture_seconds" || Key == "battle_seconds" || Key == "planning_seconds"
 		|| Key == "watchtower_count" || Key == "item_budget" || Key == "camps" || Key == "random_boss"
-		|| Key == "elements" || Key == "friendly_fire" || Key == "camp_respawn";
+		|| Key == "elements" || Key == "friendly_fire" || Key == "camp_respawn" || Key == "boss_hunt" || Key == "boss_claim";
 }
 
 int32 ATMBattleDirector::ItemPointsSpent(int32 Team) const

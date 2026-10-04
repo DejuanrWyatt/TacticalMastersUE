@@ -70,25 +70,29 @@
       }
     },
     {
-      "id": "druid_thorn_staff",
-      "name": "Thorn Staff",
-      "desc": "Strike an adjacent enemy.",
+      "id": "druid_entangle",
+      "name": "Entangle",
+      "desc": "Roots burst under every enemy within 2 m of a point 2-7 m away: a light hit, and Rooted for 1 turn (1 s).",
       "kind": "active",
       "effect": "damage",
-      "scale": "att",
+      "scale": "mag",
       "target": "enemy",
-      "shape": "unit",
-      "power": 29,
-      "min_range": 0,
-      "max_range": 1.8,
-      "aoe": 0,
-      "cooldown": 0,
-      "cast": 0,
-      "fx": "attack",
+      "shape": "circle",
+      "power": 30,
+      "min_range": 2,
+      "max_range": 7,
+      "aoe": 2,
+      "cooldown": 3,
+      "cast": 1,
+      "status": {
+        "id": "root",
+        "turns": 1
+      },
+      "fx": "earth_slash",
       "vfx": {
-        "system": "/Game/ParagonFey/FX/Particles/Fey/Abilities/Nettles/FX/P_Fey_Nettles_HitPlayer_Plants.P_Fey_Nettles_HitPlayer_Plants",
+        "system": "/Game/ParagonFey/FX/Particles/Fey/Abilities/Ultimate/FX/P_Ultimate_Root_Spikes.P_Ultimate_Root_Spikes",
         "at": "targets",
-        "scale": 1
+        "scale": 0.5
       }
     },
     {
@@ -118,5 +122,30 @@
         "scale": 1
       }
     }
-  ]
+  ],
+  "creator": {
+    "rebalanced": {
+      "on": "2026-10-04",
+      "why": "Signature in place of Thorn Staff (never used): roots every enemy within 2 m of a point for 1 turn, with a light hit. Before that (2026-10-02): Balance audit 2026-10-02: the staff strikes from 1-5 m (power -15%) instead of only at arm's length, which the computer never used"
+    },
+    "changedAt": "2026-10-03T03:45:00.000Z",
+    "icons": {
+      "abilities": [
+        null,
+        null,
+        {
+          "backing": "circle",
+          "glyph": "leaf",
+          "colour": "#8fd99f",
+          "style": "light",
+          "mark": "circle",
+          "scale": 1,
+          "rotate": 0,
+          "badge": "none",
+          "finish": "lit"
+        },
+        null
+      ]
+    }
+  }
 }

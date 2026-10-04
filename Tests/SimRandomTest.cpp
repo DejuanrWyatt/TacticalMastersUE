@@ -85,6 +85,6 @@ int main()
         }
     }
 
-    printf("\n%s\n", Failures == 0 ? "C++ MATCHES GODOT BIT FOR BIT" : "PARITY BROKEN");
+    printf("\n%s\n", Failures == 0 ? "THE DICE ROLL AS RECORDED, BIT FOR BIT" : "THE DICE CHANGED");
     return Failures;
 }

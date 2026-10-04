@@ -1,6 +1,6 @@
 // The classes, read from Tactical Masters' own class files.
 //
-// Four things are checked, in the order they would go wrong.
+// Three things are checked, in the order they would go wrong.
 //
 // READ: every file in Content/Data/Classes loads through the rules' own reader
 // and registers, and the game then knows the six built-in classes plus every one
@@ -11,29 +11,23 @@
 // reason rather than skipped. Forgiving reading is what made the Astra files
 // dangerous; this proves it did not come back.
 //
-// MATCH: each class is exactly what the Godot game's own importer made of the
-// Astra file it was converted from, as Godot printed it (GodotClassTable.txt,
-// from tests/dump_class_table.gd). Numbers are compared after the same narrowing
-// to float the rules apply, so "equal" means the rules see the same number.
-// Until that table exists this part says so loudly and is not counted as passed.
-//
 // PLAY: every class fights one battle through the order path -- in a team with
 // a knight, an archer and a white mage, against a black mage, a knight, an
-// archer and a white mage, as the Godot game's balance tests arrange it -- and
-// the rules must refuse none of the computer's orders. A class can read
-// perfectly and still be unplayable, an ability nothing can legally aim, and
-// that shows up only here.
+// archer and a white mage -- and the rules must refuse none of the computer's
+// orders. A class can read perfectly and still be unplayable, an ability
+// nothing can legally aim, and that shows up only here.
 //
-//   SimClassTest <class dir> [GodotClassTable.txt]
+// What each class's numbers should be is the class creator's business now
+// (E:\TacticsClassCreator), where every class is designed and measured.
+//
+//   SimClassTest <class dir>
 
 #include "SimAI.h"
 #include "SimBattle.h"
 #include "SimClassFile.h"
-#include "SimJson.h"
 
 #include <algorithm>
 #include <map>
-#include <set>
 #include <chrono>
 #include <cstdio>
 #include <filesystem>
@@ -65,29 +59,6 @@ namespace
 		return Buffer.str();
 	}
 
-	const char* ShapeOrEmpty(const FAbility& Ability) { return Ability.Shape.c_str(); }
-
-	std::string EffectName(EEffect Effect)
-	{
-		switch (Effect)
-		{
-		case EEffect::Damage: return "damage";
-		case EEffect::Heal: return "heal";
-		case EEffect::Revive: return "revive";
-		default: return "support";
-		}
-	}
-
-	std::string TargetName(ETargetSide Target)
-	{
-		switch (Target)
-		{
-		case ETargetSide::Enemy: return "enemy";
-		case ETargetSide::Ally: return "ally";
-		default: return "ko_ally";
-		}
-	}
-
 	/** A test file: a valid class with one thing changed, which must be refused. */
 	std::string Mutated(const std::string& Valid, const std::string& Find, const std::string& Replace)
 	{
@@ -99,131 +70,6 @@ namespace
 		std::string Out = Valid;
 		Out.replace(At, Find.size(), Replace);
 		return Out;
-	}
-
-	// ------------------------------------------------------------ MATCH
-
-	// Classes whose ability descriptions were reworded on purpose (2026-10-02,
-	// creator.reworded): every number still matches Godot; the words do not.
-	std::set<std::string> Reworded;
-
-	void CompareWithGodot(const FJson& Godot)
-	{
-		const FJson* IdJson = Godot.Find("id");
-		const std::string Id = IdJson ? IdJson->String : "?";
-		const FJobDef* Job = FindJob(Id);
-		if (!Job)
-		{
-			Fail(Id + ": Godot has this class, the files do not");
-			return;
-		}
-		auto Text = [&Godot](const char* Key)
-		{
-			const FJson* Value = Godot.Find(Key);
-			return Value && Value->IsString() ? Value->String : std::string();
-		};
-		if (Job->Name != Text("name")) { Fail(Id + ".name: " + Job->Name + " vs Godot's " + Text("name")); }
-		// Godot's to_html(false) writes a colour without the leading #.
-		if (Job->Color != "#" + Text("color")) { Fail(Id + ".color: " + Job->Color + " vs Godot's " + Text("color")); }
-		if (Job->Look != Text("look")) { Fail(Id + ".look: " + Job->Look + " vs Godot's " + Text("look")); }
-		if (Job->Icon != Text("icon")) { Fail(Id + ".icon: " + Job->Icon + " vs Godot's " + Text("icon")); }
-
-		const FJson* Roles = Godot.Find("roles");
-		std::vector<std::string> GodotRoles;
-		if (Roles)
-		{
-			for (const FJson& Role : Roles->Array)
-			{
-				GodotRoles.push_back(Role.String);
-			}
-		}
-		if (GodotRoles != Job->Roles) { Fail(Id + ".roles differ from Godot's"); }
-
-		const FJson* Stats = Godot.Find("stats");
-		for (int i = 0; Stats && i < StatCount; ++i)
-		{
-			const EStat Which = static_cast<EStat>(i);
-			const FJson* Value = Stats->Find(StatName(Which));
-			if (!Value || static_cast<int>(Value->Number) != Job->Stats.Get(Which))
-			{
-				Fail(Id + ".stats." + StatName(Which) + " differs from Godot's");
-			}
-		}
-
-		const FJson* Abilities = Godot.Find("abilities");
-		if (!Abilities || Abilities->Array.size() != 4)
-		{
-			Fail(Id + ": Godot's line has no four abilities");
-			return;
-		}
-		for (int Slot = 0; Slot < 4; ++Slot)
-		{
-			const FJson& G = Abilities->Array[Slot];
-			const FAbility* A = FindAbility(Job->AbilityIds[Slot]);
-			const std::string Where = Id + ".abilities[" + std::to_string(Slot) + "]";
-			if (!A)
-			{
-				Fail(Where + ": missing");
-				continue;
-			}
-			auto GText = [&G](const char* Key, const char* Default)
-			{
-				const FJson* Value = G.Find(Key);
-				return Value && Value->IsString() ? Value->String : std::string(Default);
-			};
-			auto GNumber = [&G](const char* Key, double Default)
-			{
-				const FJson* Value = G.Find(Key);
-				return Value && Value->IsNumber() ? Value->Number : Default;
-			};
-			// Each number is compared as the rules will hold it.
-			auto SameFloat = [](float Ours, double Theirs) { return Ours == static_cast<float>(Theirs); };
-
-			if (A->Id != GText("id", "")) { Fail(Where + ".id: " + A->Id + " vs Godot's " + GText("id", "")); }
-			if (A->Name != GText("name", "")) { Fail(Where + ".name differs"); }
-			if (!Reworded.count(Id) && A->Desc != GText("desc", "")) { Fail(Where + ".desc differs"); }
-			if (A->Kind != GText("kind", "active")) { Fail(Where + ".kind differs"); }
-			if (EffectName(A->Effect) != GText("effect", "")) { Fail(Where + ".effect differs"); }
-			if ((A->Scale == EScale::Att ? "att" : "mag") != GText("scale", "")) { Fail(Where + ".scale differs"); }
-			if (TargetName(A->Target) != GText("target", "")) { Fail(Where + ".target differs"); }
-			if (std::string(ShapeOrEmpty(*A)) != GText("shape", "")) { Fail(Where + ".shape differs"); }
-			if (A->Fx != GText("fx", "")) { Fail(Where + ".fx differs"); }
-			if (!SameFloat(A->Power, GNumber("power", 0.0))) { Fail(Where + ".power differs"); }
-			if (!SameFloat(A->MinRange, GNumber("min_range", 0.0))) { Fail(Where + ".min_range differs"); }
-			if (!SameFloat(A->MaxRange, GNumber("max_range", 0.0))) { Fail(Where + ".max_range differs"); }
-			if (!SameFloat(A->Aoe, GNumber("aoe", 0.0))) { Fail(Where + ".aoe differs"); }
-			if (!SameFloat(A->Angle, GNumber("angle", 60.0))) { Fail(Where + ".angle differs"); }
-			if (!SameFloat(A->Cast, GNumber("cast", 0.0))) { Fail(Where + ".cast differs"); }
-			if (A->Channel != static_cast<int>(GNumber("channel", 2.0))) { Fail(Where + ".channel differs"); }
-			if (A->Cooldown != static_cast<int>(GNumber("cooldown", 0.0))) { Fail(Where + ".cooldown differs"); }
-			if (A->TgChange != static_cast<int>(GNumber("tg", 0.0))) { Fail(Where + ".tg differs"); }
-
-			const FJson* Status = G.Find("status");
-			const std::string GodotStatus = Status && Status->Find("id") ? Status->Find("id")->String : std::string();
-			const int GodotTurns = Status && Status->Find("turns") ? static_cast<int>(Status->Find("turns")->Number) : 0;
-			if (A->StatusId != GodotStatus || A->StatusTurns != GodotTurns) { Fail(Where + ".status differs"); }
-
-			const FJson* Buffs = G.Find("buffs");
-			const size_t GodotBuffs = Buffs ? Buffs->Array.size() : 0;
-			if (A->Buffs.size() != GodotBuffs)
-			{
-				Fail(Where + ".buffs differ in number");
-			}
-			else
-			{
-				for (size_t b = 0; b < GodotBuffs; ++b)
-				{
-					const FJson& GB = Buffs->Array[b];
-					const FBuff& Ours = A->Buffs[b];
-					if (StatName(Ours.Stat) != GB.Find("stat")->String
-						|| Ours.Amount != static_cast<int>(GB.Find("amount")->Number)
-						|| Ours.Turns != static_cast<int>(GB.Find("turns")->Number))
-					{
-						Fail(Where + ".buffs[" + std::to_string(b) + "] differs");
-					}
-				}
-			}
-		}
 	}
 
 	// ------------------------------------------------------------- PLAY
@@ -239,8 +85,7 @@ namespace
 
 	FPlayed PlayOne(const std::string& JobId)
 	{
-		// The class in a mixed team against the reference, as check_class.gd and
-		// balance.gd arrange it.
+		// The class in a mixed team against the reference team.
 		const std::string Roster[8] =
 		{
 			JobId, "knight", "archer", "white_mage",
@@ -310,11 +155,133 @@ namespace
 	}
 }
 
+namespace
+{
+	// ----------------------------------------------------------- MOVE
+	// Movement skills (2026-10-03): the Berserker's Leap Smash lands where it
+	// smashes, the Ninja's Shadow Step lands behind its target and strikes its
+	// back, and its Smoke Bomb leaves it Vanished. Only when those classes are
+	// among the files read.
+
+	/** A ready unit of a class, and an enemy archer before it, on the highlands. */
+	FBattle Duel(const std::string& JobId, const FVec2& At, const FVec2& Enemy)
+	{
+		FBattle Battle;
+		Battle.Map.BuildMirrored(HighlandsRows());
+		const char* Jobs[2] = { JobId.c_str(), "archer" };
+		const FVec2 Spots[2] = { At, Enemy };
+		for (int Index = 0; Index < 2; ++Index)
+		{
+			FUnit Unit;
+			Unit.Id = Index;
+			Unit.Team = Index;
+			Unit.Job = Jobs[Index];
+			Unit.Stats = &FindJob(Unit.Job)->Stats;
+			Unit.Pos = Spots[Index];
+			Battle.Units.push_back(Unit);
+		}
+		Battle.Start(5);
+		for (FUnit& Unit : Battle.Units)
+		{
+			Unit.bReady = Unit.Id == 0;
+			Unit.Clock = 1000;
+		}
+		// The archer looks away from the Ninja's side, so "behind" is the far side.
+		Battle.Units[1].Facing = FVec2(1.0f, 0.0f);
+		return Battle;
+	}
+
+	/** The slot of a class's ability by id, or -1. */
+	int SlotOf(const FBattle& Battle, const std::string& AbilityId)
+	{
+		const FUnit& Unit = Battle.Units[0];
+		for (int Slot = 0; Slot < AbilitySlots; ++Slot)
+		{
+			const FAbility* Ability = Unit.Ability(Slot);
+			if (Ability && Ability->Id == AbilityId)
+			{
+				return Slot;
+			}
+		}
+		return -1;
+	}
+
+	/** Uses it, then lets two seconds pass for a cast to go off. */
+	std::string UseAndWait(FBattle& Battle, int Slot, const FVec2& Target, int Follow)
+	{
+		const FOrder Order = FOrder::MakeUseAbility(0, Battle.Units[0].Serial, Slot, Target, Follow);
+		const std::string Refused = Battle.Validate(Order);
+		if (!Refused.empty())
+		{
+			return Refused;
+		}
+		FTickReport Report;
+		Battle.Apply(Order, Report);
+		Battle.Apply(FOrder::MakeAdvance(20), Report);
+		return std::string();
+	}
+
+	int CheckMovementSkills()
+	{
+		int Checks = 0;
+		const FVec2 Home(4.75f, 8.75f);
+		const FVec2 Foe(8.75f, 8.75f);
+		if (FindJob("berserker"))
+		{
+			FBattle Battle = Duel("berserker", Home, Foe);
+			const int Slot = SlotOf(Battle, "berserker_leap_smash");
+			const FVec2 Aim(8.25f, 8.75f);
+			++Checks;
+			const std::string Refused = Slot < 0 ? std::string("no Leap Smash") : UseAndWait(Battle, Slot, Aim, -1);
+			const FVec2 Landed = Battle.Units[0].Pos;
+			if (!Refused.empty())
+			{
+				Fail("Leap Smash refused: " + Refused);
+			}
+			else if (Landed.DistanceTo(Home) < 2.0f || Landed.DistanceTo(Aim) > 1.6f || Landed.DistanceTo(Foe) < 0.4f)
+			{
+				Fail("Leap Smash did not land the Berserker by where it smashed");
+			}
+		}
+		if (FindJob("ninja"))
+		{
+			FBattle Battle = Duel("ninja", Home, Foe);
+			const int Step = SlotOf(Battle, "ninja_shadow_step");
+			++Checks;
+			const std::string Refused = Step < 0 ? std::string("no Shadow Step") : UseAndWait(Battle, Step, Foe, 1);
+			const FVec2 Landed = Battle.Units[0].Pos;
+			const FVec2 Away = Landed - Battle.Units[1].Pos;
+			if (!Refused.empty())
+			{
+				Fail("Shadow Step refused: " + Refused);
+			}
+			else if (Away.Length() > 1.7f || Away.Length() < 0.5f || Away.Dot(Battle.Units[1].Facing) > -0.5f)
+			{
+				Fail("Shadow Step did not land the Ninja behind its target");
+			}
+
+			FBattle Smoke = Duel("ninja", Home, Foe);
+			const int Bomb = SlotOf(Smoke, "ninja_smoke_bomb");
+			++Checks;
+			const std::string BombRefused = Bomb < 0 ? std::string("no Smoke Bomb") : UseAndWait(Smoke, Bomb, Home, 0);
+			if (!BombRefused.empty())
+			{
+				Fail("Smoke Bomb refused: " + BombRefused);
+			}
+			else if (!Smoke.Units[0].HasStatus("veil") || Smoke.CanSeeUnit(1, Smoke.Units[0]))
+			{
+				Fail("Smoke Bomb did not leave the Ninja Vanished, unseen by the other side");
+			}
+		}
+		return Checks;
+	}
+}
+
 int main(int ArgCount, char** Args)
 {
 	if (ArgCount < 2)
 	{
-		std::printf("usage: SimClassTest <class dir> [GodotClassTable.txt]\n");
+		std::printf("usage: SimClassTest <class dir>\n");
 		return 2;
 	}
 	const std::filesystem::path Dir = Args[1];
@@ -332,9 +299,6 @@ int main(int ArgCount, char** Args)
 	std::sort(Files.begin(), Files.end());
 	std::vector<std::string> Loaded;
 	std::string AnyValid;
-	// Classes rebalanced on purpose since the port (2026-10-01): their creator
-	// notes say so ("rebalanced"), and they are no longer meant to match Godot.
-	std::map<std::string, std::string> Rebalanced;
 	for (const std::filesystem::path& File : Files)
 	{
 		const std::string Text = ReadAll(File);
@@ -353,23 +317,6 @@ int main(int ArgCount, char** Args)
 			continue;
 		}
 		Loaded.push_back(Job.Id);
-		{
-			FJson Whole;
-			if (ParseJson(Text, Whole).empty())
-			{
-				const FJson* Notes = Whole.Find("creator");
-				const FJson* Mark = Notes ? Notes->Find("rebalanced") : nullptr;
-				if (Mark)
-				{
-					const FJson* Why = Mark->Find("why");
-					Rebalanced[Job.Id] = Why && Why->IsString() ? Why->String : std::string("rebalanced");
-				}
-				if (Notes && Notes->Find("reworded"))
-				{
-					Reworded.insert(Job.Id);
-				}
-			}
-		}
 		if (AnyValid.empty())
 		{
 			AnyValid = Text;
@@ -479,73 +426,6 @@ int main(int ArgCount, char** Args)
 		std::printf("\n");
 	}
 
-	// -------------------------------------------------------------- MATCH
-	int Matched = 0;
-	bool bHaveTable = false;
-	if (ArgCount >= 3 && std::filesystem::exists(Args[2]))
-	{
-		bHaveTable = true;
-		std::ifstream Table(Args[2]);
-		std::string Line;
-		const int Before = Failures;
-		while (std::getline(Table, Line))
-		{
-			if (!Line.empty() && Line.back() == '\r')
-			{
-				Line.pop_back();
-			}
-			if (Line.rfind("CLASS ", 0) != 0)
-			{
-				continue;
-			}
-			FJson Godot;
-			const std::string Bad = ParseJson(Line.substr(6), Godot);
-			if (!Bad.empty())
-			{
-				Fail("a line of the Godot table is not JSON: " + Bad);
-				continue;
-			}
-			const FJson* GodotId = Godot.Find("id");
-			if (GodotId && Rebalanced.count(GodotId->String))
-			{
-				++Matched;
-				continue;
-			}
-			CompareWithGodot(Godot);
-			++Matched;
-		}
-		// Every class Godot has must be here and agree. A class with no Godot line
-		// was made in the class creator, after the conversion, and has nothing in
-		// Godot to agree with; it is still read, refused if broken, and played.
-		if (Matched > static_cast<int>(Loaded.size()))
-		{
-			Fail("the Godot table has " + std::to_string(Matched) + " classes, more than the files' " + std::to_string(Loaded.size()));
-		}
-		std::printf("compared %d classes with what Godot made of them: %s\n", Matched - static_cast<int>(Rebalanced.size()),
-			Failures == Before ? "every field agrees" : "they differ");
-		if (!Rebalanced.empty())
-		{
-			std::printf("%d rebalanced on purpose since, and not compared:", static_cast<int>(Rebalanced.size()));
-			for (const auto& Each : Rebalanced)
-			{
-				std::printf(" %s", Each.first.c_str());
-			}
-			std::printf("\n");
-		}
-		if (!Reworded.empty())
-		{
-			std::printf("%d with descriptions reworded on purpose (their numbers still compared)\n", static_cast<int>(Reworded.size()));
-		}
-		std::printf("%d more made in the class creator, with no Godot counterpart\n",
-			static_cast<int>(Loaded.size()) - Matched);
-	}
-	else
-	{
-		std::printf("NOT CHECKED AGAINST GODOT: GodotClassTable.txt is missing. Run the Godot project's\n"
-			"  tests/dump_class_table.gd and put its output in Tests/ -- until then these classes\n"
-			"  are only known to be well formed, not known to be the classes Godot plays.\n");
-	}
-
 	// --------------------------------------------------------------- PLAY
 	const auto Start = std::chrono::steady_clock::now();
 	int Clean = 0;
@@ -565,13 +445,16 @@ int main(int ArgCount, char** Args)
 	const double Seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - Start).count();
 	std::printf("played %zu classes, one battle each, in %.1fs: %d with every order legal\n", Loaded.size(), Seconds, Clean);
 
+	const int BeforeMoves = Failures;
+	const int MoveChecks = CheckMovementSkills();
+	std::printf("movement skills: %d checks, %s\n", MoveChecks, Failures == BeforeMoves ? "as the rules say" : "WRONG");
+
 	ForgetLoadedJobs();
 	if (Failures > 0)
 	{
 		std::printf("CLASS FILES FAILED (%d problems)\n", Failures);
 		return 1;
 	}
-	std::printf(bHaveTable ? "THE CLASS FILES ARE THE CLASSES GODOT PLAYS, AND THE NEW ONES READ AND PLAY\n"
-		: "THE CLASS FILES READ AND PLAY (not yet compared with Godot)\n");
+	std::printf("THE CLASS FILES READ, REFUSE WHAT IS BROKEN, AND PLAY\n");
 	return 0;
 }

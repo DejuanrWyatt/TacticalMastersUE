@@ -52,6 +52,32 @@ the human chose walk-and-end as the default and single trips for now.
   `FBattle::RouteTo` (an unbounded way by the waypoints) in SimMovement.cpp; the ground route in `PaintPlans`, the
   numbers in `ATMBattleHud::DrawGoToMarks`, the strip in `DrawGoToStrip`.
 
+## Polish (2026-10-03)
+
+Asked for: "it's clunky ... I feel like I wasted a turn if the last movement of the queue only moves a short distance
+ending my turn"; "the queue system needs to also work for abilities that are out of range"; "when units are queued up
+and they encounter another unit in their sight range, the queue should be cancelled".
+
+- **No turn spent on a step.** When a Go To's walk this turn would be short -- the last stretch, or as far as a blocked
+  way lets it, more than max(1 m, 15% of the move) short of a full move -- the unit is handed to the player *before*
+  it walks, the strip saying why. **Keep going (G)** walks it; any other order replaces it.
+- **Abilities out of reach.** Aiming an ability at a target the unit can't get in range of this turn shows, in orange,
+  "OUT OF RANGE: ... Click to go into range (N turns, X m), then use it there", with the way and the turn rings on the
+  ground. A click makes a Go To carrying the ability (`SetAbilityGoTo`): each turn it walks towards the nearest spot
+  the ability can be used from (in range, in sight where it needs it, not stood on: `ApproachRoute`), worked out again
+  each turn from where a unit target stands then; the turn it can use it from where it stands, or from a spot this
+  turn's walk reaches, it does (`StepAbilityGoTo`), and the order is over. A unit target that dies or goes out of sight
+  ends it. Its strip reads "Into range for <ability>". Planning a waiting unit makes the same order.
+- **Seeing an enemy cancels.** Each frame (`CancelQueuesOnSight`), a unit with a Go To, or a plan for a coming turn,
+  that has an enemy come into its own view (within its sight, nothing in the way, and seen; not monsters in their
+  camps; not the unit an ability Go To is going after) has the order cancelled -- not stopped -- and is handed back.
+  If it saw it on a walk-and-end step, the turn is not ended: the unit can still act. Being hurt still only stops a
+  Go To.
+- A Go To's road and turn rings show only while its unit is pointed at, on the board or on its turn square
+  (`GoToShown`); the ">N" on its turn square stays. The way under the pointer before a click still shows.
+- Ground fills (walk area, ranges, areas, zones, wind-ups) keep 30% of their opacity: nearly see-through, the edges
+  carrying the shapes (`GroundFillOpacity`, TMBattleDirectorIndicators.cpp).
+
 ## Rules (TMSim)
 
 - `FOrder::Via`: up to `MaxWaypoints` (4) node centres. Order text: `move <unit> <serial> <x> <y> <sprint>`, then,
@@ -61,6 +87,8 @@ the human chose walk-and-end as the default and single trips for now.
 - `ApplyMove` faces the last step of the whole way, picks up at each waypoint, and keeps `FUnit::WalkVia` and
   `WalkFrom` (screen only, not in the checksum) so the walk is shown going the way it was told.
 - Online protocol 12.
+- 2026-10-03, facing on arrival: `FOrder::Face`, written last as `f <way>` (0-7) when a walk was told which way to
+  face (Docs/design/feat-combat-feel.md). Protocol 16.
 
 ## The game (TacticalMasters)
 

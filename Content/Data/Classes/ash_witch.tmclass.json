@@ -44,32 +44,29 @@
       }
     },
     {
-      "id": "ash_witch_flame_curse",
-      "name": "Flame Curse",
-      "desc": "Weaken an enemy 2-8 m away for 2 turns; AttDef -6. (1 s)",
+      "id": "ash_witch_pitch_curse",
+      "name": "Pitch Curse",
+      "desc": "Curse an enemy 2-8 m away with pitch: a light hit, and Oiled for 2 turns, so fire lasts twice as long on it.",
       "kind": "active",
-      "effect": "support",
+      "effect": "damage",
       "scale": "mag",
       "target": "enemy",
       "shape": "unit",
-      "power": 0,
+      "power": 10,
       "min_range": 2,
       "max_range": 8,
       "aoe": 0,
       "cooldown": 3,
-      "cast": 1,
-      "buffs": [
-        {
-          "stat": "attdef",
-          "amount": -6,
-          "turns": 2
-        }
-      ],
+      "cast": 0,
+      "status": {
+        "id": "oiled",
+        "turns": 2
+      },
       "fx": "pin_shot",
       "vfx": {
-        "system": "/Game/ParagonIggyScorch/FX/Particles/IggyScorch/Abilities/Turret/FX/Alternate/P_Turret_Proj_HitPlayer.P_Turret_Proj_HitPlayer",
+        "system": "/Game/PotaVFX_Smoke/VFX/System/ColorSmoke/NS_SmokeGradient_Loop.NS_SmokeGradient_Loop",
         "at": "targets",
-        "scale": 1
+        "scale": 0.6
       }
     },
     {
@@ -129,6 +126,28 @@
     "reworded": {
       "on": "2026-10-02",
       "why": "Descriptions say what the abilities do (2026-10-02): Stun not sleep, Crit not the old Power, turns not seconds"
+    },
+    "icons": {
+      "abilities": [
+        null,
+        {
+          "backing": "circle",
+          "glyph": "drop",
+          "colour": "#e07a3a",
+          "style": "light",
+          "mark": "unit",
+          "scale": 1,
+          "rotate": 0,
+          "badge": "none",
+          "finish": "lit"
+        },
+        null,
+        null
+      ]
+    },
+    "rebalanced": {
+      "on": "2026-10-04",
+      "why": "Status curse in place of Flame Curse (never used): a light hit that Oils the enemy for 2 turns, so her Flame Doom burns it twice as long"
     }
   }
 }

@@ -26,6 +26,8 @@ Unreal reads an Astra file, and nothing needs Astra to make a class.
 - **Refuse:** checks that broken files are refused.
 - **Play:** plays each class in a battle and requires every order the computer
   gives to be legal.
+- **Whole battles:** `Tests/SimTraceTest.cpp` replays the battles Godot recorded with Godot's own
+  classes, read from `Tests/GodotClassTable.txt`, so rebalancing a class here never breaks it.
 - **Match:** compares each class, field for field, with how the Godot game's
   importer reads the Astra file it came from (`Tests/GodotClassTable.txt`, printed
   by the Godot project's `tests/dump_class_table.gd`). This runs only when that
@@ -57,6 +59,21 @@ The creator shows these effects because the game films them:
 
 The creator's **Film again** button runs the same script. Run it again after
 installing more effects from Fab.
+
+## Pets
+
+An ability with `"special": "pet"` calls up a pet when it goes off (2026-10-02):
+`"pet": {"job": "golem_pet", "turns": 3}`.
+
+- **What it is:** a class file in `Content/Data/Monsters` (so no side can field it),
+  waiting off the board from the start, one per unit whose class calls it.
+- **Where it comes:** where the ability was aimed, or the nearest open spot round
+  there or round its caller. Called again while it is out, it moves to the new
+  spot, whole, its time started afresh.
+- **Who plays it:** the computer, for its caller's side (online, the host's).
+- **How long:** the given number of its own turns; then it leaves. Nothing
+  raises it, and it never counts towards a win.
+- **Tests:** `SimCampTest` plays whole battles with three summoners.
 
 ## Passive, toggle and aura abilities
 

@@ -44,27 +44,23 @@
       }
     },
     {
-      "id": "wind_dancer_gale_kunai",
-      "name": "Gale Kunai",
-      "desc": "Throw a blade at an enemy 2-8 m away; TG -25%.",
+      "id": "wind_dancer_gale_rush",
+      "name": "Gale Rush",
+      "desc": "Rush up to 6 m in a line, striking everyone in the way; TG -25%. (Moves you.)",
       "kind": "active",
       "effect": "damage",
       "scale": "att",
       "target": "enemy",
-      "shape": "unit",
-      "power": 29,
+      "shape": "vector",
+      "power": 27,
       "min_range": 2,
-      "max_range": 8,
-      "aoe": 0,
-      "cooldown": 1,
+      "max_range": 6,
+      "aoe": 0.7,
+      "cooldown": 2,
       "cast": 0,
       "tg": -25,
-      "fx": "throw_stone",
-      "vfx": {
-        "system": "/Game/ParagonShinbi/FX/Particles/Abilities/AttackWolves/FX/P_Mudang_AttackWolves_Impact.P_Mudang_AttackWolves_Impact",
-        "at": "targets",
-        "scale": 1
-      }
+      "fx": "attack",
+      "anim": "dash"
     },
     {
       "id": "wind_dancer_gale_veil",
@@ -115,5 +111,11 @@
         "scale": 1
       }
     }
-  ]
+  ],
+  "creator": {
+    "rebalanced": {
+      "on": "2026-10-03",
+      "why": "Gale Rush (a dash-strike that carries her) in place of Gale Kunai"
+    }
+  }
 }

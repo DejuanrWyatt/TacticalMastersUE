@@ -10,6 +10,6 @@ public class TacticalMastersEditorTarget : TargetRules
 		// levels is refused outright.
 		DefaultBuildSettings = BuildSettingsVersion.V7;
 		IncludeOrderVersion = EngineIncludeOrderVersion.Latest;
-		ExtraModuleNames.AddRange(new string[] { "TacticalMasters", "TMSim" });
+		ExtraModuleNames.AddRange(new string[] { "TacticalMasters", "TMSim", "TMCast" });
 	}
 }

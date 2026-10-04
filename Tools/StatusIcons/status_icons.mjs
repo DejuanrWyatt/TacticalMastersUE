@@ -62,6 +62,9 @@ export const STATUSES = {
   decay: ['Decay', '#8fad47', true, (c, d) => `<rect x="25" y="8" width="14" height="42" rx="3" fill="${c}"/><rect x="11" y="22" width="42" height="14" rx="3" fill="${c}"/><path d="M28 10 L34 20 L28 28 L36 36 L30 48" fill="none" stroke="${d}" stroke-width="3.5" stroke-linejoin="round"/><path d="M18 36 C18 41 16 44 16 47 C16 50 20 50 20 47 C20 44 18 41 18 36 Z M46 36 C46 43 44 47 44 50 C44 54 48 54 48 50 C48 47 46 43 46 36 Z" fill="${c}"/>`],
   // 2026-10-02: healing received halved -- half the cross only outlined, an arrow down.
   wounded: ['Wounded', '#bf525c', true, c => `<path d="M25 8 H39 V22 H53 V36 H39 V50 H25 V36 H11 V22 H25 Z" fill="none" stroke="${c}" stroke-width="3.5" stroke-linejoin="round"/><path d="M25 8 H32 V50 H25 V36 H11 V22 H25 Z" fill="${c}"/><path d="M50 36 V56 M42 48 L50 56 L58 48" fill="none" stroke="${c}" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/>`],
+  // 2026-10-02 ("Camps and Bosses Mockups" C, D): a boss's prey, and the boon of a claimed boss.
+  hunted: ['Hunted', '#ff8a5c', true, c => `<circle cx="32" cy="32" r="18" fill="none" stroke="${c}" stroke-width="5"/><circle cx="32" cy="32" r="5" fill="${c}"/><path d="M32 6 V18 M32 46 V58 M6 32 H18 M46 32 H58" stroke="${c}" stroke-width="5" stroke-linecap="round"/>`],
+  boon: ['Boss\'s Boon', '#ffd27a', false, (c, d) => `<path d="M10 46 L14 20 L24 32 L32 14 L40 32 L50 20 L54 46 Z" fill="${c}" stroke-linejoin="round"/><rect x="10" y="48" width="44" height="7" rx="2" fill="${c}"/><circle cx="32" cy="38" r="4" fill="${d}"/>`],
 };
 
 /** A star with its centre anywhere. */

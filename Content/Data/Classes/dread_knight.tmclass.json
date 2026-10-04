@@ -47,7 +47,7 @@
     {
       "id": "dread_knight_shadow_bash",
       "name": "Shadow Bash",
-      "desc": "Shield-bash an adjacent enemy; MagDef -6, AttDef -3 for 2 turns.",
+      "desc": "Shield-bash an adjacent enemy; MagDef -6, AttDef -3 for 2 turns, and Terrified for 1 turn: it runs from you before it acts.",
       "kind": "active",
       "effect": "damage",
       "scale": "att",
@@ -59,6 +59,10 @@
       "aoe": 0,
       "cooldown": 2,
       "cast": 0,
+      "status": {
+        "id": "terrified",
+        "turns": 1
+      },
       "buffs": [
         {
           "stat": "magdef",
@@ -146,6 +150,10 @@
     "reworded": {
       "on": "2026-10-02",
       "why": "Descriptions say what the abilities do (2026-10-02): Stun not sleep, Crit not the old Power, turns not seconds"
+    },
+    "rebalanced": {
+      "on": "2026-10-03",
+      "why": "Shadow Bash terrifies"
     }
   }
 }

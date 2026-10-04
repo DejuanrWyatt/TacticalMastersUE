@@ -45,10 +45,11 @@ namespace
 			{ TEXT("edit_layout"), TEXT("Edit layout / lock it"), { EKeys::F2 } },
 			{ TEXT("chat"), TEXT("Chat (online)"), { EKeys::T } },
 			{ TEXT("status_bars"), TEXT("Show / hide status bars"), { EKeys::Tab } },
-			{ TEXT("auto_recenter"), TEXT("Auto-recenter camera on / off"), { EKeys::V } },
+			{ TEXT("auto_recenter"), TEXT("Camera follow: always / when idle / never"), { EKeys::V } },
 			{ TEXT("waypoint"), TEXT("Waypoint (hold while clicking a walk)"), { EKeys::LeftControl } },
 			{ TEXT("plan_turn"), TEXT("Plan a turn ahead / go"), { EKeys::G } },
 			{ TEXT("plan_undo"), TEXT("Undo the plan's last step"), { EKeys::BackSpace } },
+			{ TEXT("fast_forward"), TEXT("Fast-forward (hold, while none of yours is ready)"), { EKeys::X } },
 		};
 		return List;
 	}
@@ -140,14 +141,27 @@ void FTMSettings::ResetOptions()
 	CameraSpeed = 1.0f;
 	UiScale = 1.0f;
 	OverheadScale = 1.35f;
-	StatusIconScale = 1.5f;
+	StatusIconScale = 1.875f;
 	SfxVolume = 0.8f;
 	VoiceVolume = 0.8f;
 	DamageTextScale = 1.75f;
 	bFullscreen = false;
 	bColorblind = false;
 	bTurnSquares = true;
+	bSquadStrip = true;
 	bAutoRecenter = true;
+	CameraFollow = 1;
+	bLeadCamera = true;
+	bCameraHeldNote = true;
+	for (bool& Quick : bQuickCast)
+	{
+		Quick = false;
+	}
+	bFastEnemyTurns = false;
+	bAutoEndTurn = false;
+	bCloseUps = true;
+	bZoomToCursor = true;
+	bEdgePan = true;
 	ResetKeys();
 	Save();
 	Apply();
@@ -183,15 +197,40 @@ void FTMSettings::Load()
 	if (Root->TryGetNumberField(TEXT("camera_speed"), Number)) { CameraSpeed = FMath::Clamp(static_cast<float>(Number), 0.5f, 2.0f); }
 	if (Root->TryGetNumberField(TEXT("ui_scale"), Number)) { UiScale = FMath::Clamp(static_cast<float>(Number), 0.9f, 1.3f); }
 	if (Root->TryGetNumberField(TEXT("overhead_scale"), Number)) { OverheadScale = FMath::Clamp(static_cast<float>(Number), 0.6f, 2.5f); }
-	if (Root->TryGetNumberField(TEXT("status_icon_scale"), Number)) { StatusIconScale = FMath::Clamp(static_cast<float>(Number), 0.6f, 3.0f); }
+	// 2026-10-03: status icons a quarter bigger. A size saved before then is
+	// read as that much bigger too; one saved since is kept as it is.
+	if (Root->TryGetNumberField(TEXT("status_icon_scale_v2"), Number)) { StatusIconScale = FMath::Clamp(static_cast<float>(Number), 0.6f, 3.0f); }
+	else if (Root->TryGetNumberField(TEXT("status_icon_scale"), Number)) { StatusIconScale = FMath::Clamp(static_cast<float>(Number) * 1.25f, 0.6f, 3.0f); }
 	if (Root->TryGetNumberField(TEXT("sfx_volume"), Number)) { SfxVolume = FMath::Clamp(static_cast<float>(Number), 0.0f, 1.0f); }
 	if (Root->TryGetNumberField(TEXT("voice_volume"), Number)) { VoiceVolume = FMath::Clamp(static_cast<float>(Number), 0.0f, 1.0f); }
 	if (Root->TryGetNumberField(TEXT("damage_text_scale"), Number)) { DamageTextScale = FMath::Clamp(static_cast<float>(Number), 0.75f, 3.0f); }
 	Root->TryGetBoolField(TEXT("fullscreen"), bFullscreen);
 	Root->TryGetBoolField(TEXT("colorblind"), bColorblind);
 	Root->TryGetBoolField(TEXT("turn_squares"), bTurnSquares);
+	Root->TryGetBoolField(TEXT("squad_strip"), bSquadStrip);
 	Root->TryGetBoolField(TEXT("auto_recenter"), bAutoRecenter);
+	// The follow's three ways (2026-10-03); saved before them, On reads as When I'm idle, Off as Never.
+	if (Root->TryGetNumberField(TEXT("camera_follow"), Number))
+	{
+		CameraFollow = FMath::Clamp(static_cast<int32>(Number), 0, 2);
+	}
+	else
+	{
+		CameraFollow = bAutoRecenter ? 1 : 2;
+	}
+	bAutoRecenter = CameraFollow != 2;
+	Root->TryGetBoolField(TEXT("lead_camera"), bLeadCamera);
+	Root->TryGetBoolField(TEXT("camera_held_note"), bCameraHeldNote);
 	Root->TryGetBoolField(TEXT("layout_grid"), bLayoutGrid);
+	for (int32 Slot = 0; Slot < 4; ++Slot)
+	{
+		Root->TryGetBoolField(FString::Printf(TEXT("quick_cast_%d"), Slot + 1), bQuickCast[Slot]);
+	}
+	Root->TryGetBoolField(TEXT("fast_enemy_turns"), bFastEnemyTurns);
+	Root->TryGetBoolField(TEXT("auto_end_turn"), bAutoEndTurn);
+	Root->TryGetBoolField(TEXT("close_ups"), bCloseUps);
+	Root->TryGetBoolField(TEXT("zoom_to_cursor"), bZoomToCursor);
+	Root->TryGetBoolField(TEXT("edge_pan"), bEdgePan);
 	if (Root->TryGetNumberField(TEXT("grid_size"), Number)) { GridSize = FMath::Clamp(static_cast<float>(Number), 5.0f, 80.0f); }
 	const TSharedPtr<FJsonObject>* Sizes = nullptr;
 	if (Root->TryGetObjectField(TEXT("layout_scale"), Sizes))
@@ -296,15 +335,28 @@ void FTMSettings::Save() const
 	Root->SetNumberField(TEXT("camera_speed"), CameraSpeed);
 	Root->SetNumberField(TEXT("ui_scale"), UiScale);
 	Root->SetNumberField(TEXT("overhead_scale"), OverheadScale);
-	Root->SetNumberField(TEXT("status_icon_scale"), StatusIconScale);
+	Root->SetNumberField(TEXT("status_icon_scale_v2"), StatusIconScale);
 	Root->SetNumberField(TEXT("sfx_volume"), SfxVolume);
 	Root->SetNumberField(TEXT("voice_volume"), VoiceVolume);
 	Root->SetNumberField(TEXT("damage_text_scale"), DamageTextScale);
 	Root->SetBoolField(TEXT("fullscreen"), bFullscreen);
 	Root->SetBoolField(TEXT("colorblind"), bColorblind);
 	Root->SetBoolField(TEXT("turn_squares"), bTurnSquares);
-	Root->SetBoolField(TEXT("auto_recenter"), bAutoRecenter);
+	Root->SetBoolField(TEXT("squad_strip"), bSquadStrip);
+	Root->SetBoolField(TEXT("auto_recenter"), CameraFollow != 2);
+	Root->SetNumberField(TEXT("camera_follow"), CameraFollow);
+	Root->SetBoolField(TEXT("lead_camera"), bLeadCamera);
+	Root->SetBoolField(TEXT("camera_held_note"), bCameraHeldNote);
 	Root->SetBoolField(TEXT("layout_grid"), bLayoutGrid);
+	for (int32 Slot = 0; Slot < 4; ++Slot)
+	{
+		Root->SetBoolField(FString::Printf(TEXT("quick_cast_%d"), Slot + 1), bQuickCast[Slot]);
+	}
+	Root->SetBoolField(TEXT("fast_enemy_turns"), bFastEnemyTurns);
+	Root->SetBoolField(TEXT("auto_end_turn"), bAutoEndTurn);
+	Root->SetBoolField(TEXT("close_ups"), bCloseUps);
+	Root->SetBoolField(TEXT("zoom_to_cursor"), bZoomToCursor);
+	Root->SetBoolField(TEXT("edge_pan"), bEdgePan);
 	Root->SetNumberField(TEXT("grid_size"), GridSize);
 	TSharedRef<FJsonObject> Sizes = MakeShared<FJsonObject>();
 	for (const TPair<FString, float>& Entry : LayoutScale)

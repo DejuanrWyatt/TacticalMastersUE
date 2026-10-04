@@ -1,4 +1,5 @@
-// Checks what the computer decides to DO with a turn, against the Godot game.
+// Checks what the computer decides to DO with a turn, against its recorded
+// baseline (Baselines/AIActionTable.txt, first recorded from the Godot version).
 //
 // SimAITest covers where it would rather stand. This covers the other half: which
 // of its four abilities it picks, where it walks to in order to use it, what it
@@ -14,20 +15,21 @@
 // Hard only, and deliberately. At hard the generator is never touched -- GDScript
 // short-circuits `mistakes > 0.0 and rng.randf() < mistakes` -- so the decision is
 // wholly deterministic. Easy and medium roll to settle for a worse option, and
-// that roll wants Godot's randf, which is not ported; SimRandom.h records what is
-// known about it.
+// that roll is not covered here.
 //
-// The tie count is the fussy part. The original sorts its options by score and
+// The tie count is the fussy part. The baseline's chooser sorted its options by score and
 // takes the first, with a sort that is not stable, so if two options ever tied at
 // the top it could take either and no transcription could promise to match. So
 // this insists the best was unique in every case rather than assuming it, and if
 // that ever stops being true the assumption has to be revisited rather than the
 // test loosened.
 //
-// Regenerate with tests/dump_ai_action_table.gd in the Godot project; the table's
-// first line says which script and which Godot build produced it. Never edit the
-// table to make this pass.
+// When the computer player is changed on purpose, write the table again from
+// the rules with --rebaseline (Baseline.h). Never edit the table to make this pass.
+//
+//   SimAIActionTest [Baselines/AIActionTable.txt] [--rebaseline]
 
+#include "Baseline.h"
 #include "SimAI.h"
 #include "SimAbility.h"
 #include "SimBattle.h"
@@ -139,7 +141,11 @@ namespace
 
 int main(int argc, char** argv)
 {
-	const std::string Path = argc > 1 ? argv[1] : "GodotAIActionTable.txt";
+	const std::vector<std::string> Args = TMBaseline::Paths(argc, argv);
+	const std::string Path = Args.empty() ? std::string("Baselines/AIActionTable.txt") : Args[0];
+	TMBaseline::FWriter Writer;
+	Writer.bOn = TMBaseline::Asked(argc, argv);
+	Writer.Path = Path;
 	std::ifstream File(Path);
 	if (!File)
 	{
@@ -148,23 +154,38 @@ int main(int argc, char** argv)
 	}
 
 	std::vector<std::string> Lines;
+	// Where each of those is in the table as written, and how it was indented.
+	std::vector<size_t> LineAt;
+	std::vector<std::string> Indent;
 	std::string Read;
 	while (std::getline(File, Read))
 	{
-		Read = Trimmed(Read);
-		if (!Read.empty())
+		if (!Read.empty() && Read.back() == '\r')
 		{
-			Lines.push_back(Read);
+			Read.pop_back();
+		}
+		const size_t At = Writer.Next();
+		Writer.Read(Read);
+		const std::string Kept = Trimmed(Read);
+		if (!Kept.empty())
+		{
+			Lines.push_back(Kept);
+			LineAt.push_back(At);
+			Indent.push_back(Read.substr(0, Read.find_first_not_of(" \t")));
 		}
 	}
+	// What the rules make of line k of Lines, written back in its place.
+	const auto Rewrite = [&](size_t k, const std::string& Now) { Writer.SetAt(LineAt[k], Indent[k] + Now); };
 
 	FBattle Battle;
 	Battle.Map.BuildMirrored(HighlandsRows());
 	std::vector<std::string> UnitLines;
+	std::vector<size_t> UnitLineK;
 	std::string Section;
 
-	for (const std::string& Line : Lines)
+	for (size_t k = 0; k < Lines.size(); ++k)
 	{
+		const std::string& Line = Lines[k];
 		if (Line.rfind("TUNING", 0) == 0)
 		{
 			Battle.Tuning.DamageMultiplier = ValueOf(Line, "damage_multiplier");
@@ -202,12 +223,13 @@ int main(int argc, char** argv)
 		if (Section == "UNITS")
 		{
 			UnitLines.push_back(Line);
+			UnitLineK.push_back(k);
 		}
 	}
 
 	if (UnitLines.empty())
 	{
-		std::printf("THE REFERENCE HAS NO BOARD IN IT\n");
+		std::printf("THE BASELINE HAS NO BOARD IN IT\n");
 		return 1;
 	}
 
@@ -227,8 +249,9 @@ int main(int argc, char** argv)
 		Battle.Units.push_back(Unit);
 	}
 	Battle.Start(12345);
-	for (const std::string& Line : UnitLines)
+	for (size_t u = 0; u < UnitLines.size(); ++u)
 	{
+		const std::string& Line = UnitLines[u];
 		int Id = -1;
 		std::istringstream(Line) >> Id;
 		FUnit* Unit = Battle.FindUnit(Id);
@@ -237,10 +260,17 @@ int main(int argc, char** argv)
 			Fail("there is no unit " + std::to_string(Id));
 			continue;
 		}
-		if (Unit->MaxHp() != static_cast<int>(ValueOf(Line, "maxhp")))
+		if (Writer.bOn)
+		{
+			if (Unit->MaxHp() != static_cast<int>(ValueOf(Line, "maxhp")))
+			{
+				Rewrite(UnitLineK[u], TMBaseline::WithValue(Line, "maxhp", std::to_string(Unit->MaxHp())));
+			}
+		}
+		else if (Unit->MaxHp() != static_cast<int>(ValueOf(Line, "maxhp")))
 		{
 			Fail("unit " + std::to_string(Id) + " has " + std::to_string(Unit->MaxHp())
-				+ " health at most, Godot says "
+				+ " health at most, the baseline says "
 				+ std::to_string(static_cast<int>(ValueOf(Line, "maxhp"))));
 		}
 		Unit->Pos = PointOf(Line, "pos");
@@ -273,8 +303,9 @@ int main(int argc, char** argv)
 	int Tied = 0;
 
 	Section.clear();
-	for (const std::string& Line : Lines)
+	for (size_t k = 0; k < Lines.size(); ++k)
 	{
+		const std::string& Line = Lines[k];
 		if (Line == "UNITS" || Line.rfind("SCORE", 0) == 0 || Line.rfind("CHOICE", 0) == 0)
 		{
 			Section = Line.substr(0, 6);
@@ -308,17 +339,27 @@ int main(int argc, char** argv)
 				if (!Struck.empty()) { Struck += "|"; }
 				Struck += std::to_string(Hit.UnitId) + ":" + std::to_string(Hit.Amount);
 			}
+			if (Writer.bOn)
+			{
+				const double Worth = Computer.Score(Battle, *Caster, Slot, *Ability, Hits);
+				if ((Struck.empty() ? "-" : Struck) != TextOf(Line, "hits") || std::fabs(Worth - ValueOf(Line, "score")) > 1e-4)
+				{
+					Rewrite(k, TMBaseline::WithValue(TMBaseline::WithValue(Line, "score", Number(Worth)), "hits", Struck.empty() ? "-" : Struck));
+				}
+				++Scores;
+				continue;
+			}
 			if ((Struck.empty() ? "-" : Struck) != TextOf(Line, "hits"))
 			{
 				Fail(Where + " reaches " + (Struck.empty() ? "nobody" : Struck)
-					+ ", Godot says " + TextOf(Line, "hits"));
+					+ ", the baseline says " + TextOf(Line, "hits"));
 			}
 
 			const double Got = Computer.Score(Battle, *Caster, Slot, *Ability, Hits);
 			const double Want = ValueOf(Line, "score");
 			if (std::fabs(Got - Want) > 1e-4)
 			{
-				Fail(Where + " is worth " + Number(Got) + ", Godot says " + Number(Want));
+				Fail(Where + " is worth " + Number(Got) + ", the baseline says " + Number(Want));
 			}
 			++Scores;
 			continue;
@@ -334,7 +375,7 @@ int main(int argc, char** argv)
 			{
 				continue;
 			}
-			// The same one search of the ground the original does per decision.
+			// The same one search of the ground the chooser does per decision.
 			std::vector<std::pair<FNode, double>> Reach;
 			if (!Unit->bMoved && !Unit->IsCasting())
 			{
@@ -342,13 +383,39 @@ int main(int argc, char** argv)
 			}
 			const FChoice Best = Computer.BestAction(Battle, *Unit, Reach);
 			const std::string Who = "unit " + std::to_string(UnitId);
+			if (Writer.bOn)
+			{
+				// Kept where the table already says what the rules choose, or an option
+				// tied with it; otherwise what the rules choose now.
+				const std::string Now = Best.Slot < 0 ? std::to_string(UnitId) + " nothing"
+					: std::to_string(UnitId) + " slot=" + std::to_string(Best.Slot) + " spot=" + Text(Best.Spot) + " target=" + Text(Best.Target)
+						+ " follow=" + std::to_string(Best.Follow) + " score=" + Number(Best.Score);
+				bool bKeep = false;
+				if (Line.find("nothing") != std::string::npos)
+				{
+					bKeep = Best.Slot < 0;
+				}
+				else if (Best.Slot >= 0)
+				{
+					const int WasSlot = static_cast<int>(ValueOf(Line, "slot"));
+					const bool bSame = Best.Slot == WasSlot && Same(Best.Spot, PointOf(Line, "spot")) && Same(Best.Target, PointOf(Line, "target"));
+					const bool bTie = !bSame && std::fabs(Computer.ValueOfOption(Battle, *Unit, WasSlot, PointOf(Line, "spot"), PointOf(Line, "target")) - Best.Score) <= 1e-9;
+					bKeep = (bSame && Best.Follow == static_cast<int>(ValueOf(Line, "follow", -1)) && std::fabs(Best.Score - ValueOf(Line, "score")) <= 1e-4) || bTie;
+				}
+				if (!bKeep)
+				{
+					Rewrite(k, Now);
+				}
+				++Choices;
+				continue;
+			}
 
 			if (Line.find("nothing") != std::string::npos)
 			{
 				if (Best.Slot >= 0)
 				{
 					Fail(Who + " would use slot " + std::to_string(Best.Slot)
-						+ ", Godot finds nothing worth doing");
+						+ ", the baseline finds nothing worth doing");
 				}
 				++Nothings;
 				++Choices;
@@ -357,7 +424,7 @@ int main(int argc, char** argv)
 
 			if (Best.Slot < 0)
 			{
-				Fail(Who + " finds nothing worth doing, Godot picks slot "
+				Fail(Who + " finds nothing worth doing, the baseline picks slot "
 					+ std::to_string(static_cast<int>(ValueOf(Line, "slot"))));
 				++Choices;
 				continue;
@@ -381,13 +448,13 @@ int main(int argc, char** argv)
 				{
 					Fail(Who + " picks slot " + std::to_string(Best.Slot) + " at "
 						+ Text(Best.Spot) + " aimed at " + Text(Best.Target) + " worth "
-						+ Number(Best.Score) + ", but Godot's slot " + std::to_string(WantSlot)
+						+ Number(Best.Score) + ", but the baseline's slot " + std::to_string(WantSlot)
 						+ " at " + Text(WantSpot) + " aimed at " + Text(WantTarget)
 						+ " is worth " + Number(Theirs) + " -- not a tie, a disagreement");
 				}
 				else if (Best.Ties < 2)
 				{
-					Fail(Who + " disagrees with Godot on an option worth the same, yet counted"
+					Fail(Who + " disagrees with the baseline on an option worth the same, yet counted"
 						" no tie, which means the count is wrong");
 				}
 				else
@@ -399,18 +466,18 @@ int main(int argc, char** argv)
 			}
 			if (Best.Slot != WantSlot)
 			{
-				Fail(Who + " would use slot " + std::to_string(Best.Slot) + ", Godot picks "
+				Fail(Who + " would use slot " + std::to_string(Best.Slot) + ", the baseline picks "
 					+ std::to_string(static_cast<int>(ValueOf(Line, "slot"))));
 			}
 			if (Best.Follow != static_cast<int>(ValueOf(Line, "follow", -1)))
 			{
-				Fail(Who + " would follow " + std::to_string(Best.Follow) + ", Godot says "
+				Fail(Who + " would follow " + std::to_string(Best.Follow) + ", the baseline says "
 					+ std::to_string(static_cast<int>(ValueOf(Line, "follow", -1))));
 			}
 			const double Want = ValueOf(Line, "score");
 			if (std::fabs(Best.Score - Want) > 1e-4)
 			{
-				Fail(Who + " rates it " + Number(Best.Score) + ", Godot says " + Number(Want));
+				Fail(Who + " rates it " + Number(Best.Score) + ", the baseline says " + Number(Want));
 			}
 			++Choices;
 			continue;
@@ -423,14 +490,18 @@ int main(int argc, char** argv)
 	// A reference that came out empty would pass every check in it.
 	if (Scores < 100 || Choices < 5)
 	{
-		std::printf("THE REFERENCE IS SHORT -- re-dump it from the Godot game\n");
+		std::printf("THE BASELINE IS SHORT -- it has lost situations; restore it from git\n");
 		return 1;
+	}
+	if (Writer.bOn)
+	{
+		return Writer.Finish() ? 0 : 1;
 	}
 	if (Failures > 0)
 	{
 		std::printf("THE COMPUTER PLAYER DECIDES DIFFERENTLY (%d)\n", Failures);
 		return 1;
 	}
-	std::printf("THE COMPUTER PLAYER DOES WHAT IT DOES IN GODOT\n");
+	std::printf("THE COMPUTER PLAYER DOES WHAT ITS BASELINE SAYS\n");
 	return 0;
 }

@@ -299,6 +299,12 @@
     "click": [
       "/Game/Free_Sounds_Pack/wav/Interface_1-1.Interface_1-1"
     ],
+    "no_move": [
+      "/Game/Free_Sounds_Pack/wav/Wood_14-8.Wood_14-8"
+    ],
+    "no_action": [
+      "/Game/Free_Sounds_Pack/wav/Sci-Fi_Interface_8-1.Sci-Fi_Interface_8-1"
+    ],
     "select": [
       "/Game/Free_Sounds_Pack/wav/Magical_Interface_8-1.Magical_Interface_8-1"
     ],
@@ -750,6 +756,9 @@
     "defeat": "defeat",
     "step": "step",
     "click": "click",
+    "order": "click",
+    "noMove": "no_move",
+    "noAction": "no_action",
     "select": "select",
     "battleStart": "horn",
     "step_meadow": "step_meadow",

@@ -247,6 +247,14 @@ void ATMBattleDirector::UpdateMarks()
 				Now.Add(Hovered->Id);
 			}
 		}
+		// Pointed at on the turn order (2026-10-02): the unit on the board lights up too.
+		if (const TMSim::FUnit* OnBar = Battle.FindUnit(HudHoverUnitId))
+		{
+			if (IsSeen(*OnBar))
+			{
+				Now.Add(OnBar->Id);
+			}
+		}
 		const TMSim::FUnit* Unit = SelectedUnit();
 		if (AimMode == EAimMode::Ability && PlayerCanOrder(Unit) && !Battle.IsPlanning())
 		{
@@ -369,8 +377,8 @@ void ATMBattleDirector::FramePortrait(USceneCaptureComponent2D* Camera, int32 In
 	// Face to face with it, a little above: head and shoulders.
 	const FTMMotion& Motion = Motions[Index];
 	const FVector Facing = FRotator(0.0f, Motion.Yaw, 0.0f).Vector();
-	const FVector Head = Motion.Shown + FVector(0.0f, 0.0f, 150.0f);
-	const FVector Eye = Head + Facing * 175.0f + FVector(0.0f, 0.0f, 20.0f);
+	const FVector Head = Motion.Shown + FVector(0.0f, 0.0f, 150.0f * UnitSize);
+	const FVector Eye = Head + Facing * 175.0f * UnitSize + FVector(0.0f, 0.0f, 20.0f * UnitSize);
 	Camera->SetRelativeLocationAndRotation(Eye, (Head - Eye).Rotation());
 }
 

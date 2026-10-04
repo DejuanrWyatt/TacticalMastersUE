@@ -66,26 +66,26 @@
       }
     },
     {
-      "id": "lumimancer_holy_staff",
-      "name": "Holy Staff",
-      "desc": "Strike an adjacent enemy.",
+      "id": "lumimancer_prism_ward",
+      "name": "Prism Ward",
+      "desc": "Ward an ally up to 6 m away with Reflect for 2 turns: the next enemy spell on it bounces back at the caster.",
       "kind": "active",
-      "effect": "damage",
-      "scale": "att",
-      "target": "enemy",
+      "effect": "support",
+      "scale": "mag",
+      "target": "ally",
       "shape": "unit",
-      "power": 29,
+      "power": 0,
       "min_range": 0,
-      "max_range": 1.8,
+      "max_range": 6,
       "aoe": 0,
-      "cooldown": 0,
+      "cooldown": 3,
       "cast": 0,
-      "fx": "attack",
-      "vfx": {
-        "system": "/Game/ParagonSerath/FX/Particles/Abilities/Primary/FX/P_PrimaryImpact.P_PrimaryImpact",
-        "at": "targets",
-        "scale": 1
-      }
+      "status": {
+        "id": "reflect",
+        "turns": 2
+      },
+      "fx": "focus",
+      "anim": "buff"
     },
     {
       "id": "lumimancer_divine_wrath",
@@ -110,5 +110,12 @@
         "scale": 1
       }
     }
-  ]
+  ],
+  "creator": {
+    "rebalanced": {
+      "on": "2026-10-03",
+      "why": "Prism Ward (Reflect on an ally) in place of Holy Staff"
+    },
+    "changedAt": "2026-10-03T03:45:00.000Z"
+  }
 }

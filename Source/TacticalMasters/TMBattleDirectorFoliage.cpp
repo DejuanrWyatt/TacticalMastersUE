@@ -205,6 +205,27 @@ void ATMBattleDirector::BuildFoliage(const FTMTheme& Theme)
 						Foot + FVector(0, 0, Tall * 0.5f), FVector(0.05f, 0.05f, Tall / 100.0f)));
 				}
 			}
+			// Tall grass (the map's "grass", 2026-10-04): thick and well over knee
+			// height, where the rules hide whoever stands in it (FBattle::Hidden).
+			if (!Map.Grass.empty() && Map.Grass[Index] != 0 && Grass.Num() > 0)
+			{
+				const int32 Stems = Count(Theme.GrassDensity * Tile * Tile * (bKitGrass ? 5.0f : 24.0f)) + 16;
+				for (int32 k = 0; k < Stems; ++k)
+				{
+					const FVector Foot = Spot();
+					UHierarchicalInstancedStaticMeshComponent* Layer = Grass[Dice.RandHelper(Grass.Num())];
+					if (FoliageIsKit(Layer))
+					{
+						Layer->AddInstance(FoliageKitPlace(Layer, Foot, Theme.KitGrassHeight * M * Dice.FRandRange(2.8f, 4.0f), Dice.FRandRange(0.0f, 360.0f)));
+					}
+					else
+					{
+						const float Tall = FMath::Max(Theme.GrassHeight * 4.0f, 0.9f) * M * Dice.FRandRange(0.8f, 1.2f);
+						Layer->AddInstance(FTransform(FRotator(Dice.FRandRange(-10.0f, 10.0f), Dice.FRandRange(0.0f, 360.0f), Dice.FRandRange(-10.0f, 10.0f)),
+							Foot + FVector(0, 0, Tall * 0.5f), FVector(0.07f, 0.07f, Tall / 100.0f)));
+					}
+				}
+			}
 			const int32 Blooms = Flowers.Num() > 0 ? Count(Theme.FlowerDensity * Tile * Tile) : 0;
 			for (int32 k = 0; k < Blooms; ++k)
 			{

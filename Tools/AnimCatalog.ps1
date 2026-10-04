@@ -59,11 +59,16 @@ foreach ($Entry in $Catalog.looks.PSObject.Properties) {
 
 $Merged = [ordered]@{
 	format = 'tactical-masters-anim-catalog'
-	version = 1
+	version = $Catalog.version
 	made = (Get-Date).ToUniversalTime().ToString('o')
 	frameSize = $Catalog.frameSize
 	thumbSize = $Catalog.thumbSize
 	fps = $Catalog.fps
+	# Version 2 (Cast Studio): strips 16 frames to a row, thumbs every other
+	# frame, and the camera every body is filmed from.
+	columns = $Catalog.columns
+	thumbEvery = $Catalog.thumbEvery
+	camera = $Catalog.camera
 	clips = $Clips
 	bodies = $Bodies
 	looks = $Looks

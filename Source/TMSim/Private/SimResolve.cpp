@@ -255,14 +255,15 @@ namespace TMSim
 	void FBattle::KnockOut(FUnit& Target, FTickReport& Report)
 	{
 		Target.Hp = 0;
-		// A monster that falls is gone at once: nothing raises it.
-		Target.KoTicks = Target.bMonster ? 0 : RoundToInt(Tuning.KoSeconds * Pace::TicksPerSecond);
+		// A monster or a pet that falls is gone at once: nothing raises it.
+		const bool bNoRaise = Target.bMonster || Target.PetOf >= 0;
+		Target.KoTicks = bNoRaise ? 0 : RoundToInt(Tuning.KoSeconds * Pace::TicksPerSecond);
 		Target.bReady = false;
 		Target.Clock = 0;
 		Target.bMoved = false;
 		Target.bActed = false;
 		// Reraise: it stands again a few seconds later, so it lies there until then.
-		const bool bReraise = !Target.bMonster && Target.HasStatus("reraise");
+		const bool bReraise = !bNoRaise && Target.HasStatus("reraise");
 		Target.Statuses.clear();
 		if (Target.CharmedFrom >= 0)
 		{
@@ -276,7 +277,8 @@ namespace TMSim
 		if (Target.IsCasting())
 		{
 			// Whatever it was part-way through is lost with it. Death is the only
-			// thing that stops a cast: being stunned, silenced or frozen does not.
+			// thing that stops a cast -- being stunned, silenced or frozen does not --
+			// but for a boss's wind-up, which a stagger breaks (SimCamps.cpp).
 			FEvent Event;
 			Event.Kind = EEventKind::CastFizzled;
 			Event.Unit = Target.Id;
@@ -314,7 +316,7 @@ namespace TMSim
 		{
 			for (const FUnit& Unit : Units)
 			{
-				if (Unit.IsAlive() && Unit.HomeTeam() == Team && !Unit.bMonster)
+				if (Unit.IsAlive() && Unit.HomeTeam() == Team && !Unit.bMonster && Unit.PetOf < 0)
 				{
 					return true;
 				}
@@ -410,6 +412,15 @@ namespace TMSim
 		User.Casting.FollowId = Follow;
 		User.Casting.Ticks = Ticks;
 		User.Casting.Total = Ticks;
+		// A boss's wind-up starts its count of hits from behind afresh (B).
+		if (User.bMonster)
+		{
+			const FMonsterInfo* Info = User.MonsterInfo();
+			if (Info && Info->Tier >= 3 && !Info->Has(MonsterTrait::Stagger))
+			{
+				User.Stagger = 0;
+			}
+		}
 
 		FEvent Event;
 		Event.Kind = EEventKind::CastStarted;
@@ -429,9 +440,32 @@ namespace TMSim
 			return;
 		}
 
-		// Worked out before anything moves or changes, because a "vector" ability
-		// carries the caster along its own line and the damage is owed from where
-		// the swing started, not from where it finished.
+		// A movement skill (2026-10-03) moves the user first: the blow lands from
+		// where it comes down (Leap Smash) or from behind its target (Shadow
+		// Step), so a step behind strikes the back. It faces where it aimed.
+		if (Ability->Special == "leap" || Ability->Special == "behind")
+		{
+			FVec2 Landing;
+			if (LandingFor(User, *Ability, Target, Landing))
+			{
+				User.Pos = Landing;
+				const FVec2 Toward = Target - Landing;
+				if (Toward.Length() > 0.001f && !User.HasStatus("offbalance"))
+				{
+					User.Facing = Toward.Normalized();
+				}
+				FEvent Moved;
+				Moved.Kind = EEventKind::Teleported;
+				Moved.Unit = User.Id;
+				Moved.Where = Landing;
+				Moved.Id = Ability->Special;
+				Report.Events.push_back(Moved);
+			}
+		}
+
+		// Worked out before anything else moves or changes, because a "vector"
+		// ability carries the caster along its own line and the damage is owed
+		// from where the swing started, not from where it finished.
 		const std::vector<FHit> Hits = Preview(User, Slot, User.Pos, Target);
 
 		if (ShapeOf(*Ability) == "vector" && Map.NodeWalkable(FMap::NodeOf(Target)))
@@ -444,6 +478,11 @@ namespace TMSim
 			}
 		}
 
+		// Striking out from tall grass gives it away until its next turn.
+		if (Ability->Effect == EEffect::Damage)
+		{
+			User.bSpotted = true;
+		}
 		// Vanished: striking out shows where it is.
 		if (Ability->Effect == EEffect::Damage && User.HasStatus("veil"))
 		{
@@ -459,6 +498,16 @@ namespace TMSim
 		Cast.Id = Ability->Id;
 		Report.Events.push_back(Cast);
 
+		// A loud blow near a waiting camp wakes it sooner (2026-10-02, A): an area
+		// blow is loud, and fire louder.
+		if (!Camps.empty() && !User.bMonster && (User.Team == 0 || User.Team == 1) && Ability->Effect == EEffect::Damage)
+		{
+			const std::string Shape = ShapeOf(*Ability);
+			const bool bArea = Ability->Aoe > 0.0f || Shape == "cone" || Shape == "line" || Shape == "circle";
+			const int Loud = (bArea ? 1 : 0) + (ElementOf(*Ability) == "fire" ? 1 : 0);
+			MakeNoise(Shape == "self" ? User.Pos : Target, User, Loud, Report);
+		}
+
 		for (const FHit& Hit : Hits)
 		{
 			FUnit* Struck = FindUnit(Hit.UnitId);
@@ -469,6 +518,8 @@ namespace TMSim
 			int Amount = Hit.Amount;
 			// Reflect and Guarded send it elsewhere, before the dice (SimStatuses.cpp).
 			Redirect(User, *Ability, Struck, Amount, Report);
+			// Whole before this blow: killed by it, that is a clean kill (A).
+			const bool bWasWhole = Struck->IsAlive() && Struck->Hp >= Struck->MaxHp();
 
 			// The dice, and the only place in the rules they are thrown.
 			bool bEvaded = false;
@@ -544,11 +595,19 @@ namespace TMSim
 			{
 				Amount = TakeFromShield(*Struck, Amount, Report);
 				Amount = Hurt(*Struck, Amount);
+				if (Struck->bMonster && Amount > 0)
+				{
+					BossHurtBy(*Struck, User, Amount);
+				}
 				if (Amount > 0 && !Struck->Statuses.empty())
 				{
 					// Marked and Off-Balance pay out on the hit that lands, and are gone.
 					RemoveStatus(*Struck, "marked");
 					RemoveStatus(*Struck, "offbalance");
+				}
+				if (Amount > 0)
+				{
+					Struck->bSpotted = true;  // hit in the grass: found
 				}
 				if (Amount > 0 && Struck->HasStatus("veil"))
 				{
@@ -645,6 +704,28 @@ namespace TMSim
 					{
 						User.KillTgPercent += GearSum(User, &FItemDef::KillTgPercent);
 					}
+					// Camps and bosses (2026-10-02): a kill is loud; a monster killed
+					// from whole in one blow pays its killer gauge, as a Lost headshot
+					// does; and a boss's last blow claims it.
+					if (!User.bMonster && (User.Team == 0 || User.Team == 1))
+					{
+						MakeNoise(Struck->Pos, User, 1, Report);
+						if (Struck->bMonster && bWasWhole && Ability->Effect == EEffect::Damage)
+						{
+							User.KillTgPercent += Camp::CleanKillTgPercent;
+							FEvent Clean;
+							Clean.Kind = EEventKind::CleanKill;
+							Clean.Unit = User.Id;
+							Clean.By = Struck->Id;
+							Clean.Amount = Camp::CleanKillTgPercent;
+							Clean.Where = User.Pos;
+							Report.Events.push_back(Clean);
+						}
+						if (Struck->bMonster)
+						{
+							ClaimBoss(*Struck, User, Report);
+						}
+					}
 				}
 				continue;  // nothing follows a killing blow
 			}
@@ -705,9 +786,27 @@ namespace TMSim
 			}
 		}
 
+		// What the user gives itself (2026-10-03): the Ninja vanishing in its own smoke.
+		if (!Ability->SelfStatusId.empty() && User.IsAlive())
+		{
+			AddStatus(User, Ability->SelfStatusId, Ability->SelfStatusTurns, 0, -1);
+			FEvent Self;
+			Self.Kind = EEventKind::StatusApplied;
+			Self.Unit = User.Id;
+			Self.By = User.Id;
+			Self.Where = User.Pos;
+			Self.Id = Ability->SelfStatusId;
+			Report.Events.push_back(Self);
+		}
+
 		if (Ability->Special == "blink" && User.IsAlive())
 		{
 			ApplySpecial(User, *Ability, Target, nullptr, Report);
+		}
+		// A pet comes once the blow has landed, where it was aimed (2026-10-02).
+		if (Ability->Special == "pet" && User.IsAlive())
+		{
+			CallPet(User, *Ability, Target, Report);
 		}
 
 		CheckWinner();
@@ -715,5 +814,66 @@ namespace TMSim
 		{
 			Report.Say(EEventKind::Won, Winner);
 		}
+	}
+}
+
+namespace TMSim
+{
+	bool FBattle::LandingFor(const FUnit& User, const FAbility& Ability, const FVec2& Target, FVec2& OutSpot) const
+	{
+		// Leap: as near the aim point as can be, within 1.5 m of it (or the
+		// ability's area, if wider). Behind: round the unit aimed at, as near as
+		// can be to the spot a metre behind it, not on top of it.
+		FVec2 Centre = FMap::Snap(Target);
+		FVec2 Want = Centre;
+		float Reach = std::max(1.5f, Ability.Aoe);
+		float Closest = 0.0f;
+		if (Ability.Special == "behind")
+		{
+			const FUnit* Victim = UnitNear(Target, Ground::HitRadius);
+			if (!Victim || Victim->Id == User.Id)
+			{
+				return false;
+			}
+			Centre = Victim->Pos;
+			Want = Victim->Pos - Victim->Facing * 1.0f;
+			Reach = 1.6f;
+			Closest = 0.6f;
+		}
+		else if (Ability.Special != "leap")
+		{
+			return false;
+		}
+		const FNode Middle = FMap::NodeOf(Centre);
+		bool bFound = false;
+		float Best = 0.0f;
+		// Rows then columns, nearest-first by distance, the first of equals kept:
+		// the same spot on every machine.
+		for (int DY = -4; DY <= 4; ++DY)
+		{
+			for (int DX = -4; DX <= 4; ++DX)
+			{
+				const FNode Node{ Middle.X + DX, Middle.Y + DY };
+				const FVec2 Spot = FMap::NodePos(Node);
+				const float FromCentre = Spot.DistanceTo(Centre);
+				if (FromCentre > Reach + 0.001f || FromCentre < Closest || !InBounds(Spot) || !Map.NodeWalkable(Node))
+				{
+					continue;
+				}
+				const FUnit* Other = UnitNear(Spot, Ground::UnitSpacing);
+				if (Other && Other->Id != User.Id)
+				{
+					continue;
+				}
+				const float Score = Spot.DistanceTo(Want);
+				if (!bFound || Score < Best)
+				{
+					bFound = true;
+					Best = Score;
+					OutSpot = Spot;
+				}
+			}
+		}
+		return bFound;
 	}
 }

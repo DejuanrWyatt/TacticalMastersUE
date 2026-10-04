@@ -15,6 +15,9 @@
 #include "GameFramework/Actor.h"
 #include "InputCoreTypes.h"
 
+#include "CastAnimation.h"
+#include "CastLegacy.h"
+#include "CastLooks.h"
 #include "SimAI.h"
 #include "SimBattle.h"
 #include "SimOrder.h"
@@ -82,6 +85,17 @@ struct FTMChest
 	int32 Tier = 0;
 	float Phase = 0.0f;
 	float LightBase = 0.0f;
+
+	/**
+	 * A column of light over it in its tier's colour, so a chest that dropped
+	 * is seen from across the board (v19 play test). A child of the chest, so
+	 * it shows only when the chest does: never through the fog.
+	 */
+	UPROPERTY()
+	TArray<TObjectPtr<UStaticMeshComponent>> Beam;
+	UPROPERTY()
+	TArray<TObjectPtr<class UMaterialInstanceDynamic>> BeamPaint;
+	FLinearColor BeamColour = FLinearColor::White;
 };
 
 /** A watchtower as it is drawn (TMBattleDirectorTower.cpp): its fire, which takes the holder's colour. */
@@ -204,6 +218,14 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Tactical Masters")
 	float ReadyLightBrightness = 12000.0f;
 
+	/**
+	 * Every unit's body drawn this much bigger than its mesh (times the map's
+	 * bodyScale), and what stands over a head raised with it: half as big again
+	 * since the v19 play test (2026-10-04). A head is about UnitHeadCm up.
+	 */
+	static constexpr float UnitSize = 1.5f;
+	static constexpr float UnitHeadCm = 180.0f * UnitSize;
+
 	/** The mesh each tile of the board is built from. */
 	UPROPERTY(EditAnywhere, Category = "Tactical Masters")
 	TSoftObjectPtr<UStaticMesh> TileMesh;
@@ -259,6 +281,11 @@ public:
 	void ApplyCamera();
 	/** Brings the camera round to the selected unit, or the first of this side's that is ready. */
 	void CenterCamera();
+	/** Brings the camera round to this unit (a double click on its chip or portrait). */
+	void CenterCameraOn(const TMSim::FUnit& Unit);
+	/** The last click on a unit's chip or portrait, to tell a double click (PickUnit). */
+	int32 LastPickId = -1;
+	double LastPickAt = -1.0;
 	void OnKeyUp(FKey Key);
 
 	// ---------------------------------------------- options and dev tools
@@ -563,8 +590,14 @@ private:
 		bool bElements = false;
 		/** Area blows hurt their caster's own side too (FTuning::FriendlyFire): off unless chosen. */
 		bool bFriendlyFire = false;
+		/** One of each class in the battle, both sides together (v19 play test): off unless chosen. Online, the host's. */
+		bool bUniqueClasses = false;
 		/** Cleared camps wake again later (FTuning::CampRespawn): off by default since 2026-10-01. */
 		bool bCampRespawn = false;
+		/** A boss hunts whoever has hurt it most (FTuning::BossHunt, "Camps and Bosses Mockups" C): off unless chosen. */
+		bool bBossHunt = false;
+		/** The side landing a boss's last blow claims its boon (FTuning::BossClaim, D): off unless chosen. */
+		bool bBossClaim = false;
 		uint64 FixedSeed = 12345;
 		/** The map, by id (TMSim::FindMap), and the look it is dressed in: empty for the map's own. */
 		std::string MapId = "highlands";
@@ -711,8 +744,8 @@ private:
 	/** The rule numbers a battle in the game starts from: the rules' own, with the game's newer rules turned on. */
 	static TMSim::FTuning GameTuning();
 
-	/** Sends an order for the selected unit and takes the next step after it. */
-	void OrderSelected(const TMSim::FOrder& Order);
+	/** Sends an order for the selected unit and takes the next step after it; false if it was refused. */
+	bool OrderSelected(const TMSim::FOrder& Order);
 
 	/** Keeps the selection honest as time runs: turns end, units fall. */
 	void MaintainSelection();
@@ -787,12 +820,16 @@ private:
 		bool bSprint = false;
 		std::vector<TMSim::FVec2> Via;
 		TMSim::FVec2 To;
+		/** Which way to face on arrival (TMSim::FacingWay), or -1 for the way it last steps (2026-10-03). */
+		int32 Face = -1;
 		/** The way drawn on the ground, and its length. */
 		std::vector<TMSim::FVec2> Path;
 		double Metres = 0.0;
 		int32 Slot = -1;
 		TMSim::FVec2 Target;
 		int32 Follow = -1;
+		/** The enemies in the unit's own sight when it was planned: one more, and the plan is dropped (2026-10-03). */
+		TSet<int32> Seen;
 		bool HasAbility() const { return Slot >= 0; }
 		bool IsEmpty() const { return !bWalk && Slot < 0; }
 	};
@@ -817,7 +854,7 @@ private:
 	/** The plan's last step back: a waypoint, then its ability, then its walk. */
 	void UndoPlanStep();
 	void ClearPlan(int32 UnitId);
-	void PlanWalk(const TMSim::FVec2& To);
+	void PlanWalk(const TMSim::FVec2& To, int32 Face = -1);
 	void PlanAbility(int32 Slot, const TMSim::FVec2& Target, int32 Follow);
 	/** Out of range while planning: the walk to the nearest spot it can be used from, then it. */
 	bool PlanWalkIntoRange(const TMSim::FUnit& Unit, const TMSim::FVec2& Point);
@@ -864,6 +901,15 @@ private:
 		/** The way left, and where each turn's walk will end (the last is Dest). */
 		std::vector<TMSim::FVec2> Route;
 		std::vector<TMSim::FVec2> Stops;
+		/**
+		 * An ability ordered from out of range (2026-10-03): it walks towards the
+		 * target, turn by turn, and uses it the turn it can get in range.
+		 * Follow: the unit aimed at, whose spot is followed; -1 for a spot.
+		 */
+		int32 Slot = -1;
+		TMSim::FVec2 Target;
+		int32 Follow = -1;
+		bool HasAbility() const { return Slot >= 0; }
 	};
 	TMap<int32, FTMGoTo> GoTos;
 	/** A walk-and-end step: the turn is ended once its walk has been applied. */
@@ -876,10 +922,27 @@ private:
 	double GoToHoverMetres = 0.0;
 
 	const FTMGoTo* GoToOf(int32 UnitId) const { return GoTos.Find(UnitId); }
+	/** A Go To's road and turn rings show only while its unit is pointed at, on the board or its turn square (2026-10-03). */
+	bool GoToShown(int32 UnitId) const { return HoverUnitId == UnitId || HudHoverUnitId == UnitId; }
 	/** On its way and needing nobody: not stopped, walking and ending its turns. */
 	bool IsMarching(int32 UnitId) const { const FTMGoTo* G = GoTos.Find(UnitId); return G && !G->bStopped && !G->bWaitForMe; }
 	/** Sends the unit there; this turn's walk at once if it can. False, with a word why, if there's no way. */
 	bool SetGoTo(int32 UnitId, const TMSim::FVec2& Dest);
+	/**
+	 * An ability aimed out of reach (2026-10-03): a Go To to the nearest spot
+	 * it can be used from, and the ability the turn it gets in range. False if
+	 * there is no such spot it can get to.
+	 */
+	bool SetAbilityGoTo(int32 UnitId, int32 Slot, const TMSim::FVec2& Target, int32 Follow);
+	/**
+	 * The way to the nearest spot the ability can be used on Target from (in
+	 * range, in sight where it needs it, not stood on), and how far. Empty if none.
+	 */
+	std::vector<TMSim::FVec2> ApproachRoute(const TMSim::FUnit& Unit, int32 Slot, const TMSim::FVec2& Target, double* OutMetres = nullptr);
+	/** An ability Go To's turn: used now, or walked into range and used, if it can be (true: done, the order is over). */
+	bool StepAbilityGoTo(int32 UnitId);
+	/** The ability under the pointer is beyond this turn's reach: GoToHoverStops is its way into range. */
+	bool bAbilityHoverGoTo = false;
 	/** This turn's walk along the way, unless something stopped it (bResume: it was told to carry on). */
 	bool StepGoTo(int32 UnitId, bool bResume);
 	void StopGoTo(int32 UnitId, const FString& Why);
@@ -888,6 +951,13 @@ private:
 	void RunDueGoTos();
 	/** The other side's units this side can see now. */
 	TSet<int32> EnemiesInSight(const TMSim::FUnit& Unit) const;
+	/** The other side's units within the unit's own sight, seen (2026-10-03: what ends a queued order). */
+	TSet<int32> EnemiesInOwnSight(const TMSim::FUnit& Unit) const;
+	/**
+	 * A queued unit that has just seen an enemy it did not see before: its Go
+	 * To or plan is cancelled and it is handed to the player. Checked each frame.
+	 */
+	void CancelQueuesOnSight();
 	/** Where each turn's walk ends along the way, with the unit's move; the last is the end of the way. */
 	std::vector<TMSim::FVec2> SplitRoute(const TMSim::FUnit& Unit, const std::vector<TMSim::FVec2>& Route) const;
 
@@ -923,6 +993,19 @@ private:
 	void PaintAbility(void* Painter, const TMSim::FUnit& Unit, const FAim& Where);
 	/** The plans of this machine's units (dashed walks, ghosts, aims), and the waypoints being set. */
 	void PaintPlans(void* Painter);
+	/**
+	 * A monster's wind-up (2026-10-02, "Camps and Bosses Mockups" B): where it
+	 * lands, filling as the cast runs out, and, round a boss, the arc to hit it
+	 * from to break it. Every caster this side can see, in purple.
+	 */
+	void PaintCasts(void* Painter);
+	/** Zones of control on the ground ("Zone of Control Mockups" A, B, D): each seen tank's, and while walking, each enemy's reach and the ground zones take away. */
+	void PaintZones(void* Painter, bool bMoving);
+	void PaintZoneShadow(void* Painter);
+	FString ZoneSignature() const;
+	/** ZoneShadow, for the walk being aimed. */
+	void RefreshZoneShadow();
+	FString CastSignature() const;
 	/** What PaintPlans would paint, in a line, so the ground is painted again only when it changes. */
 	FString PlanSignature() const;
 	/** Whether the decal is up; without its material the HUD draws outlines instead. */
@@ -1000,6 +1083,143 @@ private:
 
 	/** Something the person should read: why an order was refused, mostly. */
 	void Tell(const FString& What);
+	/** A refused move or action (2026-10-03): its sound (sounds.json events noMove, noAction), then the words. */
+	void Deny(const TCHAR* Event, const FString& Why);
+	float LastDenyAt = -100.0f;
+
+	// ------------------------------------------------ feel (2026-10-03)
+	// (TMBattleDirectorFeel.cpp; Docs/design/feat-combat-feel.md) How the
+	// controls answer and how blows land. Nothing here is a rule: the battle's
+	// clock is the rules' and runs on real time whatever the look does, except
+	// fast-forward, which runs it faster offline while nobody here has a turn.
+
+	/** Where a click on the board was taken, as a ring that spreads and fades, and its tick. */
+	struct FTMClickMark
+	{
+		TMSim::FVec2 Point;
+		FLinearColor Colour = FLinearColor::White;
+		double Born = 0.0;
+	};
+	TArray<FTMClickMark> ClickMarks;
+	static constexpr double ClickMarkSeconds = 0.45;
+	void Acknowledge(const TMSim::FVec2& Point, const FLinearColor& Colour, bool bSound = true);
+	/** The pointer tells what a click would do: a hand on a button or one of yours, crosshairs aiming, a bar where it can't. */
+	void UpdateCursor();
+
+	/** Quick Cast: the ability key held now, and its slot, to be used where the pointer is when it is let go. */
+	int32 QuickSlot = -1;
+	FKey QuickKey;
+	void QuickRelease();
+	/** The ability being aimed, used where it points: a click's work for it (OnClick, QuickRelease). */
+	void ClickAbility(const TMSim::FUnit& Unit, bool bPlanning);
+
+	/** Online, an order given while the last is still with the host: kept, and given when the answer comes. */
+	FKey BufferedKey;
+	bool bBufferedClick = false;
+	double BufferedAt = 0.0;
+	FVector2D BufferedMouse = FVector2D::ZeroVector;
+	bool bWasWaitingForHost = false;
+	/** Whether this input is kept for later (true: OnKey or OnClick stops there). */
+	bool BufferWhileWaiting(const FKey& Key, bool bClick);
+	void ReplayBuffered();
+
+	/** Fast-forward: the key held, or the option, while none of this machine's units is ready (offline only). */
+	bool bFastForwarding = false;
+	bool WantsFastForward() const;
+	/** Hit-stop: the world all but still for a moment as a heavy blow lands, in platform seconds. */
+	double HitStopUntil = 0.0;
+	void HitStop(float Seconds);
+	/** The world slowed to Factor for a while (crits, falls, ultimates); the slowest wins. */
+	float SlowFactor = 1.0f;
+	void SlowWorld(float Factor, float Seconds);
+	/** Puts the slowest of the above into effect, or fast-forward's speed; the clock's share of real time is returned. */
+	float UpdateDilation();
+	float AppliedDilation = 1.0f;
+
+	/** A close-up on whoever uses an ultimate (Options), then back; any key or click ends it. */
+	double CloseUpUntil = 0.0;
+	FVector CloseUpReturnTarget = FVector::ZeroVector;
+	float CloseUpReturnDistance = 0.0f;
+	/** Caster: whose ultimate; one of yours ordered just now is no reason to hold it (camera rules A). */
+	void CloseUp(const FVector& Where, int32 Caster = -1);
+	void EndCloseUp();
+	/** The wheel: closer or further, toward where the pointer is (Options). */
+	void ZoomCamera(bool bIn);
+	/** The camera goes ahead of a walk (From to To) whose end is near the edge of the screen. */
+	void LeadCamera(const TMSim::FVec2& From, const TMSim::FVec2& To);
+	/** Edge pan's speed, rising while the pointer stays at the edge. */
+	float EdgeHeld = 0.0f;
+
+	/**
+	 * Facing on arrival (2026-10-03): a walk is pressed on where it ends and
+	 * given when the button is let go; dragged away from that spot first, the
+	 * unit ends facing the way of the drag (the nearest of eight). A plain
+	 * click walks as it always has, facing its last step.
+	 */
+	struct FTMWalkPress
+	{
+		bool bActive = false;
+		TMSim::FVec2 To;
+		FVector2D Mouse = FVector2D::ZeroVector;
+		int32 UnitId = -1;
+		int32 Serial = -1;
+		bool bPlanning = false;
+		/** The way chosen so far (TMSim::FacingWay), or -1 while the drag is too short. */
+		int32 Face = -1;
+	};
+	FTMWalkPress WalkPress;
+	/** Each frame while pressed: the way the drag points, or the press called off. */
+	void UpdateWalkPress();
+	/** The button let go: the walk (or the plan's walk), facing the way dragged. */
+	void ReleaseWalk();
+	/** The nearest of the eight ways to a direction on the board, or -1 for none. */
+	static int32 FaceToward(const TMSim::FVec2& Direction);
+
+	// ------------------------------------------------ camera rules (2026-10-03)
+	// ("Camera Rules Mockups", A + B + C + D; TMBattleDirectorFeel.cpp) The
+	// camera moves by itself only when the player's hands are off the controls,
+	// and only because of their own unit's turn ending (or a queued unit handed
+	// back); a unit becoming ready never takes the selection from one being
+	// ordered or planned -- it is pointed out instead.
+
+	/** In the middle of an order: aiming, pressing a walk, planning, waypoints, dragging, a menu (A). */
+	bool MidOrder() const;
+	/** When this machine's player last pressed a key or a button, in real seconds (A). */
+	double LastInputAt = -100.0;
+	/** One of yours just ended its turn: until then a unit taken up next may be followed (C). */
+	double FollowArmedUntil = 0.0;
+	/** The camera wants to go to this unit, since when, and why it is waiting, for the "Camera held" note. */
+	int32 PendingFollowId = -1;
+	double PendingFollowSince = 0.0;
+	FString CameraHeldWhy;
+	/** Asks the camera to go to a unit, by the rules: Options' follow, the hands, already on screen. */
+	void RequestFollow(int32 UnitId);
+	/** Each frame: a follow asked for goes now, waits, or is let go. */
+	void UpdateFollow();
+	/** Whether a unit is comfortably on screen: inside the middle 80% of it. */
+	bool OnScreenNow(const TMSim::FUnit& Unit) const;
+	/** A unit of yours that became ready while you were busy with another (B): pointed out, not taken. */
+	int32 ReadyToastId = -1;
+	double ReadyToastSince = 0.0;
+	void PointOut(int32 UnitId);
+
+	/**
+	 * Online, the joiner's own walks are shown setting off at once, before the
+	 * host has answered (TMBattleDirectorMotion.cpp): where each is going, by
+	 * unit, and when it was sent. Only the look: the unit is where the rules
+	 * say once the answer comes, and walks back if the host refused it.
+	 */
+	struct FTMPredicted
+	{
+		TMSim::FVec2 To;
+		double Sent = 0.0;
+	};
+	TMap<int32, FTMPredicted> PredictedWalks;
+	void PredictWalk(const TMSim::FOrder& Order);
+	/** Walks the host refused (or never answered) go back where the rules have the unit; each frame while any are out. */
+	void SettlePredictions();
+	/** The host's last answer to this machine was a refusal (TMBattleDirectorOnline.cpp); read by SettlePredictions. */
+	bool bHostRefused = false;
 
 	/**
 	 * The selected unit spends its turn at the nearest watchtower within reach,
@@ -1105,10 +1325,24 @@ private:
 	int32 AimSlot = -1;
 	bool bSprinting = false;
 	std::vector<std::pair<TMSim::FNode, double>> Reachable;
+	/** Ground the walk could reach but for the enemy's tanks ("Zone of Control Mockups" B), hatched in the walk area. */
+	std::vector<TMSim::FNode> ZoneShadow;
+	/** Pointing at that ground: the tank whose zone ends a walk that way, where, and the rest of the way. */
+	int32 ZoneStopBy = -1;
+	TMSim::FVec2 ZoneStopAt;
+	std::vector<TMSim::FVec2> ZoneGhost;
+	/** Planning a tank's walk ("Zone of Control Mockups" D): each seen enemy's way to the back line with the tank where the walk ends, and whose walk. */
+	std::vector<TMSim::FLane> TankLanes;
+	int32 TankLanesFor = -1;
 
 	bool bHaveHover = false;
 	TMSim::FVec2 HoverPoint;
 	int32 HoverUnitId = -1;
+	/** The unit whose turn chip, square or cooldown pin the pointer is on (the HUD sets it each frame): outlined as if pointed at. */
+	int32 HudHoverUnitId = -1;
+	/** What the boss bar announces (a hunt, a claim), and when, in real seconds (DrawBossBar). */
+	FString BossNews;
+	float BossNewsAt = -100.0f;
 
 	/** The path last drawn, kept so the pathfinder is not asked every frame. */
 	TMSim::FNode PathNode{ -9999, -9999 };
@@ -1194,6 +1428,8 @@ private:
 		float Age = 0.0f;
 		/** Red for a wound, blue for a soak, green for healing, gold for a return. */
 		FLinearColor Colour = FLinearColor(1.0f, 0.25f, 0.2f);
+		/** How bright it flares: 1 as it always has; a wound by how much it took (2026-10-03). */
+		float Strength = 1.0f;
 	};
 
 	UPROPERTY()
@@ -1450,6 +1686,12 @@ private:
 	bool LoadingProgress(FString& What, float& Fraction) const;
 	/** The bodies for the battle, while they load; the next random teams' heroes, likewise. */
 	TSharedPtr<struct FStreamableHandle> BodyLoad;
+	/**
+	 * The last load once it is in, held until the next one is: its effects and
+	 * sounds stay in memory through the battle instead of being let go, unloaded
+	 * a minute later and read from disk again mid-battle (FlushAsyncLoading).
+	 */
+	TSharedPtr<struct FStreamableHandle> BodyKept;
 
 	// The Unit Guide's turntable (TMBattleDirectorShowcase.cpp): a class's hero on
 	// its own, far above the board and seen only by its camera, turning slowly.
@@ -1484,15 +1726,53 @@ private:
 	mutable int32 PipelinesPeak = 0;
 
 	/** What one unit is doing on screen. */
+	/**
+	 * One ability's Cast Studio picks for one body, loaded
+	 * (Content/Data/CastStudio/AbilityAnimation.json; TMCast). Null where
+	 * nothing was picked: the character map's clips play there, as before.
+	 */
+	struct FTMCastClips
+	{
+		/** Before the release, or once as a cast begins. */
+		UAnimSequence* Windup = nullptr;
+		UAnimSequence* Release = nullptr;
+		/** While it charges or channels. */
+		UAnimSequence* Loop = nullptr;
+		/** After the release, before standing again. */
+		UAnimSequence* Recover = nullptr;
+		/** When the release connects, 0 to 1 of it; below zero, the motion's usual. */
+		float Contact = -1.0f;
+	};
+
 	struct FTMMotion
 	{
 		const FTMBody* Body = nullptr;
+		/** Its abilities' Cast Studio picks, by slot, for the body it wears (ResetMotion). */
+		FTMCastClips Picked[TMSim::AbilitySlots];
+		/** One-offs to play after the one playing, in order: a picked release after its wind-up, a recover after that. */
+		TArray<UAnimSequence*> Then;
+		/** The same for a swing waiting on a walk (Queued). */
+		TArray<UAnimSequence*> QueuedThen;
 		/** Where it is drawn, and which way it faces, in degrees. */
 		FVector Shown = FVector::ZeroVector;
 		float Yaw = 0.0f;
 		/** The rest of a walk, as points on the board; empty when standing. */
 		TArray<FVector> Path;
 		bool bRun = false;
+		/** How much faster than its walk or run a long walk goes, and how long it has been walking (2026-10-03). */
+		float Pace = 1.0f;
+		/**
+		 * A movement skill under way (2026-10-03): 0 none, 1 a leap (an arc
+		 * through the air, the jump clip, the blow on landing), 2 a dash (fast
+		 * and low, the swing as it goes), 3 a step through smoke (gone, then
+		 * there). From where, how long it has been going and takes, how high.
+		 */
+		uint8 Flight = 0;
+		FVector FlightFrom = FVector::ZeroVector;
+		float FlightAge = 0.0f;
+		float FlightTime = 0.0f;
+		float FlightArc = 0.0f;
+		float WalkAge = 0.0f;
 		/** Where the rules had it last frame, to notice it moving. */
 		TMSim::FVec2 SimPos;
 		/** The clip playing, and how long a one-off has left. */
@@ -1514,6 +1794,12 @@ private:
 		bool bWasCasting = false;
 		/** The release it last began, or will begin when its walk ends. */
 		UAnimSequence* LastRelease = nullptr;
+		/**
+		 * What plays before that release (a picked wind-up), in seconds, and the
+		 * picked contact, below zero for none: when the blow connects (GatherBlows).
+		 */
+		float LastLead = 0.0f;
+		float LastContact = -1.0f;
 		/**
 		 * Blows on their way that will knock it down or raise it. Until they
 		 * land it stays as it was, so nobody falls before the arrow reaches them.
@@ -1547,6 +1833,8 @@ private:
 		TWeakObjectPtr<class UPointLightComponent> Glow;
 		/** The particle it flies as, when its look has one (TMBattleDirectorAbilityFx.cpp). */
 		TWeakObjectPtr<class UFXSystemComponent> Trail;
+		/** What Cast Studio's projectile events play on it, ended with it (CastEnd); 0 for none. */
+		uint64 CastKey = 0;
 		FVector From = FVector::ZeroVector;
 		FVector To = FVector::ZeroVector;
 		float Flight = 0.3f;
@@ -1666,6 +1954,141 @@ private:
 	FVector JoltOffset = FVector::ZeroVector;
 	/** With -tmcapture, a picture a moment after a blow lands, when its effects are up. */
 	float LookCaptureIn = -1.0f;
+	/** An effect by its object path, loaded once and kept (LoadedVfx); null for one that cannot play. */
+	UObject* LoadLookFx(const FString& Path);
+	class UFXSystemComponent* PlayFx(const TMCast::FLegacyFx& Fx, const FVector& Local, float WantCm,
+		class USceneComponent* AttachTo = nullptr);
+
+	// ------------------------------------------------ Cast Studio's looks
+	// (TMBattleDirectorCast.cpp). What a designer authored in the class
+	// creator's Cast Studio for how each ability looks, published to
+	// Content/Data/CastStudio/AbilityLooks.json and read by TMCast (CastLooks.h).
+	// Each ability's events play at its moments -- the cast, the swing, the
+	// release, each shot, each unit it touches, the ground it covers, the
+	// statuses it leaves and their ticks and ends, the pet it calls -- on top of
+	// today's look, or in its place where the designer stripped it. Only the
+	// look: nothing here is read by the rules, so no battle, replay or online
+	// match can come out differently. No file: every ability looks as before.
+
+	/** Reads the published looks, again whenever the file has changed (as each battle loads). */
+	void LoadCastLooks();
+	/** How much of today's look an ability keeps: all of it (None), all but its class file's effect (Legacy), none (All). */
+	TMCast::EStrip CastStrip(const TMSim::FAbility* Ability) const;
+	/** An ability's authored look, or null. */
+	const TMCast::FLook* CastLookOf(const TMSim::FAbility* Ability) const;
+
+	/** Where a moment is raised, and what is known there. */
+	struct FTMCastAt
+	{
+		/** The unit its events sit on: the user, the one struck, the status's bearer, the pet. -1 for none. */
+		int32 UnitId = -1;
+		/** The area's centre and the aim, on the ground (director space). */
+		FVector Centre = FVector::ZeroVector;
+		FVector Aim = FVector::ZeroVector;
+		/** How wide the ability's area is, in centimetres; 0 for a single target. */
+		float AreaCm = 0.0f;
+		/** How hard the blow's heaviest hit was, as a share of someone's health (shakes). */
+		float Harm = 0.0f;
+		/** A projectile's shot, which its events ride on. */
+		TWeakObjectPtr<class USceneComponent> Carrier;
+		/** Whether this side sees it: nothing plays for what fog hides. */
+		bool bSeen = true;
+	};
+
+	/** Plays a look's events for one moment. Lasting ones are kept under Key until CastEnd(Key). */
+	void CastRaise(const TMCast::FLook* Look, TMCast::EMoment Moment, const TMCast::FMomentContext& Context,
+		const FTMCastAt& At, uint64 Key = 0, const TMCast::FSwingTimes* Swing = nullptr);
+	/** One event, now. */
+	void CastSpawn(const TMCast::FLookEvent& Event, const FTMCastAt& At, uint64 Key);
+	/** Ends everything playing under Key: a cast finished, a shot landed, a status gone. */
+	void CastEnd(uint64 Key);
+	/** Where an event goes, in director space, and the facing it is turned by. False if what it sits on is gone. */
+	bool CastPlace(const TMCast::FLookEvent& Event, const FTMCastAt& At, FVector& Local, float& Yaw, const char*& Resolved);
+	uint64 CastNewKey() { return ++CastKeys; }
+	/** A unit raising its moment, with what the director knows of it. */
+	FTMCastAt CastAtUnit(int32 UnitId);
+	/** Delays, followers, durations, repeats; and casts and statuses beginning and ending. Every frame. */
+	void AdvanceCast(float DeltaSeconds);
+	/** Statuses that have ended, and channels: their expire moments, before the frame's hits. */
+	void CastNoticeEnds();
+	/** Everything playing stopped, everything remembered forgotten: a new battle. */
+	void ClearCast();
+
+	// The director's own moments, raised where today's look is.
+	/** The swing begins (after any walk there): swing, and castStart for an instant ability. */
+	void CastSwing(const FTMBlow& Blow);
+	/** The blow connects: release. */
+	void CastRelease(const FTMBlow& Blow);
+	/** A shot leaves: its projectile events ride it. The key to end them with. */
+	uint64 CastShot(const FTMBlow& Blow, class USceneComponent* Carrier);
+	/** It lands: impact on each unit it touched, and area once. */
+	void CastLand(const FTMBlow& Blow);
+	/** One event shown (ShowOne): a cast beginning, a status given or ticking, a reaction, a pet come or gone. */
+	void CastShown(const TMSim::FEvent& Event, const TMSim::FAbility* Ability, int32 CasterId);
+
+	TMCast::FLooksFile CastLooks;
+	FDateTime CastLooksTime = FDateTime::MinValue();
+	uint64 CastKeys = 0;
+
+	/** Something Cast Studio is playing. */
+	struct FTMCastLive
+	{
+		TWeakObjectPtr<class USceneComponent> Component;
+		uint64 Key = 0;
+		/** Moves with what it sits on. */
+		bool bFollow = false;
+		TMCast::FLookEvent Event;
+		FTMCastAt At;
+		float Age = 0.0f;
+		/** Seconds it plays; 0 until its key ends. */
+		float Life = 0.0f;
+		/** A repeater: plays its event again every Event.Repeat seconds until its key ends. */
+		bool bRepeater = false;
+		float NextRepeat = 0.0f;
+	};
+	TArray<FTMCastLive> CastLive;
+
+	/** An event waiting out its delay. */
+	struct FTMCastPending
+	{
+		TMCast::FLookEvent Event;
+		FTMCastAt At;
+		uint64 Key = 0;
+		float In = 0.0f;
+	};
+	TArray<FTMCastPending> CastPending;
+
+	/** A status shown on a unit, and who gave it: the ability's looks follow it until it ends. */
+	struct FTMCastStatus
+	{
+		int32 UnitId = -1;
+		FString Status;
+		/** The ability that gave it, or empty (a reaction's Wet, a camp's shrine). */
+		FString Ability;
+		uint64 Key = 0;
+	};
+	/** By "unit:status". */
+	TMap<FString, FTMCastStatus> CastStatuses;
+
+	/** A unit casting or channelling, and its casting events' key. */
+	struct FTMCastCasting
+	{
+		int32 Slot = -1;
+		bool bChannel = false;
+		uint64 Key = 0;
+	};
+	TMap<int32, FTMCastCasting> CastCasting;
+
+	/** A pet on the board, and the ability that called it. */
+	struct FTMCastPet
+	{
+		FString Ability;
+		uint64 Key = 0;
+	};
+	TMap<int32, FTMCastPet> CastPets;
+
+	/** What was spawned, one line each, newest last: Film this ability writes it out (phase 3). */
+	TArray<FString> CastSpawnLog;
 
 	UPROPERTY()
 	TArray<TObjectPtr<class UPointLightComponent>> StatusLights;
@@ -1683,6 +2106,14 @@ private:
 
 	/** Reads the character map once per run. False, and said why, if it cannot. */
 	bool LoadCharacterMap();
+	/**
+	 * Reads Cast Studio's published animation picks, again whenever the file
+	 * has changed (checked as each battle starts, so a Publish from the class
+	 * creator shows in the next battle). No file: nothing picked.
+	 */
+	void LoadCastAnimation();
+	/** An ability's picks for a body, loaded; a clip not made for the body's skeleton is left out, and said once. */
+	FTMCastClips CastClipsFor(const FTMBody& Body, const TMSim::FAbility& Ability);
 	const FTMBody* BodyFor(const TMSim::FUnit& Unit) const;
 	const FTMBody* BodyForJob(const std::string& JobId) const;
 	/** Starts every unit standing where the rules put it. */
@@ -1782,6 +2213,10 @@ private:
 	/** A class for a slot (team * 4 + slot): the host's own, or asked of it. */
 	void LobbyPick(int32 SlotCode, const std::string& JobId);
 	bool LobbyMayPick(int32 Player, int32 SlotCode) const;
+	/** Whether a class is on any slot of either side but this one (Setup.bUniqueClasses). */
+	bool ClassTaken(const std::string& JobId, int32 Team, int32 Slot) const;
+	/** With one of each class: every slot holding a class an earlier slot has gets another of its role. */
+	void DedupeRosters();
 	void LobbyApplyPick(int32 Player, int32 SlotCode, const std::string& JobId);
 	/** The lobby's messages: true if it was one. */
 	bool OnLobbyMessage(const FString& Kind, const FJsonObject& Message, int32 From);
@@ -1846,6 +2281,11 @@ private:
 	void SoundStep(int32 Index, float DeltaSeconds);
 
 	bool bCharacterMapRead = false;
+	/** Cast Studio's animation picks, and the file's time when they were read (LoadCastAnimation). */
+	TMCast::FAnimationFile CastAnimation;
+	FDateTime CastAnimationTime = FDateTime::MinValue();
+	/** Picks already said to be unplayable, so each is said once a run. */
+	TSet<FString> CastWarned;
 	/**
 	 * Every set as the map writes it, and the sets loaded so far. Loaded only
 	 * when worn: thirty heroes' clips at once ran the editor out of memory, and
@@ -2229,6 +2669,8 @@ public:
 		/** Damage that never landed: Armor or Resist's share, dodges and grazes, Protect or Shell, shields. */
 		int32 Mitigated = 0;
 		int32 Healing = 0;
+		/** Healing this unit took in, from anyone or anything: abilities, Regen, springs, mending. */
+		int32 HealingReceived = 0;
 		int32 Kills = 0;
 		int32 Assists = 0;
 		int32 Deaths = 0;

@@ -29,6 +29,9 @@ namespace TMSim
 	struct FItemDef;
 	struct FVec2;
 	struct FAbility;
+	struct FJobDef;
+	class FBattle;
+	struct FOdds;
 }
 
 /** Something on the HUD that does something when clicked. */
@@ -40,6 +43,8 @@ enum class ETMHudAction : uint8
 	Ability,
 	EndTurn,
 	PickUnit,
+	/** The "is ready" note's Go: that unit (Value), and the camera to it (2026-10-03). */
+	ReadyGo,
 	NewBattle,
 
 	// The title screen.
@@ -118,7 +123,12 @@ enum class ETMHudAction : uint8
 	DevReset,
 	DevResetAll,
 	OptionTurnSquares,
+	OptionSquadStrip,
 	OptionAutoRecenter,
+	/** Quick Cast on or off for an ability key; Value is its slot, 0-3 (2026-10-03). */
+	OptionQuickCast,
+	/** One of the feel options on or off; Value says which (ATMBattleHud::FeelOption). */
+	OptionFeel,
 
 	// Edit layout. LayoutGrab's value is the panel's place in this frame's list;
 	// LayoutCard's is the unit whose turn square is being dragged.
@@ -142,7 +152,10 @@ enum class ETMHudAction : uint8
 	SetupBoss,
 	SetupElements,
 	SetupFriendlyFire,
+	SetupUniqueClasses,
 	SetupCampRespawn,
+	SetupBossHunt,
+	SetupBossClaim,
 	TakeOpen,
 	/** The combat log's tab: 0 All, 1 Combat, 2 Mine, 3 Key. */
 	LogTab,
@@ -233,14 +246,41 @@ public:
 	FString DescribeMiss(const FVector2D& Point) const;
 	/** A button on screen now, by what it does (Value -2: any value). For the robot playtester. */
 	bool FindButton(ETMHudAction Action, int32 Value, FTMHudButton& Out) const;
+	/** The feel options (Options), by OptionFeel's value; null for none. */
+	static bool* FeelOption(int32 Which);
 
 private:
 	ATMBattleDirector* FindDirector();
 
 	// The parts, top to bottom.
 	void DrawBoardAids(ATMBattleDirector& Director);
+	/**
+	 * A damaging blow's odds on one unit ("Open Odds Mockups" A): its health and
+	 * where each outcome leaves it, a bar split hit / crit / graze / dodge by
+	 * chance, the damage of each, and the chance it falls. Centred on CX, its
+	 * foot at Bottom; returns its height.
+	 */
+	float OddsCard(const TMSim::FUnit& Target, const TMSim::FOdds& Odds, bool bFriend, const FString& Extra, float CX, float Bottom);
+	/**
+	 * An enemy pointed at ("Open Odds Mockups" C): its best blow on each of your
+	 * units on its next turn, as lines and odds, and a card listing them; and
+	 * while you plan a walk, which enemies reach where it ends.
+	 */
+	void DrawThreats(ATMBattleDirector& Director);
+	/**
+	 * Words for the zones of control ("Zone of Control Mockups" A, B, D) while a
+	 * walk is aimed: who holds the line, the cost of breaking away, where a walk
+	 * into a zone ends, and, for a tank, the ways to your back line it would cut.
+	 */
+	void DrawZoneWords(ATMBattleDirector& Director);
 	void DrawTurnOrder(ATMBattleDirector& Director);
 	void DrawLog(ATMBattleDirector& Director);
+	/**
+	 * Your squad down the left edge ("Squad Strip Mockups" C): a health ring and
+	 * status icons with turns left for each; the unit acting now, and one pointed
+	 * at here, on its square or on the board, opens to its full row.
+	 */
+	void DrawSquadStrip(ATMBattleDirector& Director);
 	void DrawUnitCard(ATMBattleDirector& Director);
 	void DrawActionBar(ATMBattleDirector& Director);
 	/** Queued orders (2026-10-01): the selected unit's plan as steps, with Go, Undo and Clear, above Above. Returns the new top. */
@@ -249,6 +289,11 @@ private:
 	float DrawGoToStrip(ATMBattleDirector& Director, const TMSim::FUnit& Unit, float Above);
 	/** Each Go To's turn numbers on the ground, where each turn's walk ends. */
 	void DrawGoToMarks(ATMBattleDirector& Director);
+	/** Where clicks were taken, the walk's ghost, fast-forward (TMBattleHudFeel.cpp, 2026-10-03). */
+	void DrawFeel(ATMBattleDirector& Director);
+	/** A tick box with its words after it; it answers as Action, Value. */
+	void CheckBox(float X, float Y, float H, bool bOn, const FString& Words, ETMHudAction Action, int32 Value, const FString& Tip);
+
 	void DrawBanners(ATMBattleDirector& Director);
 	void DrawTitle(ATMBattleDirector& Director);
 	/** The Replays screen, and the bar along the bottom while one is watched (TMBattleHudReplay.cpp). */
@@ -294,6 +339,12 @@ private:
 	/** A slider with its track, fill and knob, answering the pointer over all of it. */
 	void Slider(float X, float Y, float W, float H, int32 Id, double Value, double Low, double High);
 	void DrawClassPicker(ATMBattleDirector& Director);
+	/**
+	 * A class at a glance, for choosing it (v19 play test): name, roles, its
+	 * numbers, and its four abilities with what each does. In the class picker
+	 * and the draft, for the class under the pointer.
+	 */
+	void DrawClassCard(const TMSim::FJobDef& Job, float X, float Y, float W, float H);
 	/** Every item that can go in one setup slot, by tier, with its cost and what it does. */
 	void DrawItemPicker(ATMBattleDirector& Director);
 	/** The items panel over the action bar: the cache in reach to take from, and the unit's own to leave. */
@@ -312,6 +363,26 @@ private:
 	float GearRow(const TMSim::FUnit& Unit, float X, float Y, float Size);
 	/** The words in the world -- numbers that fly off a blow, camp names, what lies in a cache -- drawn white-ish with a dark outline. */
 	void DrawWorldWords(ATMBattleDirector& Director);
+	/**
+	 * Over a unit casting (v19 play test, "Battle Indicator Alternatives" Cast A):
+	 * the ability's icon and name, the seconds left and a thick bar, its bottom
+	 * edge centred on (X, Bottom). Its height.
+	 */
+	float CastCard(const TMSim::FUnit& Unit, float X, float Bottom, float Scale);
+	/**
+	 * A tank's zone of control as shields circling its edge (v19 play test,
+	 * "Battle Indicator Alternatives" Tank B): every enemy tank in sight, and
+	 * one of yours under the pointer.
+	 */
+	void DrawZoneShields(ATMBattleDirector& Director);
+	/**
+	 * A gold READY tag over every unit in sight whose turn is up, in place of
+	 * the light at its feet the v19 play test found too bright ("Battle
+	 * Indicator Alternatives" Ready D; nothing drawn on the ground).
+	 */
+	void DrawReadyMarks(ATMBattleDirector& Director);
+	/** Cast B: a sigil under each caster, and a banner for an enemy cast that will catch yours. */
+	void DrawCastWarnings(ATMBattleDirector& Director);
 	/** What an item does, in one line: "+12 max HP, +10% ability damage". */
 	static FString ItemSummary(const TMSim::FItemDef& Item);
 	static FLinearColor TierColour(int32 Tier);
@@ -331,10 +402,33 @@ private:
 	void DrawOverheads(ATMBattleDirector& Director);
 	/** What is left of a unit's turn, two joined round tokens in front of its ring: the move and the action. */
 	void TurnPips(const TMSim::FUnit& Unit, float CX, float Top, float Zoom);
+	/** An ability cooling down, and on which of its owner's coming turns it is back (1 = the next). */
+	struct FTMBack
+	{
+		int32 Slot = -1;
+		int32 Turn = 0;
+		/** The ability being aimed: where its cooldown would put it if used now. */
+		bool bPreview = false;
+	};
+	/** Every ability of the unit cooling down, and the one being aimed (2026-10-02, "Cooldown Ghost Chip Mockups"). */
+	TArray<FTMBack> ComingBack(ATMBattleDirector& From, const TMSim::FUnit& Unit) const;
+	/** About how many seconds until the unit's Turn-th coming turn (1 = the next). */
+	float TurnInSeconds(const TMSim::FBattle& Battle, const TMSim::FUnit& Unit, int32 Turn) const;
+	/** The unit is pointed at, on the board or on its chip, square or pin: the others light up with it. */
+	bool TurnLinked(ATMBattleDirector& From, int32 UnitId) const;
+	/** Under a turn square: the unit's next three turns as ghost squares, with what comes back on each. */
+	void DrawComingTurns(ATMBattleDirector& From, const TMSim::FUnit& Unit, float X, float Top, bool bLeftward);
+	/**
+	 * The boss bar ("Camps and Bosses Mockups" B, C, D): an awake boss in sight,
+	 * its health (split by each side's share with the claim on), its wind-up and
+	 * stagger, whom it hunts and remembers, and what it has just announced.
+	 */
+	void DrawBossBar(ATMBattleDirector& From);
 	/** One of ours just in a fight: its health over its head for a few seconds, the lost part draining. */
 	void PopBar(ATMBattleDirector& Director, const TMSim::FUnit& Unit, float CentreX, float Bottom);
 	/** A row of status chips. Returns the width used. Right to left from X when bLeftward. */
-	float StatusChips(const TMSim::FUnit& Unit, float X, float Y, float Size, bool bLeftward, bool bTips);
+	/** Most > 0 draws at most that many, the last as "+N" for the rest. */
+	float StatusChips(const TMSim::FUnit& Unit, float X, float Y, float Size, bool bLeftward, bool bTips, int32 Most = 0);
 	/** An ability's icon tile: coloured when it can be used, grey with the turns left when it cannot. */
 	void AbilityTile(ATMBattleDirector& Director, const TMSim::FUnit& Unit, int32 Slot, float X, float Y, float Size, bool bButton);
 	/** An aura that is on: two lights chasing each other round the tile's edge, in its colour (the human's choice "B", 2026-09-30). */
@@ -440,10 +534,16 @@ private:
 
 	/** Where each turn chip is drawn, so it glides rather than jumps (hud.gd:1297-1311). */
 	TMap<int32, FVector2D> ChipPlace;
+	/** The unit whose chip, square or cooldown pin the pointer is on this frame, or -1. */
+	int32 HoverLink = -1;
 	TMap<int32, float> ChipScale;
 
 	/** The bottom of the log window, so the field list can sit under it. */
 	float LogBottom = 0.0f;
+	/** The bottom of the squad strip, or 0 when it is off, so the field list can sit under it. */
+	float SquadBottom = 0.0f;
+	/** The squad row the pointer was on last frame, which stays open while it is. */
+	int32 SquadHoverId = -1;
 
 	/** The top of the action bar, so the preview and notices can sit on it. */
 	float ActionBarTop = 0.0f;

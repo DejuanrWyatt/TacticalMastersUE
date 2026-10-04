@@ -30,8 +30,9 @@ namespace TMSim
 
 		const char* const ClassKeys[] = { "format", "version", "id", "name", "color", "look", "icon", "roles", "stats", "abilities", "creator", "monster" };
 		const char* const AbilityKeys[] = { "id", "name", "desc", "kind", "effect", "scale", "target", "shape", "power", "min_range",
-			"max_range", "aoe", "angle", "channel", "cooldown", "cast", "tg", "status", "buffs", "fx", "vfx", "anim", "special", "element" };
-		const char* const Specials[] = { "blink", "swap", "tame", "summon", "rewind" };
+			"max_range", "aoe", "angle", "channel", "cooldown", "cast", "tg", "status", "self_status", "buffs", "fx", "vfx", "anim", "special",
+			"element", "pet" };
+		const char* const Specials[] = { "blink", "swap", "tame", "summon", "rewind", "pet", "leap", "behind" };
 		const char* const Elements[] = { "fire", "ice", "lightning", "water", "none" };
 		const char* const MonsterKeys[] = { "tier", "temperament", "traits", "ring", "leash", "phases" };
 		const char* const Tiers[] = { "easy", "medium", "hard", "epic" };
@@ -172,6 +173,31 @@ namespace TMSim
 			{
 				Problems.Say(Where, "unknown special \"" + Out.Special + "\"");
 			}
+			// A pet (2026-10-02): what it calls up and for how many of its turns.
+			// The class need not be loaded yet: monsters are read after classes.
+			if (const FJson* Pet = Json.Find("pet"))
+			{
+				const FJson* PetJob = Pet->IsObject() ? Pet->Find("job") : nullptr;
+				const FJson* PetTurns = Pet->IsObject() ? Pet->Find("turns") : nullptr;
+				if (!PetJob || !PetJob->IsString() || !ValidId(PetJob->String, 96) || !PetTurns || !PetTurns->IsNumber()
+					|| !IsWhole(PetTurns->Number) || PetTurns->Number < 1.0 || PetTurns->Number > 10.0)
+				{
+					Problems.Say(Where, "\"pet\" should be a class id (\"job\") and 1 to 10 turns (\"turns\")");
+				}
+				else
+				{
+					Out.PetJob = PetJob->String;
+					Out.PetTurns = static_cast<int>(PetTurns->Number);
+				}
+				if (Out.Special != "pet")
+				{
+					Problems.Say(Where, "\"pet\" goes with \"special\": \"pet\"");
+				}
+			}
+			else if (Out.Special == "pet")
+			{
+				Problems.Say(Where, "\"special\": \"pet\" needs a \"pet\"");
+			}
 			Out.Element = StringOf(Json, "element", Where, Problems, false);
 			if (!Out.Element.empty() && !OneOf(Out.Element, Elements))
 			{
@@ -265,6 +291,22 @@ namespace TMSim
 				{
 					Out.StatusId = Id->String;
 					Out.StatusTurns = static_cast<int>(Turns->Number);
+				}
+			}
+			// What the user gives itself (2026-10-03), read as "status" is.
+			if (const FJson* Self = Json.Find("self_status"))
+			{
+				const FJson* Id = Self->IsObject() ? Self->Find("id") : nullptr;
+				const FJson* Turns = Self->IsObject() ? Self->Find("turns") : nullptr;
+				if (!Id || !Id->IsString() || !FindStatus(Id->String) || !Turns || !Turns->IsNumber()
+					|| !IsWhole(Turns->Number) || Turns->Number < 1.0 || Turns->Number > 10.0)
+				{
+					Problems.Say(Where, "\"self_status\" should be a known status id and 1 to 10 turns");
+				}
+				else
+				{
+					Out.SelfStatusId = Id->String;
+					Out.SelfStatusTurns = static_cast<int>(Turns->Number);
 				}
 			}
 			if (const FJson* Buffs = Json.Find("buffs"))

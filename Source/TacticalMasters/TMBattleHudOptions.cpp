@@ -34,6 +34,50 @@ void ATMBattleHud::Slider(float X, float Y, float W, float H, int32 Id, double V
 	SliderAreas.Add(Id, FBox2D(FVector2D(X, Y), FVector2D(X + W, Y + H)));
 }
 
+bool* ATMBattleHud::FeelOption(int32 Which)
+{
+	FTMSettings& Settings = FTMSettings::Get();
+	switch (Which)
+	{
+	case 0: return &Settings.bFastEnemyTurns;
+	case 1: return &Settings.bAutoEndTurn;
+	case 2: return &Settings.bCloseUps;
+	case 3: return &Settings.bZoomToCursor;
+	case 4: return &Settings.bEdgePan;
+	case 5: return &Settings.bLeadCamera;
+	case 6: return &Settings.bCameraHeldNote;
+	default: return nullptr;
+	}
+}
+
+void ATMBattleHud::CheckBox(float X, float Y, float H, bool bOn, const FString& Words, ETMHudAction Action, int32 Value, const FString& Tip)
+{
+	UFont* Font = GEngine->GetMediumFont();
+	const float Box = H * 0.62f;
+	const float BY = Y + (H - Box) * 0.5f;
+	// A dark square with a light rim; ticked, a gold square inside it.
+	DrawRect(FLinearColor(0.0f, 0.0f, 0.0f, 0.55f), X, BY, Box, Box);
+	const FLinearColor Rim = bOn ? Gold : TextColour * FLinearColor(1.0f, 1.0f, 1.0f, 0.7f);
+	const float T = FMath::Max(1.0f, 2.0f * S);
+	DrawRect(Rim, X, BY, Box, T);
+	DrawRect(Rim, X, BY + Box - T, Box, T);
+	DrawRect(Rim, X, BY, T, Box);
+	DrawRect(Rim, X + Box - T, BY, T, Box);
+	if (bOn)
+	{
+		const float Inset = Box * 0.24f;
+		DrawRect(Gold, X + Inset, BY + Inset, Box - Inset * 2.0f, Box - Inset * 2.0f);
+	}
+	const FVector2D Size = TextSize(Words, Font, 0.5f * S);
+	Text(Words, X + Box + 8.0f * S, Y + (H - Size.Y) * 0.5f, bOn ? Gold : TextColour, Font, 0.5f * S);
+	// The box and its words both answer.
+	AddButton(X, Y, Box + 12.0f * S + Size.X, H, Action, Value);
+	if (!Tip.IsEmpty())
+	{
+		AddTip(X, Y, Box + 12.0f * S + Size.X, H, Tip);
+	}
+}
+
 void ATMBattleHud::DrawOptions(ATMBattleDirector& From)
 {
 	FTMSettings& Settings = FTMSettings::Get();
@@ -86,10 +130,53 @@ void ATMBattleHud::DrawOptions(ATMBattleDirector& From)
 		TEXT("A square per unit, filling as its turn comes, instead of chips sliding along two bars. Move and reorder them in Edit layout."));
 	MenuButton(PX + LabelW, Y, 160.0f * S, RowH, Settings.bTurnSquares ? TEXT("On") : TEXT("Off"), ETMHudAction::OptionTurnSquares);
 	Y += RowH + 8.0f * S;
-	Label(FString::Printf(TEXT("Camera follows to the next ready unit  (%s toggles)"), *Settings.KeyName(ETMAction::AutoRecenter)), Y, PX,
-		TEXT("When a unit's turn ends, the camera slides to the next of yours that is ready. Off, it stays where you left it; Center camera and Next ready unit still move it."));
-	MenuButton(PX + LabelW, Y, 160.0f * S, RowH, Settings.bAutoRecenter ? TEXT("On") : TEXT("Off"), ETMHudAction::OptionAutoRecenter);
+	Label(TEXT("Squad strip down the left edge"), Y, PX,
+		TEXT("Your units with their health, statuses (and turns left on each) and cooldowns. The one acting opens to its full row; so does one you point at."));
+	MenuButton(PX + LabelW, Y, 160.0f * S, RowH, Settings.bSquadStrip ? TEXT("On") : TEXT("Off"), ETMHudAction::OptionSquadStrip);
 	Y += RowH + 8.0f * S;
+	Label(FString::Printf(TEXT("Camera follows to the next ready unit  (%s cycles)"), *Settings.KeyName(ETMAction::AutoRecenter)), Y, PX,
+		TEXT("When one of your units ends its turn and the next is ready at once, the camera may slide to it (only if it is off screen). Always: at once, but never while you are aiming, planning or dragging. When I'm idle: also not within 1.5 s of a key or a click. Never: only you move it. A unit that becomes ready while you are busy with another never takes it: it is pointed out instead."));
+	{
+		static const TCHAR* const Ways[3] = { TEXT("Always"), TEXT("When I'm idle"), TEXT("Never") };
+		const float WayW[3] = { 110.0f * S, 170.0f * S, 100.0f * S };
+		float WX = PX + LabelW;
+		for (int32 Way = 0; Way < 3; ++Way)
+		{
+			MenuButton(WX, Y, WayW[Way], RowH, Ways[Way], ETMHudAction::OptionAutoRecenter, Way, Settings.CameraFollow == Way);
+			WX += WayW[Way] + 6.0f * S;
+		}
+	}
+	Y += RowH + 8.0f * S;
+	// How the battle feels to play (2026-10-03, TMBattleDirectorFeel.cpp).
+	struct FFeelRow
+	{
+		FString Name;
+		const TCHAR* Tip;
+	};
+	const FFeelRow FeelRows[] =
+	{
+		{ FString::Printf(TEXT("Fast-forward the other side's turns  (hold %s any time)"), *Settings.KeyName(ETMAction::FastForward)),
+			TEXT("While none of your units is ready, the battle runs three times as fast: the enemy's turns, the waits. It never runs fast while one of yours has a turn. Not online, where time is the host's.") },
+		{ TEXT("End a unit's turn by itself when it has nothing left to use"),
+			TEXT("A unit that has walked and has no ability it could use now (all cooling down or blocked) ends its turn, rather than leaving you to press End turn. Not beside a chest or a tower it could take. Online, for the host only for now.") },
+		{ TEXT("Close-ups on ultimates"),
+			TEXT("The camera closes in on whoever uses an ultimate and what it is aimed at, for a moment, then goes back. Any key or click skips it.") },
+		{ TEXT("Zoom toward the pointer"),
+			TEXT("The mouse wheel zooms toward what the pointer is on. Off, it zooms toward the middle of the screen.") },
+		{ TEXT("Pan at the edge of the window"),
+			TEXT("Resting the pointer at the edge of the window pans the camera that way, gently at first.") },
+		{ TEXT("Camera goes ahead of a walk to the edge of the screen"),
+			TEXT("A walk whose end is near the edge of the screen, or off it, brings the camera halfway along.") },
+		{ TEXT("Say \"Camera held\" when the camera waits for you"),
+			TEXT("When the camera wanted to follow but you were busy, a small note says so; it follows once you are done, if that is soon.") },
+	};
+	for (int32 Row = 0; Row < static_cast<int32>(UE_ARRAY_COUNT(FeelRows)); ++Row)
+	{
+		const bool* On = FeelOption(Row);
+		Label(FeelRows[Row].Name, Y, PX, FeelRows[Row].Tip);
+		MenuButton(PX + LabelW, Y, 160.0f * S, RowH, On && *On ? TEXT("On") : TEXT("Off"), ETMHudAction::OptionFeel, Row);
+		Y += RowH + 8.0f * S;
+	}
 	Label(TEXT("Sound effects volume"), Y, PX, TEXT("How loud swings, spells, hits, footsteps and the menus are."));
 	Slider(PX + LabelW, Y + 6.0f * S, ControlW, RowH - 12.0f * S, ATMBattleDirector::SliderSfxVolume, Settings.SfxVolume, 0.0, 1.0);
 	Text(FString::Printf(TEXT("%.0f%%"), Settings.SfxVolume * 100.0f), PX + LabelW + ControlW + 16.0f * S, Y + 8.0f * S, TextColour, Font, 0.62f * S);
@@ -126,6 +213,13 @@ void ATMBattleHud::DrawOptions(ATMBattleDirector& From)
 		}
 		MenuButton(CX + 280.0f * S, CY, 240.0f * S, KeyRowH, From.CaptureAction == i ? FString(TEXT("Press a key...")) : Names,
 			ETMHudAction::RebindAction, i, From.CaptureAction == i);
+		// Quick Cast, next to each ability's key (2026-10-03).
+		const int32 Slot = i - static_cast<int32>(ETMAction::Ability1);
+		if (Slot >= 0 && Slot < 4)
+		{
+			CheckBox(CX + 532.0f * S, CY, KeyRowH, Settings.bQuickCast[Slot], TEXT("Quick Cast"), ETMHudAction::OptionQuickCast, Slot,
+				TEXT("Quick Cast: hold the key to aim the ability, let go to use it where the pointer is -- no click. Let go over a button to put it down. Off: the key aims, a click uses it."));
+		}
 	}
 	Y += PerColumn * (KeyRowH + 4.0f * S) + 12.0f * S;
 	Text(TEXT("Mouse (fixed): left-click select / move / target · right-click cancel · right-drag rotate and tilt camera · middle-drag pan · wheel zoom (or scroll the log)"),

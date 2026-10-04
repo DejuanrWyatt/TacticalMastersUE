@@ -485,8 +485,9 @@ int main()
 		}
 		// Godot's 28, in Godot's order, then the watchtowers' three, the item
 		// budget, the camps' two, element reactions and friendly fire after them
-		// (not Godot's), so every older rule keeps its index.
-		if (TuningKeys().size() != 40 || Speed < 0 || KoSeconds < 0
+		// (not Godot's), so every older rule keeps its index; the boss's hunt and
+		// claim last (2026-10-02).
+		if (TuningKeys().size() != 44 || Speed < 0 || KoSeconds < 0
 			|| std::string(TuningKeys()[27].Key) != "battle_seconds"
 			|| std::string(TuningKeys()[28].Key) != "watchtower_count"
 			|| std::string(TuningKeys()[32].Key) != "camps"
@@ -494,7 +495,11 @@ int main()
 			|| std::string(TuningKeys()[36].Key) != "camp_respawn"
 			|| std::string(TuningKeys()[37].Key) != "defense_model"
 			|| std::string(TuningKeys()[39].Key) != "zone_of_control"
-			|| std::string(TuningKeys()[38].Key) != "defense_scale")
+			|| std::string(TuningKeys()[38].Key) != "defense_scale"
+			|| std::string(TuningKeys()[40].Key) != "boss_hunt"
+			|| std::string(TuningKeys()[41].Key) != "boss_claim"
+			|| std::string(TuningKeys()[42].Key) != "spring_percent"
+			|| std::string(TuningKeys()[43].Key) != "spring_rest_turns")
 		{
 			Fail("the tuning table should have Godot's 28 rule numbers, then the watchtowers' three, the item budget, the camps' two, elements and friendly fire");
 		}

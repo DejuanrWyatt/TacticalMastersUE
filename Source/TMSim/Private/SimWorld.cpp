@@ -389,6 +389,13 @@ namespace TMSim
 			Mix(static_cast<uint64_t>(Tower.Capturer + 1));
 			Mix(static_cast<uint64_t>(Tower.Progress));
 		}
+		// Dry springs: which, for whom, how long.
+		for (const FSpringRest& Rest : SpringRests)
+		{
+			Mix(static_cast<uint64_t>(Rest.Tile));
+			Mix(static_cast<uint64_t>(Rest.UnitId + 1));
+			Mix(static_cast<uint64_t>(Rest.Turns));
+		}
 		// The dice themselves. Two machines that have drawn a different number of
 		// times still agree about the board for a while, and then disagree about
 		// the very next thing anyone rolls for -- so the generator's own position
@@ -417,6 +424,7 @@ namespace TMSim
 			Mix(static_cast<uint64_t>(Unit.KoTicks));
 			Mix(static_cast<uint64_t>(Unit.bHustling ? 1 : 0));
 			Mix(static_cast<uint64_t>(Unit.UnharmedTurns));
+			Mix(static_cast<uint64_t>(Unit.bSpotted ? 1 : 0));
 
 			for (const FStatus& Status : Unit.Statuses)
 			{
@@ -482,6 +490,8 @@ namespace TMSim
 			Mix(static_cast<uint64_t>(Unit.Team));
 			Mix(static_cast<uint64_t>(Unit.CharmedFrom + 1));
 			Mix(static_cast<uint64_t>(Unit.ReraiseTicks));
+			Mix(static_cast<uint64_t>(Unit.PetOf + 1));
+			Mix(static_cast<uint64_t>(Unit.PetTurns));
 			if (Unit.bMonster)
 			{
 				Mix(static_cast<uint64_t>(Unit.Camp + 1));
@@ -495,6 +505,15 @@ namespace TMSim
 				Mix(static_cast<uint64_t>(Unit.Phase));
 				Mix(static_cast<uint64_t>(Unit.Stagger));
 				Mix(static_cast<uint64_t>(Unit.TamedTurns));
+				for (const std::pair<int, int>& Entry : Unit.Wrath)
+				{
+					Mix(static_cast<uint64_t>(Entry.first + 1));
+					Mix(static_cast<uint64_t>(Entry.second));
+				}
+				Mix(static_cast<uint64_t>(Unit.HuntTarget + 1));
+				Mix(static_cast<uint64_t>(Unit.HuntLost));
+				Mix(static_cast<uint64_t>(Unit.Claim[0]));
+				Mix(static_cast<uint64_t>(Unit.Claim[1]));
 			}
 		}
 		// The camps, the items on the ground, and the two generators that place
@@ -510,6 +529,14 @@ namespace TMSim
 			Mix(static_cast<uint64_t>(Held.ShrineRest));
 			Mix(static_cast<uint64_t>(Held.Wakes));
 			Mix(static_cast<uint64_t>(Held.Route.size()));
+			Mix(static_cast<uint64_t>(Held.Noise));
+			Mix(static_cast<uint64_t>(Held.NoiseQuiet));
+			Mix(static_cast<uint64_t>(Held.NoiseBy[0]));
+			Mix(static_cast<uint64_t>(Held.NoiseBy[1]));
+			Mix(static_cast<uint64_t>(Held.LoudUnit[0] + 1));
+			Mix(static_cast<uint64_t>(Held.LoudUnit[1] + 1));
+			Mix(static_cast<uint64_t>(Held.LastLoudSide));
+			Mix(static_cast<uint64_t>(Held.bNoiseWake ? 1 : 0));
 		}
 		for (int Team = 0; Team < 2; ++Team)
 		{
@@ -728,6 +755,10 @@ namespace TMSim
 		switch (Order.Type)
 		{
 		case EOrderType::Move:
+			if (Order.Face < -1 || Order.Face >= FacingWays)
+			{
+				return "That isn't a way to face.";
+			}
 			return ValidateMove(Order.UnitId, Order.To, Order.bSprint, Order.Via);
 		case EOrderType::EndTurn:
 			return std::string();
@@ -797,6 +828,12 @@ namespace TMSim
 		{
 			return "No line of sight.";
 		}
+		// A leap or a step behind needs somewhere to land (2026-10-03).
+		FVec2 Landing;
+		if ((Ability->Special == "leap" || Ability->Special == "behind") && !LandingFor(*Unit, *Ability, Target, Landing))
+		{
+			return Ability->Special == "behind" ? "There's no room behind that target." : "There's nowhere to land there.";
+		}
 
 		// Taunted: while whoever taunted it is within reach, an attack has to be
 		// aimed somewhere that catches them.
@@ -838,7 +875,7 @@ namespace TMSim
 			return true;
 
 		case EOrderType::Move:
-			return ApplyMove(Order.UnitId, Order.To, Order.bSprint, Report, Order.Via);
+			return ApplyMove(Order.UnitId, Order.To, Order.bSprint, Report, Order.Via, Order.Face);
 
 		case EOrderType::UseAbility:
 			if (FUnit* Unit = FindUnit(Order.UnitId))

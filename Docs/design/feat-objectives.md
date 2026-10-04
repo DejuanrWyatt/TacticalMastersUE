@@ -255,7 +255,7 @@ The human's choices, which replace the watchtower parts of sections 3-5 where th
 - **Capturing costs turns, not seconds.** A unit standing next to a tower (within 2.5 m, on ground it could
   step to from the tower's) spends its turn on a **Capture order**. It is the turn's action and then the end
   of the turn: it may walk there first, but not act as well. After **N** such turns by its side the side
-  holds the tower. N is the rule number `watchtower_turns` (default 2, 1-6), a slider in **Developer Tools**
+  holds the tower. N is the rule number `watchtower_turns` (default 1 since 2026-10-02, was 2; 1-6), a slider in **Developer Tools**
   ("Watchtower capture (turns)"), changed mid-battle by a Tune order like any rule.
 - Refused when: too far, an enemy is standing at it (contested), the side already holds it, the unit has
   acted, or the order is for another turn. Progress belongs to one side at a time: the other side starting
@@ -271,7 +271,7 @@ The human's choices, which replace the watchtower parts of sections 3-5 where th
   offered in Developer Tools). 2 the first time a person opens the setup screen; 0 for a battle nobody set
   up, which is therefore still Godot's battle. `-tmtowers=N` on the command line. Online, the host sends the
   count with the battle; protocol version 2.
-- **Vision:** a side holding a tower sees every spot within `watchtower_sight` metres (default 14, 4-30, a
+- **Vision:** a side holding a tower sees every spot within `watchtower_sight` metres (default 28 since 2026-10-02, was 14; 4-60, a
   Developer Tools slider) that has line of sight from 4 m above the tower's ground. It goes through
   `CanSee`, so fog, "You can't see that spot." and the computer player's positioning all follow.
 - **The computer player** (divergence from Godot, as Root/Freeze/Taunt are; nothing runs without towers):

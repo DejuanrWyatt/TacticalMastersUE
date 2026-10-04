@@ -1,22 +1,21 @@
-// Whole battles, replayed from Godot's own orders.
+// Whole battles, replayed from their recorded orders (Baselines/BattleTrace.txt).
 //
-// Every other parity test pins down one rule on a board set up for it. This one
+// Every other rules test pins down one rule on a board set up for it. This one
 // is the rules together, as a battle brings them about: statuses ticking as a
 // turn begins, auras reaching whoever stands near, toggles switched on and off,
 // casts landing, units falling, one after another over a few thousand ticks.
 //
-// The port's own computer player is asked for every order too, before Godot's
+// The computer player is asked for every order too, before the recorded one
 // is applied, and must ask for the same one -- at hard, and at medium and easy,
 // whose mistakes are random draws from their own generator.
 //
-// Godot's computer player chose the orders (tests/dump_battle_trace.gd in the
-// Godot project wrote them, with the state after each, into
-// GodotBattleTrace.txt). The battle goes on with Godot's order, whatever the
-// port's player asked for, so a difference in a rule and a difference in a
-// choice are told apart: each is reported as what it is.
+// The recorded battles (first recorded from the Godot version, which the rules
+// were ported from) go on with the recorded order, whatever the computer player
+// asked for, so a difference in a rule and a difference in a choice are told
+// apart: each is reported as what it is.
 //
-// Each order must be one the port's rules accept, and after each order and
-// each run of ticks every unit must be in the state Godot printed: position,
+// Each order must be one the rules accept, and after each order and each run of
+// ticks every unit must be in the state recorded: position,
 // facing, health, gauge, turn, meter, countdown, statuses, buffs, casts,
 // cooldowns, toggles -- and the dice and the time spent holding the middle
 // must have reached the same point. Two of the battles are fought with the
@@ -24,7 +23,17 @@
 // battle is won is compared as well as how it is fought. The
 // first difference in a battle is reported with both lines, and that battle
 // stops there, since everything after it would differ too.
+//
+// With --rebaseline every battle is played again from its first line -- the
+// same sides, seed and setup, the same scripted placings -- with the rules and
+// the computer player as they are now, and the trace is written again
+// (Baseline.h). A line the rules still agree with is kept as it was written.
+//
+//   SimTraceTest <class dir> [Baselines/BattleTrace.txt] [--rebaseline]
+//   (the classes come from Baselines/TraceClasses.txt beside the trace; the class
+//   directory is used only when that file is missing)
 
+#include "Baseline.h"
 #include "SimAbility.h"
 #include "SimAI.h"
 #include "SimBattle.h"
@@ -32,6 +41,7 @@
 #include "SimMap.h"
 #include "SimOrder.h"
 
+#include <algorithm>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -102,7 +112,7 @@ namespace
 		return Buffer;
 	}
 
-	/** One unit, in exactly the shape dump_battle_trace.gd's _unit_line prints it. */
+	/** One unit, in exactly the shape the trace writes one. */
 	std::string UnitLine(const FUnit& Unit)
 	{
 		std::string Statuses;
@@ -175,9 +185,9 @@ namespace
 	}
 
 	/** The first field in which two unit lines differ, or empty when they agree. */
-	std::string Differs(const std::string& Godot, const std::string& Port)
+	std::string Differs(const std::string& Was, const std::string& Port)
 	{
-		const std::map<std::string, std::string> Want = Fields(Godot);
+		const std::map<std::string, std::string> Want = Fields(Was);
 		const std::map<std::string, std::string> Have = Fields(Port);
 		for (const auto& Field : Want)
 		{
@@ -222,7 +232,7 @@ namespace
 		return true;
 	}
 
-	/** An order, in the shape dump_battle_trace.gd's _order prints one (after the first word). */
+	/** An order, in the shape the trace writes one (after the first word). */
 	std::string OrderText(const FOrder& Order)
 	{
 		const char* Type = Order.Type == EOrderType::Move ? "move"
@@ -240,19 +250,19 @@ namespace
 	}
 
 	/**
-	 * Whether the port's computer player asked for what Godot's did. Godot's
+	 * Whether the computer player asked for the recorded order. Recorded
 	 * orders leave out what they do not need (a walk only says sprint when it
-	 * might be one), so each field Godot gives must agree, and a sprint Godot
+	 * might be one), so each field recorded must agree, and a sprint the record
 	 * does not mention must not be one.
 	 */
-	bool SameOrder(const std::string& Godot, const FOrder& Port)
+	bool SameOrder(const std::string& Was, const FOrder& Port)
 	{
 		const std::string Mine = OrderText(Port);
-		if (Split(Godot, ' ').size() < 2 || Split(Godot, ' ')[1] != Split(Mine, ' ')[0])
+		if (Split(Was, ' ').size() < 2 || Split(Was, ' ')[1] != Split(Mine, ' ')[0])
 		{
 			return false;
 		}
-		std::map<std::string, std::string> Want = Fields(Godot);
+		std::map<std::string, std::string> Want = Fields(Was);
 		const std::map<std::string, std::string> Have = Fields(Mine);
 		Want.erase("refused");
 		if (!Want.count("sprint") && Port.bSprint)
@@ -270,7 +280,7 @@ namespace
 		return true;
 	}
 
-	/** The first unit waiting on an order, as Godot's orderable_units() lists them. */
+	/** The first unit waiting on an order: alive, ready and not stunned, in id order. */
 	const FUnit* FirstOrderable(const FBattle& Battle)
 	{
 		for (const FUnit& Unit : Battle.Units)
@@ -311,48 +321,354 @@ namespace
 	}
 }
 
-int main(int ArgCount, char** Args)
+namespace
 {
-	if (ArgCount < 3)
+	/**
+	 * A row of Baselines/TraceClasses.txt as a class file: each class in the file
+	 * format's own words, compactly, with three differences -- the file it came
+	 * from and the role as written, which a class file does not have, and its
+	 * colour without the leading #. An empty icon is the class's own.
+	 */
+	std::string TableRowAsClassFile(std::string Json)
 	{
-		std::printf("usage: SimTraceTest <class dir> <GodotBattleTrace.txt>\n");
-		return 2;
+		auto Drop = [&Json](const std::string& Key, bool bOnlyIfEmpty)
+		{
+			const std::string Needle = "\"" + Key + "\":\"";
+			const size_t At = Json.find(Needle);
+			if (At == std::string::npos)
+			{
+				return;
+			}
+			const size_t Close = Json.find('"', At + Needle.size());
+			if (Close == std::string::npos || (bOnlyIfEmpty && Close != At + Needle.size()))
+			{
+				return;
+			}
+			size_t Stop = Close + 1;
+			if (Stop < Json.size() && Json[Stop] == ',')
+			{
+				++Stop;
+			}
+			else if (At > 0 && Json[At - 1] == ',')
+			{
+				Json.erase(At - 1, Stop - At + 1);
+				return;
+			}
+			Json.erase(At, Stop - At);
+		};
+		Drop("file", false);
+		Drop("role_written", false);
+		Drop("icon", true);
+		const std::string Colour = "\"color\":\"";
+		const size_t At = Json.find(Colour);
+		if (At != std::string::npos && Json.compare(At + Colour.size(), 1, "#") != 0)
+		{
+			Json.insert(At + Colour.size(), "#");
+		}
+		return "{\"format\":\"tactical-masters-class\",\"version\":1," + Json.substr(1);
 	}
-	if (!std::filesystem::exists(Args[2]))
+}
+
+namespace
+{
+	// ----------------------------------------------------- playing a battle again
+	// (--rebaseline): the loop the trace records, with the rules and the computer
+	// player as they are now.
+
+	/** An order as the trace writes one: a walk says sprint only when it is one. */
+	std::string TraceOrderText(const FOrder& Order)
 	{
-		std::printf("NOT CHECKED AGAINST GODOT: GodotBattleTrace.txt is missing. Run the Godot project's\n"
-			"  tests/dump_battle_trace.gd and put its output in Tests/ -- until then whole battles\n"
-			"  (auras, toggles, statuses ticking) are only known to agree with themselves.\n");
-		return 0;
+		std::string Out = OrderText(Order);
+		const std::string NoSprint = " sprint=0";
+		const size_t At = Out.find(NoSprint);
+		if (At != std::string::npos)
+		{
+			Out.erase(At, NoSprint.size());
+		}
+		return Out;
 	}
 
-	// The classes the battles are fought with.
-	for (const auto& Entry : std::filesystem::directory_iterator(Args[1]))
+	/** The STATE line, then a U line for every unit. */
+	void WriteState(const FBattle& Battle, std::vector<std::string>& Out)
 	{
-		const std::string Name = Entry.path().filename().string();
-		if (Name.size() > 13 && Name.compare(Name.size() - 13, 13, ".tmclass.json") == 0)
+		char Head[256];
+		std::snprintf(Head, sizeof(Head), "STATE tick=%d winner=%d capture=%d,%d planning=%d done=%d,%d rng=%lld", Battle.TickCount, Battle.Winner,
+			Battle.CaptureTicks[0], Battle.CaptureTicks[1], Battle.PlanningTicks, Battle.PlanningDone[0] ? 1 : 0,
+			Battle.PlanningDone[1] ? 1 : 0, static_cast<long long>(Battle.Rng.GetState()));
+		Out.push_back(Head);
+		for (const FUnit& Unit : Battle.Units)
 		{
-			const std::string Problem = LoadClassFile(ReadAll(Entry.path()));
+			Out.push_back(UnitLine(Unit));
+		}
+	}
+
+	/**
+	 * One battle played again from its BATTLE line and the scripted orders it
+	 * recorded (the placings and readying of a planning phase): every chosen
+	 * order is the computer player's now. False, and said, if the rules refuse
+	 * a scripted order.
+	 */
+	bool PlayAgain(const std::string& Header, const std::vector<std::string>& Scripted, FAIPlayer& Computer, std::vector<std::string>& Out)
+	{
+		std::map<std::string, std::string> F = Fields(Header);
+		FBattle Battle;
+		Computer.SetDifficulty((F.count("ai") ? F["ai"] : std::string("hard")).c_str());
+		Computer.Rng.Seed(std::strtoull(F["seed"].c_str(), nullptr, 10));
+		if (!Deal(Battle, Split(F["blue"], ','), Split(F["red"], ','), std::strtoull(F["seed"].c_str(), nullptr, 10),
+			std::strtod(F["capture"].c_str(), nullptr), std::strtod(F["time"].c_str(), nullptr), std::strtod(F["planning"].c_str(), nullptr)))
+		{
+			return false;
+		}
+		Out.push_back(Header);
+		WriteState(Battle, Out);
+		for (const std::string& Line : Scripted)
+		{
+			const FOrder Order = OrderOf(Line);
+			if (Order.Type == EOrderType::Place)
+			{
+				std::string Nodes;
+				if (const FUnit* Unit = Battle.FindUnit(Order.UnitId))
+				{
+					for (const FNode& Node : Battle.PlaceableNodes(*Unit))
+					{
+						Nodes += (Nodes.empty() ? "" : "|") + std::to_string(Node.X) + "," + std::to_string(Node.Y);
+					}
+				}
+				Out.push_back("PLACEABLE unit=" + std::to_string(Order.UnitId) + " nodes=" + (Nodes.empty() ? std::string("-") : Nodes));
+			}
+			Out.push_back(Line);
+			const std::string Refused = Battle.Validate(Order);
+			if (!Refused.empty())
+			{
+				Fail(Header + ": the rules now refuse the scripted " + Line + " -- \"" + Refused + "\"");
+				return false;
+			}
+			FTickReport Report;
+			Battle.Apply(Order, Report);
+			WriteState(Battle, Out);
+		}
+		// A battle that runs this long has stopped meaning anything.
+		const int Limit = 200000;
+		while (Battle.Winner == -1 && Battle.TickCount < Limit)
+		{
+			if (const FUnit* Ready = FirstOrderable(Battle))
+			{
+				FOrder Order = Computer.NextCommand(Battle, *Ready);
+				if (!Battle.Validate(Order).empty())
+				{
+					// Asked for something the rules refuse: the turn is ended instead.
+					Out.push_back("WANTED ORDER " + TraceOrderText(Order));
+					Order = FOrder::MakeEndTurn(Ready->Id, Ready->Serial);
+					Out.push_back("ORDER " + TraceOrderText(Order) + " refused=1");
+				}
+				else
+				{
+					Out.push_back("ORDER " + TraceOrderText(Order));
+				}
+				FTickReport Report;
+				Battle.Apply(Order, Report);
+				WriteState(Battle, Out);
+				continue;
+			}
+			int Ticks = 0;
+			while (Battle.Winner == -1 && !FirstOrderable(Battle) && Battle.TickCount < Limit)
+			{
+				FTickReport Report;
+				Battle.Apply(FOrder::MakeAdvance(1), Report);
+				++Ticks;
+			}
+			Out.push_back("ADVANCE " + std::to_string(Ticks));
+			WriteState(Battle, Out);
+		}
+		Out.push_back("END ticks=" + std::to_string(Battle.TickCount) + " winner=" + std::to_string(Battle.Winner));
+		return true;
+	}
+
+	/** Whether two lines of the trace say the same thing, however each was written. */
+	bool SameLine(const std::string& A, const std::string& B)
+	{
+		if (A == B)
+		{
+			return true;
+		}
+		const std::vector<std::string> WordsA = Split(A, ' ');
+		const std::vector<std::string> WordsB = Split(B, ' ');
+		if (WordsA.empty() || WordsB.empty() || WordsA[0] != WordsB[0])
+		{
+			return false;
+		}
+		if (WordsA[0] == "ORDER" && (WordsA.size() < 2 || WordsB.size() < 2 || WordsA[1] != WordsB[1]))
+		{
+			return false;
+		}
+		std::map<std::string, std::string> FieldsA = Fields(A);
+		std::map<std::string, std::string> FieldsB = Fields(B);
+		// A walk that is not a sprint may be written with sprint=0 or without it.
+		if (WordsA[0] == "ORDER")
+		{
+			FieldsA.emplace("sprint", "0");
+			FieldsB.emplace("sprint", "0");
+		}
+		if (FieldsA.size() != FieldsB.size())
+		{
+			return false;
+		}
+		for (const auto& Field : FieldsA)
+		{
+			const auto Found = FieldsB.find(Field.first);
+			if (Found == FieldsB.end() || !Agree(Field.second, Found->second))
+			{
+				return false;
+			}
+		}
+		return WordsA[0] != "U" || WordsA[1] == WordsB[1];
+	}
+
+	/**
+	 * A battle as written before and as played now: the old lines while the two
+	 * agree, so a rule that changed nothing changes no line, then the new ones.
+	 */
+	int Merge(const std::vector<std::string>& Was, const std::vector<std::string>& Now, std::vector<std::string>& Out)
+	{
+		size_t i = 0;
+		while (i < Was.size() && i < Now.size() && SameLine(Was[i], Now[i]))
+		{
+			Out.push_back(Was[i]);
+			++i;
+		}
+		const int Written = static_cast<int>(Now.size() - i);
+		for (; i < Now.size(); ++i)
+		{
+			Out.push_back(Now[i]);
+		}
+		return Written;
+	}
+}
+
+int main(int ArgCount, char** Args)
+{
+	const std::vector<std::string> Paths = TMBaseline::Paths(ArgCount, Args);
+	if (Paths.empty())
+	{
+		std::printf("usage: SimTraceTest <class dir> [Baselines/BattleTrace.txt] [--rebaseline]\n");
+		return 2;
+	}
+	const std::string TracePath = Paths.size() > 1 ? Paths[1] : std::string("Baselines/BattleTrace.txt");
+	if (!std::filesystem::exists(TracePath))
+	{
+		std::printf("FAILED: %s is missing. Restore it from git.\n", TracePath.c_str());
+		return 1;
+	}
+
+	// The classes the battles are fought with, as the trace was recorded with
+	// them (Baselines/TraceClasses.txt beside the trace), so the game's classes
+	// can be rebalanced without these battles changing (2026-10-02). Only
+	// without that table are the class files used.
+	const std::filesystem::path ClassTable = std::filesystem::path(TracePath).parent_path() / "TraceClasses.txt";
+	int FromTable = 0;
+	if (std::filesystem::exists(ClassTable))
+	{
+		std::ifstream Table(ClassTable);
+		std::string Row;
+		while (std::getline(Table, Row))
+		{
+			if (!Row.empty() && Row.back() == '\r')
+			{
+				Row.pop_back();
+			}
+			if (Row.rfind("CLASS ", 0) != 0)
+			{
+				continue;
+			}
+			const std::string Problem = LoadClassFile(TableRowAsClassFile(Row.substr(6)));
 			if (!Problem.empty())
 			{
-				Fail(Name + ": " + Problem);
+				Fail("TraceClasses.txt: " + Problem);
+			}
+			++FromTable;
+		}
+		std::printf("%d classes as the trace was recorded with them (TraceClasses.txt)\n", FromTable);
+	}
+	else
+	{
+		for (const auto& Entry : std::filesystem::directory_iterator(Paths[0]))
+		{
+			const std::string Name = Entry.path().filename().string();
+			if (Name.size() > 13 && Name.compare(Name.size() - 13, 13, ".tmclass.json") == 0)
+			{
+				const std::string Problem = LoadClassFile(ReadAll(Entry.path()));
+				if (!Problem.empty())
+				{
+					Fail(Name + ": " + Problem);
+				}
 			}
 		}
 	}
 
-	std::ifstream Trace(Args[2]);
+	if (TMBaseline::Asked(ArgCount, Args))
+	{
+		// Every battle played again, from its first line and its scripted orders.
+		std::vector<std::string> Was;
+		{
+			std::ifstream In(TracePath);
+			std::string Read;
+			while (std::getline(In, Read))
+			{
+				if (!Read.empty() && Read.back() == '\r')
+				{
+					Read.pop_back();
+				}
+				Was.push_back(Read);
+			}
+		}
+		TMBaseline::FWriter Writer;
+		Writer.bOn = true;
+		Writer.Path = TracePath;
+		FAIPlayer Again("hard");
+		size_t i = 0;
+		while (i < Was.size() && Was[i].rfind("BATTLE ", 0) != 0)
+		{
+			Writer.Lines.push_back(Was[i++]);
+		}
+		int Played = 0;
+		while (i < Was.size())
+		{
+			std::vector<std::string> Block;
+			std::vector<std::string> Scripted;
+			Block.push_back(Was[i++]);
+			while (i < Was.size() && Was[i].rfind("BATTLE ", 0) != 0)
+			{
+				if (Was[i].rfind("ORDER ", 0) == 0 && Was[i].find(" scripted=1") != std::string::npos)
+				{
+					Scripted.push_back(Was[i]);
+				}
+				Block.push_back(Was[i++]);
+			}
+			std::vector<std::string> Now;
+			if (!PlayAgain(Block[0], Scripted, Again, Now))
+			{
+				return 1;
+			}
+			Writer.Changed += Merge(Block, Now, Writer.Lines);
+			++Played;
+		}
+		std::printf("%d battles played again\n", Played);
+		return Failures == 0 && Writer.Finish() ? 0 : 1;
+	}
+
+	std::ifstream Trace(TracePath);
 	std::string Line;
 	FBattle Battle;
 	int BattleNumber = 0;
-	bool bFollowing = false;   // still in step with Godot in this battle
+	bool bFollowing = false;   // still in step with the trace in this battle
 	int Checked = 0;
 	int Orders = 0;
 	int Agreed = 0;
 	int Battles = 0;
 	std::string Version;
 	std::string LastOrder;
-	// The port's own computer player, seeded as Godot's was, asked for every
-	// order before Godot's is applied: it must ask for the same one.
+	// The computer player, seeded as the trace says, asked for every order
+	// before the recorded one is applied: it must ask for the same one.
 	FAIPlayer Computer("hard");
 	std::string Wanted;
 	std::string Level;
@@ -368,7 +684,7 @@ int main(int ArgCount, char** Args)
 	{
 		if (!bFollowing || ExpectedState.empty())
 		{
-			// A battle already parted from Godot, or nothing read yet: whatever
+			// A battle already parted from the trace, or nothing read yet: whatever
 			// was read belongs to no comparison and must not reach the next one.
 			ExpectedState.clear();
 			Expected.clear();
@@ -386,7 +702,7 @@ int main(int ArgCount, char** Args)
 		{
 			if (Want[Key] != HaveFields.at(Key))
 			{
-				Wrong = std::string(Key) + ": Godot " + Want[Key] + ", port " + HaveFields.at(Key);
+				Wrong = std::string(Key) + ": recorded " + Want[Key] + ", now " + HaveFields.at(Key);
 				break;
 			}
 		}
@@ -396,12 +712,12 @@ int main(int ArgCount, char** Args)
 			const std::string Field = Differs(Expected[i], Port);
 			if (!Field.empty())
 			{
-				Wrong = "unit " + std::to_string(i) + " " + Field + "\n    Godot " + Expected[i] + "\n    port  " + Port;
+				Wrong = "unit " + std::to_string(i) + " " + Field + "\n    recorded " + Expected[i] + "\n    now      " + Port;
 			}
 		}
 		if (!Wrong.empty())
 		{
-			Fail("battle " + std::to_string(BattleNumber) + " parts from Godot at tick " + Want["tick"]
+			Fail("battle " + std::to_string(BattleNumber) + " parts from the trace at tick " + Want["tick"]
 				+ (LastOrder.empty() ? std::string() : " after " + LastOrder) + ": " + Wrong);
 			bFollowing = false;
 		}
@@ -443,7 +759,7 @@ int main(int ArgCount, char** Args)
 		}
 		else if (Line.rfind("ADVANCE ", 0) == 0 && bFollowing)
 		{
-			// One tick at a time, as Godot's loop gave them.
+			// One tick at a time, as the recording gave them.
 			const int Ticks = std::atoi(Line.c_str() + 8);
 			for (int i = 0; i < Ticks; ++i)
 			{
@@ -458,7 +774,7 @@ int main(int ArgCount, char** Args)
 		}
 		else if (Line.rfind("PLACEABLE ", 0) == 0 && bFollowing)
 		{
-			// Every spot Godot would let this unit be put down on, in its order.
+			// Every spot the recording would let this unit be put down on, in its order.
 			std::map<std::string, std::string> F = Fields(Line);
 			const FUnit* Unit = Battle.FindUnit(std::atoi(F["unit"].c_str()));
 			std::string Mine;
@@ -473,7 +789,7 @@ int main(int ArgCount, char** Args)
 			if ((Mine.empty() ? std::string("-") : Mine) != F["nodes"])
 			{
 				Fail("battle " + std::to_string(BattleNumber) + ": the spots unit " + F["unit"]
-					+ " may be placed on differ from Godot's");
+					+ " may be placed on differ from the trace's");
 				bFollowing = false;
 			}
 		}
@@ -486,7 +802,7 @@ int main(int ArgCount, char** Args)
 			LastOrder = Line;
 			if (!Refused.empty())
 			{
-				Fail("battle " + std::to_string(BattleNumber) + ": the port refuses " + Line + " -- \"" + Refused + "\"");
+				Fail("battle " + std::to_string(BattleNumber) + ": the rules refuse " + Line + " -- \"" + Refused + "\"");
 				bFollowing = false;
 				continue;
 			}
@@ -495,25 +811,25 @@ int main(int ArgCount, char** Args)
 		}
 		else if (Line.rfind("ORDER ", 0) == 0 && bFollowing)
 		{
-			// First what the port's computer player would do here.
+			// First what the computer player would do here.
 			const bool bRefused = Line.find(" refused=1") != std::string::npos;
-			const std::string GodotAsked = bRefused ? Wanted : Line;
+			const std::string Recorded = bRefused ? Wanted : Line;
 			Wanted.clear();
 			const FUnit* Ready = FirstOrderable(Battle);
 			if (!Ready)
 			{
-				Fail("battle " + std::to_string(BattleNumber) + ": Godot gave an order at tick " + std::to_string(Battle.TickCount)
-					+ " while the port has nobody waiting on one");
+				Fail("battle " + std::to_string(BattleNumber) + ": the trace gives an order at tick " + std::to_string(Battle.TickCount)
+					+ " while nobody is waiting on one");
 				bFollowing = false;
 				continue;
 			}
 			const FOrder Mine = Computer.NextCommand(Battle, *Ready);
 			++Decisions;
 			++LevelDecisions[Level];
-			if (!SameOrder(GodotAsked, Mine))
+			if (!SameOrder(Recorded, Mine))
 			{
 				Fail("battle " + std::to_string(BattleNumber) + " (" + Level + "): the computer player chooses differently at tick "
-					+ std::to_string(Battle.TickCount) + "\n    Godot " + GodotAsked + "\n    port  ORDER " + OrderText(Mine));
+					+ std::to_string(Battle.TickCount) + "\n    recorded " + Recorded + "\n    now      ORDER " + OrderText(Mine));
 				bFollowing = false;
 				continue;
 			}
@@ -524,7 +840,7 @@ int main(int ArgCount, char** Args)
 			++Orders;
 			if (!Refused.empty())
 			{
-				Fail("battle " + std::to_string(BattleNumber) + ": the port refuses an order Godot carried out, at tick "
+				Fail("battle " + std::to_string(BattleNumber) + ": the rules refuse a recorded order, at tick "
 					+ std::to_string(Battle.TickCount) + ": " + Line + " -- \"" + Refused + "\"");
 				bFollowing = false;
 				continue;
@@ -543,10 +859,10 @@ int main(int ArgCount, char** Args)
 	}
 	Compare();
 
-	std::printf("%d battles from Godot %s: %d orders, %d states compared\n", Battles, Version.c_str(), Orders, Checked);
-	std::printf("%d of %d battles agree with Godot from the first tick to the last\n", Agreed, Battles);
+	std::printf("%d recorded battles: %d orders, %d states compared\n", Battles, Orders, Checked);
+	std::printf("%d of %d battles agree with the trace from the first tick to the last\n", Agreed, Battles);
 	std::printf("every spot a unit may be placed on agrees for %d units\n", PlaceChecks);
-	std::printf("the computer player chose as Godot's did %d times out of %d (", DecisionsAgreed, Decisions);
+	std::printf("the computer player chose as recorded %d times out of %d (", DecisionsAgreed, Decisions);
 	bool bFirst = true;
 	for (const auto& Each : LevelDecisions)
 	{
@@ -560,7 +876,7 @@ int main(int ArgCount, char** Args)
 	}
 	if (Failures == 0)
 	{
-		std::printf("WHOLE BATTLES PLAY IN UNREAL AS THEY PLAY IN GODOT\n");
+		std::printf("WHOLE BATTLES PLAY AS THEY WERE RECORDED\n");
 	}
 	return Failures == 0 ? 0 : 1;
 }

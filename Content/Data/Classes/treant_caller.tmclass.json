@@ -10,13 +10,13 @@
     "support"
   ],
   "stats": {
-    "hp": 73,
+    "hp": 86,
     "attdef": 4,
     "magdef": 12,
     "aeva": 5,
     "meva": 14,
     "crit": 10,
-    "speed": 6,
+    "speed": 8,
     "move": 6,
     "patience": 10,
     "sight": 10
@@ -25,15 +25,15 @@
     {
       "id": "treant_caller_thorn_rod",
       "name": "Thorn Rod",
-      "desc": "Strike an adjacent enemy.",
+      "desc": "Strikes an enemy 1-7 m away.",
       "kind": "active",
       "effect": "damage",
       "scale": "att",
       "target": "enemy",
       "shape": "unit",
-      "power": 34,
-      "min_range": 0,
-      "max_range": 1.8,
+      "power": 39,
+      "min_range": 1,
+      "max_range": 7,
       "aoe": 0,
       "cooldown": 0,
       "cast": 0,
@@ -42,23 +42,24 @@
         "system": "/Game/ParagonFey/FX/Particles/Fey/Abilities/Primary/FX/P_Fey_Primary_HitPlayer.P_Fey_Primary_HitPlayer",
         "at": "targets",
         "scale": 1
-      }
+      },
+      "anim": "bolt"
     },
     {
       "id": "treant_caller_summon_treant",
       "name": "Summon Treant",
-      "desc": "The Treant strikes every enemy within 2 m of a point 3-9 m away; Burns for 2 turns. (2 s)",
+      "desc": "Strikes every enemy within 2 m of a point 3-9 m away; Burns for 2 turns, and calls up the Treant there to fight for 3 of its turns. (1 s)",
       "kind": "active",
       "effect": "damage",
       "scale": "mag",
       "target": "enemy",
       "shape": "circle",
-      "power": 46,
+      "power": 63,
       "min_range": 3,
       "max_range": 9,
       "aoe": 2,
-      "cooldown": 2,
-      "cast": 2,
+      "cooldown": 3,
+      "cast": 1,
       "status": {
         "id": "burn",
         "turns": 2
@@ -68,6 +69,11 @@
         "system": "/Game/ParagonFey/FX/Particles/Fey/Abilities/Growth/FX/P_Growth_PoisonSpores_Boom.P_Growth_PoisonSpores_Boom",
         "at": "point",
         "scale": 1
+      },
+      "special": "pet",
+      "pet": {
+        "job": "treant_pet",
+        "turns": 3
       }
     },
     {
@@ -107,18 +113,18 @@
     {
       "id": "treant_caller_treant_ascendant",
       "name": "Treant Ascendant",
-      "desc": "ULTIMATE: Every enemy within 4 m of a point 4-11 m away; Burns for 2 turns. (4 s)",
+      "desc": "ULTIMATE: Every enemy within 4 m of a point 4-11 m away; Burns for 2 turns. (3 s)",
       "kind": "active",
       "effect": "damage",
       "scale": "mag",
       "target": "enemy",
       "shape": "circle",
-      "power": 61,
+      "power": 83,
       "min_range": 4,
       "max_range": 11,
       "aoe": 4,
       "cooldown": 0,
-      "cast": 4,
+      "cast": 3,
       "status": {
         "id": "burn",
         "turns": 2
@@ -130,5 +136,12 @@
         "scale": 1
       }
     }
-  ]
+  ],
+  "creator": {
+    "rebalanced": {
+      "on": "2026-10-03",
+      "why": "Tuning pass 2026-10-03 (lab 13% in place of the Black Mage): HP 73->86, Speed 6->8, power +36%. Before that (2026-10-02): Balance audit 2026-10-02: rod reaches 1-7 m (power -15%); the summon casts in 1 s, every 3 turns, and calls up a computer-played pet for 3 turns; ultimate 1 s quicker"
+    },
+    "changedAt": "2026-10-03T03:45:00.000Z"
+  }
 }

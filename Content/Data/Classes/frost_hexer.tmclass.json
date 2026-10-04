@@ -9,7 +9,7 @@
     "special"
   ],
   "stats": {
-    "hp": 72,
+    "hp": 63,
     "attdef": 5,
     "magdef": 15,
     "aeva": 6,
@@ -30,7 +30,7 @@
       "scale": "mag",
       "target": "enemy",
       "shape": "unit",
-      "power": 37,
+      "power": 24,
       "min_range": 1,
       "max_range": 7,
       "aoe": 0,
@@ -118,7 +118,7 @@
       "scale": "mag",
       "target": "enemy",
       "shape": "circle",
-      "power": 46,
+      "power": 34,
       "min_range": 3,
       "max_range": 10,
       "aoe": 3.5,
@@ -169,8 +169,9 @@
     "description": "Weakens and disables enemies",
     "measured": -50,
     "rebalanced": {
-      "on": "2026-10-01",
-      "why": "Split from the Frost Witch: the Hexer controls (Chill, Mark, sleep)"
-    }
+      "on": "2026-10-03",
+      "why": "Tuning pass 2026-10-03 (lab 80% in place of the Archer): HP 72->63, power -26%. Before that (2026-10-02): Balance audit 2026-10-02: everyday hex power 33 (it won 83-96% in place of the Archer)"
+    },
+    "changedAt": "2026-10-03T03:45:00.000Z"
   }
 }

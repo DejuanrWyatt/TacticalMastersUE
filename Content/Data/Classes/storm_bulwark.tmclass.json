@@ -73,7 +73,7 @@
     {
       "id": "storm_bulwark_thunder_ward",
       "name": "Thunder Ward",
-      "desc": "Every ally within 4 m is shielded; AttDef +5, Speed +2 for 2 turns. Always on, for allies nearby.",
+      "desc": "Every ally within 4 m is shielded; AttDef +5, Speed +1 for 2 turns. Always on, for allies nearby.",
       "kind": "aura",
       "effect": "support",
       "scale": "mag",
@@ -93,7 +93,7 @@
         },
         {
           "stat": "speed",
-          "amount": 2,
+          "amount": 1,
           "turns": 2
         }
       ],
@@ -125,5 +125,12 @@
         "scale": 1
       }
     }
-  ]
+  ],
+  "creator": {
+    "rebalanced": {
+      "on": "2026-10-02",
+      "why": "Balance audit 2026-10-02: the Speed aura gives +1, not +2 (top of its role)"
+    },
+    "changedAt": "2026-10-03T03:45:00.000Z"
+  }
 }

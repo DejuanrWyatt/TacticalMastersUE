@@ -666,6 +666,88 @@ int main(int ArgCount, char** Args)
 		}
 	}
 
+	// Springs (wells, 2026-10-04): their own healing, and a rest once used.
+	{
+		const int Before = Failures;
+		FBattle Battle;
+		Deal(Battle, { { "knight", 0, FVec2(8, 8), "" }, { "knight", 1, FVec2(16, 8), "" } });
+		Battle.Tuning.SpringPercent = 10.0;
+		Battle.Tuning.HazardPercent = 30.0;
+		Battle.Tuning.SpringRestTurns = 2.0;
+		FUnit& Blue = Battle.Units[0];
+		const int TileX = static_cast<int>(std::floor(Blue.Pos.X / Ground::TileSize));
+		const int TileY = static_cast<int>(std::floor(Blue.Pos.Y / Ground::TileSize));
+		Battle.Map.Hazards[TileY * Battle.Map.TilesX + TileX] = 1;
+		std::vector<int> Healed;
+		for (int Turn = 0; Turn < 5; ++Turn)
+		{
+			Blue.Hp = Blue.MaxHp() / 2;
+			FTickReport Report;
+			for (int i = 0; i < 4000 && !Blue.bReady; ++i)
+			{
+				Battle.Tick(Report);
+				for (FUnit& Other : Battle.Units)
+				{
+					if (Other.Id != Blue.Id && Other.bReady)
+					{
+						Battle.Apply(FOrder::MakeEndTurn(Other.Id, Other.Serial), Report);
+					}
+				}
+			}
+			int Amount = 0;
+			for (const FEvent& Event : Report.Events)
+			{
+				Amount += Event.Kind == EEventKind::Hit && Event.Id == "ground" && Event.Unit == Blue.Id ? Event.Amount : 0;
+			}
+			Healed.push_back(Amount);
+			Check(Battle.SpringRestAt(Blue.Pos) == (Turn % 3 == 0 ? 2 : Turn % 3 == 1 ? 1 : 0),
+				"a spring should count its rest down on its user's turns (turn " + std::to_string(Turn + 1) + ")");
+			Battle.Apply(FOrder::MakeEndTurn(Blue.Id, Blue.Serial), Report);
+		}
+		const int Mend = RoundToInt(Blue.MaxHp() * 0.1);
+		Check(Healed.size() == 5 && Healed[0] == Mend && Healed[1] == 0 && Healed[2] == 0 && Healed[3] == Mend && Healed[4] == 0,
+			"a spring should mend its own share (spring_percent, not hazard_percent), then rest 2 turns, then mend again");
+		if (Failures == Before)
+		{
+			std::printf("springs mend by their own number, then run dry for spring_rest_turns of their user's turns\n");
+		}
+	}
+
+	// Tall grass (2026-10-04): hides who stands in it from an enemy not close by,
+	// until it strikes out or is struck, and again from its next turn.
+	{
+		const int Before = Failures;
+		FBattle Battle;
+		Deal(Battle, { { "knight", 0, FVec2(8, 8), "" }, { "knight", 1, FVec2(14, 8), "" } });
+		FUnit& Blue = Battle.Units[0];
+		FUnit& Red = Battle.Units[1];
+		const int TileX = static_cast<int>(std::floor(Blue.Pos.X / Ground::TileSize));
+		const int TileY = static_cast<int>(std::floor(Blue.Pos.Y / Ground::TileSize));
+		Battle.Map.Grass[static_cast<size_t>(TileY) * Battle.Map.TilesX + TileX] = 1;
+		Check(Battle.Map.InGrass(Blue.Pos) && Battle.Hidden(Red.Team, Blue), "a unit in tall grass should be hidden from an enemy 6 m off");
+		Check(!Battle.Hidden(Blue.Team, Red), "a unit out of the grass should not be hidden");
+		const FVec2 Away = Red.Pos;
+		Red.Pos = FVec2(Blue.Pos.X + 2.5f, Blue.Pos.Y);
+		Check(!Battle.Hidden(Red.Team, Blue), "an enemy within 3 m should see into the grass");
+		Red.Pos = Away;
+		Blue.bSpotted = true;
+		Check(!Battle.Hidden(Red.Team, Blue), "a unit that has struck out of the grass should be seen until its turn comes round");
+		FTickReport Report;
+		for (int i = 0; i < 4000 && !Blue.bReady; ++i)
+		{
+			Battle.Tick(Report);
+			if (Red.bReady)
+			{
+				Battle.Apply(FOrder::MakeEndTurn(Red.Id, Red.Serial), Report);
+			}
+		}
+		Check(Blue.bReady && !Blue.bSpotted && Battle.Hidden(Red.Team, Blue), "its next turn should hide it in the grass again");
+		if (Failures == Before)
+		{
+			std::printf("tall grass hides a unit from enemies more than 3 m off until it strikes or is struck, and again from its next turn\n");
+		}
+	}
+
 	std::printf("\n%s\n", Failures == 0 ? "STATUSES DO WHAT THE DESIGN SAYS" : "STATUSES ARE WRONG");
 	return Failures == 0 ? 0 : 1;
 }

@@ -46,7 +46,7 @@
     {
       "id": "cantor_holy_anthem",
       "name": "Holy Anthem",
-      "desc": "Every ally within 3 m of a point up to 6 m away gains 25% TG. (1.5 s)",
+      "desc": "Every ally within 3 m of a point up to 6 m away gains 25% TG and Shell for 2 turns: spells on them do a third less. (1.5 s)",
       "kind": "active",
       "effect": "support",
       "scale": "mag",
@@ -59,6 +59,10 @@
       "cooldown": 3,
       "cast": 1.5,
       "tg": 25,
+      "status": {
+        "id": "shell",
+        "turns": 2
+      },
       "fx": "haste",
       "vfx": {
         "system": "/Game/FreeParticle_SoftTofu/Niagara/NS_Sparkling_Glow.NS_Sparkling_Glow",
@@ -121,5 +125,11 @@
         "scale": 1
       }
     }
-  ]
+  ],
+  "creator": {
+    "rebalanced": {
+      "on": "2026-10-03",
+      "why": "Holy Anthem also gives Shell"
+    }
+  }
 }

@@ -12,6 +12,17 @@
     "white_mage": "muriel"
   },
   "classes": {
+    "golem_pet": "rampage_elemental",
+    "ifrit_pet": "sevarog_sevarog_red",
+    "leviathan_pet": "monster_skink",
+    "lich_pet": "revenant_frostking",
+    "roc_pet": "monster_stalker",
+    "salamander_pet": "grux_grux_beetle_molten",
+    "seraph_pet": "serath_serath_gold",
+    "thorn_beast_pet": "khaimera_gruxpelt",
+    "thunderbird_pet": "monster_skyray",
+    "treant_pet": "monster_grazer",
+    "yeti_pet": "rampage",
     "cryomancer": "aurora",
     "frost_hexer": "aurora_frozenhearth",
     "frost_stalker": "aurora_glacialempress",

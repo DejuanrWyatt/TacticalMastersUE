@@ -187,11 +187,12 @@ namespace TMCodex
 			"It acts at the start of the turn of a unit standing on it, not as units walk over it.")));
 		Out.Add(Row(TEXT("Burning ground"), TEXT("Loses 8% of its max HP at the start of each of its turns there. Dries Wet and thaws Chilled.\n"
 			"Summer Meadow: smouldering grass.  Autumn Ruins: burning rubble.  Ashen Caldera: a lava vent.  Winter Pass: a fire pit in the snow.  Moonlit Glade: a witchfire ring."), BurnCue));
-		Out.Add(Row(TEXT("Healing spring"), TEXT("Heals 8% of its max HP at the start of each of its turns there. A unit with Decay is hurt instead.\n"
+		Out.Add(Row(TEXT("Healing spring"), TEXT("Heals 8% of its max HP at the start of its turn there, then runs dry for 3 of that unit's turns (it says so on the board). A unit with Decay is hurt instead. Both numbers are in Developer Tools.\n"
 			"Summer Meadow: a spring pool.  Autumn Ruins: an old fountain.  Ashen Caldera: a hot spring.  Winter Pass: a steaming ice spring.  Moonlit Glade: a fairy pool."), SpringCue));
 		Out.Add(Heading(TEXT("Terrain")));
 		Out.Add(Row(TEXT("Height"), TEXT("Walkable ground stands at levels. A step may climb or drop 2 levels; more is a cliff (fliers cross any). Higher ground hits harder and sees over lower.")));
 		Out.Add(Row(TEXT("Water"), TEXT("Can't be walked or waded. It is low, so units see and aim across it.")));
+		Out.Add(Row(TEXT("Tall grass"), TEXT("Thick grass over knee height. A unit standing in it can't be seen by an enemy more than 3 m away, so it can't be targeted from further off. Striking out, or being struck, gives it away until its next turn. Yours says \"hidden in grass\" under its feet.")));
 		Out.Add(Row(TEXT("Rock and ruins"), TEXT("Can't be walked. Block sight and every line aimed through them.")));
 		Out.Add(Row(TEXT("Hills"), TEXT("Ground rising between two points hides one from the other.")));
 		Out.Add(Row(TEXT("Trees and grass"), TEXT("Only scenery: they block nothing.")));

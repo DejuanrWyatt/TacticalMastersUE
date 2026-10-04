@@ -9,13 +9,13 @@
     "special"
   ],
   "stats": {
-    "hp": 58,
+    "hp": 51,
     "attdef": 5,
     "magdef": 11,
     "aeva": 10,
     "meva": 16,
     "crit": 10,
-    "speed": 16,
+    "speed": 14,
     "move": 6,
     "patience": 7,
     "sight": 10
@@ -30,7 +30,7 @@
       "scale": "mag",
       "target": "enemy",
       "shape": "unit",
-      "power": 38,
+      "power": 29,
       "min_range": 1,
       "max_range": 7,
       "aoe": 0,
@@ -96,20 +96,20 @@
     {
       "id": "time_mage_time_stop",
       "name": "Time Stop",
-      "desc": "ULTIMATE: Freeze time around a point 3-9 m away: every enemy within 3 m takes damage and is Stunned for 1 turn. (2.5 s)",
+      "desc": "ULTIMATE: Stop time round a point 3-9 m away: every enemy within 3 m takes damage and is Stopped: its Turn Gauge stands still for 4 seconds.",
       "kind": "active",
       "effect": "damage",
       "scale": "mag",
       "target": "enemy",
       "shape": "circle",
-      "power": 35,
+      "power": 26,
       "min_range": 3,
       "max_range": 9,
       "aoe": 3,
       "cooldown": 0,
       "cast": 2.5,
       "status": {
-        "id": "stun",
+        "id": "stop",
         "turns": 1
       },
       "fx": "meteor",
@@ -124,6 +124,10 @@
     "reworded": {
       "on": "2026-10-02",
       "why": "Descriptions say what the abilities do (2026-10-02): Stun not sleep, Crit not the old Power, turns not seconds"
+    },
+    "rebalanced": {
+      "on": "2026-10-03",
+      "why": "Tuning pass 2026-10-03 (lab 72% in place of the Archer): HP 58->51, Speed 16->14, power -24%. Before that (2026-10-03): Time Stop gives Stop, not Stun"
     }
   }
 }

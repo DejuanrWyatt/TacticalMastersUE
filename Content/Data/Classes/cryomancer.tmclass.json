@@ -15,7 +15,7 @@
     "aeva": 5,
     "meva": 14,
     "crit": 12,
-    "speed": 6,
+    "speed": 8,
     "move": 6,
     "patience": 8,
     "sight": 10
@@ -70,25 +70,29 @@
       }
     },
     {
-      "id": "cryomancer_frost_staff",
-      "name": "Frost Staff",
-      "desc": "Strike an adjacent enemy.",
+      "id": "cryomancer_frost_armor",
+      "name": "Frost Armor",
+      "desc": "Protect every ally within 3 m of you, yourself too, for 1 turn: physical hits on them do a third less (1 s).",
       "kind": "active",
-      "effect": "damage",
-      "scale": "att",
-      "target": "enemy",
-      "shape": "unit",
-      "power": 29,
+      "effect": "support",
+      "scale": "mag",
+      "target": "ally",
+      "shape": "self",
+      "power": 0,
       "min_range": 0,
-      "max_range": 1.8,
-      "aoe": 0,
-      "cooldown": 0,
-      "cast": 0,
-      "fx": "attack",
+      "max_range": 0,
+      "aoe": 3,
+      "cooldown": 4,
+      "cast": 1,
+      "status": {
+        "id": "protect",
+        "turns": 1
+      },
+      "fx": "guard",
       "vfx": {
-        "system": "/Game/ParagonMinions/FX/Particles/Minions/Shared/P_Minion_Melee_Impact.P_Minion_Melee_Impact",
+        "system": "/Game/ParagonAurora/FX/Particles/Abilities/Leap/FX/P_Aurora_Decoy_Frost.P_Aurora_Decoy_Frost",
         "at": "targets",
-        "scale": 1
+        "scale": 0.6
       }
     },
     {
@@ -118,5 +122,30 @@
         "scale": 1
       }
     }
-  ]
+  ],
+  "creator": {
+    "rebalanced": {
+      "on": "2026-10-04",
+      "why": "Signature in place of Frost Staff (never used): Protect for 2 turns on every ally within 3 m. Before that (2026-10-03): Tuning pass 2026-10-03 (lab 24% in place of the Black Mage): Speed 6->8. Before that (2026-10-02): Balance audit 2026-10-02: the staff strikes from 1-5 m (power -15%) instead of only at arm's length, which the computer never used"
+    },
+    "changedAt": "2026-10-03T03:45:00.000Z",
+    "icons": {
+      "abilities": [
+        null,
+        null,
+        {
+          "backing": "hex",
+          "glyph": "shield",
+          "colour": "#7fd4ef",
+          "style": "light",
+          "mark": "self",
+          "scale": 1,
+          "rotate": 0,
+          "badge": "none",
+          "finish": "lit"
+        },
+        null
+      ]
+    }
+  }
 }

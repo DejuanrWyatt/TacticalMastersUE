@@ -262,6 +262,10 @@ int main(int ArgCount, char** Args)
 						{
 							Fail(Map.Id + ": a tower on ground nobody can walk to, or on a hazard");
 						}
+						if (std::min(std::min(At.X, Size.X - At.X), std::min(At.Y, Size.Y - At.Y)) < static_cast<float>(Watchtower::FromEdge))
+						{
+							Fail(Map.Id + ": a tower against the edge of the map");
+						}
 						for (const FUnit& Unit : Battle.Units)
 						{
 							if (At.DistanceTo(Unit.Pos) < Watchtower::AwayFromStart)
@@ -310,16 +314,22 @@ int main(int ArgCount, char** Args)
 		}
 		if (Failures == Before)
 		{
-			std::printf("%d battles over %d maps: towers in mirrored pairs, on open ground both sides reach, away from the starts and each other, the same for the same seed (%d had room for fewer than asked)\n",
+			std::printf("%d battles over %d maps: towers in mirrored pairs, on open ground both sides reach, away from the starts, the edges and each other, the same for the same seed (%d had room for fewer than asked)\n",
 				Battles, static_cast<int>(Maps.size()), Short);
 		}
 	}
 
-	// Taking one: what it costs, and when it is refused.
+	// Taking one: what it costs, and when it is refused. One turn by default
+	// (2026-10-02); two here, so a capture part-way through is tested too.
 	{
 		const int Before = Failures;
+		if (FTuning().WatchtowerTurns != 1.0 || FTuning().WatchtowerSight != 28.0)
+		{
+			Fail("a tower should take one turn to capture and see 28 m by default");
+		}
 		FBattle Battle;
 		Battle.Tuning.WatchtowerCount = 2;
+		Battle.Tuning.WatchtowerTurns = 2;
 		Deal(Battle, *Big, 99);
 		if (Battle.Watchtowers.size() != 2)
 		{

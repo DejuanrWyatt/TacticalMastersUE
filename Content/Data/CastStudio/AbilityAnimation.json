@@ -1,0 +1,57 @@
+{
+  "format": "tactical-masters-ability-animation",
+  "schemaVersion": 1,
+  "abilities": {
+    "berserker_cleave": {
+      "grux": {
+        "windup": {
+          "clip": "/Game/ParagonGrux/Characters/Heroes/Grux/Animations/Emote_Master_BattleCry_T3.Emote_Master_BattleCry_T3"
+        },
+        "release": {
+          "clip": "/Game/ParagonGrux/Characters/Heroes/Grux/Animations/DoublePain.DoublePain",
+          "contact": 0.428
+        }
+      }
+    },
+    "berserker_rage": {
+      "grux": {
+        "windup": {
+          "clip": "/Game/ParagonGrux/Characters/Heroes/Grux/Animations/Emote_Master_BattleCry_T3.Emote_Master_BattleCry_T3"
+        },
+        "release": {
+          "contact": 0.428
+        }
+      }
+    },
+    "berserker_rampage": {
+      "grux": {
+        "windup": {
+          "clip": "/Game/ParagonGrux/Characters/Heroes/Grux/Animations/Emote_Master_BattleCry_T3.Emote_Master_BattleCry_T3"
+        },
+        "release": {
+          "clip": "/Game/ParagonGrux/Characters/Heroes/Grux/Animations/PrimaryAttack_LA.PrimaryAttack_LA",
+          "contact": 0.286
+        },
+        "loop": {
+          "clip": "/Game/ParagonGrux/Characters/Heroes/Grux/Animations/PrimaryAttack_LA.PrimaryAttack_LA"
+        },
+        "recover": {
+          "clip": "/Game/ParagonGrux/Characters/Heroes/Grux/Animations/PrimaryAttack_LA.PrimaryAttack_LA"
+        }
+      }
+    },
+    "thunder_brawler_jab": {
+      "yin": {
+        "release": {
+          "clip": "/Game/ParagonYin/Characters/Heroes/Yin/Animations/Emote_WannaPlay.Emote_WannaPlay"
+        },
+        "loop": {
+          "clip": "/Game/ParagonYin/Characters/Heroes/Yin/Animations/Emote_WannaPlay.Emote_WannaPlay"
+        },
+        "recover": {
+          "clip": "/Game/ParagonYin/Characters/Heroes/Yin/Animations/Emote_Indie.Emote_Indie"
+        }
+      }
+    }
+  }
+}

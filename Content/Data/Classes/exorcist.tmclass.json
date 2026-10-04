@@ -44,32 +44,29 @@
       }
     },
     {
-      "id": "exorcist_holy_curse",
-      "name": "Holy Curse",
-      "desc": "Weaken an enemy 2-8 m away for 2 turns; Crit -12. (1 s)",
+      "id": "exorcist_banish",
+      "name": "Banish",
+      "desc": "Banish an enemy's voice, 2-8 m away: a light hit, and Silenced for 1 turn, so it can use no abilities.",
       "kind": "active",
-      "effect": "support",
+      "effect": "damage",
       "scale": "mag",
       "target": "enemy",
       "shape": "unit",
-      "power": 0,
+      "power": 15,
       "min_range": 2,
       "max_range": 8,
       "aoe": 0,
       "cooldown": 3,
-      "cast": 1,
-      "buffs": [
-        {
-          "stat": "crit",
-          "amount": -12,
-          "turns": 2
-        }
-      ],
-      "fx": "pin_shot",
+      "cast": 0,
+      "status": {
+        "id": "silence",
+        "turns": 1
+      },
+      "fx": "holy_blade",
       "vfx": {
-        "system": "/Game/ParagonSerath/FX/Particles/Abilities/Primary/FX/P_PrimaryImpact.P_PrimaryImpact",
+        "system": "/Game/ParagonKwang/FX/Particles/Abilities/LightStrike/FX/P_KwangBuff.P_KwangBuff",
         "at": "targets",
-        "scale": 1
+        "scale": 0.8
       }
     },
     {
@@ -125,6 +122,28 @@
     "reworded": {
       "on": "2026-10-02",
       "why": "Descriptions say what the abilities do (2026-10-02): Stun not sleep, Crit not the old Power, turns not seconds"
+    },
+    "icons": {
+      "abilities": [
+        null,
+        {
+          "backing": "circle",
+          "glyph": "sun",
+          "colour": "#fff2c0",
+          "style": "light",
+          "mark": "unit",
+          "scale": 1,
+          "rotate": 0,
+          "badge": "none",
+          "finish": "lit"
+        },
+        null,
+        null
+      ]
+    },
+    "rebalanced": {
+      "on": "2026-10-04",
+      "why": "Status curse in place of Holy Curse (never used): a light hit that Silences the enemy for 1 turn (no abilities)"
     }
   }
 }

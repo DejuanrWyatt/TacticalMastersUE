@@ -322,6 +322,11 @@ void ATMBattleHud::DrawDraft(ATMBattleDirector& From)
 	const float CellH = 40.0f * S;
 	float Y = FY + 44.0f * S;
 	int32 Column = 0;
+	// The class under the pointer, in full, under the grid (v19 play test).
+	const float CardH = FMath::Min(260.0f * S, PH * 0.32f);
+	const float CardY = PY + PH - 24.0f * S - CardH;
+	const FVector2D Mouse = MousePoint();
+	const TMSim::FJobDef* Shown = nullptr;
 	for (int32 j = 0; j < static_cast<int32>(Jobs.size()); ++j)
 	{
 		const TMSim::FJobDef& Job = *Jobs[j];
@@ -329,9 +334,13 @@ void ATMBattleHud::DrawDraft(ATMBattleDirector& From)
 		{
 			continue;
 		}
-		if (Y + CellH > PY + PH - 24.0f * S)
+		if (Y + CellH > CardY - 10.0f * S)
 		{
 			break;
+		}
+		if (FBox2D(FVector2D(GX + Column * (CellW + Gap), Y), FVector2D(GX + Column * (CellW + Gap) + CellW, Y + CellH)).IsInside(Mouse))
+		{
+			Shown = &Job;
 		}
 		const FString Id = UTF8_TO_TCHAR(Job.Id.c_str());
 		const FString Name = UTF8_TO_TCHAR(Job.Name.c_str());
@@ -369,5 +378,13 @@ void ATMBattleHud::DrawDraft(ATMBattleDirector& From)
 			Column = 0;
 			Y += CellH + Gap;
 		}
+	}
+	if (Shown)
+	{
+		DrawClassCard(*Shown, GX, CardY, GW, CardH);
+	}
+	else
+	{
+		Text(TEXT("Rest the pointer on a class to see its abilities."), GX, CardY + 8.0f * S, Dim, Font, 0.5f * S);
 	}
 }

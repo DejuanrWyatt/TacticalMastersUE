@@ -184,6 +184,10 @@ void ATMBattleDirector::TallyEvents(const TMSim::FTickReport& Report)
 				{
 					T->Healing += Healed;
 				}
+				if (FTMUnitTally* T = TallyOf(Event.Unit))
+				{
+					T->HealingReceived += Healed;
+				}
 				break;
 			}
 			if (Ability && Ability->Effect != TMSim::EEffect::Damage)
@@ -200,10 +204,23 @@ void ATMBattleDirector::TallyEvents(const TMSim::FTickReport& Report)
 					{
 						T->Healing += Event.Amount;
 					}
+					if (FTMUnitTally* T = TallyOf(Event.Unit))
+					{
+						T->HealingReceived += Event.Amount;
+					}
 					break;
 				}
 				if (Event.Id == "mend" || Event.Id == "ground")
 				{
+					// Nobody's healing to give, but the unit took it in. "ground" is
+					// burning ground's hurt too: a spring's is the one on a spring,
+					// unless Decay turned it to harm (SimBattle.cpp, GroundEffect).
+					const bool bHealed = Event.Id == "mend"
+						|| (Battle.HazardAt(Event.Where) > 0 && !Struck->HasStatus("decay"));
+					if (FTMUnitTally* T = TallyOf(Event.Unit))
+					{
+						T->HealingReceived += bHealed ? Event.Amount : 0;
+					}
 					break;
 				}
 			}

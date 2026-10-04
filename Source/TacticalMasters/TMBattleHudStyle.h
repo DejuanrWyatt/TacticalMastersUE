@@ -114,6 +114,8 @@ namespace TMHudStyle
 			{ "terrified", FLinearColor(0.65f, 0.5f, 0.85f), TEXT("On its turn it first runs its full move away from what it fears, then may act.") },
 			{ "decay", FLinearColor(0.56f, 0.68f, 0.28f), TEXT("Healing on it deals damage instead; Regen and springs hurt it.") },
 			{ "wounded", FLinearColor(0.75f, 0.32f, 0.36f), TEXT("Receives only half of any healing: abilities, Regen, springs, mending and lifesteal.") },
+			{ "hunted", FLinearColor(1.0f, 0.54f, 0.36f), TEXT("A boss is hunting it: it goes for this unit first, until it falls or the boss loses sight of it for 3 of its turns.") },
+			{ "boon", FLinearColor(1.0f, 0.82f, 0.48f), TEXT("The Boss's Boon: its side claimed a boss. Its abilities do 10% more damage.") },
 		};
 		for (const FStatusLook& Look : Looks)
 		{
@@ -140,6 +142,20 @@ namespace TMHudStyle
 	/** Room kept at the top right for the corner buttons (hud.gd:56). */
 	inline constexpr float CornerWidth = 394.0f;
 	inline constexpr float TickSeconds[] = { 0.0f, 1.0f, 3.0f, 5.0f, 10.0f, 20.0f, 30.0f };
+	/** Room above the blue bar and below the red for the cooldown pins (2026-10-02). */
+	inline constexpr float PinLane = 28.0f;
+	/** Room under the turn squares for each one's status icons (2026-10-02, "Squad Strip Mockups" B). */
+	inline constexpr float SquareLane = 24.0f;
+
+	/** Health at a glance, whichever side: green, then gold under 60%, red under 30% (2026-10-02). */
+	inline FLinearColor HealthColour(float Part)
+	{
+		if (Part >= 0.6f)
+		{
+			return FLinearColor(0.37f, 0.82f, 0.54f);
+		}
+		return Part >= 0.3f ? FLinearColor(1.0f, 0.82f, 0.35f) : FLinearColor(1.0f, 0.38f, 0.32f);
+	}
 
 	inline constexpr float Tps = static_cast<float>(TMSim::Pace::TicksPerSecond);
 

@@ -15,7 +15,7 @@
     "aeva": 5,
     "meva": 16,
     "crit": 5,
-    "speed": 8,
+    "speed": 10,
     "move": 6,
     "patience": 9,
     "sight": 10
@@ -23,16 +23,16 @@
   "abilities": [
     {
       "id": "herbalist_thorn_rod",
-      "name": "Thorn Rod",
-      "desc": "Strike an adjacent enemy.",
+      "name": "Thorn Bolt",
+      "desc": "Strikes an enemy 1-7 m away.",
       "kind": "active",
       "effect": "damage",
       "scale": "att",
       "target": "enemy",
       "shape": "unit",
-      "power": 24,
-      "min_range": 0,
-      "max_range": 1.8,
+      "power": 22,
+      "min_range": 1,
+      "max_range": 7,
       "aoe": 0,
       "cooldown": 0,
       "cast": 0,
@@ -41,7 +41,8 @@
         "system": "/Game/ParagonFey/FX/Particles/Fey/Abilities/Primary/FX/P_Fey_Primary_HitPlayer.P_Fey_Primary_HitPlayer",
         "at": "targets",
         "scale": 1
-      }
+      },
+      "anim": "bolt"
     },
     {
       "id": "herbalist_thorn_mend",
@@ -117,5 +118,12 @@
         "scale": 1
       }
     }
-  ]
+  ],
+  "creator": {
+    "rebalanced": {
+      "on": "2026-10-03",
+      "why": "Tuning pass 2026-10-03 (lab 19% in place of the White Mage): Speed 8->10. Before that (2026-10-02): Balance audit 2026-10-02: Thorn Bolt strikes from 1-7 m (power 22); its only attack was at arm's length"
+    },
+    "changedAt": "2026-10-03T03:45:00.000Z"
+  }
 }

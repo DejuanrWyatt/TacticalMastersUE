@@ -1,6 +1,6 @@
-// Checks what an ability does against the Godot version.
+// Checks what an ability does against its recorded baseline.
 //
-// GodotCalcTable.txt came out of the Godot game: every built-in ability, used
+// Baselines/CalcTable.txt (first recorded from the Godot version): every built-in ability, used
 // by each of the six classes against each of the six, from spots at different
 // ground heights, with the target facing four ways and at two states of health.
 // For each it wrote down the damage or healing, the chance of being evaded and
@@ -9,10 +9,18 @@
 // The rows carry the ground levels rather than the map, because the map is not
 // ported yet. That is the point: what an ability does can be checked now, and
 // the map slice only has to get the levels right when it arrives.
+//
+// With --rebaseline the table is written again from the rules (Baseline.h):
+// the classes' stats as the rules have them, and every result.
+//
+//   SimCalcTest [Baselines/CalcTable.txt] [--rebaseline]
 
+#include "Baseline.h"
 #include "SimAbility.h"
 #include "SimBattle.h"
 
+#include <algorithm>
+#include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <fstream>
@@ -34,7 +42,12 @@ namespace
 
 int main(int argc, char** argv)
 {
-	const char* Path = argc > 1 ? argv[1] : "GodotCalcTable.txt";
+	const std::vector<std::string> Args = TMBaseline::Paths(argc, argv);
+	const std::string PathText = Args.empty() ? std::string("Baselines/CalcTable.txt") : Args[0];
+	const char* Path = PathText.c_str();
+	TMBaseline::FWriter Writer;
+	Writer.bOn = TMBaseline::Asked(argc, argv);
+	Writer.Path = PathText;
 	std::ifstream File(Path);
 	if (!File)
 	{
@@ -43,7 +56,7 @@ int main(int argc, char** argv)
 	}
 
 	FBattle Battle;
-	std::map<std::string, FJobStats> GodotStats;
+	std::map<std::string, FJobStats> TableStats;
 
 	int Checked = 0;
 	int Failures = 0;
@@ -56,6 +69,7 @@ int main(int argc, char** argv)
 		{
 			Line.pop_back();
 		}
+		Writer.Read(Line);
 
 		if (Line.rfind("TUNING", 0) == 0)
 		{
@@ -78,7 +92,7 @@ int main(int argc, char** argv)
 			continue;
 		}
 
-		// A class's stats, as Godot has them. Checking these against the table
+		// A class's stats, as the baseline has them. Checking these against the table
 		// ported into C++ is half the point: a wrong stat would otherwise show up
 		// as a wrong damage number and look like a broken formula.
 		if (Line.find("attdef=") != std::string::npos && Line.find("sight=") != std::string::npos)
@@ -94,9 +108,29 @@ int main(int argc, char** argv)
 			Stats.Set(EStat::Move, static_cast<int>(ValueOf(Line, "move", 0)));
 			Stats.Set(EStat::Patience, static_cast<int>(ValueOf(Line, "patience", 0)));
 			Stats.Set(EStat::Sight, static_cast<int>(ValueOf(Line, "sight", 0)));
-			GodotStats[First] = Stats;
+			TableStats[First] = Stats;
 
 			const FJobDef* Ported = FindJob(First);
+			if (Writer.bOn && Ported)
+			{
+				// Written again: the rules' own stats, and the results below worked from them.
+				std::string Row = "  " + First;
+				const EStat Order[] = { EStat::Hp, EStat::AttDef, EStat::MagDef, EStat::AEva, EStat::MEva, EStat::Crit,
+					EStat::Speed, EStat::Move, EStat::Patience, EStat::Sight };
+				const char* Keys[] = { "hp", "attdef", "magdef", "aeva", "meva", "crit", "speed", "move", "patience", "sight" };
+				bool bDiffers = false;
+				for (int k = 0; k < 10; ++k)
+				{
+					Row += std::string(" ") + Keys[k] + "=" + std::to_string(Ported->Stats.Get(Order[k]));
+					bDiffers = bDiffers || Ported->Stats.Get(Order[k]) != Stats.Get(Order[k]);
+				}
+				if (bDiffers)
+				{
+					Writer.Set(Row);
+				}
+				TableStats[First] = Ported->Stats;
+				continue;
+			}
 			if (!Ported)
 			{
 				std::printf("  no class called %s is registered\n", First.c_str());
@@ -109,7 +143,7 @@ int main(int argc, char** argv)
 					const EStat Stat = static_cast<EStat>(i);
 					if (Ported->Stats.Get(Stat) != Stats.Get(Stat))
 					{
-						std::printf("  %s %s: ported %d, Godot %d\n", First.c_str(), StatName(Stat),
+						std::printf("  %s %s: the rules %d, the baseline %d\n", First.c_str(), StatName(Stat),
 							Ported->Stats.Get(Stat), Stats.Get(Stat));
 						++StatMismatches;
 					}
@@ -130,9 +164,9 @@ int main(int argc, char** argv)
 		}
 
 		const FAbility* Ability = JobAbility(First, Slot);
-		const auto AttackerStats = GodotStats.find(First);
-		const auto TargetStats = GodotStats.find(TargetJob);
-		if (!Ability || AttackerStats == GodotStats.end() || TargetStats == GodotStats.end())
+		const auto AttackerStats = TableStats.find(First);
+		const auto TargetStats = TableStats.find(TargetJob);
+		if (!Ability || AttackerStats == TableStats.end() || TargetStats == TableStats.end())
 		{
 			std::printf("  missing data for %s slot %d against %s\n", First.c_str(), Slot, TargetJob.c_str());
 			++Failures;
@@ -157,12 +191,49 @@ int main(int argc, char** argv)
 		const int GotCrit = Battle.CritChance(User);
 		++Checked;
 
+		// The odds the aim shows (2026-10-02): the four outcomes add up to 100,
+		// they split the way the dice are thrown, and the knockout chance is the
+		// sum of the outcomes that leave it on nothing.
+		if (Ability->Effect == EEffect::Damage)
+		{
+			const FOdds Odds = Battle.OddsOf(User, *Ability, Target, GotValue);
+			const double Sum = Odds.Hit + Odds.Crit + Odds.Graze + Odds.Dodge;
+			const double Ko = (GotValue >= Hp ? Odds.Hit : 0.0)
+				+ (std::max(1, RoundToInt(GotValue * Battle.Tuning.CritMultiplier)) >= Hp ? Odds.Crit : 0.0)
+				+ (std::max(Combat::MinimumDamage, RoundToInt(GotValue * Combat::GrazeDamage)) >= Hp ? Odds.Graze : 0.0);
+			if (std::fabs(Sum - 100.0) > 0.001 || std::fabs(Odds.Hit + Odds.Crit - (100.0 - GotEvade)) > 0.001
+				|| std::fabs(Odds.Graze + Odds.Dodge - GotEvade) > 0.001 || std::fabs(Odds.Ko - Ko) > 0.001
+				|| Odds.HitAmount != GotValue)
+			{
+				if (Failures < 10)
+				{
+					std::printf("  %s slot %d vs %s: odds hit %.2f crit %.2f graze %.2f dodge %.2f ko %.2f (want ko %.2f)\n",
+						First.c_str(), Slot, TargetJob.c_str(), Odds.Hit, Odds.Crit, Odds.Graze, Odds.Dodge, Odds.Ko, Ko);
+				}
+				++Failures;
+			}
+		}
+
+		if (Writer.bOn)
+		{
+			if (GotValue != WantValue || GotEvade != WantEvade || GotCrit != WantCrit)
+			{
+				// The situation as it was written, then the rules' three numbers.
+				size_t Cut = Line.size();
+				for (int k = 0; k < 3 && Cut > 0; ++k)
+				{
+					Cut = Line.find_last_of(' ', Cut - 1);
+				}
+				Writer.Set(Line.substr(0, Cut) + " " + std::to_string(GotValue) + " " + std::to_string(GotEvade) + " " + std::to_string(GotCrit));
+			}
+			continue;
+		}
 		if (GotValue != WantValue || GotEvade != WantEvade || GotCrit != WantCrit)
 		{
 			if (Failures < 10)
 			{
 				std::printf("  %s slot %d (%s) vs %s facing (%.0f,%.0f) levels %d->%d hp %d:\n"
-					"      got value=%d evade=%d crit=%d, Godot had value=%d evade=%d crit=%d\n",
+					"      got value=%d evade=%d crit=%d, the baseline has value=%d evade=%d crit=%d\n",
 					First.c_str(), Slot, Ability->Name.c_str(), TargetJob.c_str(), Fx, Fy,
 					FromLevel, TargetLevel, Hp, GotValue, GotEvade, GotCrit, WantValue, WantEvade, WantCrit);
 			}
@@ -171,10 +242,14 @@ int main(int argc, char** argv)
 	}
 
 	std::printf("%d class stat blocks, %d ability results checked\n",
-		static_cast<int>(GodotStats.size()), Checked);
+		static_cast<int>(TableStats.size()), Checked);
+	if (Writer.bOn)
+	{
+		return Writer.Finish() ? 0 : 1;
+	}
 	if (StatMismatches > 0)
 	{
-		std::printf("%d stat(s) disagree with Godot\n", StatMismatches);
+		std::printf("%d stat(s) disagree with the baseline\n", StatMismatches);
 	}
 	if (Checked == 0)
 	{
@@ -182,7 +257,7 @@ int main(int argc, char** argv)
 		return 1;
 	}
 	std::printf("\n%s\n", (Failures == 0 && StatMismatches == 0)
-		? "ABILITIES DO WHAT THEY DO IN GODOT"
-		: "DIVERGED FROM GODOT");
+		? "ABILITIES DO WHAT THEIR BASELINE SAYS"
+		: "DIVERGED FROM THE BASELINE");
 	return (Failures == 0 && StatMismatches == 0) ? 0 : 1;
 }

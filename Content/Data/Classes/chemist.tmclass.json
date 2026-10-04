@@ -24,8 +24,8 @@
   "abilities": [
     {
       "id": "chemist_fire_bomb",
-      "name": "Fire Bomb",
-      "desc": "Throw a bomb hitting enemies within 1.2 m of a point 2-6 m away; Burns for 2 turns.",
+      "name": "Oil Bomb",
+      "desc": "Throw a bomb hitting enemies within 1.2 m of a point 2-6 m away; leaves them Oiled for 2 turns: fire hits them harder and burns twice as long.",
       "kind": "active",
       "effect": "damage",
       "scale": "att",
@@ -38,7 +38,7 @@
       "cooldown": 0,
       "cast": 0,
       "status": {
-        "id": "burn",
+        "id": "oiled",
         "turns": 2
       },
       "fx": "throw_stone",
@@ -119,6 +119,10 @@
     "reworded": {
       "on": "2026-10-02",
       "why": "Descriptions say what the abilities do (2026-10-02): Stun not sleep, Crit not the old Power, turns not seconds"
+    },
+    "rebalanced": {
+      "on": "2026-10-03",
+      "why": "Fire Bomb oils, so the next fire on them ignites"
     }
   }
 }

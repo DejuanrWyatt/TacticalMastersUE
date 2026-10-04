@@ -53,6 +53,8 @@ enum class ETMAction : uint8
 	PlanTurn,
 	/** Takes back the plan's last step: a waypoint, its ability, then its walk. */
 	PlanUndo,
+	/** Held: the battle runs three times as fast while none of this machine's units is ready (2026-10-03). */
+	FastForward,
 	Count
 };
 
@@ -82,12 +84,44 @@ public:
 	 */
 	bool bTurnSquares = true;
 
+	/** Your squad down the left edge: health, statuses and turns left, cooldowns (2026-10-02, "Squad Strip Mockups" C). */
+	bool bSquadStrip = true;
+
 	/** When a unit's turn ends, the camera slides to the next one ready (2026-10-01: optional, and a key toggles it). */
 	bool bAutoRecenter = true;
+	/**
+	 * Camera rules (2026-10-03, "Camera Rules Mockups"): when the camera may
+	 * follow to the next ready unit by itself. 0 Always (at once, but never in
+	 * the middle of an order), 1 When I'm idle (the default: not within 1.5 s of
+	 * a click or key either), 2 Never. bAutoRecenter is On unless this is Never.
+	 */
+	int32 CameraFollow = 1;
+	/** The camera goes ahead of a walk to the edge of the screen (Options). */
+	bool bLeadCamera = true;
+	/** A small "Camera held" note while the camera waits for you to finish (Options). */
+	bool bCameraHeldNote = true;
+
+	/**
+	 * Quick Cast, per ability key (2026-10-03): the key held aims the ability,
+	 * and letting it go uses it where the pointer is -- no click. Off, a press
+	 * aims and a click uses it, as before.
+	 */
+	bool bQuickCast[4] = { false, false, false, false };
+
+	/** The battle runs fast while none of this machine's units is ready: the other side's turns, the waits (Options). */
+	bool bFastEnemyTurns = false;
+	/** A unit that has walked and has no ability it can use ends its turn by itself (Options). */
+	bool bAutoEndTurn = false;
+	/** The camera closes in on whoever uses an ultimate, for a moment (Options; any key or click skips it). */
+	bool bCloseUps = true;
+	/** The wheel zooms toward where the pointer is, not the middle of the screen (Options). */
+	bool bZoomToCursor = true;
+	/** The camera pans when the pointer rests at the edge of the window (Options). */
+	bool bEdgePan = true;
 
 	/** How big the name and health over each unit are drawn, and its status icons (Options). */
 	float OverheadScale = 1.35f;
-	float StatusIconScale = 1.5f;
+	float StatusIconScale = 1.875f;
 
 	/** How loud the battle's sound effects and the heroes' voices are, 0 to 1 (Options). */
 	float SfxVolume = 0.8f;

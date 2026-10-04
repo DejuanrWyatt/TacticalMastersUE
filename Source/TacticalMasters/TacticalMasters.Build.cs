@@ -8,7 +8,9 @@ public class TacticalMasters : ModuleRules
 
 		PublicDependencyModuleNames.AddRange(new string[]
 		{
-			"Core", "CoreUObject", "Engine", "InputCore", "TMSim"
+			"Core", "CoreUObject", "Engine", "InputCore", "TMSim",
+			// Cast Studio's published looks (Docs/CastStudio-Plan.md).
+			"TMCast"
 		});
 
 		// Effects bought from Fab: Niagara systems (and Cascade ones, which are

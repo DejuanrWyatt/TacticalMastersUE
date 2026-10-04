@@ -60,6 +60,58 @@ namespace
 		return Battle.TicksToReady(Unit) / Tps;
 	}
 
+	/** A box edged in dashes: a ghost, for something that has not happened yet. */
+	void DashedEdge(TFunctionRef<void(const FLinearColor&, float, float, float, float)> Rect, float BX, float BY, float BW, float BH,
+		const FLinearColor& Colour, float Thick, float Run, float Skip)
+	{
+		for (float Along = 0.0f; Along < BW; Along += Run + Skip)
+		{
+			const float Piece = FMath::Min(Run, BW - Along);
+			Rect(Colour, BX + Along, BY, Piece, Thick);
+			Rect(Colour, BX + Along, BY + BH - Thick, Piece, Thick);
+		}
+		for (float Along = 0.0f; Along < BH; Along += Run + Skip)
+		{
+			const float Piece = FMath::Min(Run, BH - Along);
+			Rect(Colour, BX, BY + Along, Thick, Piece);
+			Rect(Colour, BX + BW - Thick, BY + Along, Thick, Piece);
+		}
+	}
+
+	/** A wild monster part-way through a wind-up (whether this side sees it is the caller's to ask). */
+	bool WindingUp(const TMSim::FUnit& Unit)
+	{
+		return Unit.bMonster && Unit.Team == 2 && Unit.IsAlive() && !Unit.bOffBoard && Unit.IsCasting();
+	}
+
+	/** Where a cast will land: the unit it follows, or the spot it was aimed at. */
+	TMSim::FVec2 CastAim(const TMSim::FBattle& Battle, const TMSim::FUnit& Unit)
+	{
+		if (Unit.Casting.FollowId >= 0)
+		{
+			for (const TMSim::FUnit& Each : Battle.Units)
+			{
+				if (Each.Id == Unit.Casting.FollowId)
+				{
+					return Each.Pos;
+				}
+			}
+		}
+		return Unit.Casting.Target;
+	}
+
+	/** "Shield Bash / Back on its 2nd turn from now, in about 16 s" (cooldown pins and squares). */
+	FString BackLine(const FString& Who, const TMSim::FAbility& Ability, bool bPreview, int32 Turn, float Seconds)
+	{
+		FString Which = TEXT("its next turn");
+		if (Turn > 1)
+		{
+			Which = FString::Printf(TEXT("its %d%s turn from now"), Turn, Turn == 2 ? TEXT("nd") : Turn == 3 ? TEXT("rd") : TEXT("th"));
+		}
+		return FString::Printf(TEXT("%s: %hs%s\nBack on %s, in about %.0f s"), *Who, Ability.Name.c_str(),
+			bPreview ? TEXT(", if used now") : TEXT(""), *Which, Seconds);
+	}
+
 	/**
 	 * The damage type the class creator gave each of a class's four abilities,
 	 * read once from the class files' creator notes ("creator.plan[slot].damageType",
@@ -423,8 +475,9 @@ void ATMBattleHud::DrawTooltip()
 	}
 	UFont* Font = GEngine->GetMediumFont();
 	const float Scale = 0.5f * S;
-	TArray<FString> Lines;
-	Found->Text.ParseIntoArrayLines(Lines, false);
+	// Long tips wrap at a reading width (and never wider than the screen) rather than running off its edge.
+	const float TipWidth = FMath::Min(440.0f * S, Canvas->ClipX - 40.0f * S);
+	const TArray<FString> Lines = Wrap(Found->Text, Font, Scale, TipWidth);
 	float W = 0.0f;
 	const float LineH = TextSize(TEXT("Ag"), Font, Scale).Y;
 	for (const FString& Line : Lines)
@@ -444,6 +497,10 @@ void ATMBattleHud::DrawTooltip()
 	{
 		Y = Mouse.Y - BoxH - 8.0f * S;
 	}
+	// Kept wholly on screen whichever side of the pointer it went.
+	const float TipEdge = 4.0f * S;
+	X = FMath::Clamp(X, TipEdge, FMath::Max(TipEdge, Canvas->ClipX - BoxW - TipEdge));
+	Y = FMath::Clamp(Y, TipEdge, FMath::Max(TipEdge, Canvas->ClipY - BoxH - TipEdge));
 	Panel(X, Y, BoxW, BoxH, FLinearColor(0.03f, 0.04f, 0.07f, 0.96f), FLinearColor(1, 1, 1, 0.25f), 1.0f);
 	for (int32 i = 0; i < Lines.Num(); ++i)
 	{
@@ -468,6 +525,8 @@ void ATMBattleHud::DrawTurnOrder(ATMBattleDirector& From)
 	const float End = X0 + Width;
 	const float Track = TrackStart * S;
 	const float Chip = ChipSize * S;
+	const float Lane = PinLane * S;
+	HoverLink = -1;
 	auto BarX = [&](float Seconds)
 	{
 		const float Frac = FMath::Sqrt(FMath::Clamp(Seconds / TimelineSeconds, 0.0f, 1.0f));
@@ -494,9 +553,10 @@ void ATMBattleHud::DrawTurnOrder(ATMBattleDirector& From)
 	TSet<int32> Shown;
 	for (int32 Team = 0; Team < 2; ++Team)
 	{
-		const float RowY = Y0 + Team * RowHeight * S;
+		// Each bar keeps a lane for its cooldown pins: above the blue bar, below the red.
+		const float RowY = Y0 + Lane + Team * RowHeight * S;
 		const float LineY = RowY + Chip * 0.5f + 2.0f * S;
-		Panel(X0 - 6.0f * S, RowY - 3.0f * S, Width + 12.0f * S, (RowHeight - 2.0f) * S, PanelFill);
+		Panel(X0 - 6.0f * S, RowY - 3.0f * S - (Team == 0 ? Lane : 0.0f), Width + 12.0f * S, (RowHeight - 2.0f) * S + Lane, PanelFill);
 		DrawRect(FLinearColor(Gold.R, Gold.G, Gold.B, 0.12f), X0, RowY, Track - 6.0f * S, Chip);
 		DrawRect(TeamColour(Team) * FLinearColor(1, 1, 1, 0.45f), X0 + Track, LineY - 1.5f * S, Width - Track, 3.0f * S);
 		for (float Seconds : TickSeconds)
@@ -639,6 +699,81 @@ void ATMBattleHud::DrawTurnOrder(ATMBattleDirector& From)
 				FLinearColor(0.03f, 0.04f, 0.07f, 0.75f), FLinearColor(1, 1, 1, 0.25f), 1.0f);
 		}
 
+		// Cooldown pins (2026-10-02, "Cooldown Ghost Chip Mockups" B): each ability
+		// cooling down, as its tile on a stem, at the time of its owner's turn on
+		// which it is back -- above the blue bar, below the red. The ability being
+		// aimed shows too, beating gold, where it would come back if used now.
+		{
+			struct FPin
+			{
+				const TMSim::FUnit* Unit = nullptr;
+				FTMBack Back;
+				float X = 0.0f;
+				float Seconds = 0.0f;
+			};
+			std::vector<FPin> Pins;
+			for (const TMSim::FUnit& Unit : Battle.Units)
+			{
+				if (Unit.Team != Team || !Unit.IsAlive() || !From.IsSeen(Unit))
+				{
+					continue;
+				}
+				for (const FTMBack& Back : ComingBack(From, Unit))
+				{
+					FPin Pin;
+					Pin.Unit = &Unit;
+					Pin.Back = Back;
+					Pin.Seconds = TurnInSeconds(Battle, Unit, Back.Turn);
+					Pin.X = BarX(Pin.Seconds);
+					Pins.push_back(Pin);
+				}
+			}
+			std::sort(Pins.begin(), Pins.end(), [](const FPin& A, const FPin& B) { return A.X < B.X; });
+			const float PinSize = 18.0f * S;
+			const float PinY = Team == 0 ? RowY - Lane + 4.0f * S : RowY + Chip + 11.0f * S;
+			const float PinBeat = 0.55f + 0.45f * FMath::Sin((GetWorld() ? GetWorld()->GetRealTimeSeconds() : 0.0f) * 6.0f);
+			float Last = -1.0e6f;
+			for (const FPin& Pin : Pins)
+			{
+				const TMSim::FAbility* Ability = Pin.Unit->Ability(Pin.Back.Slot);
+				if (!Ability)
+				{
+					continue;
+				}
+				// Side by side where two would overlap, the later nudged right.
+				const float Left = FMath::Min(FMath::Max(Pin.X - PinSize * 0.5f, Last + 2.0f * S), End - PinSize);
+				Last = Left + PinSize;
+				const bool bLit = TurnLinked(From, Pin.Unit->Id);
+				const FLinearColor Stem = Pin.Back.bPreview ? Gold : TeamColour(Team) * FLinearColor(1, 1, 1, 0.6f);
+				const float StemX = Left + PinSize * 0.5f - 0.5f * S;
+				if (Team == 0)
+				{
+					DrawRect(Stem, StemX, PinY + PinSize, 1.0f * S, LineY - PinY - PinSize);
+				}
+				else
+				{
+					DrawRect(Stem, StemX, LineY, 1.0f * S, PinY - LineY);
+				}
+				FLinearColor PinEdge = bLit ? Gold : TeamColour(Team) * FLinearColor(1, 1, 1, 0.85f);
+				if (Pin.Back.bPreview)
+				{
+					PinEdge = FLinearColor(Gold.R, Gold.G, Gold.B, PinBeat);
+				}
+				Panel(Left - 1.0f * S, PinY - 1.0f * S, PinSize + 2.0f * S, PinSize + 2.0f * S, FLinearColor(0.02f, 0.03f, 0.05f, 0.95f),
+					PinEdge, bLit || Pin.Back.bPreview ? 2.0f : 1.0f);
+				if (UTexture2D* Tile = AbilityIcon(*Ability, false))
+				{
+					Picture(Tile, Left, PinY, PinSize, PinSize,
+						Pin.Back.bPreview ? FLinearColor(1.0f, 1.0f, 1.0f, 0.5f + 0.5f * PinBeat) : FLinearColor::White);
+				}
+				if (FBox2D(FVector2D(Left, PinY), FVector2D(Left + PinSize, PinY + PinSize)).IsInside(Mouse))
+				{
+					HoverLink = Pin.Unit->Id;
+				}
+				AddTip(Left, PinY, PinSize, PinSize, BackLine(JobName(*Pin.Unit), *Ability, Pin.Back.bPreview, Pin.Back.Turn, Pin.Seconds));
+			}
+		}
+
 		auto DrawChip = [&](const FEntry& Entry)
 		{
 			const TMSim::FUnit& Unit = *Entry.Unit;
@@ -684,6 +819,17 @@ void ATMBattleHud::DrawTurnOrder(ATMBattleDirector& From)
 				Edge = FLinearColor::White;
 				Thick = 3.5f;
 			}
+			// Pointed at here, on its pins or on the board (2026-10-02): gold, with a glow round it.
+			if (!bFogged && TurnLinked(From, Unit.Id))
+			{
+				Edge = Gold;
+				Thick = 3.0f;
+				DrawRect(FLinearColor(Gold.R, Gold.G, Gold.B, 0.22f), Place.X - 4.0f * S, Place.Y - 4.0f * S, Size + 8.0f * S, Size + 8.0f * S);
+			}
+			if (bOver)
+			{
+				HoverLink = Unit.Id;
+			}
 			Panel(Place.X, Place.Y, Size, Size, bFogged ? FLinearColor(0.15f, 0.15f, 0.18f, 0.95f) : TeamFill(Team), Edge, Thick);
 			const float Letters = 0.58f * S * ChipScale[Unit.Id];
 			const FString Mark = bFogged ? FString(TEXT("?")) : Initials(JobName(Unit));
@@ -726,7 +872,36 @@ void ATMBattleHud::DrawTurnOrder(ATMBattleDirector& From)
 		}
 	}
 
-	Movable(TEXT("turn_order"), TEXT("Turn order bars"), X0 - 6.0f * S, Y0 - 3.0f * S, Width + 12.0f * S, 2.0f * RowHeight * S);
+	// A monster's wind-up ("Camps and Bosses Mockups" B): a purple ghost chip on
+	// the line between the two bars, where it lands.
+	for (const TMSim::FUnit& Caster : Battle.Units)
+	{
+		if (!WindingUp(Caster) || !From.IsSeen(Caster))
+		{
+			continue;
+		}
+		const TMSim::FAbility* Winding = Caster.Ability(Caster.Casting.Slot);
+		const float Lands = Caster.Casting.Ticks / Tps;
+		const float Ghost = Chip * 0.8f;
+		const float GX = FMath::Clamp(BarX(Lands) - Ghost * 0.5f, X0 + Track, End - Ghost);
+		const float GY = Y0 + Lane + RowHeight * S - 2.5f * S - Ghost * 0.5f;
+		const bool bLit = TurnLinked(From, Caster.Id);
+		DrawRect(FLinearColor(0.14f, 0.07f, 0.26f, 0.9f), GX, GY, Ghost, Ghost);
+		DashedEdge([this](const FLinearColor& C, float RX, float RY, float RW, float RH) { DrawRect(C, RX, RY, RW, RH); },
+			GX, GY, Ghost, Ghost, bLit ? Gold : CastColour, 2.0f * S, 4.0f * S, 3.0f * S);
+		const FString Mark = Initials(JobName(Caster));
+		const FVector2D MarkSize = TextSize(Mark, Font, 0.42f * S);
+		Text(Mark, GX + (Ghost - MarkSize.X) * 0.5f, GY + (Ghost - MarkSize.Y) * 0.5f, FLinearColor(0.9f, 0.82f, 1.0f), Font, 0.42f * S);
+		if (FBox2D(FVector2D(GX, GY), FVector2D(GX + Ghost, GY + Ghost)).IsInside(Mouse))
+		{
+			HoverLink = Caster.Id;
+		}
+		AddTip(GX, GY, Ghost, Ghost, FString::Printf(TEXT("%s winds up %hs: it lands in %.1f s\nHits from behind break a boss's wind-up."),
+			*JobName(Caster), Winding ? Winding->Name.c_str() : "something", Lands));
+	}
+
+	Movable(TEXT("turn_order"), TEXT("Turn order bars"), X0 - 6.0f * S, Y0 - 3.0f * S, Width + 12.0f * S, 2.0f * RowHeight * S + 2.0f * Lane);
+	From.HudHoverUnitId = HoverLink;
 
 	// Units that are gone lose their place, so a new battle starts them fresh.
 	for (auto It = ChipPlace.CreateIterator(); It; ++It)
@@ -753,6 +928,14 @@ void ATMBattleHud::DrawTurnSquares(ATMBattleDirector& From)
 	UFont* Font = GEngine->GetMediumFont();
 	const float Now = GetWorld() ? GetWorld()->GetRealTimeSeconds() : 0.0f;
 	const float Pulse = 0.55f + 0.45f * FMath::Sin(Now * 1000.0f / 180.0f);
+	// Pointing at a square lights its unit up on the board, and the reverse; over
+	// its portrait, its coming turns drop down under the row (2026-10-02).
+	const FVector2D Mouse = MousePoint();
+	HoverLink = -1;
+	const TMSim::FUnit* DropFor = nullptr;
+	float DropX = 0.0f;
+	float DropTop = 0.0f;
+	bool bDropLeft = false;
 	for (int32 Team = 0; Team < 2; ++Team)
 	{
 		const FPanelScale Sized(*this, Team == 0 ? TEXT("turn_cards_blue") : TEXT("turn_cards_red"));
@@ -842,6 +1025,12 @@ void ATMBattleHud::DrawTurnSquares(ATMBattleDirector& From)
 				Frame = FLinearColor::White;
 				FrameWidth = 3.5f * S;
 			}
+			if (!bFogged && TurnLinked(From, Unit->Id))
+			{
+				Frame = Gold;
+				FrameWidth = 3.5f * S;
+				DrawRect(FLinearColor(Gold.R, Gold.G, Gold.B, 0.22f), X - 4.0f * S, RowY - 4.0f * S, SW + 8.0f * S, SH + 8.0f * S);
+			}
 			DrawRect(FLinearColor(0.0f, 0.0f, 0.0f, 0.7f * Alpha), X - 1.0f, RowY - 1.0f, SW + 2.0f, SH + 2.0f);
 			DrawRect(Frame, X, RowY, SW, SW);
 			DrawRect(FLinearColor(0.02f, 0.03f, 0.05f, Alpha), X + FrameWidth, RowY + FrameWidth, SW - 2.0f * FrameWidth, SW - 2.0f * FrameWidth);
@@ -876,6 +1065,17 @@ void ATMBattleHud::DrawTurnSquares(ATMBattleDirector& From)
 				const float Crest = 18.0f * S;
 				DrawRect(FLinearColor(0.0f, 0.0f, 0.0f, 0.6f), X + FrameWidth, RowY + FrameWidth, Crest, Crest);
 				Picture(ClassIcon(*Unit), X + FrameWidth, RowY + FrameWidth, Crest, Crest);
+				// A dot per ability cooling down ("Cooldown Ghost Chip Mockups" C), gold
+				// and beating for the one being aimed.
+				const TArray<FTMBack> Backs = ComingBack(From, *Unit);
+				const float Dot = 7.0f * S;
+				for (int32 i = 0; i < Backs.Num(); ++i)
+				{
+					const float DX = X + SW - FrameWidth - 2.0f * S - (i + 1) * (Dot + 2.0f * S) + 2.0f * S;
+					const float DY = RowY + SW - FrameWidth - 3.0f * S - Dot;
+					DrawRect(FLinearColor(0.0f, 0.0f, 0.0f, 0.85f), DX - 1.0f * S, DY - 1.0f * S, Dot + 2.0f * S, Dot + 2.0f * S);
+					DrawRect(Backs[i].bPreview ? FLinearColor(Gold.R, Gold.G, Gold.B, Pulse) : FLinearColor(0.79f, 0.83f, 0.9f, 1.0f), DX, DY, Dot, Dot);
+				}
 			}
 			// A plan waiting for its turn (2026-10-01): a gold corner with a P; on a
 			// Go To, ">" and its turns left instead.
@@ -908,17 +1108,35 @@ void ATMBattleHud::DrawTurnSquares(ATMBattleDirector& From)
 			{
 				ReadySince.Remove(Unit->Id);
 			}
-			// Health in its side's colour, under the card.
+			// Health under the card, green to red as it falls ("Squad Strip Mockups"
+			// B; the frame already says whose it is).
 			const float BarY = RowY + SW + 2.0f * S;
 			const float HpPart = bFogged ? 0.0f : static_cast<float>(Unit->Hp) / FMath::Max(1, Unit->MaxHp());
 			DrawRect(FLinearColor(0.03f, 0.04f, 0.06f, 0.95f * Alpha), X, BarY, SW, 5.0f * S);
-			DrawRect(SideColour(bFriend) * FLinearColor(1, 1, 1, Alpha), X, BarY, SW * HpPart, 5.0f * S);
+			DrawRect(HealthColour(HpPart) * FLinearColor(1, 1, 1, Alpha), X, BarY, SW * HpPart, 5.0f * S);
+			// Its statuses under it, both sides, each with its turns left: three at
+			// most, the third "+N" when there are more.
+			if (!bFogged)
+			{
+				StatusChips(*Unit, X, RowY + SH + 3.0f * S, 18.0f * S, false, true, 3);
+			}
 			const float GaugeY = BarY + 1.0f * S;
 			const float BadgeScale = 0.4f * S;
 			const FVector2D BadgeSize = TextSize(Badge, Font, BadgeScale);
 			Text(Badge, X + (SW - BadgeSize.X) * 0.5f, GaugeY + 5.0f * S, BadgeColour * FLinearColor(1, 1, 1, Alpha), Font, BadgeScale);
 			AddButton(X, RowY, SW, SH, ETMHudAction::PickUnit, Unit->Id);
 			SquareAreas.Add(Unit->Id, FBox2D(FVector2D(X, RowY), FVector2D(X + SW, RowY + SH)));
+			if (FBox2D(FVector2D(X, RowY), FVector2D(X + SW, RowY + SH)).IsInside(Mouse))
+			{
+				HoverLink = Unit->Id;
+				if (!bFogged && Mouse.Y < RowY + SW)
+				{
+					DropFor = Unit;
+					DropX = bLeft ? X + SW : X;
+					DropTop = RowY + SH + SquareLane * S + 6.0f * S;
+					bDropLeft = bLeft;
+				}
+			}
 			FString Tip;
 			if (bFogged)
 			{
@@ -928,6 +1146,12 @@ void ATMBattleHud::DrawTurnSquares(ATMBattleDirector& From)
 			{
 				Tip = FString::Printf(TEXT("%s %s %d  hp %d/%d"), Team == 0 ? TEXT("Blue") : TEXT("Red"),
 					*JobName(*Unit), Unit->Id, Unit->Hp, Unit->MaxHp());
+				for (const TMSim::FStatus& Status : Unit->Statuses)
+				{
+					const TMSim::FStatusDef* Def = TMSim::FindStatus(Status.Id);
+					Tip += FString::Printf(TEXT("\n%s: %d %s"), Def ? UTF8_TO_TCHAR(Def->Name) : UTF8_TO_TCHAR(Status.Id.c_str()), Status.Turns,
+						Status.Id == "stop" ? TEXT("s") : (Status.Turns == 1 ? TEXT("turn left") : TEXT("turns left")));
+				}
 				if (Unit->IsCasting())
 				{
 					const TMSim::FAbility* Ability = Unit->Ability(Unit->Casting.Slot);
@@ -944,7 +1168,8 @@ void ATMBattleHud::DrawTurnSquares(ATMBattleDirector& From)
 					Tip += TEXT("\n\nClick to plan its next turn.");
 				}
 			}
-			AddTip(X, RowY, SW, SH, Tip);
+			// The portrait shows the coming turns now; the words are on the strip under it.
+			AddTip(X, bFogged ? RowY : RowY + SW, SW, bFogged ? SH : SH - SW, Tip);
 			X += SW + Gap;
 		}
 		if (Row.Num() > 0)
@@ -953,6 +1178,46 @@ void ATMBattleHud::DrawTurnSquares(ATMBattleDirector& From)
 				RowX - 3.0f * S, RowY - 3.0f * S, X - RowX - Gap + 6.0f * S, SH + 6.0f * S);
 		}
 	}
+	// A monster's wind-up ("Camps and Bosses Mockups" B): a purple ghost square
+	// between the two rows, with the seconds until it lands.
+	{
+		float CastX = Canvas->ClipX * 0.5f;
+		int32 Shown = 0;
+		for (const TMSim::FUnit& Caster : Battle.Units)
+		{
+			if (!WindingUp(Caster) || !From.IsSeen(Caster))
+			{
+				continue;
+			}
+			const TMSim::FAbility* Winding = Caster.Ability(Caster.Casting.Slot);
+			const float Lands = Caster.Casting.Ticks / Tps;
+			const float Ghost = 54.0f * S;
+			const float GX = CastX - Ghost * 0.5f + Shown * (Ghost + 6.0f * S);
+			const float GY = 12.0f * S + 98.0f * S;
+			const bool bLit = TurnLinked(From, Caster.Id);
+			DrawRect(FLinearColor(0.14f, 0.07f, 0.26f, 0.92f), GX, GY, Ghost, Ghost);
+			DashedEdge([this](const FLinearColor& C, float RX, float RY, float RW, float RH) { DrawRect(C, RX, RY, RW, RH); },
+				GX, GY, Ghost, Ghost, bLit ? Gold : CastColour, 2.0f * S, 5.0f * S, 4.0f * S);
+			const FString Mark = Initials(JobName(Caster));
+			const FVector2D MarkSize = TextSize(Mark, Font, 0.5f * S);
+			Text(Mark, GX + (Ghost - MarkSize.X) * 0.5f, GY + 6.0f * S, FLinearColor(0.9f, 0.82f, 1.0f), Font, 0.5f * S);
+			const FString Secs = FString::Printf(TEXT("%.1fs"), Lands);
+			const FVector2D SecsSize = TextSize(Secs, Font, 0.42f * S);
+			Text(Secs, GX + (Ghost - SecsSize.X) * 0.5f, GY + Ghost - SecsSize.Y - 4.0f * S, CastColour, Font, 0.42f * S);
+			if (FBox2D(FVector2D(GX, GY), FVector2D(GX + Ghost, GY + Ghost)).IsInside(Mouse))
+			{
+				HoverLink = Caster.Id;
+			}
+			AddTip(GX, GY, Ghost, Ghost, FString::Printf(TEXT("%s winds up %hs: it lands in %.1f s\nHits from behind break a boss's wind-up."),
+				*JobName(Caster), Winding ? Winding->Name.c_str() : "something", Lands));
+			++Shown;
+		}
+	}
+	if (DropFor)
+	{
+		DrawComingTurns(From, *DropFor, DropX, DropTop, bDropLeft);
+	}
+	From.HudHoverUnitId = HoverLink;
 }
 
 // --------------------------------------------------------------------- log
@@ -978,7 +1243,7 @@ void ATMBattleHud::DrawLog(ATMBattleDirector& From)
 	const float LineH = TextSize(TEXT("Ag"), Font, Scale).Y + 3.0f * S;
 	const int32 Shown = From.bLogLarge ? 26 : 10;
 	const float X = 16.0f * S + Nudge(TEXT("log")).X;
-	const float Y = 12.0f * S + 2.0f * RowHeight * S + 18.0f * S + Nudge(TEXT("log")).Y;
+	const float Y = 12.0f * S + (2.0f * RowHeight + (FTMSettings::Get().bTurnSquares ? SquareLane : 2.0f * PinLane)) * S + 18.0f * S + Nudge(TEXT("log")).Y;
 	const float W = 520.0f * S;
 	const float Head = 30.0f * S;
 	const FLinearColor Harm(1.0f, 0.54f, 0.48f);
@@ -1412,13 +1677,39 @@ void ATMBattleHud::Bar(float X, float Y, float W, float H, float Fraction, const
 	Slant(X, Y, W * FMath::Clamp(Fraction, 0.0f, 1.0f), FMath::Max(1.0f, H * 0.18f), FLinearColor(1.0f, 1.0f, 1.0f, 0.25f), Skew * 0.18f);
 }
 
-float ATMBattleHud::StatusChips(const TMSim::FUnit& Unit, float X, float Y, float Size, bool bLeftward, bool bTips)
+float ATMBattleHud::StatusChips(const TMSim::FUnit& Unit, float X, float Y, float Size, bool bLeftward, bool bTips, int32 Most)
 {
 	UFont* Font = GEngine->GetSmallFont();
 	const float Gap = Size * 0.15f;
 	float Used = 0.0f;
+	const int32 Count = static_cast<int32>(Unit.Statuses.size());
+	int32 Drawn = 0;
 	for (const TMSim::FStatus& Status : Unit.Statuses)
 	{
+		// No room for them all: the last place says how many more (2026-10-02).
+		if (Most > 0 && Count > Most && Drawn == Most - 1)
+		{
+			const float At = bLeftward ? X - Used - Size : X + Used;
+			const FString More = FString::Printf(TEXT("+%d"), Count - Drawn);
+			const FVector2D MoreSize = TextSize(More, Font, Size / 60.0f);
+			DrawRect(FLinearColor(0.0f, 0.0f, 0.0f, 0.75f), At, Y, Size, Size);
+			Text(More, At + (Size - MoreSize.X) * 0.5f, Y + (Size - MoreSize.Y) * 0.5f, FLinearColor::White, Font, Size / 60.0f, false);
+			if (bTips)
+			{
+				FString Rest;
+				for (int32 i = Drawn; i < Count; ++i)
+				{
+					const TMSim::FStatus& Other = Unit.Statuses[i];
+					const TMSim::FStatusDef* OtherDef = TMSim::FindStatus(Other.Id);
+					Rest += FString::Printf(TEXT("%s%s  (%d)"), Rest.IsEmpty() ? TEXT("") : TEXT("\n"),
+						OtherDef ? UTF8_TO_TCHAR(OtherDef->Name) : UTF8_TO_TCHAR(Other.Id.c_str()), Other.Turns);
+				}
+				AddTip(At, Y, Size, Size, Rest);
+			}
+			Used += Size + Gap;
+			break;
+		}
+		++Drawn;
 		const TMSim::FStatusDef* Def = TMSim::FindStatus(Status.Id);
 		const FStatusLook& Look = StatusLook(Status.Id);
 		const float At = bLeftward ? X - Used - Size : X + Used;
@@ -1443,7 +1734,10 @@ float ATMBattleHud::StatusChips(const TMSim::FUnit& Unit, float X, float Y, floa
 		const bool bLayers = Status.Id == "chilled";
 		const FString Turns = bLayers ? FString::Printf(TEXT("x%d"), FMath::Max(1, Status.Amount)) : FString::FromInt(Status.Turns);
 		const FVector2D TurnSize = TextSize(Turns, Font, Scale * 0.8f);
-		DrawRect(FLinearColor(0.02f, 0.02f, 0.04f, 0.8f), At + Size - TurnSize.X - 3.0f, Y + Size - TurnSize.Y, TurnSize.X + 3.0f, TurnSize.Y);
+		// Red when it ends at the start of the unit's next turn ("Squad Strip Mockups").
+		const bool bEnding = !bLayers && Status.Id != "stop" && Status.Turns == 1;
+		DrawRect(bEnding ? FLinearColor(0.7f, 0.12f, 0.1f, 0.95f) : FLinearColor(0.02f, 0.02f, 0.04f, 0.8f),
+			At + Size - TurnSize.X - 3.0f, Y + Size - TurnSize.Y, TurnSize.X + 3.0f, TurnSize.Y);
 		Text(Turns, At + Size - TurnSize.X - 1.0f, Y + Size - TurnSize.Y, FLinearColor::White, Font, Scale * 0.8f);
 		if (bTips)
 		{
@@ -1460,6 +1754,10 @@ float ATMBattleHud::StatusChips(const TMSim::FUnit& Unit, float X, float Y, floa
 			if (*Look.Desc)
 			{
 				Tip += TEXT("\n") + FString(Look.Desc);
+			}
+			if (bEnding)
+			{
+				Tip += TEXT("\nEnds as its next turn begins.");
 			}
 			AddTip(At, Y, Size, Size, Tip);
 		}
@@ -1583,11 +1881,12 @@ void ATMBattleHud::DrawGoToMarks(ATMBattleDirector& From)
 	for (const TPair<int32, ATMBattleDirector::FTMGoTo>& Pair : From.GoTos)
 	{
 		const TMSim::FUnit* Unit = From.Battle.FindUnit(Pair.Key);
-		if (!Unit || !Unit->IsAlive())
+		// Only the one pointed at (2026-10-03).
+		if (!Unit || !Unit->IsAlive() || !From.GoToShown(Pair.Key))
 		{
 			continue;
 		}
-		const float Strength = Pair.Key == From.SelectedId ? 1.0f : 0.5f;
+		const float Strength = 1.0f;
 		const int32 Count = static_cast<int32>(Pair.Value.Stops.size());
 		for (int32 i = 0; i < Count; ++i)
 		{
@@ -1604,7 +1903,8 @@ void ATMBattleHud::DrawGoToMarks(ATMBattleDirector& From)
 
 void ATMBattleHud::TurnPips(const TMSim::FUnit& Unit, float CX, float Top, float Zoom)
 {
-	const float R = 7.5f * S * Zoom;
+	// The move and act tokens, a quarter bigger since 2026-10-03.
+	const float R = 9.375f * S * Zoom;
 	const float Y0 = Top + R + 3.0f * S;
 	const FLinearColor Ink(0.03f, 0.04f, 0.07f, 0.92f);
 	const FLinearColor Spent(0.52f, 0.55f, 0.62f, 0.75f);
@@ -1686,7 +1986,7 @@ void ATMBattleHud::DrawOverheads(ATMBattleDirector& From)
 			continue;
 		}
 		const FVector Shown = From.ShownAt(Unit);
-		const FVector World = From.GetActorTransform().TransformPosition(Shown + FVector(0.0f, 0.0f, Unit.IsAlive() ? 262.0f : 70.0f));
+		const FVector World = From.GetActorTransform().TransformPosition(Shown + FVector(0.0f, 0.0f, Unit.IsAlive() ? ATMBattleDirector::UnitHeadCm + 82.0f : 70.0f));
 		const FVector FootWorld = From.GetActorTransform().TransformPosition(Shown + FVector(0.0f, 0.0f, 5.0f));
 		FVector2D At;
 		FVector2D Foot;
@@ -1731,14 +2031,18 @@ void ATMBattleHud::DrawOverheads(ATMBattleDirector& From)
 			// Its statuses, small, beside its ring.
 			const float Small = 11.0f * S * FTMSettings::Get().StatusIconScale;
 			StatusChips(Unit, Head.Foot.X + Head.Ring + 4.0f * S, Head.Foot.Y - Small * 0.5f, Small, false, false);
-			// A spell on its way out stays in sight: a short thin bar over its head.
+			// One of ours unseen in tall grass (FBattle::Hidden): says so under its feet.
+			if (bFriend && !Unit.bSpotted && From.Battle.Map.InGrass(Unit.Pos))
+			{
+				const FString Hid = TEXT("hidden in grass");
+				const FVector2D HidSize = TextSize(Hid, Font, 0.36f * S * O);
+				OutlinedText(Hid, Head.Foot.X - HidSize.X * 0.5f, Head.Foot.Y + 6.0f * S, FLinearColor(0.7f, 1.0f, 0.6f, 0.9f), Font, 0.36f * S * O, 1.0f * S);
+			}
+			// A spell on its way out stays in sight: what it is and how long, over its head.
 			float PopY = Head.At.Y;
 			if (Unit.IsCasting())
 			{
-				const float CastW = 48.0f * S * O;
-				const float Done = 1.0f - static_cast<float>(Unit.Casting.Ticks) / FMath::Max(1, Unit.Casting.Total);
-				Bar(Head.At.X - CastW * 0.5f, Head.At.Y, CastW, 3.0f * S * O, Done, CastColour, FLinearColor(0.05f, 0.05f, 0.08f, 0.8f), 0.0f);
-				PopY -= 10.0f * S * O;
+				PopY -= CastCard(Unit, Head.At.X, Head.At.Y + 6.0f * S * O, O) + 4.0f * S * O;
 			}
 			// One of ours that just took or dealt a blow: its health, for a few seconds.
 			PopBar(From, Unit, Head.At.X, PopY);
@@ -1814,18 +2118,47 @@ void ATMBattleHud::DrawOverheads(ATMBattleDirector& From)
 		Bar(X, Y, W, Thin, static_cast<float>(Unit.Ult) / TMSim::Pace::UltMax, UltColour, FLinearColor(0.05f, 0.05f, 0.08f, 0.85f), 0.0f);
 		Y += Thin + 3.0f * S;
 
-		// A spell on its way out: how long it has left.
+		// A spell on its way out: the card, over the name.
 		if (Unit.IsCasting())
 		{
-			const float Done = 1.0f - static_cast<float>(Unit.Casting.Ticks) / FMath::Max(1, Unit.Casting.Total);
-			Bar(X, Y, W, 3.0f * S, Done, CastColour, FLinearColor(0.05f, 0.05f, 0.08f, 0.8f), 0.0f);
-			Y += 6.0f * S;
+			CastCard(Unit, Head.At.X, Head.At.Y - 26.0f * S * O, O);
 		}
 
 		// Its statuses, under the bars.
 		const float Chip = 15.0f * S * FTMSettings::Get().StatusIconScale;
 		StatusChips(Unit, X, Y, Chip, false, false);
 	}
+}
+
+float ATMBattleHud::CastCard(const TMSim::FUnit& Unit, float X, float Bottom, float Scale)
+{
+	const TMSim::FAbility* Ability = Unit.Ability(Unit.Casting.Slot);
+	if (!Ability)
+	{
+		return 0.0f;
+	}
+	UFont* Font = GEngine->GetMediumFont();
+	const float K = S * Scale;
+	const float W = 196.0f * K;
+	const float H = 44.0f * K;
+	const float Left = X - W * 0.5f;
+	const float Top = Bottom - H;
+	Panel(Left, Top, W, H, FLinearColor(0.04f, 0.05f, 0.08f, 0.9f), CastColour, 2.0f * K);
+	const float IconSize = H - 10.0f * K;
+	if (UTexture2D* Picture2D = AbilityIcon(*Ability, false))
+	{
+		Picture(Picture2D, Left + 5.0f * K, Top + 5.0f * K, IconSize, IconSize);
+	}
+	const float TX = Left + IconSize + 12.0f * K;
+	const float TW = W - (TX - Left) - 8.0f * K;
+	const FString Name = UTF8_TO_TCHAR(Ability->Name.c_str());
+	const FString LeftText = FString::Printf(TEXT("%.1f s"), static_cast<float>(Unit.Casting.Ticks) / TMSim::Pace::TicksPerSecond);
+	const FVector2D LeftSize = TextSize(LeftText, Font, 0.5f * K);
+	OutlinedText(Name, TX, Top + 4.0f * K, TextColour, Font, 0.52f * K, 1.0f * K);
+	OutlinedText(LeftText, TX + TW - LeftSize.X, Top + 4.0f * K, CastColour, Font, 0.5f * K, 1.0f * K);
+	const float Done = 1.0f - static_cast<float>(Unit.Casting.Ticks) / FMath::Max(1, Unit.Casting.Total);
+	Bar(TX, Top + H - 13.0f * K, TW, 7.0f * K, FMath::Clamp(Done, 0.0f, 1.0f), CastColour, FLinearColor(0.12f, 0.12f, 0.16f, 0.95f), 0.0f);
+	return H;
 }
 
 // ------------------------------------------------------------ unit panels
@@ -1855,14 +2188,21 @@ void ATMBattleHud::AbilityTile(ATMBattleDirector& From, const TMSim::FUnit& Unit
 	// A unit that has moved but not acted: its abilities are what is left, and their
 	// edges flash ("Turn Left Indicator Mockups" D, with flashing borders, 2026-10-02).
 	const bool bFlash = bButton && bColour && Unit.bReady && Unit.bMoved && !Unit.bActed && From.PlayerCanCommand(&Unit);
-	const float Pulse = bFlash ? 0.5f + 0.5f * FMath::Sin((GetWorld() ? GetWorld()->GetRealTimeSeconds() : 0.0f) * 2.0f * PI * 1.1f) : 0.0f;
-	const FLinearColor Flash(1.0f, 0.93f, 0.62f, 1.0f);
+	// 2026-10-03, "more visually noticeable": a thicker edge, a three-step glow,
+	// a quicker beat, never fully dark between beats (as the move tiles, TMBattleHud.cpp).
+	const float Pulse = bFlash ? 0.35f + 0.65f * (0.5f + 0.5f * FMath::Sin((GetWorld() ? GetWorld()->GetRealTimeSeconds() : 0.0f) * 2.0f * PI * 1.4f)) : 0.0f;
+	const FLinearColor Flash(1.0f, 0.95f, 0.55f, 1.0f);
 	if (bFlash)
 	{
-		DrawRect(Flash * FLinearColor(1.0f, 1.0f, 1.0f, 0.35f * Pulse), X - 6.0f * S, Y - 6.0f * S, Size + 12.0f * S, Size + 12.0f * S);
+		for (int32 Ring = 3; Ring >= 1; --Ring)
+		{
+			const float Out = (3.0f + 4.0f * Ring) * S;
+			DrawRect(Flash * FLinearColor(1.0f, 1.0f, 1.0f, (0.14f + 0.12f * (3 - Ring)) * Pulse), X - Out, Y - Out, Size + 2.0f * Out, Size + 2.0f * Out);
+		}
 	}
 	DrawRect(FLinearColor(0.0f, 0.0f, 0.0f, 0.75f), X - 3.0f * S, Y - 3.0f * S, Size + 6.0f * S, Size + 6.0f * S);
-	DrawRect(bFlash ? FMath::Lerp(Edge, Flash, Pulse) : Edge, X - 2.0f * S, Y - 2.0f * S, Size + 4.0f * S, Size + 4.0f * S);
+	const float RimW = (bFlash ? 4.0f : 2.0f) * S;
+	DrawRect(bFlash ? FMath::Lerp(Edge, Flash, Pulse) : Edge, X - RimW, Y - RimW, Size + 2.0f * RimW, Size + 2.0f * RimW);
 	DrawRect(bColour && bOver && bButton ? FLinearColor(0.16f, 0.2f, 0.3f, 1.0f) : FLinearColor(0.06f, 0.07f, 0.1f, 1.0f), X, Y, Size, Size);
 	const float Inset = Size * 0.08f;
 	Picture(AbilityIcon(*Ability, !bColour), X + Inset, Y + Inset, Size - 2.0f * Inset, Size - 2.0f * Inset,
@@ -2088,6 +2428,40 @@ void ATMBattleHud::DrawUnitPanel(ATMBattleDirector& From, const TMSim::FUnit& Un
 	const float Badge = 42.0f * S;
 	DrawRect(FLinearColor(0.0f, 0.0f, 0.0f, 0.6f), PX + 4.0f * S, Y + 4.0f * S, Badge, Badge);
 	Picture(ClassIcon(Unit), PX + 4.0f * S, Y + 4.0f * S, Badge, Badge);
+	// The turn's clock round the portrait (2026-10-03): its frame, from the top
+	// middle clockwise, is the time left before the turn is lost, shrinking as
+	// it runs; red and beating in the last five seconds.
+	if (Unit.IsAlive() && Unit.bReady)
+	{
+		const float Share = FMath::Clamp(static_cast<float>(Unit.Clock) / FMath::Max(1, Battle.ClockTicks(Unit)), 0.0f, 1.0f);
+		const bool bUrgent = Unit.Clock / Tps <= 5.0f;
+		const float Beat = bUrgent ? 0.6f + 0.4f * FMath::Abs(FMath::Sin(GetWorld()->GetRealTimeSeconds() * 5.0f)) : 1.0f;
+		const FLinearColor Hand = (bUrgent ? Urgent : Gold) * FLinearColor(1.0f, 1.0f, 1.0f, Beat);
+		const float Thick = 4.0f * S;
+		const float FX = PX - 3.0f * S;
+		const float FY = Y - 3.0f * S;
+		const float FrameSide = Portrait + 6.0f * S;
+		float ClockLeft = Share * 4.0f * FrameSide;
+		// Each leg of the frame in turn, as much of it as is left.
+		auto Leg = [&](float AX, float AY, float DX, float DY, float Length)
+		{
+			const float Drawn = FMath::Min(ClockLeft, Length);
+			if (Drawn <= 0.0f)
+			{
+				return;
+			}
+			ClockLeft -= Drawn;
+			const float EX = AX + DX * Drawn;
+			const float EY = AY + DY * Drawn;
+			DrawRect(Hand, FMath::Min(AX, EX) - (DX == 0.0f ? Thick * 0.5f : 0.0f), FMath::Min(AY, EY) - (DY == 0.0f ? Thick * 0.5f : 0.0f),
+				DX == 0.0f ? Thick : FMath::Abs(EX - AX), DY == 0.0f ? Thick : FMath::Abs(EY - AY));
+		};
+		Leg(FX + FrameSide * 0.5f, FY, 1.0f, 0.0f, FrameSide * 0.5f);
+		Leg(FX + FrameSide, FY, 0.0f, 1.0f, FrameSide);
+		Leg(FX + FrameSide, FY + FrameSide, -1.0f, 0.0f, FrameSide);
+		Leg(FX, FY + FrameSide, 0.0f, -1.0f, FrameSide);
+		Leg(FX, FY, 1.0f, 0.0f, FrameSide * 0.5f);
+	}
 	// The defenses as the rules read them: a share off each hit and one
 	// Evasion (2026-10-01), or, under the classic rules, the old four.
 	const int32 ArmorNow = Unit.Stat(TMSim::EStat::AttDef);
@@ -2321,7 +2695,7 @@ void ATMBattleHud::DrawField(ATMBattleDirector& From)
 	const float H = Rows * RowH + 16.0f * S;
 	const float X = 16.0f * S + Nudge(TEXT("field")).X;
 	// Under the log when it is open, so the two never overlap.
-	const float Top = From.bShowLog ? LogBottom + 16.0f * S : 12.0f * S + 2.0f * RowHeight * S + 18.0f * S;
+	const float Top = SquadBottom > 0.0f ? SquadBottom + 16.0f * S : From.bShowLog ? LogBottom + 16.0f * S : 12.0f * S + (2.0f * RowHeight + (FTMSettings::Get().bTurnSquares ? SquareLane : 2.0f * PinLane)) * S + 18.0f * S;
 	const float Y = FMath::Max(Top, (Canvas->ClipY - H) * 0.5f) + Nudge(TEXT("field")).Y;
 	Panel(X - 6.0f * S, Y - 8.0f * S, W, H, FLinearColor(0.03f, 0.05f, 0.08f, 0.9f), FLinearColor(1, 1, 1, 0.12f), 1.0f);
 	Movable(TEXT("field"), TEXT("Field list"), X - 6.0f * S, Y - 8.0f * S, W, H);
@@ -2543,6 +2917,207 @@ float ATMBattleHud::GearRow(const TMSim::FUnit& Unit, float X, float Y, float Si
 	return Used;
 }
 
+void ATMBattleHud::DrawReadyMarks(ATMBattleDirector& From)
+{
+	// "Battle Indicator Alternatives" Ready D, chosen after the v19 play test: a
+	// gold READY tag where the health bar sits over the head; nothing on the ground.
+	if (!PlayerOwner || From.Battle.Winner != -1)
+	{
+		return;
+	}
+	UFont* Font = GEngine->GetMediumFont();
+	const FTransform& BoardAt = From.GetActorTransform();
+	const float O = FTMSettings::Get().OverheadScale;
+	const FString Word = TEXT("READY");
+	const float Scale = 0.44f * S * O;
+	const FVector2D WordSize = TextSize(Word, Font, Scale);
+	for (const TMSim::FUnit& Each : From.Battle.Units)
+	{
+		if (!Each.bReady || !Each.IsAlive() || Each.bOffBoard || !From.IsSeen(Each))
+		{
+			continue;
+		}
+		FVector2D At;
+		if (!PlayerOwner->ProjectWorldLocationToScreen(BoardAt.TransformPosition(From.ShownAt(Each)
+			+ FVector(0.0f, 0.0f, ATMBattleDirector::UnitHeadCm + 82.0f)), At))
+		{
+			continue;
+		}
+		const FLinearColor Edge = From.IsFriend(Each) ? Gold : FLinearColor(1.0f, 0.55f, 0.45f);
+		const float PadX = 6.0f * S * O;
+		const float W = WordSize.X + 2.0f * PadX;
+		const float H = WordSize.Y + 2.0f * S * O;
+		// Its bottom just above the bars and the name (DrawOverheads draws them from At).
+		const float X = At.X - W * 0.5f;
+		const float Y = At.Y - H - 34.0f * S * O;
+		Panel(X, Y, W, H, FLinearColor(0.06f, 0.07f, 0.1f, 0.9f), Edge, 2.0f * S * O);
+		Text(Word, X + PadX, Y + 1.0f * S * O, Edge, Font, Scale);
+	}
+}
+
+void ATMBattleHud::DrawCastWarnings(ATMBattleDirector& From)
+{
+	// "Battle Indicator Alternatives" Cast B, with A (CastCard, PaintCasts): a
+	// sigil turning under every caster in sight, and a banner across the top for
+	// each enemy cast that will catch units of yours.
+	if (!PlayerOwner || From.Battle.Winner != -1)
+	{
+		return;
+	}
+	UFont* Font = GEngine->GetMediumFont();
+	const FTransform& BoardAt = From.GetActorTransform();
+	const float Spin = static_cast<float>(FPlatformTime::Seconds() * 1.4);
+	const int32 Mine = From.FriendTeam();
+	float BannerY = 150.0f * S;
+	for (const TMSim::FUnit& Caster : From.Battle.Units)
+	{
+		if (!Caster.IsAlive() || Caster.bOffBoard || !Caster.IsCasting() || !From.IsSeen(Caster))
+		{
+			continue;
+		}
+		const TMSim::FAbility* Ability = Caster.Ability(Caster.Casting.Slot);
+		if (!Ability)
+		{
+			continue;
+		}
+		// The sigil: two dashed rings round the caster's feet, turning opposite ways.
+		const FVector Feet = From.ShownAt(Caster) + FVector(0.0f, 0.0f, 6.0f);
+		for (int32 Ring = 0; Ring < 2; ++Ring)
+		{
+			const float Radius = (Ring == 0 ? 0.9f : 0.62f) * From.TileSize;
+			const int32 Steps = 32;
+			const float Turn = Ring == 0 ? Spin : -Spin * 0.6f;
+			const FLinearColor Ink(CastColour.R, CastColour.G, CastColour.B, Ring == 0 ? 0.95f : 0.6f);
+			for (int32 k = 0; k < Steps; k += 2)
+			{
+				const float A0 = Turn + UE_TWO_PI * k / Steps;
+				const float A1 = Turn + UE_TWO_PI * (k + 1) / Steps;
+				FVector2D P0;
+				FVector2D P1;
+				if (PlayerOwner->ProjectWorldLocationToScreen(BoardAt.TransformPosition(Feet + FVector(FMath::Cos(A0), FMath::Sin(A0), 0.0f) * Radius), P0)
+					&& PlayerOwner->ProjectWorldLocationToScreen(BoardAt.TransformPosition(Feet + FVector(FMath::Cos(A1), FMath::Sin(A1), 0.0f) * Radius), P1))
+				{
+					DrawLine(P0.X, P0.Y, P1.X, P1.Y, Ink, (Ring == 0 ? 2.5f : 1.5f) * S);
+				}
+			}
+		}
+		// The banner: an enemy's cast, and how many of yours stand where it lands.
+		if (Caster.Team == Mine || BannerY > 330.0f * S)
+		{
+			continue;
+		}
+		TMSim::FVec2 Aim = Caster.Casting.Target;
+		if (Caster.Casting.FollowId >= 0)
+		{
+			if (const TMSim::FUnit* Followed = From.Battle.FindUnit(Caster.Casting.FollowId))
+			{
+				Aim = Followed->Pos;
+			}
+		}
+		int32 Caught = 0;
+		for (const TMSim::FHit& Hit : From.Battle.Preview(Caster, Caster.Casting.Slot, Caster.Pos, Aim))
+		{
+			const TMSim::FUnit* Struck = From.Battle.FindUnit(Hit.UnitId);
+			Caught += Struck && Struck->Team == Mine && Struck->IsAlive() ? 1 : 0;
+		}
+		if (Caught == 0)
+		{
+			continue;
+		}
+		const float W = FMath::Min(560.0f * S, Canvas->ClipX - 40.0f * S);
+		const float H = 40.0f * S;
+		const float X = (Canvas->ClipX - W) * 0.5f;
+		const FLinearColor Foe(1.0f, 0.56f, 0.52f);
+		Panel(X, BannerY, W, H, FLinearColor(0.05f, 0.05f, 0.08f, 0.94f), Foe, 2.0f * S);
+		const FString Say = FString::Printf(TEXT("ENEMY %s casting %hs"), *JobName(Caster), Ability->Name.c_str());
+		const FString Right = FString::Printf(TEXT("%d of yours in it   %.1f s"), Caught,
+			static_cast<float>(Caster.Casting.Ticks) / TMSim::Pace::TicksPerSecond);
+		Text(Say, X + 12.0f * S, BannerY + 5.0f * S, TextColour, Font, 0.5f * S);
+		const FVector2D RightSize = TextSize(Right, Font, 0.5f * S);
+		Text(Right, X + W - 12.0f * S - RightSize.X, BannerY + 5.0f * S, Foe, Font, 0.5f * S);
+		const float Done = 1.0f - static_cast<float>(Caster.Casting.Ticks) / FMath::Max(1, Caster.Casting.Total);
+		Bar(X + 12.0f * S, BannerY + H - 10.0f * S, W - 24.0f * S, 5.0f * S, FMath::Clamp(Done, 0.0f, 1.0f), CastColour,
+			FLinearColor(0.12f, 0.12f, 0.16f, 0.95f), 0.0f);
+		BannerY += H + 6.0f * S;
+	}
+}
+
+void ATMBattleHud::DrawZoneShields(ATMBattleDirector& From)
+{
+	const TMSim::FTuning& Tune = From.Battle.Tuning;
+	if (!PlayerOwner || Tune.ZoneOfControl < 1.0 || Tune.EngageRadius <= 0.0 || From.Battle.Winner != -1)
+	{
+		return;
+	}
+	UTexture2D* Shield = Icon(TEXT("hud/zone_shield"), false);
+	if (!Shield)
+	{
+		return;
+	}
+	const int32 Mine = From.FriendTeam();
+	const float Spin = static_cast<float>(FPlatformTime::Seconds() * 0.45);
+	const float Reach = static_cast<float>(Tune.EngageRadius) * From.TileSize;
+	const FTransform& BoardAt = From.GetActorTransform();
+	for (const TMSim::FUnit& Each : From.Battle.Units)
+	{
+		if (!Each.IsAlive() || !From.IsSeen(Each) || !TMSim::FBattle::HoldsTheLine(Each))
+		{
+			continue;
+		}
+		const bool bEnemy = Each.Team != Mine;
+		const bool bHovered = Each.Id == From.HoverUnitId || Each.Id == From.HudHoverUnitId;
+		if (!bEnemy && !bHovered)
+		{
+			continue;
+		}
+		const FVector Middle = From.ShownAt(Each) + FVector(0.0f, 0.0f, 10.0f);
+		FVector2D At;
+		FVector2D Edge;
+		if (!PlayerOwner->ProjectWorldLocationToScreen(BoardAt.TransformPosition(Middle), At)
+			|| !PlayerOwner->ProjectWorldLocationToScreen(BoardAt.TransformPosition(Middle + FVector(Reach, 0.0f, 0.0f)), Edge))
+		{
+			continue;
+		}
+		const float Size = FMath::Clamp(static_cast<float>(FVector2D::Distance(At, Edge)) * 0.3f, 14.0f * S, 40.0f * S);
+		const FLinearColor Tint = bEnemy ? FLinearColor(1.0f, 0.55f, 0.2f, bHovered ? 1.0f : 0.9f) : FLinearColor(0.45f, 0.7f, 1.0f, 0.95f);
+		// "Battle Indicator Alternatives" Tank B, chosen: three big shields riding a
+		// ring broken into arcs, the arcs turning with them.
+		const int32 Arcs = 3;
+		const int32 Steps = 12;
+		for (int32 a = 0; a < Arcs; ++a)
+		{
+			// Each arc fills the space between two shields, short of both.
+			const float Start = Spin + (a + 0.18f) * UE_TWO_PI / Arcs;
+			const float Stop = Spin + (a + 0.82f) * UE_TWO_PI / Arcs;
+			FVector2D Last(0.0f, 0.0f);
+			bool bLast = false;
+			for (int32 k = 0; k <= Steps; ++k)
+			{
+				const float Angle = FMath::Lerp(Start, Stop, static_cast<float>(k) / Steps);
+				FVector2D Here;
+				const bool bHere = PlayerOwner->ProjectWorldLocationToScreen(
+					BoardAt.TransformPosition(Middle + FVector(FMath::Cos(Angle), FMath::Sin(Angle), 0.0f) * Reach), Here);
+				if (bHere && bLast)
+				{
+					DrawLine(Last.X, Last.Y, Here.X, Here.Y, Tint, 3.0f * S);
+				}
+				Last = Here;
+				bLast = bHere;
+			}
+		}
+		const float Big = Size * 1.4f;
+		for (int32 k = 0; k < Arcs; ++k)
+		{
+			const float Angle = Spin + k * UE_TWO_PI / Arcs;
+			FVector2D Spot;
+			if (PlayerOwner->ProjectWorldLocationToScreen(BoardAt.TransformPosition(Middle + FVector(FMath::Cos(Angle), FMath::Sin(Angle), 0.0f) * Reach), Spot))
+			{
+				Picture(Shield, Spot.X - Big * 0.5f, Spot.Y - Big * 0.5f, Big, Big, Tint);
+			}
+		}
+	}
+}
+
 void ATMBattleHud::DrawWorldWords(ATMBattleDirector& From)
 {
 	// Over the board, so they are drawn by the HUD rather than as text in the
@@ -2579,6 +3154,10 @@ void ATMBattleHud::DrawWorldWords(ATMBattleDirector& From)
 	};
 
 	// What lies in each cache: its best item's name in its tier's colour, and how many more.
+	// The pointer on a chest opens the whole of it (v19 play test).
+	int32 HoverCache = -1;
+	FVector2D HoverCacheAt(0.0f, 0.0f);
+	const FVector2D Mouse = MousePoint();
 	for (int32 i = 0; i < From.CacheChests.Num() && i < static_cast<int32>(From.Battle.Caches.size()); ++i)
 	{
 		const TMSim::FCache& Cache = From.Battle.Caches[static_cast<size_t>(i)];
@@ -2598,6 +3177,120 @@ void ATMBattleHud::DrawWorldWords(ATMBattleDirector& From)
 		}
 		Lines(Line, From.CacheChests[i]->GetComponentLocation() + FVector(0.0f, 0.0f, 1.0f * From.TileSize),
 			Whiter(TierColour(static_cast<int32>(Best->Tier)), 0.45f, 1.0f), Font, 0.62f * S, 1.6f * S);
+		FVector2D ChestAt;
+		if (PlayerOwner->ProjectWorldLocationToScreen(From.CacheChests[i]->GetComponentLocation(), ChestAt)
+			&& FVector2D::Distance(ChestAt, Mouse) < 56.0f * S)
+		{
+			HoverCache = i;
+			HoverCacheAt = ChestAt;
+		}
+	}
+	if (HoverCache >= 0)
+	{
+		const TMSim::FCache& Cache = From.Battle.Caches[static_cast<size_t>(HoverCache)];
+		const float W = 380.0f * S;
+		const float Pad = 10.0f * S;
+		struct FRow { FString Text; FLinearColor Colour; float Scale; };
+		TArray<FRow> Rows;
+		Rows.Add({ FString::Printf(TEXT("%d item%s on the ground"), static_cast<int32>(Cache.Items.size()), Cache.Items.size() == 1 ? TEXT("") : TEXT("s")), Dim, 0.46f * S });
+		for (const TMSim::FItemDef* Item : Cache.Items)
+		{
+			Rows.Add({ FString::Printf(TEXT("%hs  (%hs)"), Item->Name.c_str(), TMSim::ItemTierName(Item->Tier)),
+				Whiter(TierColour(static_cast<int32>(Item->Tier)), 0.3f, 1.0f), 0.56f * S });
+			const FString Summary = ItemSummary(*Item);
+			if (!Summary.IsEmpty())
+			{
+				Rows.Add({ Summary, TextColour, 0.48f * S });
+			}
+			for (const FString& Row : Wrap(UTF8_TO_TCHAR(Item->Desc.c_str()), Font, 0.46f * S, W - 2.0f * Pad))
+			{
+				Rows.Add({ Row, FLinearColor(0.8f, 0.83f, 0.9f), 0.46f * S });
+			}
+		}
+		Rows.Add({ TEXT("Walk a unit next to it to take one."), Dim, 0.44f * S });
+
+		float H = 2.0f * Pad;
+		for (const FRow& Row : Rows)
+		{
+			H += TextSize(Row.Text, Font, Row.Scale).Y + 2.0f * S;
+		}
+		const float X = FMath::Clamp(HoverCacheAt.X + 28.0f * S, 4.0f * S, Canvas->ClipX - W - 4.0f * S);
+		const float Y = FMath::Clamp(HoverCacheAt.Y - H * 0.5f, 4.0f * S, Canvas->ClipY - H - 4.0f * S);
+		Panel(X, Y, W, H, FLinearColor(0.03f, 0.04f, 0.07f, 0.94f), FLinearColor(0.5f, 0.55f, 0.65f, 0.7f), 1.0f);
+		float RY = Y + Pad;
+		for (const FRow& Row : Rows)
+		{
+			Text(Row.Text, X + Pad, RY, Row.Colour, Font, Row.Scale);
+			RY += TextSize(Row.Text, Font, Row.Scale).Y + 2.0f * S;
+		}
+	}
+
+	// Springs (wells) run dry once used (FTuning::SpringRestTurns): for how many
+	// more of their user's turns.
+	for (const TMSim::FBattle::FSpringRest& Rest : From.Battle.SpringRests)
+	{
+		const int32 Across = FMath::Max(1, From.Battle.Map.TilesX);
+		const TMSim::FVec2 Middle((Rest.Tile % Across + 0.5f) * TMSim::Ground::TileSize, (Rest.Tile / Across + 0.5f) * TMSim::Ground::TileSize);
+		if (Rest.Turns > 0 && From.IsPointSeen(Middle))
+		{
+			Lines(FString::Printf(TEXT("Dry: %d turn%s"), Rest.Turns, Rest.Turns == 1 ? TEXT("") : TEXT("s")), From.BoardPoint(Middle, 60.0f),
+				FLinearColor(0.62f, 0.86f, 1.0f, 0.95f), Font, 0.5f * S, 1.4f * S);
+		}
+	}
+
+	// A monster's wind-up ("Camps and Bosses Mockups" B): the seconds where it
+	// lands, and a mark over everyone it would catch.
+	const FTransform& BoardAt = From.GetActorTransform();
+	const FLinearColor WindWords(0.85f, 0.72f, 1.0f, 1.0f);
+	for (const TMSim::FUnit& Caster : From.Battle.Units)
+	{
+		if (!WindingUp(Caster) || !From.IsSeen(Caster))
+		{
+			continue;
+		}
+		const TMSim::FVec2 Aim = CastAim(From.Battle, Caster);
+		const TMSim::FAbility* Winding = Caster.Ability(Caster.Casting.Slot);
+		const bool bSelf = Winding && TMSim::ShapeOf(*Winding) == "self";
+		Lines(FString::Printf(TEXT("%.1f s"), Caster.Casting.Ticks / Tps), From.BoardPoint(bSelf ? Caster.Pos : Aim, 40.0f),
+			WindWords, Big, 0.8f * S, 2.0f * S);
+		for (const TMSim::FHit& Hit : From.Battle.Preview(Caster, Caster.Casting.Slot, Caster.Pos, Aim))
+		{
+			const TMSim::FUnit* Caught = From.Battle.FindUnit(Hit.UnitId);
+			if (Caught && Caught->IsAlive() && Caught->Id != Caster.Id && From.IsSeen(*Caught))
+			{
+				Lines(TEXT("!"), BoardAt.TransformPosition(From.WorldFor(*Caught) + FVector(0.0f, 0.0f, ATMBattleDirector::UnitHeadCm + 35.0f)), WindWords, Big, 0.9f * S, 2.0f * S);
+			}
+		}
+	}
+
+	// A boss on the hunt ("Camps and Bosses Mockups" C): a dashed line to its prey.
+	if (From.Battle.Tuning.BossHunt >= 0.5)
+	{
+		const FLinearColor HuntColour(1.0f, 0.54f, 0.36f, 0.95f);
+		for (const TMSim::FUnit& Boss : From.Battle.Units)
+		{
+			const TMSim::FUnit* Prey = Boss.bMonster && Boss.HuntTarget >= 0 && Boss.IsAlive() ? From.Battle.FindUnit(Boss.HuntTarget) : nullptr;
+			if (!Prey || !Prey->IsAlive() || !From.IsSeen(Boss) || !From.IsSeen(*Prey))
+			{
+				continue;
+			}
+			FVector2D A;
+			FVector2D B;
+			if (!PlayerOwner->ProjectWorldLocationToScreen(BoardAt.TransformPosition(From.WorldFor(Boss) + FVector(0.0f, 0.0f, 120.0f)), A)
+				|| !PlayerOwner->ProjectWorldLocationToScreen(BoardAt.TransformPosition(From.WorldFor(*Prey) + FVector(0.0f, 0.0f, 90.0f)), B))
+			{
+				continue;
+			}
+			const float Length = FVector2D::Distance(A, B);
+			const FVector2D Step = Length > 1.0f ? (B - A) / Length : FVector2D::ZeroVector;
+			for (float Along = 0.0f; Along < Length; Along += 22.0f * S)
+			{
+				const FVector2D P0 = A + Step * Along;
+				const FVector2D P1 = A + Step * FMath::Min(Length, Along + 13.0f * S);
+				DrawLine(P0.X, P0.Y, P1.X, P1.Y, HuntColour, 3.0f * S);
+			}
+			Lines(TEXT("HUNTED"), BoardAt.TransformPosition(From.WorldFor(*Prey) + FVector(0.0f, 0.0f, ATMBattleDirector::UnitHeadCm + 60.0f)), HuntColour, Font, 0.55f * S, 1.6f * S);
+		}
 	}
 
 	// The camps' names and clocks.
@@ -3532,6 +4225,29 @@ void ATMBattleHud::DrawGuideDetail(ATMBattleDirector& From, float PX, float PY, 
 		}
 		Y += CardH + 10.0f * S;
 	}
+	// What it summons, in full (v19 play test): each pet its abilities call.
+	for (int32 Slot = 0; Slot < 4; ++Slot)
+	{
+		const TMSim::FAbility* Calls = TMSim::JobAbility(Job.Id, Slot);
+		const TMSim::FJobDef* Pet = Calls && !Calls->PetJob.empty() ? TMSim::FindJob(Calls->PetJob) : nullptr;
+		if (!Pet)
+		{
+			continue;
+		}
+		const float HeadH = 30.0f * S;
+		if (Inside(Y, HeadH))
+		{
+			Text(FString::Printf(TEXT("SUMMONS  (%hs%s)"), Calls->Name.c_str(),
+				Calls->PetTurns > 0 ? *FString::Printf(TEXT(", stays %d turns"), Calls->PetTurns) : TEXT("")), RX, Y + 4.0f * S, Gold, Font, 0.55f * S);
+		}
+		Y += HeadH;
+		const float PetH = RW > 700.0f * S ? 300.0f * S : 470.0f * S;
+		if (Inside(Y, PetH))
+		{
+			DrawClassCard(*Pet, RX, Y, RW, PetH);
+		}
+		Y += PetH + 10.0f * S;
+	}
 	const float RightH = Y + Off - Top;
 
 	// Kept in range, and a bar to say there is more.
@@ -3592,13 +4308,17 @@ void ATMBattleHud::DrawClassPicker(ATMBattleDirector& From)
 		FX += 118.0f * S;
 	}
 
-	// The grid.
-	const int32 Columns = 6;
+	// The grid, with the class under the pointer shown in full beside it.
+	const float CardW = FMath::Min(440.0f * S, PW * 0.32f);
+	const float GridW = PW - 48.0f * S - CardW - 20.0f * S;
+	const int32 Columns = GridW > 900.0f * S ? 4 : 3;
 	const float Gap = 6.0f * S;
-	const float CellW = (PW - 48.0f * S - (Columns - 1) * Gap) / Columns;
+	const float CellW = (GridW - (Columns - 1) * Gap) / Columns;
 	const float CellH = 40.0f * S;
 	float Y = FY + 48.0f * S;
 	int32 Column = 0;
+	const FVector2D Mouse = MousePoint();
+	const TMSim::FJobDef* Shown = TMSim::FindJob(From.Setup.Rosters[Team][Slot]);
 	for (int32 j = 0; j < static_cast<int32>(Jobs.size()); ++j)
 	{
 		const TMSim::FJobDef& Job = *Jobs[j];
@@ -3613,6 +4333,25 @@ void ATMBattleHud::DrawClassPicker(ATMBattleDirector& From)
 		}
 		const float X = PX + 24.0f * S + Column * (CellW + Gap);
 		const bool bCurrent = Job.Id == From.Setup.Rosters[Team][Slot];
+		if (FBox2D(FVector2D(X, Y), FVector2D(X + CellW, Y + CellH)).IsInside(Mouse))
+		{
+			Shown = &Job;
+		}
+		if (!bCurrent && From.Setup.bUniqueClasses && From.ClassTaken(Job.Id, Team, Slot))
+		{
+			// One of each class: this one is someone else's already.
+			Panel(X, Y, CellW, CellH, FLinearColor(0.06f, 0.06f, 0.08f, 0.9f), FLinearColor(0.25f, 0.25f, 0.3f, 0.5f), 1.0f);
+			const FString Name = UTF8_TO_TCHAR(Job.Name.c_str());
+			const FVector2D Size = TextSize(Name, Font, 0.58f * S);
+			Text(Name, X + (CellW - Size.X) * 0.5f, Y + (CellH - Size.Y) * 0.5f, FLinearColor(0.5f, 0.5f, 0.55f, 0.5f), Font, 0.58f * S);
+			AddTip(X, Y, CellW, CellH, TEXT("Taken: one of each class in this battle (setup, Duplicate classes)."));
+			if (++Column == Columns)
+			{
+				Column = 0;
+				Y += CellH + Gap;
+			}
+			continue;
+		}
 		MenuButton(X, Y, CellW, CellH, UTF8_TO_TCHAR(Job.Name.c_str()), ETMHudAction::PickerChoose, j, bCurrent, RoleText);
 		// The numbers that tell classes apart at a glance.
 		AddTip(X, Y, CellW, CellH, FString::Printf(TEXT("%hs  (%s)\nHP %d  Armor %d  Resist %d  Evasion %d%%  Speed %d  Move %d\n%hs, %hs, %hs, %hs"),
@@ -3628,6 +4367,1186 @@ void ATMBattleHud::DrawClassPicker(ATMBattleDirector& From)
 			Y += CellH + Gap;
 		}
 	}
-	Text(TEXT("Rest the pointer on a class for its numbers. Classes are made in the class creator (E:\\TacticsClassCreator)."),
+	if (Shown)
+	{
+		DrawClassCard(*Shown, PX + PW - 24.0f * S - CardW, FY, CardW, PY + PH - 48.0f * S - FY);
+	}
+	Text(TEXT("Rest the pointer on a class to see it in full. Classes are made in the class creator (E:\\TacticsClassCreator)."),
 		PX + 24.0f * S, PY + PH - 32.0f * S, Dim, Font, 0.46f * S);
+}
+
+void ATMBattleHud::DrawClassCard(const TMSim::FJobDef& Job, float X, float Y, float W, float H)
+{
+	UFont* Font = GEngine->GetMediumFont();
+	UFont* Big = GEngine->GetLargeFont();
+	Panel(X, Y, W, H, FLinearColor(0.03f, 0.04f, 0.07f, 0.97f), FLinearColor(0.4f, 0.45f, 0.55f, 0.6f), 1.0f);
+	const float Pad = 14.0f * S;
+	float CY = Y + Pad;
+	Text(UTF8_TO_TCHAR(Job.Name.c_str()), X + Pad, CY, Gold, Big, 0.7f * S);
+	CY += 34.0f * S;
+	FString RoleText;
+	for (const std::string& JobRole : Job.Roles)
+	{
+		RoleText += (RoleText.IsEmpty() ? TEXT("") : TEXT(", ")) + FString(UTF8_TO_TCHAR(JobRole.c_str()));
+	}
+	Text(RoleText, X + Pad, CY, Dim, Font, 0.5f * S);
+	CY += 22.0f * S;
+	Text(FString::Printf(TEXT("HP %d   Armor %d   Resist %d   Evasion %d%%   Speed %d   Move %d"),
+		Job.Stats.Get(TMSim::EStat::Hp), Job.Stats.Get(TMSim::EStat::AttDef), Job.Stats.Get(TMSim::EStat::MagDef),
+		ClassEvasion(Job.Stats), Job.Stats.Get(TMSim::EStat::Speed), Job.Stats.Get(TMSim::EStat::Move)),
+		X + Pad, CY, TextColour, Font, 0.5f * S);
+	CY += 30.0f * S;
+
+	// The four abilities: in two columns when the card is wide (the draft's), else one.
+	const int32 Cols = W > 700.0f * S ? 2 : 1;
+	const float ColW = (W - 2.0f * Pad - (Cols - 1) * Pad) / Cols;
+	const float BlockH = (Y + H - Pad - CY) / (4 / Cols);
+	const float IconSize = 36.0f * S;
+	for (int32 Slot = 0; Slot < 4; ++Slot)
+	{
+		const TMSim::FAbility* Ability = TMSim::JobAbility(Job.Id, Slot);
+		if (!Ability)
+		{
+			continue;
+		}
+		const float BX = X + Pad + (Slot % Cols) * (ColW + Pad);
+		const float BY = CY + (Slot / Cols) * BlockH;
+		if (UTexture2D* Icon = AbilityIcon(*Ability, false))
+		{
+			Picture(Icon, BX, BY, IconSize, IconSize);
+		}
+		const float TX = BX + IconSize + 8.0f * S;
+		const float TW = ColW - IconSize - 8.0f * S;
+		Text(FString::Printf(TEXT("%hs%s"), Ability->Name.c_str(), Slot == 3 ? TEXT("  (ultimate)") : TEXT("")), TX, BY, TextColour, Font, 0.55f * S);
+		FString Meta = Ability->Kind == "active" ? FString() : FString(UTF8_TO_TCHAR(Ability->Kind.c_str()));
+		auto Add = [&Meta](const FString& Part) { Meta += (Meta.IsEmpty() ? TEXT("") : TEXT(" · ")) + Part; };
+		if (Ability->MaxRange > 0.0f)
+		{
+			Add(FString::Printf(TEXT("%g-%g m"), Ability->MinRange, Ability->MaxRange));
+		}
+		if (Ability->Cast > 0.0f)
+		{
+			Add(FString::Printf(TEXT("%g s to cast"), Ability->Cast));
+		}
+		if (Ability->Cooldown > 0)
+		{
+			Add(FString::Printf(TEXT("every %d turns"), Ability->Cooldown));
+		}
+		Text(Meta, TX, BY + 20.0f * S, Dim, Font, 0.44f * S);
+		float LY = BY + 38.0f * S;
+		for (const FString& Line : Wrap(UTF8_TO_TCHAR(Ability->Desc.c_str()), Font, 0.46f * S, TW))
+		{
+			if (LY + 18.0f * S > BY + BlockH - 4.0f * S)
+			{
+				break;
+			}
+			Text(Line, TX, LY, FLinearColor(0.82f, 0.85f, 0.92f), Font, 0.46f * S);
+			LY += 18.0f * S;
+		}
+	}
 }
+
+// ------------------------------------------------- cooldowns on the turn order
+
+TArray<ATMBattleHud::FTMBack> ATMBattleHud::ComingBack(ATMBattleDirector& From, const TMSim::FUnit& Unit) const
+{
+	// A slot's count goes down by one as each of its owner's turns begins, and it
+	// is usable at nought: a count of N is back on its Nth coming turn. One just
+	// used is set to its cooldown plus one (SimResolve.cpp), so the one being
+	// aimed would be back on that turn.
+	TArray<FTMBack> Out;
+	for (int32 Slot = 0; Slot < TMSim::AbilitySlots; ++Slot)
+	{
+		if (Unit.Cooldowns[Slot] > 0 && Unit.Ability(Slot))
+		{
+			FTMBack Back;
+			Back.Slot = Slot;
+			Back.Turn = Unit.Cooldowns[Slot];
+			Out.Add(Back);
+		}
+	}
+	if (From.AimMode == ATMBattleDirector::EAimMode::Ability && From.SelectedId == Unit.Id && From.AimSlot >= 0)
+	{
+		const TMSim::FAbility* Aimed = Unit.Ability(From.AimSlot);
+		if (Aimed && Aimed->Cooldown > 0 && Unit.Cooldowns[From.AimSlot] == 0)
+		{
+			FTMBack Back;
+			Back.Slot = From.AimSlot;
+			Back.Turn = Aimed->Cooldown + 1;
+			Back.bPreview = true;
+			Out.Add(Back);
+		}
+	}
+	return Out;
+}
+
+float ATMBattleHud::TurnInSeconds(const TMSim::FBattle& Battle, const TMSim::FUnit& Unit, int32 Turn) const
+{
+	// A full gauge at its pace now; a unit on its turn starts the next from empty.
+	int32 Gain = Battle.TgGain(Unit);
+	if (Gain <= 0)
+	{
+		Gain = Battle.BaseTgGain(Unit);
+	}
+	const float Every = FMath::DivideAndRoundUp(TMSim::Pace::TgMax, FMath::Max(1, Gain)) / Tps;
+	if (Unit.bReady)
+	{
+		return FMath::Max(1, Turn) * Every;
+	}
+	return SecondsLeft(Unit, Battle) + FMath::Max(0, Turn - 1) * Every;
+}
+
+bool ATMBattleHud::TurnLinked(ATMBattleDirector& From, int32 UnitId) const
+{
+	return UnitId >= 0 && (UnitId == From.HoverUnitId || UnitId == From.HudHoverUnitId);
+}
+
+void ATMBattleHud::DrawComingTurns(ATMBattleDirector& From, const TMSim::FUnit& Unit, float X, float Top, bool bLeftward)
+{
+	// "Cooldown Ghost Chip Mockups" C: the unit's next three turns as ghost
+	// squares, each carrying the abilities that are back on it, and when.
+	const TMSim::FBattle& Battle = From.Battle;
+	UFont* Font = GEngine->GetMediumFont();
+	const TArray<FTMBack> Backs = ComingBack(From, Unit);
+	const float Beat = 0.55f + 0.45f * FMath::Sin((GetWorld() ? GetWorld()->GetRealTimeSeconds() : 0.0f) * 6.0f);
+	const float Column = 108.0f * S;
+	const float Ghost = 46.0f * S;
+	const float Pad = 10.0f * S;
+	const float Heading = 22.0f * S;
+	const float Small = 0.4f * S;
+	const float Smaller = 0.36f * S;
+	const float BoxW = 3.0f * Column + 2.0f * Pad;
+	const float BoxH = Heading + Ghost + 50.0f * S + 2.0f * Pad;
+	const float Left = FMath::Clamp(bLeftward ? X - BoxW : X, 4.0f * S, FMath::Max(4.0f * S, Canvas->ClipX - BoxW - 4.0f * S));
+	Panel(Left, Top, BoxW, BoxH, FLinearColor(0.02f, 0.03f, 0.05f, 0.96f), FLinearColor(Gold.R, Gold.G, Gold.B, 0.5f), 1.0f);
+	Text(FString::Printf(TEXT("%s's coming turns"), *JobName(Unit)), Left + Pad, Top + Pad - 2.0f * S, Dim, Font, Small);
+	const FLinearColor Side = SideColour(From.IsFriend(Unit));
+	auto Dashes = [this](float BX, float BY, float BW, float BH, const FLinearColor& Colour, float Thick)
+	{
+		const float Run = 5.0f * S;
+		const float Skip = 4.0f * S;
+		for (float Along = 0.0f; Along < BW; Along += Run + Skip)
+		{
+			const float Piece = FMath::Min(Run, BW - Along);
+			DrawRect(Colour, BX + Along, BY, Piece, Thick);
+			DrawRect(Colour, BX + Along, BY + BH - Thick, Piece, Thick);
+		}
+		for (float Along = 0.0f; Along < BH; Along += Run + Skip)
+		{
+			const float Piece = FMath::Min(Run, BH - Along);
+			DrawRect(Colour, BX, BY + Along, Thick, Piece);
+			DrawRect(Colour, BX + BW - Thick, BY + Along, Thick, Piece);
+		}
+	};
+	const FString Who = Initials(JobName(Unit));
+	for (int32 Turn = 1; Turn <= 3; ++Turn)
+	{
+		const float CX = Left + Pad + (Turn - 1) * Column;
+		const float GX = CX + (Column - Ghost) * 0.5f;
+		const float GY = Top + Pad + Heading;
+		TArray<FTMBack> Here;
+		for (const FTMBack& Back : Backs)
+		{
+			if (Back.Turn == Turn)
+			{
+				Here.Add(Back);
+			}
+		}
+		DrawRect(FLinearColor(0.05f, 0.06f, 0.09f, 0.8f), GX, GY, Ghost, Ghost);
+		Dashes(GX, GY, Ghost, Ghost, Here.Num() > 0 ? Side : FLinearColor(0.63f, 0.67f, 0.75f, 0.35f), 2.0f * S);
+		const FVector2D WhoSize = TextSize(Who, Font, Small);
+		Text(Who, GX + (Ghost - WhoSize.X) * 0.5f, GY + 4.0f * S, Dim, Font, Small);
+		const float Tile = 18.0f * S;
+		const float TilesW = Here.Num() * (Tile + 2.0f * S) - 2.0f * S;
+		FString Names;
+		bool bAnyPreview = false;
+		for (int32 i = 0; i < Here.Num(); ++i)
+		{
+			const TMSim::FAbility* Ability = Unit.Ability(Here[i].Slot);
+			if (!Ability)
+			{
+				continue;
+			}
+			const float TX = GX + (Ghost - TilesW) * 0.5f + i * (Tile + 2.0f * S);
+			const float TY = GY + Ghost - Tile - 4.0f * S;
+			const FLinearColor TileEdge = Here[i].bPreview ? FLinearColor(Gold.R, Gold.G, Gold.B, Beat) : FLinearColor(1.0f, 1.0f, 1.0f, 0.3f);
+			Panel(TX - 1.0f * S, TY - 1.0f * S, Tile + 2.0f * S, Tile + 2.0f * S, FLinearColor(0.0f, 0.0f, 0.0f, 0.9f), TileEdge, Here[i].bPreview ? 2.0f : 1.0f);
+			if (UTexture2D* Picture0 = AbilityIcon(*Ability, false))
+			{
+				Picture(Picture0, TX, TY, Tile, Tile);
+			}
+			if (!Names.IsEmpty())
+			{
+				Names += TEXT(", ");
+			}
+			Names += UTF8_TO_TCHAR(Ability->Name.c_str());
+			if (Here[i].bPreview)
+			{
+				Names += TEXT(" (if used now)");
+				bAnyPreview = true;
+			}
+		}
+		const float Seconds = TurnInSeconds(Battle, Unit, Turn);
+		const FString When = Turn == 1 && !Unit.bReady ? FString::Printf(TEXT("next, %.1f s"), Seconds) : FString::Printf(TEXT("in %.0f s"), Seconds);
+		const FVector2D WhenSize = TextSize(When, Font, Small);
+		Text(When, CX + (Column - WhenSize.X) * 0.5f, GY + Ghost + 3.0f * S, TextColour, Font, Small);
+		const FString What = Here.Num() > 0 ? Names + TEXT(" back") : (Turn == 1 ? FString(TEXT("nothing new")) : FString());
+		const FLinearColor WhatColour = bAnyPreview ? Gold : (Here.Num() > 0 ? TextColour : Dim);
+		const TArray<FString> Lines = Wrap(What, Font, Smaller, Column - 6.0f * S);
+		float LineY = GY + Ghost + 3.0f * S + WhenSize.Y;
+		for (int32 i = 0; i < Lines.Num() && i < 2; ++i)
+		{
+			const FVector2D LineSize = TextSize(Lines[i], Font, Smaller);
+			Text(Lines[i], CX + (Column - LineSize.X) * 0.5f, LineY, WhatColour, Font, Smaller);
+			LineY += LineSize.Y;
+		}
+	}
+}
+
+// ------------------------------------------------------------- the boss bar
+
+void ATMBattleHud::DrawBossBar(ATMBattleDirector& From)
+{
+	// "Camps and Bosses Mockups" B, C and D, in one panel under the turn order:
+	// the boss in sight, its health (with the claim on, split into each side's
+	// share), its wind-up and the stagger that breaks it, whom it hunts and
+	// remembers (the hunt on), and what it has just announced.
+	if (From.Screen != ATMBattleDirector::EScreen::Battle)
+	{
+		return;
+	}
+	const TMSim::FBattle& Battle = From.Battle;
+	const TMSim::FUnit* Boss = nullptr;
+	const TMSim::FMonsterInfo* Info = nullptr;
+	for (const TMSim::FUnit& Each : Battle.Units)
+	{
+		const TMSim::FMonsterInfo* Its = Each.bMonster ? Each.MonsterInfo() : nullptr;
+		if (Its && Its->Tier >= 3 && Each.IsAlive() && !Each.bOffBoard && From.IsSeen(Each))
+		{
+			Boss = &Each;
+			Info = Its;
+			break;
+		}
+	}
+	const float Now = GetWorld() ? GetWorld()->GetRealTimeSeconds() : 0.0f;
+	const bool bNews = !From.BossNews.IsEmpty() && Now - From.BossNewsAt < 6.0f;
+	if (!Boss && !bNews)
+	{
+		return;
+	}
+	const FPanelScale Sized(*this, TEXT("boss_bar"));
+	UFont* Font = GEngine->GetMediumFont();
+	const bool bClaim = Battle.Tuning.BossClaim >= 0.5;
+	const bool bHunt = Battle.Tuning.BossHunt >= 0.5;
+	const FVector2D Moved = Nudge(TEXT("boss_bar"));
+	const float W = 460.0f * S;
+	const float Pad = 10.0f * S;
+	const float RowH = 20.0f * S;
+	const float Left = Canvas->ClipX * 0.5f - W * 0.5f + Moved.X;
+	const float Top = 160.0f * S + Moved.Y;
+	const FLinearColor Purple(0.69f, 0.49f, 1.0f);
+	const FLinearColor HuntColour(1.0f, 0.54f, 0.36f);
+	const FLinearColor BlueShare(0.31f, 0.5f, 0.84f);
+	const FLinearColor RedShare(0.77f, 0.32f, 0.29f);
+
+	// What it remembers, most first (the hunt).
+	TArray<TPair<int32, int32>> Wrath;
+	if (Boss && bHunt)
+	{
+		for (const std::pair<int, int>& Entry : Boss->Wrath)
+		{
+			Wrath.Add(TPair<int32, int32>(Entry.first, Entry.second));
+		}
+		Wrath.StableSort([](const TPair<int32, int32>& A, const TPair<int32, int32>& B) { return A.Value > B.Value; });
+		if (Wrath.Num() > 3)
+		{
+			Wrath.SetNum(3);
+		}
+	}
+	const bool bStagger = Boss && Info && (Info->Has(TMSim::MonsterTrait::Stagger) || Boss->IsCasting());
+	float H = 2.0f * Pad;
+	if (Boss)
+	{
+		H += RowH + 16.0f * S + 6.0f * S;
+		H += bStagger ? RowH : 0.0f;
+		H += Boss->IsCasting() ? RowH : 0.0f;
+		H += bHunt ? RowH * (1 + Wrath.Num()) : 0.0f;
+		H += bClaim ? RowH : 0.0f;
+	}
+	H += bNews ? RowH + 4.0f * S : 0.0f;
+	Panel(Left, Top, W, H, FLinearColor(0.03f, 0.03f, 0.06f, 0.92f), FLinearColor(Purple.R, Purple.G, Purple.B, 0.6f), 1.5f);
+	float Y = Top + Pad;
+	const float Small = 0.46f * S;
+	if (Boss)
+	{
+		// Its name and phase, and with the claim on, each side's share.
+		Text(JobName(*Boss), Left + Pad, Y, Gold, Font, 0.58f * S);
+		const int32 Max = FMath::Max(1, Boss->MaxHp());
+		FString Right = FString::Printf(TEXT("Boss  ·  phase %d"), Boss->Phase + 1);
+		if (bClaim)
+		{
+			Right = FString::Printf(TEXT("Blue %d%%  ·  Red %d%%  ·  %d%% left"), FMath::Min(100, Boss->Claim[0] * 100 / Max),
+				FMath::Min(100, Boss->Claim[1] * 100 / Max), Boss->Hp * 100 / Max);
+		}
+		const FVector2D RightSize = TextSize(Right, Font, Small);
+		Text(Right, Left + W - Pad - RightSize.X, Y + 2.0f * S, TextColour, Font, Small);
+		Y += RowH + 2.0f * S;
+		// Its health: the shares of what is gone, then what is left.
+		const float BarW = W - 2.0f * Pad;
+		const float BarH = 14.0f * S;
+		DrawRect(FLinearColor(0.08f, 0.06f, 0.12f, 1.0f), Left + Pad, Y, BarW, BarH);
+		const float LeftShare = FMath::Clamp(static_cast<float>(Boss->Hp) / Max, 0.0f, 1.0f);
+		if (bClaim)
+		{
+			float BlueW = static_cast<float>(Boss->Claim[0]) / Max;
+			float RedW = static_cast<float>(Boss->Claim[1]) / Max;
+			const float Gone = 1.0f - LeftShare;
+			if (BlueW + RedW > Gone && BlueW + RedW > 0.0f)
+			{
+				const float Fit = Gone / (BlueW + RedW);
+				BlueW *= Fit;
+				RedW *= Fit;
+			}
+			DrawRect(BlueShare, Left + Pad, Y, BarW * BlueW, BarH);
+			DrawRect(RedShare, Left + Pad + BarW * BlueW, Y, BarW * RedW, BarH);
+			DrawRect(FLinearColor(0.42f, 0.36f, 0.5f, 1.0f), Left + Pad + BarW * (1.0f - LeftShare), Y, BarW * LeftShare, BarH);
+		}
+		else
+		{
+			DrawRect(Purple, Left + Pad, Y, BarW * LeftShare, BarH);
+		}
+		Y += BarH + 6.0f * S;
+		if (bStagger)
+		{
+			// Hits from behind, of the three that stagger it (and break a wind-up).
+			Text(TEXT("Stagger"), Left + Pad, Y, Gold, Font, Small);
+			const float PipW = 26.0f * S;
+			for (int32 Pip = 0; Pip < TMSim::Camp::StaggerHits; ++Pip)
+			{
+				const float PX = Left + Pad + 70.0f * S + Pip * (PipW + 4.0f * S);
+				if (Pip < Boss->Stagger)
+				{
+					DrawRect(Gold, PX, Y + 5.0f * S, PipW, 8.0f * S);
+				}
+				else
+				{
+					Panel(PX, Y + 5.0f * S, PipW, 8.0f * S, FLinearColor::Transparent, Gold, 1.0f);
+				}
+			}
+			const FString Hint = Boss->IsCasting()
+				? (Boss->Stagger >= TMSim::Camp::StaggerHits - 1 ? FString(TEXT("one more from behind breaks the wind-up"))
+					: FString(TEXT("hits from behind break the wind-up")))
+				: FString(TEXT("three from behind stagger it"));
+			Text(Hint, Left + Pad + 70.0f * S + TMSim::Camp::StaggerHits * (PipW + 4.0f * S) + 6.0f * S, Y, TextColour, Font, Small);
+			Y += RowH;
+		}
+		if (Boss->IsCasting())
+		{
+			const TMSim::FAbility* Winding = Boss->Ability(Boss->Casting.Slot);
+			Text(FString::Printf(TEXT("Winding up %hs: it lands in %.1f s"), Winding ? Winding->Name.c_str() : "something", Boss->Casting.Ticks / Tps),
+				Left + Pad, Y, Purple, Font, Small);
+			Y += RowH;
+		}
+		if (bHunt)
+		{
+			const TMSim::FUnit* Prey = From.Battle.FindUnit(Boss->HuntTarget);
+			Text(Prey ? FString::Printf(TEXT("Hunts %s"), *From.NameOf(Prey->Id)) : FString(TEXT("Hunts nobody yet: it remembers who hurts it")),
+				Left + Pad, Y, HuntColour, Font, Small);
+			Y += RowH;
+			const int32 Most = Wrath.Num() > 0 ? FMath::Max(1, Wrath[0].Value) : 1;
+			for (const TPair<int32, int32>& Entry : Wrath)
+			{
+				const TMSim::FUnit* Who = From.Battle.FindUnit(Entry.Key);
+				const FLinearColor Side = Who ? SideColour(From.IsFriend(*Who)) : TextColour;
+				Text(From.NameOf(Entry.Key), Left + Pad + 12.0f * S, Y, Side, Font, Small);
+				const float RowBarX = Left + Pad + 190.0f * S;
+				const float RowBarW = W - 2.0f * Pad - 190.0f * S - 50.0f * S;
+				DrawRect(FLinearColor(0.1f, 0.1f, 0.1f, 1.0f), RowBarX, Y + 6.0f * S, RowBarW, 8.0f * S);
+				DrawRect(FLinearColor(HuntColour.R, HuntColour.G, HuntColour.B, Entry.Key == Boss->HuntTarget ? 1.0f : 0.55f),
+					RowBarX, Y + 6.0f * S, RowBarW * Entry.Value / Most, 8.0f * S);
+				Text(FString::FromInt(Entry.Value), RowBarX + RowBarW + 8.0f * S, Y, TextColour, Font, Small);
+				Y += RowH;
+			}
+		}
+		if (bClaim)
+		{
+			Text(FString::Printf(TEXT("Last blow: the Boss's Boon (+10%% damage, %d turns)  ·  %d%% share: a rare item"),
+				TMSim::Camp::BoonTurns, TMSim::Camp::ClaimSharePercent), Left + Pad, Y, Dim, Font, 0.42f * S);
+			Y += RowH;
+		}
+		AddTip(Left, Top, W, H, FString::Printf(TEXT("%s, the boss.%s%s%s"), *JobName(*Boss),
+			bStagger ? TEXT("\nHits from behind count towards a stagger; three stagger it, and break a wind-up.") : TEXT(""),
+			bHunt ? TEXT("\nBosses hunt: it goes for whoever has hurt it most, until they fall or it loses sight of them for 3 of its turns.") : TEXT(""),
+			bClaim ? TEXT("\nClaim the boss: the side that lands the last blow gets the Boss's Boon; the other side, with 30% of its health dealt, a rare item.") : TEXT("")));
+	}
+	if (bNews)
+	{
+		Text(From.BossNews, Left + Pad, Y + 2.0f * S, Gold, Font, 0.5f * S);
+	}
+	Movable(TEXT("boss_bar"), TEXT("Boss bar"), Left, Top, W, H);
+}
+
+// ------------------------------------------------------------- squad strip
+
+void ATMBattleHud::DrawSquadStrip(ATMBattleDirector& From)
+{
+	// "Squad Strip Mockups" C (2026-10-02): your squad down the left edge, under
+	// the log. At rest each unit is a health ring round its face and its status
+	// icons, each with the turns it has left. The unit acting now, and one pointed
+	// at -- here, on its turn square or on the board -- opens to its full row:
+	// name, move and act left, health as a number, cooldowns. Pointing at a row
+	// lights its unit and its square up, as pointing at a square does.
+	SquadBottom = 0.0f;
+	if (!FTMSettings::Get().bSquadStrip)
+	{
+		SquadHoverId = -1;
+		return;
+	}
+	const FPanelScale Sized(*this, TEXT("squad"));
+	const TMSim::FBattle& Battle = From.Battle;
+	UFont* Font = GEngine->GetMediumFont();
+	const FVector2D Mouse = MousePoint();
+	const int32 Team = From.FriendTeam();
+
+	// The order of its turn squares, then anyone else by id.
+	TArray<const TMSim::FUnit*> Squad;
+	for (int32 Id : FTMSettings::Get().CardOrder[Team])
+	{
+		for (const TMSim::FUnit& Each : Battle.Units)
+		{
+			if (Each.Id == Id && Each.Team == Team && (Each.IsAlive() || Each.IsKo()))
+			{
+				Squad.AddUnique(&Each);
+			}
+		}
+	}
+	for (const TMSim::FUnit& Each : Battle.Units)
+	{
+		if (Each.Team == Team && (Each.IsAlive() || Each.IsKo()))
+		{
+			Squad.AddUnique(&Each);
+		}
+	}
+	if (Squad.Num() == 0)
+	{
+		SquadHoverId = -1;
+		return;
+	}
+
+	const float Base = 12.0f * S + (2.0f * RowHeight + (FTMSettings::Get().bTurnSquares ? SquareLane : 2.0f * PinLane)) * S + 18.0f * S;
+	const FVector2D Moved = Nudge(TEXT("squad"));
+	const float X = 16.0f * S + Moved.X;
+	const float Top = (From.bShowLog ? LogBottom + 16.0f * S : Base) + Moved.Y;
+	const float Gap = 6.0f * S;
+	const float SmallH = 50.0f * S;
+	const float OpenW = 300.0f * S;
+	const float OpenH = 86.0f * S;
+	const FLinearColor Ground(0.03f, 0.05f, 0.08f, 0.9f);
+
+	// A ring of short lines, from the top clockwise, Part of the way round.
+	auto Ring = [this](float CX, float CY, float Radius, float Part, const FLinearColor& Colour, float Thick)
+	{
+		constexpr int32 Sides = 48;
+		const int32 Upto = FMath::Clamp(FMath::RoundToInt(Sides * Part), 0, Sides);
+		for (int32 k = 0; k < Upto; ++k)
+		{
+			const float A0 = -0.5f * PI + 2.0f * PI * k / Sides;
+			const float A1 = -0.5f * PI + 2.0f * PI * (k + 1) / Sides;
+			DrawLine(CX + FMath::Cos(A0) * Radius, CY + FMath::Sin(A0) * Radius, CX + FMath::Cos(A1) * Radius, CY + FMath::Sin(A1) * Radius, Colour, Thick);
+		}
+	};
+	auto Outline = [this](float RX, float RY, float RW, float RH, const FLinearColor& Colour, float Thick)
+	{
+		DrawRect(Colour, RX, RY, RW, Thick);
+		DrawRect(Colour, RX, RY + RH - Thick, RW, Thick);
+		DrawRect(Colour, RX, RY, Thick, RH);
+		DrawRect(Colour, RX + RW - Thick, RY, Thick, RH);
+	};
+
+	int32 HoveredNow = -1;
+	float Y = Top;
+	float Widest = 0.0f;
+	for (const TMSim::FUnit* Unit : Squad)
+	{
+		const bool bDown = !Unit->IsAlive();
+		const bool bLinked = TurnLinked(From, Unit->Id) || Unit->Id == SquadHoverId;
+		const bool bOpen = !bDown && (Unit->Id == From.SelectedId || Unit->bReady || bLinked);
+		const float HpPart = FMath::Clamp(static_cast<float>(Unit->Hp) / FMath::Max(1, Unit->MaxHp()), 0.0f, 1.0f);
+		const FLinearColor HpColour = HealthColour(HpPart);
+		FLinearColor Edge = SideColour(true) * FLinearColor(1, 1, 1, 0.5f);
+		if (Unit->bReady || bLinked)
+		{
+			Edge = Gold;
+		}
+		if (Unit->Id == From.SelectedId)
+		{
+			Edge = FLinearColor::White;
+		}
+		float RowW = 0.0f;
+		float RowH = 0.0f;
+		if (!bOpen)
+		{
+			// At rest: the ring and the icons.
+			RowH = SmallH;
+			const float D = 44.0f * S;
+			const float Chip = 22.0f * S;
+			const float ChipsW = Unit->Statuses.empty() ? 0.0f : static_cast<float>(Unit->Statuses.size()) * (Chip + Chip * 0.15f) + 4.0f * S;
+			RowW = 6.0f * S + D + 8.0f * S + ChipsW;
+			DrawRect(Ground, X, Y, RowW, RowH);
+			Outline(X, Y, RowW, RowH, Edge * FLinearColor(1, 1, 1, bLinked ? 1.0f : 0.45f), bLinked ? 2.0f * S : 1.0f * S);
+			const float CX = X + 6.0f * S + D * 0.5f;
+			const float CY = Y + RowH * 0.5f;
+			const float Face = D * 0.62f;
+			DrawRect(FLinearColor(0.02f, 0.03f, 0.05f, 1.0f), CX - Face * 0.5f, CY - Face * 0.5f, Face, Face);
+			if (UTexture* Film = From.CardPortrait(*Unit))
+			{
+				Picture(Film, CX - Face * 0.5f, CY - Face * 0.5f, Face, Face, bDown ? FLinearColor(0.35f, 0.35f, 0.38f, 1.0f) : FLinearColor::White);
+			}
+			Ring(CX, CY, D * 0.5f - 2.5f * S, 1.0f, FLinearColor(0.1f, 0.11f, 0.14f, 1.0f), 4.0f * S);
+			Ring(CX, CY, D * 0.5f - 2.5f * S, HpPart, HpColour, 4.0f * S);
+			if (bDown)
+			{
+				const FString Down = FString::Printf(TEXT("DOWN %.0fs"), Unit->KoTicks / Tps);
+				const FVector2D DownSize = TextSize(Down, Font, 0.36f * S);
+				Text(Down, CX - DownSize.X * 0.5f, CY - DownSize.Y * 0.5f, Urgent, Font, 0.36f * S);
+			}
+			StatusChips(*Unit, X + 6.0f * S + D + 8.0f * S, Y + (RowH - Chip) * 0.5f, Chip, false, true);
+			AddTip(X, Y, 6.0f * S + D + 8.0f * S, RowH, FString::Printf(TEXT("%s %d  hp %d/%d%s"), *JobName(*Unit), Unit->Id, Unit->Hp, Unit->MaxHp(),
+				bDown ? TEXT("\nDown: raise it before the time runs out") : TEXT("")));
+		}
+		else
+		{
+			// Open: the full row.
+			RowW = OpenW;
+			RowH = OpenH;
+			DrawRect(Ground, X, Y, RowW, RowH);
+			Outline(X, Y, RowW, RowH, Edge, 2.0f * S);
+			const float Face = 58.0f * S;
+			const float FX = X + 8.0f * S;
+			const float FY = Y + (RowH - Face) * 0.5f;
+			DrawRect(SideColour(true), FX - 2.0f * S, FY - 2.0f * S, Face + 4.0f * S, Face + 4.0f * S);
+			DrawRect(FLinearColor(0.02f, 0.03f, 0.05f, 1.0f), FX, FY, Face, Face);
+			if (UTexture* Film = From.CardPortrait(*Unit))
+			{
+				Picture(Film, FX, FY, Face, Face);
+			}
+			const float Crest = 18.0f * S;
+			DrawRect(FLinearColor(0.0f, 0.0f, 0.0f, 0.6f), FX, FY, Crest, Crest);
+			Picture(ClassIcon(*Unit), FX, FY, Crest, Crest);
+
+			const float IX = FX + Face + 10.0f * S;
+			const float IW = X + RowW - 8.0f * S - IX;
+			// The name, and what it has left this turn (move, act) on the right.
+			Text(JobName(*Unit), IX, Y + 5.0f * S, SideColour(true) * FLinearColor(1.3f, 1.3f, 1.3f, 1.0f), Font, 0.5f * S);
+			TurnPips(*Unit, X + RowW - 30.0f * S, Y + 2.0f * S, 0.8f);
+			AddTip(X + RowW - 56.0f * S, Y + 2.0f * S, 52.0f * S, 22.0f * S,
+				FString::Printf(TEXT("Move %s, act %s this turn"), Unit->bMoved ? TEXT("used") : TEXT("left"), Unit->bActed ? TEXT("used") : TEXT("left")));
+
+			// Health as a bar and a number, and when it acts.
+			const float BarY = Y + 33.0f * S;
+			const float BarW = IW * 0.56f;
+			DrawRect(FLinearColor(0.08f, 0.09f, 0.12f, 1.0f), IX, BarY, BarW, 10.0f * S);
+			DrawRect(HpColour, IX, BarY, BarW * HpPart, 10.0f * S);
+			const FString Hp = FString::Printf(TEXT("%d/%d"), Unit->Hp, Unit->MaxHp());
+			const FVector2D HpSize = TextSize(Hp, Font, 0.42f * S);
+			Text(Hp, IX + BarW + 6.0f * S, BarY + 5.0f * S - HpSize.Y * 0.5f, FLinearColor::White, Font, 0.42f * S);
+			AddTip(IX, BarY - 3.0f * S, BarW + 6.0f * S + HpSize.X, 16.0f * S, FString::Printf(TEXT("Health %d of %d"), Unit->Hp, Unit->MaxHp()));
+			FString When;
+			FLinearColor WhenColour = Dim;
+			if (Unit->bReady)
+			{
+				When = TEXT("NOW");
+				WhenColour = Gold;
+			}
+			else if (Unit->IsCasting())
+			{
+				When = FString::Printf(TEXT("%.1fs"), Unit->Casting.Ticks / Tps);
+				WhenColour = CastColour;
+			}
+			else
+			{
+				When = FString::Printf(TEXT("%.1fs"), Battle.TicksToReady(*Unit) / Tps);
+			}
+			const FVector2D WhenSize = TextSize(When, Font, 0.42f * S);
+			Text(When, X + RowW - 8.0f * S - WhenSize.X, BarY + 5.0f * S - WhenSize.Y * 0.5f, WhenColour, Font, 0.42f * S);
+			AddTip(X + RowW - 8.0f * S - WhenSize.X, BarY - 3.0f * S, WhenSize.X, 16.0f * S, ExplainCountdown(From, *Unit));
+
+			// Its statuses with turns left; its abilities on the right, lit when
+			// ready, the turns until each is back when not, gold for the one aimed.
+			const float Chip = 20.0f * S;
+			const float RowB = Y + RowH - Chip - 7.0f * S;
+			const TArray<FTMBack> Backs = ComingBack(From, *Unit);
+			const float Box = 16.0f * S;
+			int32 Slots = 0;
+			for (int32 Slot = 0; Slot < 4; ++Slot)
+			{
+				Slots += Unit->Ability(Slot) ? 1 : 0;
+			}
+			float BX = X + RowW - 8.0f * S - Slots * (Box + 3.0f * S) + 3.0f * S;
+			const float CoolsX = BX;
+			for (int32 Slot = 0; Slot < 4; ++Slot)
+			{
+				const TMSim::FAbility* Ability = Unit->Ability(Slot);
+				if (!Ability)
+				{
+					continue;
+				}
+				int32 Back = 0;
+				bool bAimed = false;
+				for (const FTMBack& Each : Backs)
+				{
+					if (Each.Slot == Slot)
+					{
+						Back = Each.Turn;
+						bAimed = Each.bPreview;
+					}
+				}
+				const float BY = RowB + (Chip - Box) * 0.5f;
+				if (Back == 0)
+				{
+					DrawRect(FLinearColor(0.56f, 0.72f, 1.0f, 1.0f), BX, BY, Box, Box);
+					DrawRect(FLinearColor(0.16f, 0.26f, 0.45f, 1.0f), BX + 1.5f * S, BY + 1.5f * S, Box - 3.0f * S, Box - 3.0f * S);
+				}
+				else
+				{
+					DrawRect(bAimed ? Gold : FLinearColor(0.35f, 0.37f, 0.42f, 1.0f), BX, BY, Box, Box);
+					DrawRect(FLinearColor(0.06f, 0.07f, 0.09f, 1.0f), BX + 1.0f * S, BY + 1.0f * S, Box - 2.0f * S, Box - 2.0f * S);
+					const FString Num1 = FString::FromInt(Back);
+					const FVector2D NumSize = TextSize(Num1, Font, 0.32f * S);
+					Text(Num1, BX + (Box - NumSize.X) * 0.5f, BY + (Box - NumSize.Y) * 0.5f, bAimed ? Gold : Dim, Font, 0.32f * S, false);
+				}
+				AddTip(BX, BY, Box, Box, Back == 0
+					? FString::Printf(TEXT("%hs: ready"), Ability->Name.c_str())
+					: bAimed ? FString::Printf(TEXT("%hs: used now, back on its turn %d from now"), Ability->Name.c_str(), Back)
+					: FString::Printf(TEXT("%hs: back on its turn %d from now"), Ability->Name.c_str(), Back));
+				BX += Box + 3.0f * S;
+			}
+			const float ChipRoom = FMath::Max(0.0f, CoolsX - 8.0f * S - IX);
+			const int32 Fit = FMath::Max(1, FMath::FloorToInt((ChipRoom + Chip * 0.15f) / (Chip * 1.15f)));
+			StatusChips(*Unit, IX, RowB, Chip, false, true, Fit);
+		}
+		AddButton(X, Y, RowW, RowH, ETMHudAction::PickUnit, Unit->Id);
+		if (FBox2D(FVector2D(X, Y), FVector2D(X + RowW, Y + RowH)).IsInside(Mouse))
+		{
+			HoveredNow = Unit->Id;
+		}
+		Widest = FMath::Max(Widest, RowW);
+		Y += RowH + Gap;
+	}
+	const float H = Y - Gap - Top;
+	Movable(TEXT("squad"), TEXT("Squad strip"), X, Top, FMath::Max(Widest, 120.0f * S), H);
+	SquadBottom = Top + H;
+	SquadHoverId = HoveredNow;
+	if (HoveredNow >= 0)
+	{
+		From.HudHoverUnitId = HoveredNow;
+	}
+}
+
+// ------------------------------------------------------------- open odds
+
+float ATMBattleHud::OddsCard(const TMSim::FUnit& Target, const TMSim::FOdds& Odds, bool bFriend, const FString& Extra, float CX, float Bottom)
+{
+	// "Open Odds Mockups" A (2026-10-02): every way the blow can land, how likely,
+	// and for how much, from the same OddsOf the dice follow.
+	UFont* Font = GEngine->GetMediumFont();
+	const float W = 260.0f * S;
+	const float Pad = 8.0f * S;
+	const float Inner = W - 2.0f * Pad;
+	const float HpBarH = 9.0f * S;
+	const float OutcomeH = 20.0f * S;
+	const float LineH = 17.0f * S;
+	const float H = Pad + LineH + 4.0f * S + HpBarH + 6.0f * S + OutcomeH + 4.0f * S + LineH + 2.0f * S + LineH + Pad;
+	const float X = CX - W * 0.5f;
+	const float Y = Bottom - H - 6.0f * S;
+	const FLinearColor HitColour(0.79f, 0.33f, 0.29f);
+	const FLinearColor GrazeColour(0.54f, 0.42f, 0.38f);
+	const FLinearColor DodgeColour(0.25f, 0.27f, 0.31f);
+	const FLinearColor Ink(0.16f, 0.11f, 0.02f);
+	Panel(X, Y, W, H, FLinearColor(0.02f, 0.03f, 0.05f, 0.93f), FLinearColor(1, 1, 1, 0.22f), 1.0f);
+	// A stem down to the unit.
+	DrawRect(FLinearColor(1, 1, 1, 0.3f), CX - 1.0f, Y + H, 2.0f, Bottom - (Y + H));
+
+	// Whose it is, and its health.
+	float Row = Y + Pad;
+	int32 Soak = 0;
+	for (const TMSim::FStatus& Status : Target.Statuses)
+	{
+		const TMSim::FStatusDef* Def = TMSim::FindStatus(Status.Id);
+		Soak += Def && Def->bAbsorbs ? Status.Amount : 0;
+	}
+	Text(JobName(Target), X + Pad, Row, SideColour(bFriend) * FLinearColor(1.4f, 1.4f, 1.4f, 1.0f), Font, 0.44f * S);
+	const FString Hp = Soak > 0 ? FString::Printf(TEXT("%d/%d  +%d"), Target.Hp, Target.MaxHp(), Soak) : FString::Printf(TEXT("%d/%d"), Target.Hp, Target.MaxHp());
+	const FVector2D HpSize = TextSize(Hp, Font, 0.4f * S);
+	Text(Hp, X + W - Pad - HpSize.X, Row + 1.0f * S, TextColour, Font, 0.4f * S);
+	Row += LineH + 4.0f * S;
+
+	// The health bar, and where each outcome leaves it: red for what a hit takes,
+	// gold for what a crit takes on top, a white tick where a graze leaves it.
+	const float MaxHp = static_cast<float>(FMath::Max(1, Target.MaxHp()));
+	auto Part = [&](int32 Amount)
+	{
+		// Shields soak first.
+		return FMath::Clamp(static_cast<float>(FMath::Min(Target.Hp, Target.Hp + Soak - Amount)) / MaxHp, 0.0f, 1.0f);
+	};
+	const float Now = FMath::Clamp(Target.Hp / MaxHp, 0.0f, 1.0f);
+	DrawRect(FLinearColor(0.08f, 0.09f, 0.12f, 1.0f), X + Pad, Row, Inner, HpBarH);
+	DrawRect(HealthColour(Now), X + Pad, Row, Inner * Now, HpBarH);
+	const float AfterHit = Part(Odds.HitAmount);
+	const float AfterCrit = Part(Odds.CritAmount);
+	const float AfterGraze = Part(Odds.GrazeAmount);
+	DrawRect(FLinearColor(Gold.R, Gold.G, Gold.B, 0.9f), X + Pad + Inner * AfterCrit, Row, Inner * (AfterHit - AfterCrit), HpBarH);
+	DrawRect(FLinearColor(HitColour.R, HitColour.G, HitColour.B, 0.95f), X + Pad + Inner * AfterHit, Row, Inner * (Now - AfterHit), HpBarH);
+	if (Odds.Graze > 0.0)
+	{
+		DrawRect(FLinearColor::White, X + Pad + Inner * AfterGraze - 1.0f * S, Row - 3.0f * S, 2.0f * S, HpBarH + 6.0f * S);
+	}
+	AddTip(X + Pad, Row - 3.0f * S, Inner, HpBarH + 6.0f * S, FString::Printf(TEXT("Health %d of %d%s\nRed: what a hit takes. Gold: what a crit takes on top.%s"),
+		Target.Hp, Target.MaxHp(), Soak > 0 ? *FString::Printf(TEXT(" (shields soak %d first)"), Soak) : TEXT(""),
+		Odds.Graze > 0.0 ? TEXT("\nWhite tick: where a graze leaves it.") : TEXT("")));
+	Row += HpBarH + 6.0f * S;
+
+	// The four outcomes, each as wide as it is likely.
+	struct FPiece
+	{
+		double Chance;
+		FLinearColor Colour;
+		FString Name;
+		int32 Amount;
+		bool bKo;
+	};
+	const FPiece Pieces[4] = {
+		{ Odds.Hit, HitColour, TEXT("Hit"), Odds.HitAmount, Odds.bHitKo },
+		{ Odds.Crit, Gold, TEXT("Crit"), Odds.CritAmount, Odds.bCritKo },
+		{ Odds.Graze, GrazeColour, TEXT("Graze"), Odds.GrazeAmount, Odds.bGrazeKo },
+		{ Odds.Dodge, DodgeColour, TEXT("Dodge"), 0, false },
+	};
+	float PX = X + Pad;
+	for (const FPiece& Piece : Pieces)
+	{
+		const float PW = Inner * static_cast<float>(Piece.Chance / 100.0);
+		if (PW <= 0.0f)
+		{
+			continue;
+		}
+		DrawRect(Piece.Colour, PX, Row, PW, OutcomeH);
+		const FString Inside = PW > 90.0f * S ? FString::Printf(TEXT("%s %.0f%%"), *Piece.Name, Piece.Chance) : FString::Printf(TEXT("%.0f%%"), Piece.Chance);
+		const FVector2D InSize = TextSize(Inside, Font, 0.36f * S);
+		if (InSize.X + 6.0f * S <= PW)
+		{
+			Text(Inside, PX + (PW - InSize.X) * 0.5f, Row + (OutcomeH - InSize.Y) * 0.5f,
+				&Piece == &Pieces[1] ? Ink : FLinearColor::White, Font, 0.36f * S, false);
+		}
+		AddTip(PX, Row, PW, OutcomeH, FString::Printf(TEXT("%s: %.1f%%, %d damage%s"), *Piece.Name, Piece.Chance, Piece.Amount,
+			Piece.bKo ? TEXT(", knocks it out") : TEXT("")));
+		PX += PW;
+	}
+	Row += OutcomeH + 4.0f * S;
+
+	// The damage of each, under it; KO beside those it would not survive.
+	const float Col = Inner / 4.0f;
+	for (int32 i = 0; i < 4; ++i)
+	{
+		const FPiece& Piece = Pieces[i];
+		const FString Words = i == 3 ? FString::Printf(TEXT("Dodge %.0f%%"), Piece.Chance)
+			: FString::Printf(TEXT("%s -%d%s"), *Piece.Name, Piece.Amount, Piece.bKo ? TEXT(" KO") : TEXT(""));
+		const FLinearColor Colour = Piece.Chance <= 0.0 ? Dim : (i == 1 ? Gold : (i == 3 ? Dim : FLinearColor(1.0f, 0.62f, 0.56f)));
+		Text(Words, X + Pad + i * Col, Row, Colour, Font, 0.34f * S);
+	}
+	Row += LineH + 2.0f * S;
+
+	// The chance it falls, and what comes with the blow.
+	DrawRect(FLinearColor(1, 1, 1, 0.12f), X + Pad, Row - 1.0f * S, Inner, 1.0f);
+	const FString Ko = FString::Printf(TEXT("KO %.0f%%"), Odds.Ko);
+	Text(Ko, X + Pad, Row + 1.0f * S, Odds.Ko > 0.0 ? Gold : Dim, Font, 0.42f * S);
+	AddTip(X + Pad, Row, TextSize(Ko, Font, 0.42f * S).X, LineH, FString::Printf(TEXT("Evasion %d%%: of the blows evaded, %s.\nCritical %d%% of the rest, for %d.\nThe chance it is knocked out is the sum of the outcomes it would not survive."),
+		Odds.Evade, Odds.Graze > 0.0 ? TEXT("1 in 10 is dodged and the rest graze for half") : TEXT("all are dodged"),
+		Odds.CritChance, Odds.CritAmount));
+	if (!Extra.IsEmpty())
+	{
+		const FVector2D ExtraSize = TextSize(Extra, Font, 0.36f * S);
+		Text(Extra, X + W - Pad - ExtraSize.X, Row + 3.0f * S, FLinearColor(0.88f, 0.6f, 1.0f), Font, 0.36f * S);
+	}
+	return H;
+}
+
+void ATMBattleHud::DrawThreats(ATMBattleDirector& From)
+{
+	// "Open Odds Mockups" C (2026-10-02): the enemy's blows read with the same
+	// numbers as yours.
+	const TMSim::FBattle& Battle = From.Battle;
+	UFont* Font = GEngine->GetMediumFont();
+	const TMSim::FUnit* Mine = From.SelectedUnit();
+
+	// Planning a walk: which enemies reach where it ends, without walking.
+	if (From.AimMode == ATMBattleDirector::EAimMode::Move && Mine && From.IsFriend(*Mine) && !From.PathShown.empty())
+	{
+		const TMSim::FVec2 End = From.PathShown.back();
+		struct FReach
+		{
+			const TMSim::FUnit* Enemy;
+			TMSim::FThreat Threat;
+		};
+		TArray<FReach> Reaching;
+		int32 Walkers = 0;
+		for (const TMSim::FUnit& Enemy : Battle.Units)
+		{
+			if (Enemy.Team == Mine->Team || !Enemy.IsAlive() || !From.IsSeen(Enemy))
+			{
+				continue;
+			}
+			const TMSim::FThreat Threat = Battle.ThreatOn(Enemy, *Mine, End);
+			if (Threat.Slot < 0)
+			{
+				continue;
+			}
+			if (Threat.bMoves)
+			{
+				++Walkers;
+			}
+			else
+			{
+				Reaching.Add({ &Enemy, Threat });
+			}
+		}
+		Reaching.StableSort([](const FReach& A, const FReach& B) { return A.Threat.Odds.Ko > B.Threat.Odds.Ko; });
+		TArray<FString> Lines;
+		double WorstKo = 0.0;
+		for (int32 i = 0; i < Reaching.Num() && i < 3; ++i)
+		{
+			const TMSim::FAbility* Ability = Reaching[i].Enemy->Ability(Reaching[i].Threat.Slot);
+			const TMSim::FOdds& Odds = Reaching[i].Threat.Odds;
+			WorstKo = FMath::Max(WorstKo, Odds.Ko);
+			Lines.Add(FString::Printf(TEXT("%s's %hs -%d  (%d%% evade)%s"), *JobName(*Reaching[i].Enemy), Ability ? Ability->Name.c_str() : "",
+				Odds.HitAmount, Odds.Evade, Odds.Ko > 0.0 ? *FString::Printf(TEXT("  KO %.0f%%"), Odds.Ko) : TEXT("")));
+		}
+		if (Reaching.Num() > 3)
+		{
+			Lines.Add(FString::Printf(TEXT("and %d more"), Reaching.Num() - 3));
+		}
+		if (Walkers > 0)
+		{
+			Lines.Add(FString::Printf(TEXT("%d more if they walk"), Walkers));
+		}
+		FVector2D At;
+		if (Lines.Num() > 0 && ToScreen(From, End, 60.0f, At))
+		{
+			const FString Head = Reaching.Num() > 0 ? FString(TEXT("Standing here, in reach of:")) : FString(TEXT("Here, no enemy reaches without walking"));
+			float W = TextSize(Head, Font, 0.38f * S).X;
+			for (const FString& Line : Lines)
+			{
+				W = FMath::Max(W, TextSize(Line, Font, 0.38f * S).X);
+			}
+			const float LineH = 16.0f * S;
+			const float H = (Lines.Num() + 1) * LineH + 10.0f * S;
+			const float X = At.X + 18.0f * S;
+			const float Y = At.Y - H * 0.5f;
+			Panel(X, Y, W + 16.0f * S, H, FLinearColor(0.02f, 0.03f, 0.05f, 0.9f),
+				WorstKo > 0.0 ? FLinearColor(1.0f, 0.38f, 0.32f, 0.9f) : FLinearColor(0.56f, 0.78f, 1.0f, 0.8f), 1.0f);
+			Text(Head, X + 8.0f * S, Y + 5.0f * S, FLinearColor(0.75f, 0.88f, 1.0f), Font, 0.38f * S);
+			for (int32 i = 0; i < Lines.Num(); ++i)
+			{
+				Text(Lines[i], X + 8.0f * S, Y + 5.0f * S + (i + 1) * LineH, i < Reaching.Num() && i < 3 ? TextColour : Dim, Font, 0.38f * S);
+			}
+		}
+	}
+
+	// Pointing at an enemy, on the board or on its square or chip: its best blow
+	// on each of your units. Not while aiming, which has its own forecast.
+	if (From.AimMode == ATMBattleDirector::EAimMode::Ability)
+	{
+		return;
+	}
+	const TMSim::FUnit* Enemy = nullptr;
+	for (const int32 Id : { From.HoverUnitId, From.HudHoverUnitId })
+	{
+		const TMSim::FUnit* Candidate = From.Battle.FindUnit(Id);
+		if (!Enemy && Candidate && !From.IsFriend(*Candidate) && Candidate->IsAlive() && From.IsSeen(*Candidate))
+		{
+			Enemy = Candidate;
+		}
+	}
+	if (!Enemy)
+	{
+		return;
+	}
+	struct FOn
+	{
+		const TMSim::FUnit* Target;
+		TMSim::FThreat Threat;
+	};
+	TArray<FOn> Rows;
+	for (const TMSim::FUnit& Target : Battle.Units)
+	{
+		if (From.IsFriend(Target) && Target.IsAlive())
+		{
+			Rows.Add({ &Target, Battle.ThreatOn(*Enemy, Target, Target.Pos) });
+		}
+	}
+	if (Rows.Num() == 0)
+	{
+		return;
+	}
+	// Those it reaches from where it stands first, the likeliest to fall first.
+	Rows.StableSort([](const FOn& A, const FOn& B)
+	{
+		const int32 RankA = A.Threat.Slot < 0 ? 2 : (A.Threat.bMoves ? 1 : 0);
+		const int32 RankB = B.Threat.Slot < 0 ? 2 : (B.Threat.bMoves ? 1 : 0);
+		if (RankA != RankB)
+		{
+			return RankA < RankB;
+		}
+		return A.Threat.Odds.Ko > B.Threat.Odds.Ko;
+	});
+
+	// On the board: a line to each unit it reaches, solid to the one most at risk,
+	// dashed to the rest, dotted where it would have to walk first; and the odds
+	// over each it reaches from where it stands.
+	FVector2D EnemyAt;
+	const bool bEnemyOn = ToScreen(From, Enemy->Pos, 40.0f, EnemyAt);
+	const FLinearColor Threat(1.0f, 0.38f, 0.32f);
+	for (int32 i = 0; i < Rows.Num(); ++i)
+	{
+		const FOn& Row = Rows[i];
+		FVector2D TargetAt;
+		if (Row.Threat.Slot < 0 || !bEnemyOn || !ToScreen(From, Row.Target->Pos, 40.0f, TargetAt))
+		{
+			continue;
+		}
+		const bool bWorst = i == 0 && !Row.Threat.bMoves;
+		const FVector2D Way = TargetAt - EnemyAt;
+		const float Long = Way.Size();
+		if (Long < 1.0f)
+		{
+			continue;
+		}
+		const FVector2D Dir = Way / Long;
+		const float Dash = bWorst ? Long : (Row.Threat.bMoves ? 4.0f * S : 12.0f * S);
+		const float Gap = bWorst ? 0.0f : (Row.Threat.bMoves ? 7.0f * S : 7.0f * S);
+		const FLinearColor Colour = Threat * FLinearColor(1, 1, 1, bWorst ? 1.0f : (Row.Threat.bMoves ? 0.45f : 0.75f));
+		for (float Along = 0.0f; Along < Long; Along += Dash + Gap)
+		{
+			const FVector2D A = EnemyAt + Dir * Along;
+			const FVector2D B = EnemyAt + Dir * FMath::Min(Long, Along + Dash);
+			DrawLine(A.X, A.Y, B.X, B.Y, Colour, bWorst ? 3.0f * S : 2.0f * S);
+		}
+		FVector2D LabelAt;
+		if (ToScreen(From, Row.Target->Pos, 225.0f, LabelAt))
+		{
+			const TMSim::FAbility* Ability = Enemy->Ability(Row.Threat.Slot);
+			const TMSim::FOdds& Odds = Row.Threat.Odds;
+			const FString Label = Row.Threat.bMoves
+				? FString::Printf(TEXT("if it walks: -%d"), Odds.HitAmount)
+				: FString::Printf(TEXT("%hs -%d  %d%% evade  KO %.0f%%"), Ability ? Ability->Name.c_str() : "", Odds.HitAmount, Odds.Evade, Odds.Ko);
+			const FVector2D Size = TextSize(Label, Font, 0.4f * S);
+			Panel(LabelAt.X - Size.X * 0.5f - 6.0f * S, LabelAt.Y - 3.0f * S, Size.X + 12.0f * S, Size.Y + 6.0f * S,
+				FLinearColor(0.02f, 0.03f, 0.05f, 0.9f), Threat * FLinearColor(1, 1, 1, bWorst ? 1.0f : 0.5f), 1.0f);
+			Text(Label, LabelAt.X - Size.X * 0.5f, LabelAt.Y, Row.Threat.bMoves ? Dim : (Odds.Ko > 0.0 ? Gold : TextColour), Font, 0.4f * S);
+		}
+	}
+
+	// The card, top right under the buttons: every one of your units, and what
+	// it could take.
+	const FPanelScale Sized(*this, TEXT("threat_card"));
+	const float W = 330.0f * S;
+	const float LineH = 19.0f * S;
+	const float H = 12.0f * S + 22.0f * S + 16.0f * S + Rows.Num() * LineH + 22.0f * S + 8.0f * S;
+	const FVector2D Moved = Nudge(TEXT("threat_card"));
+	const float X = Canvas->ClipX - W - 16.0f * S + Moved.X;
+	const float Y = 60.0f * S + Moved.Y;
+	Movable(TEXT("threat_card"), TEXT("Enemy threat card"), X, Y, W, H);
+	Panel(X, Y, W, H, FLinearColor(0.02f, 0.03f, 0.05f, 0.94f), Threat * FLinearColor(1, 1, 1, 0.7f), 1.0f);
+	float Row = Y + 10.0f * S;
+	Text(JobName(*Enemy), X + 12.0f * S, Row, SideColour(false) * FLinearColor(1.4f, 1.4f, 1.4f, 1.0f), Font, 0.5f * S);
+	const FString When = Enemy->bReady ? FString(TEXT("acting now"))
+		: FString::Printf(TEXT("acts in %.1f s"), Battle.TicksToReady(*Enemy) / Tps);
+	const FVector2D WhenSize = TextSize(When, Font, 0.38f * S);
+	Text(When, X + W - 12.0f * S - WhenSize.X, Row + 3.0f * S, Enemy->bReady ? Gold : Dim, Font, 0.38f * S);
+	Row += 24.0f * S;
+	Text(TEXT("ITS BEST BLOW ON EACH"), X + 12.0f * S, Row, Dim, Font, 0.3f * S);
+	Row += 16.0f * S;
+	for (const FOn& Each : Rows)
+	{
+		const TMSim::FAbility* Ability = Each.Threat.Slot >= 0 ? Enemy->Ability(Each.Threat.Slot) : nullptr;
+		Text(JobName(*Each.Target), X + 12.0f * S, Row, SideColour(true) * FLinearColor(1.4f, 1.4f, 1.4f, 1.0f), Font, 0.38f * S);
+		FString What;
+		FString Ko = TEXT("-");
+		FLinearColor WhatColour = TextColour;
+		if (Each.Threat.Slot < 0)
+		{
+			What = TEXT("out of reach");
+			WhatColour = Dim;
+		}
+		else
+		{
+			const TMSim::FOdds& Odds = Each.Threat.Odds;
+			What = Each.Threat.bMoves
+				? FString::Printf(TEXT("if it walks: %hs -%d"), Ability ? Ability->Name.c_str() : "", Odds.HitAmount)
+				: FString::Printf(TEXT("%hs -%d, %d%% evade"), Ability ? Ability->Name.c_str() : "", Odds.HitAmount, Odds.Evade);
+			WhatColour = Each.Threat.bMoves ? Dim : TextColour;
+			Ko = FString::Printf(TEXT("%.0f%%"), Odds.Ko);
+			AddTip(X, Row, W, LineH, FString::Printf(TEXT("%hs on the %s%s\nHit %.0f%% -%d, crit %.0f%% -%d, graze %.0f%% -%d, dodge %.0f%%\nKO %.0f%%"),
+				Ability ? Ability->Name.c_str() : "", *JobName(*Each.Target), Each.Threat.bMoves ? TEXT(", after walking up to it") : TEXT(""),
+				Odds.Hit, Odds.HitAmount, Odds.Crit, Odds.CritAmount, Odds.Graze, Odds.GrazeAmount, Odds.Dodge, Odds.Ko));
+		}
+		Text(What, X + 92.0f * S, Row, WhatColour, Font, 0.36f * S);
+		const FVector2D KoSize = TextSize(Ko, Font, 0.38f * S);
+		const bool bKo = Each.Threat.Slot >= 0 && Each.Threat.Odds.Ko > 0.0;
+		Text(Ko, X + W - 12.0f * S - KoSize.X, Row, bKo ? Gold : Dim, Font, 0.38f * S);
+		Row += LineH;
+	}
+	Text(Enemy->bReady ? TEXT("What is ready now.") : TEXT("What will be ready on its next turn."), X + 12.0f * S, Row + 4.0f * S, Dim, Font, 0.32f * S);
+}
+
+// ------------------------------------------------------- zones of control
+
+void ATMBattleHud::DrawZoneWords(ATMBattleDirector& From)
+{
+	// "Zone of Control Mockups" A, B and D (2026-10-02): the ground carries the
+	// rings (TMBattleDirectorIndicators.cpp); this says what they mean while a
+	// walk is aimed.
+	const TMSim::FUnit* Unit = From.SelectedUnit();
+	if (!Unit || From.AimMode != ATMBattleDirector::EAimMode::Move || !From.PlayerCanCommand(Unit))
+	{
+		return;
+	}
+	const TMSim::FBattle& Battle = From.Battle;
+	UFont* Font = GEngine->GetMediumFont();
+	const FLinearColor ZoneOrange(1.0f, 0.54f, 0.36f);
+	const FLinearColor ZoneBlue(0.43f, 0.63f, 1.0f);
+	const float Reach = static_cast<float>(Battle.Tuning.EngageRadius);
+	const bool bZones = Battle.Tuning.ZoneOfControl >= 1.0 && Reach > 0.0f;
+
+	auto Tag = [&](const FString& Words, const FVector2D& At, const FLinearColor& Edge, const FLinearColor& Ink, float Scale)
+	{
+		const FVector2D Size = TextSize(Words, Font, Scale);
+		Panel(At.X - Size.X * 0.5f - 6.0f * S, At.Y - 3.0f * S, Size.X + 12.0f * S, Size.Y + 6.0f * S, FLinearColor(0.02f, 0.03f, 0.05f, 0.9f), Edge, 1.0f);
+		Text(Words, At.X - Size.X * 0.5f, At.Y, Ink, Font, Scale);
+	};
+	auto Polyline = [&](const std::vector<TMSim::FVec2>& Points, const FLinearColor& Colour, float Thick, bool bDashed)
+	{
+		for (size_t i = 1; i < Points.size(); ++i)
+		{
+			if (bDashed && i % 2 == 0)
+			{
+				continue;
+			}
+			FVector2D A;
+			FVector2D B;
+			if (ToScreen(From, Points[i - 1], 12.0f, A) && ToScreen(From, Points[i], 12.0f, B))
+			{
+				DrawLine(A.X, A.Y, B.X, B.Y, Colour, Thick);
+			}
+		}
+	};
+	auto StopMark = [&](const TMSim::FVec2& Where, const FLinearColor& Colour)
+	{
+		FVector2D At;
+		if (ToScreen(From, Where, 12.0f, At))
+		{
+			const float Box = 14.0f * S;
+			DrawRect(Colour, At.X - Box * 0.5f, At.Y - Box * 0.5f, Box, Box);
+			const FLinearColor Ink(0.06f, 0.04f, 0.02f);
+			DrawLine(At.X - Box * 0.3f, At.Y - Box * 0.3f, At.X + Box * 0.3f, At.Y + Box * 0.3f, Ink, 2.0f * S);
+			DrawLine(At.X + Box * 0.3f, At.Y - Box * 0.3f, At.X - Box * 0.3f, At.Y + Box * 0.3f, Ink, 2.0f * S);
+		}
+	};
+
+	// A: who holds the line, on the near edge of each seen enemy tank's zone.
+	if (bZones)
+	{
+		for (const TMSim::FUnit& Tank : Battle.Units)
+		{
+			FVector2D At;
+			if (Tank.IsAlive() && Tank.Team != Unit->Team && TMSim::FBattle::HoldsTheLine(Tank) && From.IsSeen(Tank)
+				&& ToScreen(From, Tank.Pos + TMSim::FVec2(0.0f, Reach + 0.4f), 8.0f, At))
+			{
+				Tag(TEXT("HOLDS THE LINE"), At, ZoneOrange, FLinearColor(1.0f, 0.78f, 0.68f), 0.32f * S);
+			}
+		}
+	}
+
+	// B: breaking away from an enemy at the start of the walk costs.
+	if (Battle.Tuning.EngageCost > 0.0 && Reach > 0.0f)
+	{
+		const TMSim::FVec2 Start = From.WalkStart(*Unit);
+		const TMSim::FUnit* Holding = nullptr;
+		for (const TMSim::FUnit& Enemy : Battle.Units)
+		{
+			if (!Holding && Enemy.IsAlive() && Enemy.Team != Unit->Team && From.IsSeen(Enemy) && Start.DistanceTo(Enemy.Pos) < Reach)
+			{
+				Holding = &Enemy;
+			}
+		}
+		FVector2D At;
+		if (Holding && ToScreen(From, Start, 60.0f, At))
+		{
+			Tag(FString::Printf(TEXT("-%s m breaking away from the %s"), *FString::SanitizeFloat(Battle.Tuning.EngageCost), *JobName(*Holding)),
+				At + FVector2D(0.0f, 30.0f * S), ZoneOrange, TextColour, 0.34f * S);
+		}
+	}
+
+	// B: pointing at ground a zone takes away: where a walk that way ends.
+	if (From.ZoneStopBy >= 0 && !From.ZoneGhost.empty())
+	{
+		Polyline(From.ZoneGhost, FLinearColor(ZoneOrange.R, ZoneOrange.G, ZoneOrange.B, 0.5f), 2.0f * S, true);
+		StopMark(From.ZoneStopAt, ZoneOrange);
+		const TMSim::FUnit* Tank = From.Battle.FindUnit(From.ZoneStopBy);
+		const FString Who = Tank && From.IsSeen(*Tank) ? FString::Printf(TEXT("the %s"), *JobName(*Tank)) : FString(TEXT("an unseen tank"));
+		FVector2D At;
+		if (ToScreen(From, From.ZoneStopAt, 60.0f, At))
+		{
+			Tag(FString::Printf(TEXT("Out of reach this turn: %s holds the line here"), *Who), At, ZoneOrange, FLinearColor(1.0f, 0.78f, 0.68f), 0.36f * S);
+		}
+	}
+
+	// D: walking a tank, the ways to your back line it would cut standing there.
+	if (bZones && From.TankLanesFor == Unit->Id && !From.TankLanes.empty() && !From.PathShown.empty())
+	{
+		int32 Ways = 0;
+		int32 Cut = 0;
+		for (const TMSim::FLane& Lane : From.TankLanes)
+		{
+			const TMSim::FUnit* Enemy = From.Battle.FindUnit(Lane.EnemyId);
+			const TMSim::FUnit* Toward = From.Battle.FindUnit(Lane.TowardId);
+			if (!Enemy || !Toward)
+			{
+				continue;
+			}
+			bool bStillReaches = false;
+			for (const int Reached : Lane.After)
+			{
+				bStillReaches = bStillReaches || Reached == Lane.TowardId;
+			}
+			const bool bLoses = Lane.After.size() < Lane.Before.size() && !bStillReaches;
+			const bool bOpens = Lane.Before.empty();
+			Ways += Lane.Before.empty() ? 0 : 1;
+			Cut += bLoses ? 1 : 0;
+			const FLinearColor Colour = bLoses ? ZoneBlue : SideColour(false);
+			Polyline(Lane.Path, Colour, bLoses ? 3.0f * S : 2.0f * S, false);
+			if (Lane.Path.empty())
+			{
+				continue;
+			}
+			if (bLoses)
+			{
+				StopMark(Lane.Path.back(), ZoneBlue);
+			}
+			FVector2D At;
+			if (ToScreen(From, Lane.Path.back(), 60.0f, At))
+			{
+				const FString Words = bLoses
+					? FString::Printf(TEXT("Cut: the %s stops short of your %s"), *JobName(*Enemy), *JobName(*Toward))
+					: bOpens ? FString::Printf(TEXT("Opens: the %s could now reach your %s"), *JobName(*Enemy), *JobName(*Toward))
+					: FString::Printf(TEXT("Open: the %s still reaches your %s"), *JobName(*Enemy), *JobName(*Toward));
+				Tag(Words, At, Colour, bLoses ? FLinearColor(0.8f, 0.88f, 1.0f) : FLinearColor(1.0f, 0.8f, 0.76f), 0.36f * S);
+			}
+		}
+		FVector2D At;
+		if (Ways > 0 && ToScreen(From, From.PathShown.back(), 120.0f, At))
+		{
+			Tag(FString::Printf(TEXT("Standing here, the %s cuts %d of %d enemy ways to your back line"), *JobName(*Unit), Cut, Ways),
+				At, ZoneBlue, FLinearColor(0.8f, 0.88f, 1.0f), 0.38f * S);
+		}
+	}
+}

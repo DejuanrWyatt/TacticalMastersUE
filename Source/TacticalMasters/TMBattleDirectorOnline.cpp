@@ -486,6 +486,8 @@ void ATMBattleDirector::OnNetMessage(const FJsonObject& Message, int32 From)
 		FString Reason;
 		Message.TryGetStringField(TEXT("reason"), Reason);
 		bWaitingForHost = false;
+		// A walk already shown setting off goes back (SettlePredictions).
+		bHostRefused = true;
 		Tell(Reason);
 		LogNote(Reason);
 	}
@@ -653,6 +655,9 @@ void ATMBattleDirector::StartOnlineAsHost()
 		Message.SetBoolField(TEXT("friendly_fire"), Setup.bFriendlyFire);
 		// Camp respawns (protocol 11).
 		Message.SetBoolField(TEXT("camp_respawn"), Setup.bCampRespawn);
+		// The boss's hunt and claim (protocol 15).
+		Message.SetBoolField(TEXT("boss_hunt"), Setup.bBossHunt);
+		Message.SetBoolField(TEXT("boss_claim"), Setup.bBossClaim);
 		Message.SetStringField(TEXT("camp_files"), FString::Printf(TEXT("%08x-%08x"), FolderPrint(TEXT("Monsters")), FolderPrint(TEXT("Items"))));
 		TArray<TSharedPtr<FJsonValue>> Carried;
 		for (int32 Team = 0; Team < 2; ++Team)
@@ -822,6 +827,10 @@ FString ATMBattleDirector::StartOnlineFrom(const FJsonObject& Start)
 	Next.bFriendlyFire = Start.TryGetBoolField(TEXT("friendly_fire"), bFriendlyFire) && bFriendlyFire;
 	bool bCampRespawn = false;
 	Next.bCampRespawn = Start.TryGetBoolField(TEXT("camp_respawn"), bCampRespawn) && bCampRespawn;
+	bool bBossHunt = false;
+	Next.bBossHunt = Start.TryGetBoolField(TEXT("boss_hunt"), bBossHunt) && bBossHunt;
+	bool bBossClaim = false;
+	Next.bBossClaim = Start.TryGetBoolField(TEXT("boss_claim"), bBossClaim) && bBossClaim;
 	if (Next.CampLevel > 0)
 	{
 		FString Theirs;

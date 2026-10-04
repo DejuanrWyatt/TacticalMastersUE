@@ -43,11 +43,11 @@ namespace TMSim
 	double FAIPlayer::GroundValue(const FBattle& Battle, const FUnit& Unit, const FVec2& Spot) const
 	{
 		const int Kind = Battle.HazardAt(Spot);
-		if (Kind == 0)
+		if (Kind == 0 || (Kind > 0 && Battle.SpringRestAt(Spot) > 0))
 		{
-			return 0.0;
+			return 0.0;  // nothing there, or a spring run dry
 		}
-		const double Amount = Unit.MaxHp() * Battle.Tuning.HazardPercent * 0.01;
+		const double Amount = Unit.MaxHp() * (Kind > 0 ? Battle.Tuning.SpringPercent : Battle.Tuning.HazardPercent) * 0.01;
 		if (Kind < 0)
 		{
 			return -Amount * 1.5;  // embers: worth going out of the way to avoid
@@ -206,9 +206,11 @@ namespace TMSim
 		// well enough to notice. Deliberately nothing for a target that is merely
 		// hurt: a finishing blow is already worth a great deal on its own, and
 		// chasing whoever is wounded spread damage about instead of killing.
+		// A boss on the hunt (2026-10-02, a setup option) goes for its prey above all.
+		const double Hunt = User.bMonster && User.HuntTarget >= 0 && Target.Id == User.HuntTarget ? 3.0 : 1.0;
 		if (!bSmart || Target.Team == User.Team)
 		{
-			return 1.0;
+			return Hunt;
 		}
 		double Worth = 1.0;
 		if (JobHasRole(Target.Job, "support"))
@@ -219,7 +221,7 @@ namespace TMSim
 		{
 			Worth = std::max(Worth, 1.25);
 		}
-		return Worth;
+		return Worth * Hunt;
 	}
 
 	double FAIPlayer::Score(FBattle& Battle, const FUnit& User, int Slot,
@@ -739,7 +741,7 @@ namespace TMSim
 		if (!Battle.Camps.empty() || !Battle.Caches.empty())
 		{
 			// Loot within reach goes to the side's stash, free, whatever it carries.
-			if (!Unit.bMonster && (Unit.Team == 0 || Unit.Team == 1))
+			if (!Unit.bMonster && Unit.PetOf < 0 && (Unit.Team == 0 || Unit.Team == 1))
 			{
 				const int Cache = Battle.CacheNear(Unit.Pos);
 				if (Cache >= 0 && !Battle.Caches[static_cast<size_t>(Cache)].Items.empty())

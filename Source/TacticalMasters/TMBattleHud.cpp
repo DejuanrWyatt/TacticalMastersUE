@@ -368,12 +368,18 @@ void ATMBattleHud::DrawHUD()
 
 	// Under everything else, since it is drawn onto the board.
 	{ TM_SLOW("Hud BoardAids"); DrawBoardAids(*Found); }
+	DrawFeel(*Found);
 	if (Found->bShowStatusBars)
 	{
 		TM_SLOW("Hud Overheads");
 		DrawOverheads(*Found);
 	}
+	DrawZoneShields(*Found);
+	DrawReadyMarks(*Found);
+	DrawCastWarnings(*Found);
 	{ TM_SLOW("Hud WorldWords"); DrawWorldWords(*Found); }
+	DrawThreats(*Found);
+	DrawZoneWords(*Found);
 	TM_SLOW("Hud rest");
 	if (FTMSettings::Get().bTurnSquares)
 	{
@@ -384,6 +390,7 @@ void ATMBattleHud::DrawHUD()
 		DrawTurnOrder(*Found);
 	}
 	DrawLog(*Found);
+	DrawSquadStrip(*Found);
 	DrawUnitCard(*Found);
 	DrawActionBar(*Found);
 	DrawField(*Found);
@@ -392,6 +399,7 @@ void ATMBattleHud::DrawHUD()
 	// Watching a replay: its bar along the bottom (TMBattleHudReplay.cpp).
 	DrawReplayBar(*Found);
 	DrawBanners(*Found);
+	DrawBossBar(*Found);
 	// Over the panels: the team items screen, while it is open.
 	DrawTeamItems(*Found);
 	// Over everything else, only the open overlay's buttons answer.
@@ -680,10 +688,43 @@ void ATMBattleHud::DrawBoardAids(ATMBattleDirector& From)
 	// resolve with. It cannot say who a cast will have caught by the time it lands.
 	UFont* Font = GEngine->GetMediumFont();
 	const float Scale = 0.8f * S;
-	for (const TMSim::FHit& Hit : From.Battle.Preview(*Unit, From.AimSlot, Unit->Pos, Where.Point))
+	const std::vector<TMSim::FHit> Hits = From.Battle.Preview(*Unit, From.AimSlot, Unit->Pos, Where.Point);
+	// A damaging blow ("Open Odds Mockups" A, 2026-10-02): a card of its odds over
+	// each unit it would reach -- the three likeliest to fall, when it catches
+	// more; the rest keep the one line.
+	TSet<int32> Carded;
+	if (Ability->Effect == TMSim::EEffect::Damage)
+	{
+		struct FCardFor
+		{
+			const TMSim::FUnit* Target;
+			TMSim::FOdds Odds;
+		};
+		TArray<FCardFor> Cards;
+		for (const TMSim::FHit& Hit : Hits)
+		{
+			if (const TMSim::FUnit* Target = From.Battle.FindUnit(Hit.UnitId))
+			{
+				Cards.Add({ Target, From.Battle.OddsOf(*Unit, *Ability, *Target, Hit.Amount) });
+			}
+		}
+		Cards.StableSort([](const FCardFor& A, const FCardFor& B) { return A.Odds.Ko > B.Odds.Ko; });
+		const FString Extra = Ability->HasStatus()
+			? FString::Printf(TEXT("+%hs unless dodged"), Ability->StatusId.c_str()) : FString();
+		for (int32 i = 0; i < Cards.Num() && i < 3; ++i)
+		{
+			FVector2D At;
+			if (ToScreen(From, Cards[i].Target->Pos, 225.0f, At))
+			{
+				OddsCard(*Cards[i].Target, Cards[i].Odds, From.IsFriend(*Cards[i].Target), Extra, At.X, At.Y);
+				Carded.Add(Cards[i].Target->Id);
+			}
+		}
+	}
+	for (const TMSim::FHit& Hit : Hits)
 	{
 		const TMSim::FUnit* Target = From.Battle.FindUnit(Hit.UnitId);
-		if (!Target)
+		if (!Target || Carded.Contains(Hit.UnitId))
 		{
 			continue;
 		}
@@ -705,9 +746,10 @@ void ATMBattleHud::DrawBoardAids(ATMBattleDirector& From)
 			{
 				Line += FString::Printf(TEXT("  %d%% miss"), Miss);
 			}
-			if (Hit.Amount >= Target->Hp)
+			const TMSim::FOdds Odds = From.Battle.OddsOf(*Unit, *Ability, *Target, Hit.Amount);
+			if (Odds.Ko > 0.0)
 			{
-				Line += TEXT("  KO");
+				Line += FString::Printf(TEXT("  KO %.0f%%"), Odds.Ko);
 			}
 			Colour = FLinearColor(1.0f, 0.47f, 0.37f);
 			break;
@@ -833,19 +875,26 @@ void ATMBattleHud::DrawActionBar(ATMBattleDirector& From)
 	};
 	// What is left of a turn half spent flashes ("Turn Left Indicator Mockups" D,
 	// the human's pick with flashing borders, 2026-10-02): its edge pulses.
-	const float Pulse = 0.5f + 0.5f * FMath::Sin((GetWorld() ? GetWorld()->GetRealTimeSeconds() : 0.0f) * 2.0f * PI * 1.1f);
-	const FLinearColor Flash(1.0f, 0.93f, 0.62f, 1.0f);
+	// 2026-10-03, "more visually noticeable": a thicker edge, a three-step glow
+	// round it, a quicker beat, and never fully dark between beats.
+	const float Pulse = 0.35f + 0.65f * (0.5f + 0.5f * FMath::Sin((GetWorld() ? GetWorld()->GetRealTimeSeconds() : 0.0f) * 2.0f * PI * 1.4f));
+	const FLinearColor Flash(1.0f, 0.95f, 0.55f, 1.0f);
 	auto WordTile = [&](EGlyph Kind, const FString& Word, const FString& Under, bool bEnabled, bool bPressed, ETMHudAction Action, bool bFlash = false)
 	{
 		const float TY = Y + Tile - Small;
 		const bool bOver = FBox2D(FVector2D(X, TY), FVector2D(X + Small, TY + Small)).IsInside(Mouse);
 		if (bFlash)
 		{
-			DrawRect(Flash * FLinearColor(1.0f, 1.0f, 1.0f, 0.35f * Pulse), X - 6.0f * S, TY - 6.0f * S, Small + 12.0f * S, Small + 12.0f * S);
+			for (int32 Ring = 3; Ring >= 1; --Ring)
+			{
+				const float Out = (3.0f + 4.0f * Ring) * S;
+				DrawRect(Flash * FLinearColor(1.0f, 1.0f, 1.0f, (0.14f + 0.12f * (3 - Ring)) * Pulse), X - Out, TY - Out, Small + 2.0f * Out, Small + 2.0f * Out);
+			}
 		}
 		DrawRect(FLinearColor(0.0f, 0.0f, 0.0f, 0.75f), X - 3.0f * S, TY - 3.0f * S, Small + 6.0f * S, Small + 6.0f * S);
 		const FLinearColor Rim = bPressed ? Gold : FLinearColor(0.55f, 0.62f, 0.75f, bEnabled ? 0.8f : 0.3f);
-		DrawRect(bFlash ? FMath::Lerp(Rim, Flash, Pulse) : Rim, X - 2.0f * S, TY - 2.0f * S, Small + 4.0f * S, Small + 4.0f * S);
+		const float RimW = (bFlash ? 4.0f : 2.0f) * S;
+		DrawRect(bFlash ? FMath::Lerp(Rim, Flash, Pulse) : Rim, X - RimW, TY - RimW, Small + 2.0f * RimW, Small + 2.0f * RimW);
 		DrawRect(bEnabled && bOver ? FLinearColor(0.16f, 0.2f, 0.3f, 1.0f) : FLinearColor(0.06f, 0.07f, 0.1f, 1.0f), X, TY, Small, Small);
 		// The icon and the word side by side, centred, the word made smaller if they would not fit.
 		const float IconBox = 15.0f * S;
@@ -1065,11 +1114,11 @@ void ATMBattleHud::DrawBanners(ATMBattleDirector& From)
 		TMSim::FVec2 Spot;
 		double Walk = 0.0;
 		const TMSim::FAbility* Aimed = Unit->Ability(From.AimSlot);
-		if (!Where.bOk && Where.Why == UTF8_TO_TCHAR(ATMBattleDirector::OutOfRange) && !Unit->bMoved && Aimed)
+		if (!Where.bOk && Where.Why == UTF8_TO_TCHAR(ATMBattleDirector::OutOfRange) && Aimed)
 		{
 			// It can be used from somewhere it can walk to: say so, rather than
 			// simply refusing (battle.gd:1438-1447).
-			if (From.ClosestSpotInRange(*Unit, From.AimSlot, Where.Point, Spot, Walk))
+			if (!Unit->bMoved && !Unit->IsCasting() && From.ClosestSpotInRange(*Unit, From.AimSlot, Where.Point, Spot, Walk))
 			{
 				const TMSim::FUnit* Target = From.Battle.FindUnit(Where.Follow);
 				Preview = bPlanned
@@ -1078,9 +1127,17 @@ void ATMBattleHud::DrawBanners(ATMBattleDirector& From)
 						Aimed->Name.c_str(), Walk, Target ? *JobName(*Target) : TEXT("the target"));
 				PreviewColour = FLinearColor(1.0f, 0.9f, 0.35f);
 			}
+			else if (From.bAbilityHoverGoTo)
+			{
+				// Beyond this turn's reach (2026-10-03): said plainly, with what a click does.
+				const int32 Turns = static_cast<int32>(From.GoToHoverStops.size());
+				Preview = FString::Printf(TEXT("OUT OF RANGE: %hs. Click to go into range (%d turn%s, %.0f m), then use it there. It stops if it sees an enemy."),
+					Aimed->Name.c_str(), Turns, Turns == 1 ? TEXT("") : TEXT("s"), From.GoToHoverMetres);
+				PreviewColour = FLinearColor(1.0f, 0.62f, 0.3f);
+			}
 			else
 			{
-				Preview = FString::Printf(TEXT("%hs: out of range, and nowhere in reach to use it from."), Aimed->Name.c_str());
+				Preview = FString::Printf(TEXT("OUT OF RANGE: %hs, and there is no way into range of that."), Aimed->Name.c_str());
 				PreviewColour = Urgent;
 			}
 		}
@@ -1332,8 +1389,10 @@ float ATMBattleHud::DrawGoToStrip(ATMBattleDirector& From, const TMSim::FUnit& U
 	const float Gap = 8.0f * S;
 	const FLinearColor Blue(0.44f, 0.66f, 1.0f);
 	const int32 Turns = static_cast<int32>(Order->Stops.size());
+	const TMSim::FAbility* Carried = Order->HasAbility() ? Unit.Ability(Order->Slot) : nullptr;
 	const FString Lead = Order->bStopped
 		? FString::Printf(TEXT("Stopped: %s."), *Order->Why)
+		: Carried ? FString::Printf(TEXT("Into range for %hs: %d turn%s left"), Carried->Name.c_str(), Turns, Turns == 1 ? TEXT("") : TEXT("s"))
 		: FString::Printf(TEXT("Go To: %d turn%s left"), Turns, Turns == 1 ? TEXT("") : TEXT("s"));
 	const FString EndLabel = TEXT("Walk and end");
 	const FString WaitLabel = TEXT("Walk, wait for me");
@@ -1667,6 +1726,10 @@ void ATMBattleHud::DrawSetup(ATMBattleDirector& From)
 			ETMHudAction::SetupTheme, -1);
 		AddTip(RowX, Y - 46.0f * S, LabelW + ValueW, 38.0f * S,
 			TEXT("How the battlefield looks: the ground, the land around it, the sun and the sky. It changes nothing in the rules."));
+		Row(TEXT("Duplicate classes"), Setup.bUniqueClasses ? FString(TEXT("Off: one of each class")) : FString(TEXT("Allowed")),
+			ETMHudAction::SetupUniqueClasses, -1);
+		AddTip(RowX, Y - 46.0f * S, LabelW + ValueW, 38.0f * S,
+			TEXT("Off: no class appears twice in the battle, on either side. A class already on a slot is greyed in the class picker, and turning this on gives any second copy another class of its role. Online, the host's setting holds for everyone."));
 	}
 
 	// How the battle can be won, on the right under red's team.
@@ -1726,6 +1789,15 @@ void ATMBattleHud::DrawSetup(ATMBattleDirector& From)
 			ETMHudAction::SetupFriendlyFire, -1);
 		AddTip(RowX, Y - 46.0f * S, LabelW + ValueW, 38.0f * S,
 			TEXT("On: cones, lines, charges and blasts aimed at the enemy also hurt your own units standing in them (never the caster, never a single-target blow). Aim with care."));
+		// The boss's hunt and claim (2026-10-02, "Camps and Bosses Mockups" C and D).
+		Row(TEXT("Bosses hunt"), Setup.bBossHunt ? FString(TEXT("On: it hunts whoever hurt it most")) : FString(TEXT("Off")),
+			ETMHudAction::SetupBossHunt, -1);
+		AddTip(RowX, Y - 46.0f * S, LabelW + ValueW, 38.0f * S,
+			TEXT("On: a boss remembers who has hurt it most, marks them Hunted, and goes for them first, until they fall or it loses sight of them for 3 of its turns; then it turns to the next on its list. The boss bar shows the list."));
+		Row(TEXT("Claim the boss"), Setup.bBossClaim ? FString(TEXT("On: the last blow takes the boon")) : FString(TEXT("Off")),
+			ETMHudAction::SetupBossClaim, -1);
+		AddTip(RowX, Y - 46.0f * S, LabelW + ValueW, 38.0f * S,
+			TEXT("On: the boss bar shows each side's share of the damage. The side that lands the last blow gets the Boss's Boon (+10% damage for 3 turns); the other side, if it dealt 30% of the boss's health, gets a rare item in its stash."));
 		RowX = LeftRowX;
 		Y = LeftY;
 	}

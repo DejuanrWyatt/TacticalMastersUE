@@ -48,7 +48,7 @@
     {
       "id": "paladin_aegis",
       "name": "Aegis",
-      "desc": "Raise an ally's AttDef by 8 for 2 turns (up to 5 m).",
+      "desc": "Protect an ally up to 5 m away for 2 turns: physical hits on it do a third less.",
       "kind": "active",
       "effect": "support",
       "scale": "mag",
@@ -60,13 +60,10 @@
       "aoe": 0,
       "cooldown": 3,
       "cast": 0,
-      "buffs": [
-        {
-          "stat": "attdef",
-          "amount": 8,
-          "turns": 2
-        }
-      ],
+      "status": {
+        "id": "protect",
+        "turns": 2
+      },
       "fx": "guard",
       "vfx": {
         "system": "/Game/FreeParticle_SoftTofu/Niagara/NS_Sparkling_Animate_2.NS_Sparkling_Animate_2",
@@ -118,5 +115,11 @@
         "scale": 1
       }
     }
-  ]
+  ],
+  "creator": {
+    "rebalanced": {
+      "on": "2026-10-03",
+      "why": "Aegis gives Protect"
+    }
+  }
 }

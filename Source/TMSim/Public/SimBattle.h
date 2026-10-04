@@ -104,6 +104,17 @@ namespace TMSim
 		 * for half; the Hit follows. Not Godot's.
 		 */
 		Grazed,
+		// Camps and bosses (2026-10-02, "Camps and Bosses Mockups"). Not Godot's.
+		/** A fight near waiting camp Slot made noise: Amount is its noise now (of Camp::NoiseFull), Unit who made it. */
+		CampNoise,
+		/** A boss (Unit) hunts By. */
+		Hunting,
+		/** Side Amount claimed boss Unit with By's last blow: its side has the boon. */
+		BossClaimed,
+		/** Side Amount did enough to boss Unit to earn item Id, put in its stash. */
+		ClaimShare,
+		/** Unit killed monster By from whole in one blow: Amount percent of a gauge is owed it, paid as its turn ends. */
+		CleanKill,
 	};
 
 	/**
@@ -163,6 +174,60 @@ namespace TMSim
 	struct FAbility;
 
 	/**
+	 * An enemy's way to a side's back line, with one of that side's tanks stood
+	 * somewhere (2026-10-02, "Zone of Control Mockups" D): which of the back line
+	 * it could strike at this turn as things are, and which with the tank there,
+	 * and the walk it would take with the tank there, toward the first it loses
+	 * or else the first it still reaches.
+	 */
+	struct FLane
+	{
+		int EnemyId = -1;
+		std::vector<int> Before;
+		std::vector<int> After;
+		int TowardId = -1;
+		std::vector<FVec2> Path;
+	};
+
+	/**
+	 * The four ways a damaging blow can land on one unit, as the dice are thrown
+	 * in ResolveAbility (2026-10-02, "Open Odds Mockups" A): the chance of each
+	 * in %, adding up to 100, and the damage each does. Evaded hits are mostly
+	 * grazed under defense model 1 and all dodged under the classic rules.
+	 */
+	struct FOdds
+	{
+		double Hit = 0.0;
+		double Crit = 0.0;
+		double Graze = 0.0;
+		double Dodge = 0.0;
+		int HitAmount = 0;
+		int CritAmount = 0;
+		int GrazeAmount = 0;
+		/** The chance it is knocked out, shields counted. */
+		double Ko = 0.0;
+		/** The rolls behind them: Evasion and the critical chance, in %. */
+		int Evade = 0;
+		int CritChance = 0;
+		/** What would not survive each: hit, crit, graze. */
+		bool bHitKo = false;
+		bool bCritKo = false;
+		bool bGrazeKo = false;
+	};
+
+	/**
+	 * A unit's best damaging blow on another at its next turn (2026-10-02, "Open
+	 * Odds Mockups" C): from where it stands, or after walking, when that is the
+	 * only way it reaches. Slot -1 when it has nothing that would.
+	 */
+	struct FThreat
+	{
+		int Slot = -1;
+		bool bMoves = false;
+		FOdds Odds;
+	};
+
+	/**
 	 * One unit an ability would reach, and what it would do to it. Worked out
 	 * without touching anything, so the same answer serves the forecast a player
 	 * reads, the hits that land, and the computer weighing its options.
@@ -205,6 +270,8 @@ namespace TMSim
 		inline constexpr double AwayFromStart = 12.0;
 		/** Closest two towers may stand to each other (a pair's two included), in metres. */
 		inline constexpr double Apart = 10.0;
+		/** Closest a tower may stand to the edge of the map, in metres (2026-10-02: three tiles). */
+		inline constexpr double FromEdge = 6.0;
 		/** Salt for the placing generator, so it never shares a sequence with the battle's dice. */
 		inline constexpr uint64_t Salt = 0x5741544348544F57ull;  // "WATCHTOW"
 	}
@@ -265,6 +332,18 @@ namespace TMSim
 		int ShrineRest = 0;
 		/** Times it has woken. */
 		int Wakes = 0;
+		/**
+		 * Waiting: noise from fights near it (2026-10-02, A), the ticks it has been
+		 * quiet, each side's share of the noise, who on each side made it last, and
+		 * the side that made the last of it.
+		 */
+		int Noise = 0;
+		int NoiseQuiet = 0;
+		int NoiseBy[2] = { 0, 0 };
+		int LoudUnit[2] = { -1, -1 };
+		int LastLoudSide = 0;
+		/** Noise filled it: when it wakes, its monsters go for the side that made the most. */
+		bool bNoiseWake = false;
 	};
 
 	/** Items on the ground, for anybody standing near to take. Never removed, so an index stays good. */
@@ -305,6 +384,17 @@ namespace TMSim
 		inline constexpr int FirstWake[4] = { 0, 40, 100, 180 };
 		inline constexpr int Respawn[4] = { 60, 90, 150, 300 };
 		inline constexpr int Warning[4] = { 5, 10, 10, 15 };
+		/** Noise (A): how near a fight must be to a waiting camp, how much fills it, and the quiet that takes one off. */
+		inline constexpr double NoiseReach = 12.0;
+		inline constexpr int NoiseFull = 3;
+		inline constexpr int NoiseQuietSeconds = 10;
+		/** A monster killed from whole in one blow: gauge paid to its killer, in percent (A). */
+		inline constexpr int CleanKillTgPercent = 20;
+		/** A boss's prey out of its sight for this many of its turns: the scent is lost (C). */
+		inline constexpr int ScentTurns = 3;
+		/** The claim (D): the share of a boss's health a side must deal for a rare item, and the boon's turns. */
+		inline constexpr int ClaimSharePercent = 30;
+		inline constexpr int BoonTurns = 3;
 	}
 
 	/** "unit", "point", "circle", "self", "line", "cone", "global" or "vector". */
@@ -368,6 +458,22 @@ namespace TMSim
 		/** Chance in % that this unit's abilities land a critical hit. */
 		TMSIM_API int CritChance(const FUnit& User) const;
 
+		/**
+		 * The odds of a damaging blow of Amount (as Preview has it) on Target:
+		 * Evasion, then dodge or graze, then the critical roll -- the order
+		 * ResolveAbility throws them in. All zero for anything not damaging.
+		 */
+		TMSIM_API FOdds OddsOf(const FUnit& User, const FAbility& Ability, const FUnit& Target, int Amount) const;
+
+		/**
+		 * What Attacker could do to Target standing at TargetPos on Attacker's next
+		 * turn (or this one, if it is on it): its damaging abilities ready by then,
+		 * reaching from where it stands, else after a walk. The best is the likeliest
+		 * to knock it out, then the most damage on average. A forecast, not a
+		 * promise: it does not look for a clear line or a way round.
+		 */
+		TMSIM_API FThreat ThreatOn(const FUnit& Attacker, const FUnit& Target, const FVec2& TargetPos) const;
+
 		// --------------------------------------------------------- walking
 
 		/** Metres this unit walks in a turn. */
@@ -391,6 +497,29 @@ namespace TMSim
 		 */
 		TMSIM_API bool WalkVia(const FUnit& Unit, const std::vector<FVec2>& Via, bool bSprint, double& OutLeft);
 		TMSIM_API std::vector<std::pair<FNode, double>> ReachableVia(const FUnit& Unit, const std::vector<FVec2>& Via, bool bSprint = false);
+
+		/** A unit whose first role is tank: with the zone-of-control rule on, an enemy walking into its reach stops. */
+		static TMSIM_API bool HoldsTheLine(const FUnit& Unit);
+
+		/**
+		 * Zones of control (2026-10-02, "Zone of Control Mockups" B): the ground the
+		 * unit could walk to by Via this turn were there no zones, but cannot with
+		 * them -- what the enemy's tanks take away.
+		 */
+		TMSIM_API std::vector<FNode> ZoneShadow(const FUnit& Unit, const std::vector<FVec2>& Via, bool bSprint = false);
+		/** The walk by Via to To as if there were no zones, or empty if there is none even so. */
+		TMSIM_API std::vector<FVec2> PathIgnoringZones(const FUnit& Unit, const std::vector<FVec2>& Via, const FNode& To, bool bSprint = false);
+
+		/** How far off its damaging abilities ready by its next turn can strike: range, blast and the hit radius. 0 if none. */
+		TMSIM_API double StrikeReach(const FUnit& Unit) const;
+
+		/**
+		 * "Zone of Control Mockups" D: each of Enemies' ways this turn to BackLine,
+		 * as things stand and with the tank TankId standing At. The tank is put
+		 * there only while this asks, and back where it was before it returns.
+		 * Enemies that reach none of the back line either way are left out.
+		 */
+		TMSIM_API std::vector<FLane> TankLanes(int TankId, const FVec2& At, const std::vector<int>& Enemies, const std::vector<int>& BackLine);
 		/** The way there by Via, both ends and each waypoint included, or empty if there is no way. */
 		TMSIM_API std::vector<FVec2> PathVia(const FUnit& Unit, const std::vector<FVec2>& Via, const FNode& To, bool bSprint = false);
 
@@ -406,9 +535,12 @@ namespace TMSim
 		TMSIM_API std::string ValidateMove(int UnitId, const FVec2& To, bool bSprint = false,
 			const std::vector<FVec2>& Via = std::vector<FVec2>());
 
-		/** Walks the unit there, by Via. It faces the way it last stepped. */
+		/**
+		 * Walks the unit there, by Via. It faces the way it last stepped, or
+		 * FacingWay(Face) when Face is 0 or more (FOrder::Face).
+		 */
 		TMSIM_API bool ApplyMove(int UnitId, const FVec2& To, bool bSprint, FTickReport& Report,
-			const std::vector<FVec2>& Via = std::vector<FVec2>());
+			const std::vector<FVec2>& Via = std::vector<FVec2>(), int Face = -1);
 
 		/**
 		 * Ends a unit's turn the way giving no further orders would. What it
@@ -446,6 +578,14 @@ namespace TMSim
 
 		/** The nearest living unit within this far of a spot, or null. */
 		TMSIM_API const FUnit* UnitNear(const FVec2& Point, float Radius) const;
+		/**
+		 * Where a movement skill ("leap", "behind": FAbility::Special) used at
+		 * Target would put the user: a walkable node nobody else stands on, the
+		 * nearest one to where it wants to be. False when there is none, and then
+		 * the ability can't be used. The nodes are tried in a fixed order, so
+		 * every machine lands on the same one.
+		 */
+		TMSIM_API bool LandingFor(const FUnit& User, const FAbility& Ability, const FVec2& Target, FVec2& OutSpot) const;
 
 		// ------------------------------------------------- what an ability does
 
@@ -602,6 +742,19 @@ namespace TMSim
 		 * before red's.
 		 */
 		std::vector<FWatchtower> Watchtowers;
+		/**
+		 * Springs running dry (FTuning::SpringRestTurns): the tile, the unit whose
+		 * turns count it down, and how many of them are left. In the order they ran dry.
+		 */
+		struct FSpringRest
+		{
+			int Tile = -1;
+			int UnitId = -1;
+			int Turns = 0;
+		};
+		std::vector<FSpringRest> SpringRests;
+		/** The turns a spring at this point has still to rest, or 0. */
+		TMSIM_API int SpringRestAt(const FVec2& Point) const;
 
 		// ------------------------------------------------- neutral camps
 
@@ -703,6 +856,10 @@ namespace TMSim
 		int DropItems(const FVec2& Where, const std::vector<const FItemDef*>& Items, const std::vector<int>& Cooldowns, FTickReport& Report);
 		/** A unit gone for good: what it carried falls where it was; a monster leaves the board. */
 		void OnGone(FUnit& Unit, FTickReport& Report);
+		/** Pets (2026-10-02): one waiting off the board for each unit whose class calls one; calling one up; sending it away. */
+		void PlacePets();
+		void CallPet(FUnit& Owner, const FAbility& Ability, const FVec2& Where, FTickReport& Report);
+		void SendPetAway(FUnit& Pet, FTickReport& Report);
 		/** A monster's turn begins: what it has seen and suffered decides its mood. True if that took the turn. */
 		bool MonsterTurnStarts(FUnit& Unit, FTickReport& Report);
 		/** Whether anything sets this resting monster off now. */
@@ -711,6 +868,14 @@ namespace TMSim
 		void AlertMonster(FUnit& Monster, int By, FTickReport& Report);
 		/** A monster was hurt by Attacker: grudges, flight, guardians, stagger, phases. */
 		void MonsterHurt(FUnit& Monster, const FUnit& Attacker, double Flank, FTickReport& Report);
+		/** Noise near waiting camps (A): area blows, fire and kills by a side's unit. */
+		void MakeNoise(const FVec2& Where, const FUnit& By, int Amount, FTickReport& Report);
+		/** A boss took Amount from Attacker: remembered for its hunt (C) and its claim (D). */
+		void BossHurtBy(FUnit& Boss, const FUnit& Attacker, int Amount);
+		/** A boss's turn begins (C): whom it hunts. */
+		void UpdateHunt(FUnit& Boss, FTickReport& Report);
+		/** A boss fell to Killer's blow: its hunt ends, and (D) the boon and the shares. */
+		void ClaimBoss(FUnit& Boss, const FUnit& Killer, FTickReport& Report);
 		/** A shrine under a unit starting its turn. */
 		void UseShrine(FUnit& Unit, FTickReport& Report);
 		void ApplyTake(FUnit& Unit, int Cache, const std::string& ItemId, int GearSlot, FTickReport& Report);

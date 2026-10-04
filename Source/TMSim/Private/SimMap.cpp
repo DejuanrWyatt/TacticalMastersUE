@@ -49,6 +49,34 @@ namespace TMSim
 		Build(All);
 	}
 
+	void FMap::BuildMirrored(const std::vector<std::string>& TopRows, const std::vector<std::pair<int, int>>& TopGrass)
+	{
+		BuildMirrored(TopRows);
+		for (const std::pair<int, int>& Tile : TopGrass)
+		{
+			const int X = Tile.first;
+			const int Y = Tile.second;
+			if (X < 0 || Y < 0 || X >= TilesX || Y >= static_cast<int>(TopRows.size()))
+			{
+				continue;
+			}
+			Grass[static_cast<size_t>(Y) * TilesX + X] = 1;
+			// The far half is the near half turned about (BuildMirrored).
+			Grass[static_cast<size_t>(TilesY - 1 - Y) * TilesX + (TilesX - 1 - X)] = 1;
+		}
+	}
+
+	bool FMap::InGrass(const FVec2& Point) const
+	{
+		const int X = static_cast<int>(std::floor(Point.X / Ground::TileSize));
+		const int Y = static_cast<int>(std::floor(Point.Y / Ground::TileSize));
+		if (X < 0 || Y < 0 || X >= TilesX || Y >= TilesY || Grass.empty())
+		{
+			return false;
+		}
+		return Grass[static_cast<size_t>(Y) * TilesX + X] != 0;
+	}
+
 	void FMap::Build(const std::vector<std::string>& Rows)
 	{
 		TilesY = static_cast<int>(Rows.size());
@@ -59,6 +87,7 @@ namespace TMSim
 		Heights.clear();
 		Hazards.clear();
 		Covers.clear();
+		Grass.assign(static_cast<size_t>(TilesX) * TilesY, 0);
 		Heights.reserve(TilesX * TilesY);
 		for (const std::string& Row : Rows)
 		{
@@ -209,6 +238,15 @@ namespace TMSim
 		FMap Map;
 		Map.BuildMirrored(Def.Top);
 		const FVec2 Size = Map.SizeMeters();
+		for (const std::pair<int, int>& Tile : Def.Grass)
+		{
+			if (Tile.first < 0 || Tile.second < 0 || Tile.first >= Map.TilesX || Tile.second >= static_cast<int>(Def.Top.size())
+				|| Map.TileLevel(Tile.first, Tile.second) <= 0)
+			{
+				Say("grass: [" + std::to_string(Tile.first) + ", " + std::to_string(Tile.second)
+					+ "] is not a tile of ground in the top half");
+			}
+		}
 		if (Def.Spawns.size() != 4)
 		{
 			Say("spawns: four, one for each unit a side fields");
@@ -303,7 +341,7 @@ namespace TMSim
 		{
 			return "version: must be 1";
 		}
-		static const char* const Keys[] = { "format", "version", "id", "name", "desc", "theme", "top", "spawns", "boss" };
+		static const char* const Keys[] = { "format", "version", "id", "name", "desc", "theme", "top", "spawns", "boss", "grass" };
 		std::string Problems;
 		for (const auto& Member : Json.Object)
 		{
@@ -347,6 +385,20 @@ namespace TMSim
 				else
 				{
 					Problems += "spawns: each is [x, y] in metres\n";
+				}
+			}
+		}
+		if (const FJson* Grass = Json.Find("grass"); Grass && Grass->IsArray())
+		{
+			for (const FJson& Tile : Grass->Array)
+			{
+				if (Tile.IsArray() && Tile.Array.size() == 2 && Tile.Array[0].IsNumber() && Tile.Array[1].IsNumber())
+				{
+					Out.Grass.emplace_back(static_cast<int>(Tile.Array[0].Number), static_cast<int>(Tile.Array[1].Number));
+				}
+				else
+				{
+					Problems += "grass: each is [x, y], a tile of the top half\n";
 				}
 			}
 		}

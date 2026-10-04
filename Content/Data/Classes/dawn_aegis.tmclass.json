@@ -15,7 +15,7 @@
     "aeva": 5,
     "meva": 14,
     "crit": 5,
-    "speed": 8,
+    "speed": 10,
     "move": 6,
     "patience": 9,
     "sight": 10
@@ -183,6 +183,10 @@
         18
       ],
       "against": "reference team, medium"
+    },
+    "rebalanced": {
+      "on": "2026-10-03",
+      "why": "Tuning pass 2026-10-03 (lab 38% in place of the White Mage): Speed 8->10"
     }
   }
 }

@@ -730,7 +730,7 @@ bool ATMRobotPlayer::CoveredByBody(const FVector2D& Screen) const
 		FVector2D Feet;
 		FVector2D Head;
 		if (Player && Player->ProjectWorldLocationToScreen(Base, Feet)
-			&& Player->ProjectWorldLocationToScreen(Base + FVector(0.0f, 0.0f, 180.0f), Head))
+			&& Player->ProjectWorldLocationToScreen(Base + FVector(0.0f, 0.0f, ATMBattleDirector::UnitHeadCm), Head))
 		{
 			const FVector2D Along = Head - Feet;
 			const double Length = Along.Size();

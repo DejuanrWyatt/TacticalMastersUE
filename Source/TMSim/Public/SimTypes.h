@@ -193,8 +193,15 @@ namespace TMSim
 		double EngageCost = 1.0;
 		/** Multiplier on how far every unit can see. */
 		double SightMultiplier = 1.0;
-		/** Health lost on burning ground, or gained on a spring, per turn. */
+		/** Health lost on burning ground per turn (and, before 2026-10-04, gained on a spring). */
 		double HazardPercent = 8.0;
+		/** Health a spring mends, % of max HP, when a unit's turn comes round on it (v19 play test: its own number). */
+		double SpringPercent = 8.0;
+		/**
+		 * Once a spring has mended a unit it runs dry for this many of that unit's
+		 * turns (anyone's, once that unit has fallen). 0, Godot's: it never does.
+		 */
+		double SpringRestTurns = 0.0;
 
 		/** Multiplier on every ability's cast time. */
 		double CastTimeMultiplier = 1.0;
@@ -239,9 +246,9 @@ namespace TMSim
 		 */
 		double WatchtowerCount = 0.0;
 		/** Turns a side must spend at a watchtower to take it. */
-		double WatchtowerTurns = 2.0;
+		double WatchtowerTurns = 1.0;
 		/** Metres a held watchtower lets its side see, from the top of the tower. */
-		double WatchtowerSight = 14.0;
+		double WatchtowerSight = 28.0;
 
 		/**
 		 * Points each side may spend on items on the setup screen
@@ -286,6 +293,13 @@ namespace TMSim
 		 * stop there. 0, Godot's and the default here: no such stop.
 		 */
 		double ZoneOfControl = 0.0;
+		/** 1: a boss hunts whoever has hurt it most ("Camps and Bosses Mockups" C). A setup option, off by default. */
+		double BossHunt = 0.0;
+		/**
+		 * 1: the side landing a boss's last blow takes its boon, and the other side,
+		 * if it dealt 30% of the boss's health, a rare item (D). A setup option, off by default.
+		 */
+		double BossClaim = 0.0;
 	};
 
 	/**

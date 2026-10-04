@@ -137,6 +137,11 @@ namespace TMSim
 		int KoTicks = 0;
 		/** Turns begun since it last took damage; it mends once left alone. */
 		int UnharmedTurns = 0;
+		/**
+		 * Struck out, or was struck, since its last turn began: tall grass hides it
+		 * no longer until that next turn (FBattle::Hidden, 2026-10-04).
+		 */
+		bool bSpotted = false;
 
 		std::vector<FStatus> Statuses;
 		std::vector<FBuff> Buffs;
@@ -198,6 +203,20 @@ namespace TMSim
 		int Stagger = 0;
 		/** Tamed: its own turns left on the side that tamed it, then back to team 2. */
 		int TamedTurns = 0;
+		/**
+		 * A pet (2026-10-02): the unit that calls it up, or -1, and its own turns
+		 * left before it leaves. It waits off the board until called, never
+		 * counts towards a win, and nothing raises it.
+		 */
+		int PetOf = -1;
+		int PetTurns = 0;
+		/** A boss: the damage each unit has done it, by id, in the order they first hurt it (its hunt). */
+		std::vector<std::pair<int, int>> Wrath;
+		/** A boss: the unit it hunts, or -1, and how many of its turns in a row it has not seen it. */
+		int HuntTarget = -1;
+		int HuntLost = 0;
+		/** A boss: the damage each side has done it (its claim). */
+		int Claim[2] = { 0, 0 };
 
 		// ------------------------------- the second set of statuses (feat-status-effects.md)
 

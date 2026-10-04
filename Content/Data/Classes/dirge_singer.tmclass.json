@@ -69,7 +69,7 @@
     {
       "id": "dirge_singer_shadow_ballad",
       "name": "Shadow Ballad",
-      "desc": "Every ally within 4 m is inspired; Crit +8. Always on, for allies nearby.",
+      "desc": "Every ally within 4 m is inspired; Crit +12. Always on, for allies nearby.",
       "kind": "aura",
       "effect": "support",
       "scale": "mag",
@@ -84,7 +84,7 @@
       "buffs": [
         {
           "stat": "crit",
-          "amount": 8,
+          "amount": 12,
           "turns": 2
         }
       ],
@@ -99,7 +99,7 @@
       "scale": "mag",
       "target": "ally",
       "shape": "self",
-      "power": 18,
+      "power": 22,
       "min_range": 0,
       "max_range": 0,
       "aoe": 4,
@@ -121,6 +121,11 @@
     "reworded": {
       "on": "2026-10-02",
       "why": "Descriptions say what the abilities do (2026-10-02): Stun not sleep, Crit not the old Power, turns not seconds"
-    }
+    },
+    "rebalanced": {
+      "on": "2026-10-02",
+      "why": "Balance audit 2026-10-02: Ballad Crit +12 (was +8), Finale heals 22 (was 18)"
+    },
+    "changedAt": "2026-10-03T03:45:00.000Z"
   }
 }

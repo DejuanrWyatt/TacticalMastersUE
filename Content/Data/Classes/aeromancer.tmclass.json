@@ -67,23 +67,27 @@
       }
     },
     {
-      "id": "aeromancer_gale_staff",
-      "name": "Gale Staff",
-      "desc": "Strike an adjacent enemy.",
+      "id": "aeromancer_tailwind",
+      "name": "Tailwind",
+      "desc": "Haste every ally within 3 m of you, yourself too, for 1 turn: their turns come round faster (1 s).",
       "kind": "active",
-      "effect": "damage",
-      "scale": "att",
-      "target": "enemy",
-      "shape": "unit",
-      "power": 29,
+      "effect": "support",
+      "scale": "mag",
+      "target": "ally",
+      "shape": "self",
+      "power": 0,
       "min_range": 0,
-      "max_range": 1.8,
-      "aoe": 0,
-      "cooldown": 0,
-      "cast": 0,
-      "fx": "attack",
+      "max_range": 0,
+      "aoe": 3,
+      "cooldown": 4,
+      "cast": 1,
+      "status": {
+        "id": "haste",
+        "turns": 1
+      },
+      "fx": "haste",
       "vfx": {
-        "system": "/Game/ParagonGideon/FX/Particles/Gideon/Abilities/Meteor/FX/P_Gideon_MeteorBigImpact.P_Gideon_MeteorBigImpact",
+        "system": "/Game/FreeParticle_SoftTofu/Niagara/NS_feather.NS_feather",
         "at": "targets",
         "scale": 1
       }
@@ -112,5 +116,30 @@
         "scale": 1
       }
     }
-  ]
+  ],
+  "creator": {
+    "rebalanced": {
+      "on": "2026-10-04",
+      "why": "Signature in place of Gale Staff (never used): Haste for 2 turns on every ally within 3 m. Before that (2026-10-02): Balance audit 2026-10-02: the staff strikes from 1-5 m (power -15%) instead of only at arm's length, which the computer never used"
+    },
+    "changedAt": "2026-10-03T03:45:00.000Z",
+    "icons": {
+      "abilities": [
+        null,
+        null,
+        {
+          "backing": "hex",
+          "glyph": "swirl",
+          "colour": "#9fe0c0",
+          "style": "light",
+          "mark": "self",
+          "scale": 1,
+          "rotate": 0,
+          "badge": "none",
+          "finish": "lit"
+        },
+        null
+      ]
+    }
+  }
 }

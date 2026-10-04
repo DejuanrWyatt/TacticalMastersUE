@@ -1,0 +1,111 @@
+{
+  "format": "tactical-masters-class",
+  "version": 1,
+  "id": "treant_pet",
+  "name": "Treant",
+  "color": "#5b8c3a",
+  "look": "knight",
+  "roles": [
+    "damage"
+  ],
+  "stats": {
+    "hp": 115,
+    "attdef": 10,
+    "magdef": 8,
+    "aeva": 6,
+    "meva": 6,
+    "crit": 8,
+    "speed": 6,
+    "move": 5,
+    "patience": 6,
+    "sight": 8
+  },
+  "abilities": [
+    {
+      "id": "treant_pet_strike",
+      "name": "Strike",
+      "desc": "Strikes an enemy within arm's reach (power 30).",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "att",
+      "target": "enemy",
+      "shape": "unit",
+      "power": 30,
+      "min_range": 0,
+      "max_range": 1.8,
+      "aoe": 0,
+      "cooldown": 0,
+      "cast": 0
+    },
+    {
+      "id": "treant_pet_roots",
+      "name": "Grasping Roots",
+      "desc": "Roots an enemy 1-5 m away in place for 1 turn (power 18).",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "att",
+      "target": "enemy",
+      "shape": "unit",
+      "power": 18,
+      "min_range": 1,
+      "max_range": 5,
+      "aoe": 0,
+      "cooldown": 2,
+      "cast": 0,
+      "status": {
+        "id": "root",
+        "turns": 1
+      }
+    },
+    {
+      "id": "treant_pet_guard",
+      "name": "Guard",
+      "desc": "Braces itself; Armor +4 for 2 turns.",
+      "kind": "active",
+      "effect": "support",
+      "scale": "mag",
+      "target": "ally",
+      "shape": "self",
+      "power": 0,
+      "min_range": 0,
+      "max_range": 0,
+      "aoe": 0,
+      "cooldown": 3,
+      "cast": 0,
+      "buffs": [
+        {
+          "stat": "attdef",
+          "amount": 4,
+          "turns": 2
+        }
+      ]
+    },
+    {
+      "id": "treant_pet_fury",
+      "name": "Fury",
+      "desc": "ULTIMATE: Strikes every enemy within 2 m of it (power 40).",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "att",
+      "target": "enemy",
+      "shape": "self",
+      "power": 40,
+      "min_range": 0,
+      "max_range": 0,
+      "aoe": 2,
+      "cooldown": 0,
+      "cast": 0
+    }
+  ],
+  "monster": {
+    "tier": "easy",
+    "temperament": "docile",
+    "ring": 4
+  },
+  "creator": {
+    "made": {
+      "on": "2026-10-02",
+      "why": "Pet for the treant caller (balance audit 2026-10-02): called up by its summon for 3 of its turns, played by the computer"
+    }
+  }
+}

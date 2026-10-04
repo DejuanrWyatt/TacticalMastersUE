@@ -25,6 +25,25 @@ namespace TMSim
 	/** The most waypoints one walk may have. */
 	constexpr int MaxWaypoints = 4;
 
+	/**
+	 * The ways a walk can be told to end facing (2026-10-03, "facing on
+	 * arrival"): eight, a step of 45 degrees, 0 along +X and on towards +Y.
+	 * Eight and not any angle, so the player can see which one they chose and
+	 * the order carries a small number rather than a float. Written as float
+	 * literals, so every machine faces the very same way.
+	 */
+	constexpr int FacingWays = 8;
+	inline FVec2 FacingWay(int Way)
+	{
+		constexpr float D = 0.70710677f;
+		static const FVec2 Ways[FacingWays] =
+		{
+			FVec2(1.0f, 0.0f), FVec2(D, D), FVec2(0.0f, 1.0f), FVec2(-D, D),
+			FVec2(-1.0f, 0.0f), FVec2(-D, -D), FVec2(0.0f, -1.0f), FVec2(D, -D),
+		};
+		return Ways[((Way % FacingWays) + FacingWays) % FacingWays];
+	}
+
 	enum class EOrderType : uint8_t
 	{
 		/** Time passing. The only one nobody issues. */
@@ -92,6 +111,12 @@ namespace TMSim
 		 * before. Still one walk: the whole length counts against its move.
 		 */
 		std::vector<FVec2> Via;
+		/**
+		 * Move: which way to face once there (FacingWay), or -1 to face the way
+		 * it last stepped, as every walk did before 2026-10-03. Off-Balance
+		 * still keeps it from turning.
+		 */
+		int Face = -1;
 
 		/** UseAbility: which of the four, and where it is aimed. */
 		int Slot = -1;
@@ -150,7 +175,7 @@ namespace TMSim
 		}
 
 		static FOrder MakeMove(int InUnitId, int InSerial, const FVec2& InTo, bool bInSprint = false,
-			const std::vector<FVec2>& InVia = std::vector<FVec2>())
+			const std::vector<FVec2>& InVia = std::vector<FVec2>(), int InFace = -1)
 		{
 			FOrder Order;
 			Order.Type = EOrderType::Move;
@@ -159,6 +184,7 @@ namespace TMSim
 			Order.To = InTo;
 			Order.bSprint = bInSprint;
 			Order.Via = InVia;
+			Order.Face = InFace;
 			return Order;
 		}
 

@@ -17,6 +17,10 @@
 //     finished off drops what it carried; the Treasure Runner escapes;
 //   - bosses change phase as their health falls, summon their adds, shrug off
 //     stuns, and stagger;
+//   - noise from fights wakes a waiting camp early, at the loudest side, and a
+//     monster killed whole in one blow pays its killer gauge; a stagger breaks a
+//     boss's wind-up; with the setup options on, a boss hunts whoever hurt it
+//     most and loses the scent, and its last blow claims it (2026-10-02);
 //   - the new items do what they say, and Tamer's Collar tames;
 //   - the computer and the monsters' own player play whole battles with every
 //     camp and boss, every order legal, and each battle replays from its orders
@@ -1257,6 +1261,293 @@ int main(int ArgCount, char** Args)
 		}
 	}
 
+	// Camps and bosses (2026-10-02, "Camps and Bosses Mockups" A to D).
+	{
+		const int Before = Failures;
+		const int Tps = Pace::TicksPerSecond;
+		// A: noise. A waiting camp hears area blows and fire near it; full, it warns,
+		// wakes, and goes for whoever was loudest.
+		{
+			FArena A;
+			A.Setup(*Big, "stalker_pair");
+			FCamp& Held = A.Battle.Camps[0];
+			for (const int Id : Held.Members)
+			{
+				A.Unit(Id).bOffBoard = true;
+				A.Unit(Id).Hp = 0;
+			}
+			Held.State = ECampState::Waiting;
+			Held.Timer = 200 * Tps;
+			Held.Wakes = 0;
+			A.Clear();
+			FUnit& Mage = A.Unit(2);
+			int Slot = -1;
+			for (int s = 0; s < ClassSlots && Slot < 0; ++s)
+			{
+				const FAbility* Ability = Mage.Ability(s);
+				if (Ability && Ability->Effect == EEffect::Damage
+					&& (Ability->Aoe > 0.0f || ShapeOf(*Ability) == "circle" || ShapeOf(*Ability) == "cone" || ShapeOf(*Ability) == "line"))
+				{
+					Slot = s;
+				}
+			}
+			A.Put(Mage, FVec2(Held.Spot.X + 6.0f, Held.Spot.Y));
+			if (Slot < 0)
+			{
+				Fail("the black mage should have an area blow to make noise with");
+			}
+			else
+			{
+				int Uses = 0;
+				while (!Held.bNoiseWake && Uses < 6)
+				{
+					A.Report = FTickReport();
+					A.Battle.UseAbility(Mage, Slot, FVec2(Held.Spot.X + 4.0f, Held.Spot.Y), -1, A.Report);
+					for (int Tick = 0; Tick < 20 * Tps && Mage.IsCasting(); ++Tick)
+					{
+						A.Battle.Advance(1, A.Report);
+					}
+					++Uses;
+					if (!A.Said(EEventKind::CampNoise))
+					{
+						Fail("an area blow 6 m from a waiting camp should make noise");
+						break;
+					}
+				}
+				if (!Held.bNoiseWake || Held.Noise != Camp::NoiseFull || Held.Timer != Camp::Warning[Held.Tier] * Tps + 1)
+				{
+					Fail("full of noise, a camp should give its warning now and wake when it runs out");
+				}
+				A.Report = FTickReport();
+				A.Battle.Advance(Camp::Warning[Held.Tier] * Tps + 2, A.Report);
+				if (Held.State != ECampState::Awake || !A.Said(EEventKind::CampWarning))
+				{
+					Fail("a camp full of noise should warn, then wake");
+				}
+				int Hunting = 0;
+				for (const int Id : Held.Members)
+				{
+					Hunting += A.Unit(Id).Grudge == Mage.Id && A.Unit(Id).Mind == EMind::Alert ? 1 : 0;
+				}
+				if (Hunting == 0)
+				{
+					Fail("woken by noise, the camp should be set off at the loudest unit");
+				}
+				if (Held.Noise != 0 || Held.bNoiseWake)
+				{
+					Fail("a camp's noise should be spent when it wakes");
+				}
+			}
+			// Far away it hears nothing; quiet, its noise fades.
+			FArena B2;
+			B2.Setup(*Big, "stalker_pair");
+			FCamp& Far = B2.Battle.Camps[0];
+			Far.State = ECampState::Waiting;
+			Far.Timer = 200 * Tps;
+			Far.Wakes = 0;
+			for (const int Id : Far.Members)
+			{
+				B2.Unit(Id).bOffBoard = true;
+				B2.Unit(Id).Hp = 0;
+			}
+			B2.Clear();
+			FUnit& Mage2 = B2.Unit(2);
+			if (Slot >= 0)
+			{
+				B2.Put(Mage2, FVec2(Far.Spot.X + 20.0f, Far.Spot.Y));
+				B2.Battle.UseAbility(Mage2, Slot, FVec2(Far.Spot.X + 18.0f, Far.Spot.Y), -1, B2.Report);
+				for (int Tick = 0; Tick < 20 * Tps && Mage2.IsCasting(); ++Tick)
+				{
+					B2.Battle.Advance(1, B2.Report);
+				}
+				if (Far.Noise != 0)
+				{
+					Fail("a blow 18 m from a camp should not reach it");
+				}
+				B2.Put(Mage2, FVec2(Far.Spot.X + 6.0f, Far.Spot.Y));
+				B2.Battle.UseAbility(Mage2, Slot, FVec2(Far.Spot.X + 4.0f, Far.Spot.Y), -1, B2.Report);
+				for (int Tick = 0; Tick < 20 * Tps && Mage2.IsCasting(); ++Tick)
+				{
+					B2.Battle.Advance(1, B2.Report);
+				}
+				const int Heard = Far.Noise;
+				B2.Battle.Advance(Camp::NoiseQuietSeconds * Tps * Camp::NoiseFull + 4, B2.Report);
+				if (Heard == 0 || Far.Noise != 0 || Far.State != ECampState::Waiting)
+				{
+					Fail("a camp's noise should fade with quiet, and not wake it");
+				}
+			}
+		}
+		// A: a monster killed whole in one blow pays its killer 20% of a gauge; one already hurt, nothing.
+		{
+			FArena A;
+			A.Setup(*Big, "grazer_herd");
+			A.Clear();
+			FUnit& Grazer = A.Member(0);
+			FUnit& Knight = A.Unit(0);
+			static FJobStats Frail = *Grazer.Stats;
+			Frail.Set(EStat::Hp, 3);
+			Frail.Set(EStat::AEva, 0);
+			Frail.Set(EStat::MEva, 0);
+			Grazer.Stats = &Frail;
+			A.Put(Knight, FVec2(Grazer.Pos.X + 1.0f, Grazer.Pos.Y));
+			int Paid = -1;
+			for (int Try = 0; Try < 12 && Paid < 0; ++Try)
+			{
+				Grazer.Hp = Grazer.MaxHp();
+				A.TurnFor(Knight);
+				const int Owed = Knight.KillTgPercent;
+				A.Battle.Apply(FOrder::MakeUseAbility(Knight.Id, Knight.Serial, 0, Grazer.Pos, Grazer.Id), A.Report);
+				if (!Grazer.IsAlive())
+				{
+					Paid = Knight.KillTgPercent - Owed;
+				}
+			}
+			if (Paid != Camp::CleanKillTgPercent)
+			{
+				Fail("a monster killed whole in one blow should pay its killer 20% of a gauge");
+			}
+			FUnit& Other = A.Member(1);
+			Other.Stats = &Frail;
+			A.Put(Knight, FVec2(Other.Pos.X + 1.0f, Other.Pos.Y));
+			Paid = -1;
+			for (int Try = 0; Try < 12 && Paid < 0; ++Try)
+			{
+				Other.Hp = Other.MaxHp() - 1;
+				A.TurnFor(Knight);
+				const int Owed = Knight.KillTgPercent;
+				A.Battle.Apply(FOrder::MakeUseAbility(Knight.Id, Knight.Serial, 0, Other.Pos, Other.Id), A.Report);
+				if (!Other.IsAlive())
+				{
+					Paid = Knight.KillTgPercent - Owed;
+				}
+			}
+			if (Paid != 0)
+			{
+				Fail("a monster already hurt pays nothing for the kill");
+			}
+		}
+		// B: three hits from behind break a boss's wind-up.
+		{
+			FArena A;
+			A.Setup(*Big, "", "chronos");
+			A.Clear();
+			FUnit& Boss = A.Member(0);
+			FUnit& Knight = A.Unit(0);
+			int Sweep = -1;
+			for (int s = 0; s < ClassSlots; ++s)
+			{
+				Sweep = Boss.Ability(s) && Boss.Ability(s)->Cast > 0.0f ? s : Sweep;
+			}
+			A.Put(Knight, FVec2(Boss.Pos.X - Boss.Facing.X * 1.2f, Boss.Pos.Y - Boss.Facing.Y * 1.2f));
+			A.TurnFor(Boss);
+			Boss.Mind = EMind::Fighting;
+			const FVec2 Ahead(Boss.Pos.X + Boss.Facing.X * 3.0f, Boss.Pos.Y + Boss.Facing.Y * 3.0f);
+			A.Battle.UseAbility(Boss, Sweep, Ahead, -1, A.Report);
+			if (Sweep < 0 || !Boss.IsCasting())
+			{
+				Fail("Chronos should wind up its Sweep");
+			}
+			bool bBroken = false;
+			for (int Try = 0; Try < 10 && !bBroken && Boss.IsAlive(); ++Try)
+			{
+				Boss.Facing = (Boss.Pos - Knight.Pos).Normalized();
+				A.TurnFor(Knight);
+				A.Report = FTickReport();
+				Boss.Facing = (Boss.Pos - Knight.Pos).Normalized();
+				A.Battle.Apply(FOrder::MakeUseAbility(Knight.Id, Knight.Serial, 0, Boss.Pos, Boss.Id), A.Report);
+				bBroken = A.Said(EEventKind::CastFizzled, Boss.Id);
+			}
+			if (!bBroken || Boss.IsCasting() || !Boss.HasStatus("staggered"))
+			{
+				Fail("three hits from behind should break a boss's wind-up and stagger it");
+			}
+		}
+		// C: the hunt, a setup option.
+		{
+			FArena A;
+			A.Battle.Tuning.BossHunt = 1.0;
+			A.Setup(*Big, "", "helix_prime");
+			A.Battle.Tuning.BossHunt = 1.0;
+			A.Clear();
+			FUnit& Boss = A.Member(0);
+			FUnit& Knight = A.Unit(0);
+			FUnit& Archer = A.Unit(1);
+			A.Put(Knight, FVec2(Boss.Pos.X + 1.2f, Boss.Pos.Y));
+			A.Put(Archer, FVec2(Boss.Pos.X - 3.0f, Boss.Pos.Y));
+			Boss.Mind = EMind::Fighting;
+			Boss.Wrath = { { Knight.Id, 40 }, { Archer.Id, 120 } };
+			A.Report = FTickReport();
+			A.TurnFor(Boss);
+			if (Boss.HuntTarget != Archer.Id || !Archer.HasStatus("hunted") || !A.Said(EEventKind::Hunting, Boss.Id))
+			{
+				Fail("a boss should hunt whoever has hurt it most, and mark them Hunted");
+			}
+			// Out of its sight for three of its turns: it lets go, and turns to the next.
+			A.Put(Archer, A.Battle.SpawnPoints[0]);
+			for (int Turn = 0; Turn < Camp::ScentTurns; ++Turn)
+			{
+				A.TurnFor(Boss);
+			}
+			if (Boss.HuntTarget != Knight.Id || Archer.HasStatus("hunted") || !Knight.HasStatus("hunted"))
+			{
+				Fail("a boss out of sight of its prey for three of its turns should lose the scent and hunt the next");
+			}
+			// Off (the default): nobody is hunted.
+			FArena Off;
+			Off.Setup(*Big, "", "helix_prime");
+			Off.Clear();
+			FUnit& Calm = Off.Member(0);
+			Calm.Mind = EMind::Fighting;
+			Calm.Wrath = { { 0, 99 } };
+			Off.TurnFor(Calm);
+			if (Calm.HuntTarget >= 0 || Off.Unit(0).HasStatus("hunted"))
+			{
+				Fail("with the hunt off, a boss should hunt nobody");
+			}
+		}
+		// D: the claim, a setup option.
+		{
+			for (int Pass = 0; Pass < 2; ++Pass)
+			{
+				FArena A;
+				A.Setup(*Big, "", "chronos");
+				A.Battle.Tuning.BossClaim = Pass == 0 ? 1.0 : 0.0;
+				A.Clear();
+				FUnit& Boss = A.Member(0);
+				FUnit& Knight = A.Unit(0);
+				A.Put(Knight, FVec2(Boss.Pos.X + 1.2f, Boss.Pos.Y));
+				Boss.Claim[1] = Boss.MaxHp() * 2 / 5;
+				const size_t RedStash = A.Battle.Stash[1].size();
+				for (int Try = 0; Try < 12 && Boss.IsAlive(); ++Try)
+				{
+					Boss.Hp = 1;
+					A.TurnFor(Knight);
+					A.Report = FTickReport();
+					A.Battle.Apply(FOrder::MakeUseAbility(Knight.Id, Knight.Serial, 0, Boss.Pos, Boss.Id), A.Report);
+				}
+				int Boons = 0;
+				for (const FUnit& Each : A.Battle.Units)
+				{
+					Boons += Each.Team == 0 && Each.IsAlive() && Each.HasStatus("boon") ? 1 : 0;
+				}
+				if (Pass == 0 && (Boss.IsAlive() || Boons != 4 || !A.Said(EEventKind::BossClaimed, Boss.Id)
+					|| A.Battle.Stash[1].size() != RedStash + 1 || !A.Said(EEventKind::ClaimShare, Boss.Id)))
+				{
+					Fail("the last blow should give its side the boon, and the side that dealt 40% a rare item in its stash");
+				}
+				if (Pass == 1 && (Boons != 0 || A.Battle.Stash[1].size() != RedStash))
+				{
+					Fail("with the claim off, a boss's last blow should give no boon and no share");
+				}
+			}
+		}
+		if (Failures == Before)
+		{
+			std::printf("noise wakes a waiting camp early (area blows, fire, kills within 12 m; it fades with quiet), with its warning, at the loudest; a monster killed whole in one blow pays 20%% of a gauge; three hits from behind break a boss's wind-up; with the setup options on, a boss hunts whoever hurt it most and loses the scent out of sight, and its last blow claims a boon, with a rare item for a big enough share\n");
+		}
+	}
+
 	// Items that act: blink, tame, surge, lifesteal, phoenix, the situational ones.
 	{
 		const int Before = Failures;
@@ -1411,6 +1702,9 @@ int main(int ArgCount, char** Args)
 				FBattle Battle;
 				Battle.Tuning.CampLevel = 3;
 				Battle.Tuning.BattleSeconds = 480;
+				// The boss's hunt and claim (setup options) on in two battles of three.
+				Battle.Tuning.BossHunt = Seed >= 2 ? 1.0 : 0.0;
+				Battle.Tuning.BossClaim = Seed >= 2 ? 1.0 : 0.0;
 				Battle.BossJob = BossesByMap[b++ % 3];
 				Deal(Battle, Map, Seed);
 				const FPlayed Result = Play(Battle, Seed, 4800);
@@ -1429,6 +1723,8 @@ int main(int ArgCount, char** Args)
 				FBattle Replay;
 				Replay.Tuning.CampLevel = 3;
 				Replay.Tuning.BattleSeconds = 480;
+				Replay.Tuning.BossHunt = Battle.Tuning.BossHunt;
+				Replay.Tuning.BossClaim = Battle.Tuning.BossClaim;
 				Replay.BossJob = Battle.BossJob;
 				Deal(Replay, Map, Seed);
 				if (!Replays(Battle, Result, Replay))
@@ -1444,8 +1740,153 @@ int main(int ArgCount, char** Args)
 		}
 		if (Failures == Before)
 		{
-			std::printf("the computer and the monsters played %d battles with every camp: every order legal, %d monsters set off, %d fell, %d camps cleared, %d items taken, %d boss phases, %d runners escaped; each replayed to the same checksum\n",
+			std::printf("the computer and the monsters played %d battles with every camp (the boss's hunt and claim on in two of three): every order legal, %d monsters set off, %d fell, %d camps cleared, %d items taken, %d boss phases, %d runners escaped; each replayed to the same checksum\n",
 				Played, Total.Alerts, Total.MonstersFell, Total.Cleared, Total.Taken, Total.Phases, Total.Escapes);
+		}
+	}
+
+	// Pets (2026-10-02): a summoner's summon calls up a pet, a monster file played
+	// by the computer for the summoner's side, for the turns the ability says;
+	// it leaves when they run out, nothing raises it, it never counts towards a
+	// win, and the battle replays from its orders.
+	{
+		const int Before = Failures;
+		const std::filesystem::path ClassFolder = ItemFolder.parent_path() / "Classes";
+		for (const char* Caller : { "golem_master", "summoner", "seraph_caller" })
+		{
+			const std::string Problems = LoadClassFile(ReadAll(ClassFolder / (std::string(Caller) + ".tmclass.json")));
+			if (!Problems.empty())
+			{
+				Fail(std::string(Caller) + " was refused: " + Problems);
+			}
+		}
+		int Called = 0;
+		int Left = 0;
+		int PetOrders = 0;
+		int Played = 0;
+		for (uint64_t Seed = 1; Seed <= 4; ++Seed)
+		{
+			const FMapDef& Map = Maps[static_cast<size_t>(Seed) % Maps.size()];
+			const std::vector<std::string> Roster = { "knight", "golem_master", "summoner", "white_mage", "knight", "archer", "seraph_caller", "white_mage" };
+			FBattle Battle;
+			Battle.Tuning = GameTuning();
+			Battle.Tuning.BattleSeconds = 480;
+			Deal(Battle, Map, Seed, Roster);
+			int Pets = 0;
+			for (const FUnit& Unit : Battle.Units)
+			{
+				if (Unit.PetOf >= 0)
+				{
+					++Pets;
+					const FUnit* Owner = Battle.FindUnit(Unit.PetOf);
+					if (!Unit.bOffBoard || Unit.IsAlive() || !Owner || Owner->Team != Unit.Team || Unit.bMonster)
+					{
+						Fail("a pet should wait off the board, on its caller's side, from the start");
+					}
+				}
+			}
+			if (Pets != 3)
+			{
+				Fail("three callers should have three pets waiting, not " + std::to_string(Pets));
+			}
+			// Played as Play does, counting the pets' comings, goings and orders.
+			FAIPlayer Computers[2] = { FAIPlayer("hard"), FAIPlayer("hard") };
+			Computers[0].Rng.Seed(Seed);
+			Computers[1].Rng.Seed(Seed + 1);
+			FNeutralPlayer Monsters;
+			std::vector<std::pair<int, FOrder>> Orders;
+			std::map<int, int> TurnsOut;
+			int Guard = 0;
+			while (Battle.TickCount < 30000 && Battle.Winner < 0 && ++Guard < 200000)
+			{
+				const FUnit* Unit = nullptr;
+				for (const FUnit& Each : Battle.Units)
+				{
+					if (Each.IsAlive() && Each.bReady)
+					{
+						Unit = &Each;
+						break;
+					}
+				}
+				FTickReport Report;
+				if (!Unit)
+				{
+					Battle.Advance(1, Report);
+				}
+				else
+				{
+					FOrder Order = Unit->Team == 2 ? Monsters.NextCommand(Battle, *Unit) : Computers[Unit->Team].NextCommand(Battle, *Unit);
+					if (!Battle.Validate(Order).empty())
+					{
+						Fail("the computer gave a refused order for " + Unit->Job + ": " + OrderToText(Order) + ": " + Battle.Validate(Order));
+						Order = FOrder::MakeEndTurn(Unit->Id, Unit->Serial);
+					}
+					if (Unit->PetOf >= 0)
+					{
+						++PetOrders;
+						if (Order.Type == EOrderType::EndTurn || Order.Type == EOrderType::Move || Order.Type == EOrderType::UseAbility)
+						{
+							TurnsOut[Unit->Id] += Order.Type == EOrderType::EndTurn ? 1 : 0;
+						}
+					}
+					Orders.emplace_back(Battle.TickCount, Order);
+					Battle.Apply(Order, Report);
+				}
+				for (const FEvent& Event : Report.Events)
+				{
+					const FUnit* Who = Battle.FindUnit(Event.Unit);
+					if (Event.Kind == EEventKind::Teleported && Event.Id == "pet")
+					{
+						++Called;
+						const FAbility* Summon = Battle.FindUnit(Event.By) ? Battle.FindUnit(Event.By)->Ability(1) : nullptr;
+						if (!Who || !Who->IsAlive() || Who->bOffBoard || Who->PetOf != Event.By || !Summon || Who->PetTurns != Summon->PetTurns + 1)
+						{
+							Fail("a called pet should stand on the board, whole, with its turns to come");
+						}
+					}
+					if (Event.Kind == EEventKind::Gone && Who && Who->PetOf >= 0)
+					{
+						++Left;
+						if (!Who->bOffBoard || Who->IsAlive() || Who->IsKo())
+						{
+							Fail("a pet that leaves or falls should be off the board, with nothing to raise");
+						}
+					}
+				}
+			}
+			++Played;
+			// Pets never keep a side in the battle: a side down to its pets has lost.
+			for (int Team = 0; Team < 2; ++Team)
+			{
+				bool bOwn = false;
+				for (const FUnit& Unit : Battle.Units)
+				{
+					bOwn = bOwn || (Unit.HomeTeam() == Team && Unit.PetOf < 0 && !Unit.bMonster && Unit.IsAlive());
+				}
+				if (!bOwn && Battle.Winner == Team)
+				{
+					Fail("a side with only its pets left won");
+				}
+			}
+			FBattle Replay;
+			Replay.Tuning = Battle.Tuning;
+			Deal(Replay, Map, Seed, Roster);
+			FPlayed Recorded;
+			Recorded.Orders = Orders;
+			if (!Replays(Battle, Recorded, Replay))
+			{
+				Fail("a battle with pets did not replay to the same checksum");
+			}
+		}
+		if (Called == 0 || Left == 0 || PetOrders == 0)
+		{
+			Fail("in whole battles pets should be called up, take orders and leave: " + std::to_string(Called) + " called, "
+				+ std::to_string(PetOrders) + " orders, " + std::to_string(Left) + " gone");
+		}
+		if (Failures == Before)
+		{
+			std::printf("pets: %d battles, %d called up, %d of their orders legal, %d gone (time up or fallen); each replayed to the same checksum\n",
+				Played, Called, PetOrders, Left);
 		}
 	}
 

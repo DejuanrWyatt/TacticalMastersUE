@@ -46,7 +46,7 @@
     {
       "id": "necromancer_umbral_burst",
       "name": "Umbral Burst",
-      "desc": "Every enemy within 2 m of a point 2-8 m away; MagDef -6, AttDef -3 for 2 turns. (2 s)",
+      "desc": "Every enemy within 2 m of a point 2-8 m away; MagDef -6, AttDef -3 and Decay for 2 turns: healing hurts them. (2 s)",
       "kind": "active",
       "effect": "damage",
       "scale": "mag",
@@ -58,6 +58,10 @@
       "aoe": 2,
       "cooldown": 2,
       "cast": 2,
+      "status": {
+        "id": "decay",
+        "turns": 2
+      },
       "buffs": [
         {
           "stat": "magdef",
@@ -78,26 +82,31 @@
       }
     },
     {
-      "id": "necromancer_shadow_staff",
-      "name": "Shadow Staff",
-      "desc": "Strike an adjacent enemy.",
+      "id": "necromancer_wither",
+      "name": "Wither",
+      "desc": "A withering hit on an enemy 2-7 m away: Wounded for 2 turns, so healing on it is halved.",
       "kind": "active",
       "effect": "damage",
-      "scale": "att",
+      "scale": "mag",
       "target": "enemy",
       "shape": "unit",
-      "power": 29,
-      "min_range": 0,
-      "max_range": 1.8,
+      "power": 28,
+      "min_range": 2,
+      "max_range": 7,
       "aoe": 0,
-      "cooldown": 0,
+      "cooldown": 3,
       "cast": 0,
-      "fx": "attack",
+      "status": {
+        "id": "wounded",
+        "turns": 2
+      },
+      "fx": "pin_shot",
       "vfx": {
-        "system": "/Game/ParagonMorigesh/FX/Particles/Morigesh/Skins/NorthernMystic/P_Morigesh_NorthernMystic_StabDoll_IMPACT.P_Morigesh_NorthernMystic_StabDoll_IMPACT",
+        "system": "/Game/ParagonKallari/FX/Particles/Kallari/Skins/Rogue/P_Shadow_Bonus_Damage_Rogue.P_Shadow_Bonus_Damage_Rogue",
         "at": "targets",
-        "scale": 1
-      }
+        "scale": 0.8
+      },
+      "anim": "bolt"
     },
     {
       "id": "necromancer_eclipse",
@@ -134,5 +143,30 @@
         "scale": 1
       }
     }
-  ]
+  ],
+  "creator": {
+    "rebalanced": {
+      "on": "2026-10-04",
+      "why": "Signature in place of Shadow Staff (never used): a hit that leaves the enemy Wounded (healing halved) for 2 turns. Before that (2026-10-03): Umbral Burst leaves Decay"
+    },
+    "changedAt": "2026-10-03T03:45:00.000Z",
+    "icons": {
+      "abilities": [
+        null,
+        null,
+        {
+          "backing": "circle",
+          "glyph": "skull",
+          "colour": "#b48ae0",
+          "style": "light",
+          "mark": "unit",
+          "scale": 1,
+          "rotate": 0,
+          "badge": "none",
+          "finish": "lit"
+        },
+        null
+      ]
+    }
+  }
 }

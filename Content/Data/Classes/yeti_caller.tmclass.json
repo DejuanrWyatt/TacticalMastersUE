@@ -16,7 +16,7 @@
     "aeva": 5,
     "meva": 14,
     "crit": 10,
-    "speed": 4,
+    "speed": 6,
     "move": 6,
     "patience": 9,
     "sight": 10
@@ -25,29 +25,34 @@
     {
       "id": "yeti_caller_frost_rod",
       "name": "Frost Rod",
-      "desc": "Strike an adjacent enemy.",
+      "desc": "Strikes an enemy 1-7 m away.",
       "kind": "active",
       "effect": "damage",
-      "scale": "att",
+      "scale": "mag",
       "target": "enemy",
       "shape": "unit",
-      "power": 34,
-      "min_range": 0,
-      "max_range": 1.8,
+      "power": 28.9,
+      "min_range": 1,
+      "max_range": 7,
       "aoe": 0,
       "cooldown": 0,
       "cast": 0,
+      "status": {
+        "id": "chilled",
+        "turns": 1
+      },
       "fx": "attack",
       "vfx": {
         "system": "/Game/ParagonAurora/FX/Particles/Abilities/Primary/FX/P_Aurora_Melee_SucessfulImpact.P_Aurora_Melee_SucessfulImpact",
         "at": "targets",
         "scale": 1
-      }
+      },
+      "anim": "bolt"
     },
     {
       "id": "yeti_caller_summon_yeti",
       "name": "Summon Yeti",
-      "desc": "The Yeti strikes every enemy within 2 m of a point 3-9 m away; Slows for 2 turns. (2 s)",
+      "desc": "Strikes every enemy within 2 m of a point 3-9 m away; Slow for 2 turns.",
       "kind": "active",
       "effect": "damage",
       "scale": "mag",
@@ -57,8 +62,8 @@
       "min_range": 3,
       "max_range": 9,
       "aoe": 2,
-      "cooldown": 2,
-      "cast": 2,
+      "cooldown": 3,
+      "cast": 1,
       "status": {
         "id": "slow",
         "turns": 2
@@ -68,13 +73,18 @@
         "system": "/Game/ParagonAurora/FX/Particles/Abilities/Leap/FX/P_Aurora_Decoy_Explode_Fragments.P_Aurora_Decoy_Explode_Fragments",
         "at": "point",
         "scale": 1
+      },
+      "special": "pet",
+      "pet": {
+        "job": "yeti_pet",
+        "turns": 3
       }
     },
     {
       "id": "yeti_caller_yeti_pact",
       "name": "Yeti Pact",
-      "desc": "Bless every ally within 3 m of a point up to 6 m away; MagDef +6 for 2 turns. (1 s)",
-      "kind": "active",
+      "desc": "Bless every ally within 3 m of a point up to 6 m away. Always on, itself included: Resist +6.",
+      "kind": "aura",
       "effect": "support",
       "scale": "mag",
       "target": "ally",
@@ -102,7 +112,7 @@
     {
       "id": "yeti_caller_yeti_ascendant",
       "name": "Yeti Ascendant",
-      "desc": "ULTIMATE: Every enemy within 4 m of a point 4-11 m away; Slows for 2 turns. (4 s)",
+      "desc": "ULTIMATE: Every enemy within 4 m of a point 4-11 m away; Slow for 2 turns.",
       "kind": "active",
       "effect": "damage",
       "scale": "mag",
@@ -113,7 +123,7 @@
       "max_range": 11,
       "aoe": 4,
       "cooldown": 0,
-      "cast": 4,
+      "cast": 3,
       "status": {
         "id": "slow",
         "turns": 2
@@ -125,5 +135,18 @@
         "scale": 1
       }
     }
-  ]
+  ],
+  "creator": {
+    "rebalanced": {
+      "on": "2026-10-03",
+      "why": "Tuning pass 2026-10-03 (lab 31% in place of the Black Mage): Speed 4->6. Before that (2026-10-02): Balance audit 2026-10-02: rod reaches 1-7 m (power -15%); the summon casts in 1 s, every 3 turns, and calls up a computer-played pet for 3 turns; ultimate 1 s quicker"
+    },
+    "changedAt": "2026-10-03T04:52:49.315Z",
+    "flavour": [
+      null,
+      "Strikes every enemy within 2 m of a point 3-9 m away",
+      "Bless every ally within 3 m of a point up to 6 m away",
+      "Every enemy within 4 m of a point 4-11 m away"
+    ]
+  }
 }

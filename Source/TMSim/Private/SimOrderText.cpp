@@ -164,6 +164,11 @@ namespace TMSim
 					Out << ' ' << FloatText(Point.X) << ' ' << FloatText(Point.Y);
 				}
 			}
+			// The way to face on arrival (2026-10-03), last, and only when one was chosen.
+			if (Order.Face >= 0)
+			{
+				Out << " f " << Order.Face;
+			}
 			break;
 		case EOrderType::UseAbility:
 			Out << "ability " << Order.UnitId << ' ' << Order.Serial << ' ' << Order.Slot << ' '
@@ -227,7 +232,7 @@ namespace TMSim
 			Order.To.X = Read.Float("x");
 			Order.To.Y = Read.Float("y");
 			Order.bSprint = Read.Int("sprint", 0, 1) == 1;
-			if (Read.Error.empty() && Read.Next < List.size())
+			if (Read.Error.empty() && Read.Next < List.size() && List[Read.Next] != "f")
 			{
 				const int Count = Read.Int("waypoints", 1, MaxWaypoints);
 				for (int i = 0; i < Count && Read.Error.empty(); ++i)
@@ -237,6 +242,12 @@ namespace TMSim
 					Point.Y = Read.Float("waypoint y");
 					Order.Via.push_back(Point);
 				}
+			}
+			// "f" and the way to face, when one was chosen.
+			if (Read.Error.empty() && Read.Next < List.size() && List[Read.Next] == "f")
+			{
+				++Read.Next;
+				Order.Face = Read.Int("facing", 0, FacingWays - 1);
 			}
 		}
 		else if (Kind == "ability")

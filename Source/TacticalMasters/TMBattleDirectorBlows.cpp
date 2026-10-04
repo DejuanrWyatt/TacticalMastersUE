@@ -82,40 +82,24 @@ namespace
 		return 0.50f;
 	}
 
+	/** In the same order as TMCast::ELegacyShot, which says what flies. */
 	enum class EShot : uint8 { None, Arrow, Orb, Stone };
 
-	/** What an ability throws, if anything. Anything cast wide simply lands. */
+	/**
+	 * What an ability throws today, read as Cast Studio reads it
+	 * (TMCast::LegacyShotOf: a stone for throw_stone, an arrow for a shot, an
+	 * orb for a damaging bolt or a spell thrown from afar).
+	 */
 	EShot ShotOf(const TMSim::FAbility& Ability, const FString& Motion)
 	{
-		if (Ability.Fx == "throw_stone")
-		{
-			return EShot::Stone;
-		}
-		if (Motion == TEXT("shoot"))
-		{
-			return EShot::Arrow;
-		}
-		if (Motion == TEXT("bolt") && Ability.Effect == TMSim::EEffect::Damage)
-		{
-			return EShot::Orb;
-		}
-		return EShot::None;
+		return static_cast<EShot>(static_cast<uint8>(TMCast::LegacyShotOf(Ability, TCHAR_TO_UTF8(*Motion))));
 	}
 
-	/**
-	 * A colour for what it is made of, read from the built-in effect it
-	 * borrows (its "fx"): fire burns orange, ice is pale blue, holy light gold.
-	 */
+	/** A colour for what it is made of, read from the built-in effect it borrows (its "fx"). */
 	FLinearColor ShotColour(const TMSim::FAbility& Ability, EShot Shot)
 	{
-		const std::string& Fx = Ability.Fx;
-		if (Fx == "fire" || Fx == "meteor") { return FLinearColor(1.0f, 0.42f, 0.08f); }
-		if (Fx == "blizzard") { return FLinearColor(0.55f, 0.85f, 1.0f); }
-		if (Fx == "holy_blade" || Fx == "sanctuary" || Fx == "cure" || Fx == "raise") { return FLinearColor(1.0f, 0.88f, 0.45f); }
-		if (Fx == "haste" || Fx == "focus" || Fx == "chakra") { return FLinearColor(0.45f, 1.0f, 0.55f); }
-		if (Shot == EShot::Arrow) { return FLinearColor(0.42f, 0.28f, 0.14f); }
-		if (Shot == EShot::Stone) { return FLinearColor(0.35f, 0.33f, 0.3f); }
-		return FLinearColor(0.7f, 0.45f, 1.0f);  // plain magic
+		const TMCast::FCastVec Colour = TMCast::LegacyShotColour(Ability, static_cast<TMCast::ELegacyShot>(static_cast<uint8>(Shot)));
+		return FLinearColor(static_cast<float>(Colour.X), static_cast<float>(Colour.Y), static_cast<float>(Colour.Z));
 	}
 
 	/** How a status shows on its bearer: a glow, and how its clips play. */
@@ -161,6 +145,11 @@ namespace
 		{ "chilled",   FLinearColor(0.65f, 0.88f, 1.0f), 0.0f, false, 0.8f },
 		{ "protect",   FLinearColor(0.9f, 0.76f, 0.45f), 0.0f, false, 1.0f },
 		{ "shell",     FLinearColor(0.7f, 0.55f, 1.0f),  0.0f, false, 1.0f },
+		// 2026-10-03: statuses classes now give. Vanished is seen only by its own side: a dim, smoky breath.
+		{ "veil",      FLinearColor(0.32f, 0.3f, 0.45f), 0.6f, false, 1.0f },
+		{ "reraise",   FLinearColor(1.0f, 0.9f, 0.6f),   0.5f, false, 1.0f },
+		{ "wet",       FLinearColor(0.3f, 0.55f, 1.0f),  0.0f, false, 1.0f },
+		{ "oiled",     FLinearColor(0.5f, 0.42f, 0.2f),  0.0f, false, 1.0f },
 	};
 
 	/** The brightness of a status glow, well under the ready light's. */
@@ -215,6 +204,8 @@ const TArray<FString>& ATMBattleDirector::ExtraKeys()
 		TEXT("deathFront"), TEXT("deathBack"), TEXT("deathLeft"), TEXT("deathRight"),
 		TEXT("stunned"), TEXT("sleep"),
 		TEXT("ready"), TEXT("victory"), TEXT("defeat"),
+		// Leaps (2026-10-03): up, and down again. Found beside the idle by name when a set doesn't say.
+		TEXT("jump"), TEXT("land"),
 	};
 	return Keys;
 }
@@ -259,7 +250,8 @@ void ATMBattleDirector::GatherBlows(const TMSim::FTickReport& Report)
 			Open = Blows.Num() - 1;
 			// An effect on the user plays as it goes off; the rest wait to land.
 			const TMSim::FUnit* User = Battle.FindUnit(Event.Unit);
-			if (Blow.Ability && !Blow.Ability->VfxSystem.empty() && Blow.Ability->VfxAt == "user" && User && IsSeen(*User))
+			if (Blow.Ability && !Blow.Ability->VfxSystem.empty() && Blow.Ability->VfxAt == "user" && User && IsSeen(*User)
+				&& CastStrip(Blow.Ability) == TMCast::EStrip::None)
 			{
 				PlayVfx(*Blow.Ability, WorldFor(*User) + FVector(0.0f, 0.0f, VfxHeight));
 			}
@@ -284,6 +276,7 @@ void ATMBattleDirector::GatherBlows(const TMSim::FTickReport& Report)
 		FTMBlow& Blow = Blows[b];
 		const int32 Caster = IndexOfUnit(Battle, Blow.Caster);
 		float Share = UsualImpact(Blow.Motion);
+		float Lead = 0.0f;
 		if (Motions.IsValidIndex(Caster))
 		{
 			const FTMMotion& Motion = Motions[Caster];
@@ -299,12 +292,23 @@ void ATMBattleDirector::GatherBlows(const TMSim::FTickReport& Report)
 					Share = Clips->Impact;
 				}
 			}
+			// Cast Studio's contact for it, and a picked wind-up played before the
+			// release (AnimateEvents): the blow connects when the designer said.
+			if (Motion.LastContact >= 0.0f)
+			{
+				Share = Motion.LastContact;
+			}
+			Lead = Motion.LastLead;
 		}
 		else
 		{
 			Blow.bStarted = true;
 		}
-		Blow.ImpactAt = Blow.Release && Blow.Motion != TEXT("none") ? Share * Blow.Release->GetPlayLength() : 0.0f;
+		// No motion, no swing to wait for -- unless Cast Studio gave it a release.
+		const bool bPickedSwing = Motions.IsValidIndex(Caster) && Blow.Slot >= 0 && Blow.Slot < TMSim::AbilitySlots
+			&& Motions[Caster].Picked[Blow.Slot].Release != nullptr;
+		Blow.ImpactAt = Blow.Release && (Blow.Motion != TEXT("none") || bPickedSwing)
+			? static_cast<float>(TMCast::ContactSeconds(Lead, Blow.Release->GetPlayLength(), Share)) : 0.0f;
 
 		// Whoever this fells or raises stays as they are until it lands.
 		for (const TMSim::FEvent& Event : Blow.Events)
@@ -345,7 +349,11 @@ void ATMBattleDirector::AdvanceBlows(float DeltaSeconds)
 			// The swing begins (after any walk there): heard now, landing later.
 			Blow.bSounded = true;
 			SoundBlowStarts(Blow, Blow.Slot);
-			LookCast(Blow);
+			if (CastStrip(Blow.Ability) != TMCast::EStrip::All)
+			{
+				LookCast(Blow);
+			}
+			CastSwing(Blow);
 		}
 		if (Blow.bStarted && !bLanded)
 		{
@@ -353,6 +361,7 @@ void ATMBattleDirector::AdvanceBlows(float DeltaSeconds)
 			if (!Blow.bLaunched && Blow.Since >= Blow.ImpactAt)
 			{
 				Blow.bLaunched = true;
+				CastRelease(Blow);
 				LaunchShots(Blow);
 			}
 			if (Blow.bLaunched)
@@ -364,6 +373,8 @@ void ATMBattleDirector::AdvanceBlows(float DeltaSeconds)
 					const float Part = Shot.Age / Shot.Flight;
 					if (Part >= 1.0f || !Shot.Mesh.IsValid())
 					{
+						CastEnd(Shot.CastKey);
+						Shot.CastKey = 0;
 						if (Shot.Trail.IsValid())
 						{
 							Shot.Trail->DestroyComponent();
@@ -405,12 +416,19 @@ void ATMBattleDirector::LaunchShots(FTMBlow& Blow)
 		return;
 	}
 	const FTMLook& Look = LookOf(*Blow.Ability);
-	EShot Shot = ShotOf(*Blow.Ability, Blow.Motion);
 	// A spell thrown from afar flies there, whatever the motion that throws it;
 	// earth throws a stone.
-	if (Shot == EShot::None && Look.bMagic && Look.bRanged && Blow.Ability->Effect != TMSim::EEffect::Revive)
+	EShot Shot = ShotOf(*Blow.Ability, Blow.Motion);
+	// Cast Studio (TMBattleDirectorCast.cpp): its projectile events ride each
+	// shot. Stripped of today's look, the shot keeps no trail or glow of its
+	// own, and hides its plain ball, rod or stone under an authored effect.
+	// Nothing flies today but something was authored to: an unseen ball carries it.
+	const TMCast::FLook* Authored = CastLookOf(Blow.Ability);
+	const bool bStripped = CastStrip(Blow.Ability) == TMCast::EStrip::All;
+	const bool bCarrierOnly = Shot == EShot::None && Authored && Authored->Has(TMCast::EMoment::Projectile);
+	if (bCarrierOnly)
 	{
-		Shot = FString(LookName(Look)) == TEXT("earth") ? EShot::Stone : EShot::Orb;
+		Shot = EShot::Orb;
 	}
 	const int32 Caster = IndexOfUnit(Battle, Blow.Caster);
 	if (Shot == EShot::None || !Motions.IsValidIndex(Caster))
@@ -492,7 +510,7 @@ void ATMBattleDirector::LaunchShots(FTMBlow& Blow)
 			Paint->SetVectorParameterValue(TEXT("Color"), Colour);
 			Body->SetMaterial(0, Paint);
 		}
-		if (Shot == EShot::Orb && Look.bMagic)
+		if (Shot == EShot::Orb && Look.bMagic && !bStripped && !bCarrierOnly)
 		{
 			// What it is made of, flying: a fireball, a spark, a shard of ice.
 			// The plain ball stays only when the look has nothing to fly as.
@@ -502,7 +520,7 @@ void ATMBattleDirector::LaunchShots(FTMBlow& Blow)
 				Body->SetVisibility(false);
 			}
 		}
-		if (Shot == EShot::Orb)
+		if (Shot == EShot::Orb && !bStripped && !bCarrierOnly)
 		{
 			// Magic gives off its own light, which is most of what makes it read.
 			UPointLightComponent* Glow = NewObject<UPointLightComponent>(this, NAME_None, RF_Transient);
@@ -515,15 +533,26 @@ void ATMBattleDirector::LaunchShots(FTMBlow& Blow)
 			Flying.Glow = Glow;
 		}
 		Flying.Mesh = Body;
+		Flying.CastKey = CastShot(Blow, Body);
+		if (bCarrierOnly || (bStripped && Authored && Authored->HasProjectileEffect()))
+		{
+			Body->SetVisibility(false);
+		}
 	}
 }
 
 void ATMBattleDirector::LandBlow(FTMBlow& Blow)
 {
 	SoundBlowLands(Blow);
-	LookLand(Blow);
+	if (CastStrip(Blow.Ability) != TMCast::EStrip::All)
+	{
+		LookLand(Blow);
+	}
+	CastLand(Blow);
 	for (FTMShot& Shot : Blow.Shots)
 	{
+		CastEnd(Shot.CastKey);
+		Shot.CastKey = 0;
 		if (Shot.Trail.IsValid())
 		{
 			Shot.Trail->DestroyComponent();
@@ -537,7 +566,8 @@ void ATMBattleDirector::LandBlow(FTMBlow& Blow)
 			Shot.Glow->DestroyComponent();
 		}
 	}
-	if (Blow.Ability && !Blow.Ability->VfxSystem.empty() && Blow.Ability->VfxAt == "point")
+	if (Blow.Ability && !Blow.Ability->VfxSystem.empty() && Blow.Ability->VfxAt == "point"
+		&& CastStrip(Blow.Ability) == TMCast::EStrip::None)
 	{
 		const int Level = Battle.Map.NodeLevel(TMSim::FMap::NodeOf(Blow.Aim));
 		PlayVfx(*Blow.Ability, WorldFromMetres(Blow.Aim, Level) + FVector(0.0f, 0.0f, BoardHeight));
@@ -562,6 +592,8 @@ void ATMBattleDirector::ClearBlows()
 	{
 		for (FTMShot& Shot : Blow.Shots)
 		{
+			CastEnd(Shot.CastKey);
+			Shot.CastKey = 0;
 			if (Shot.Trail.IsValid())
 			{
 				Shot.Trail->DestroyComponent();
@@ -581,17 +613,25 @@ void ATMBattleDirector::ClearBlows()
 	{
 		Motion.HeldBlows = 0;
 	}
-	if (SlowUntil > 0.0)
+	if (SlowUntil > 0.0 || HitStopUntil > 0.0 || AppliedDilation != 1.0f)
 	{
 		SlowUntil = 0.0;
+		SlowFactor = 1.0f;
+		HitStopUntil = 0.0;
+		AppliedDilation = 1.0f;
 		UGameplayStatics::SetGlobalTimeDilation(this, 1.0f);
 	}
 }
 
 void ATMBattleDirector::ShowOne(const TMSim::FEvent& Event, const TMSim::FAbility* Ability, int32 CasterId, TArray<int32>* ShownOn)
 {
+	// Cast Studio's moments in what is shown: a cast beginning, a status given
+	// or ticking or a reaction, a pet come or gone (TMBattleDirectorCast.cpp).
+	CastShown(Event, Ability, CasterId);
+
 	// The effect an ability names, once on each unit it touched.
 	if (Ability && ShownOn && Ability->VfxAt == "targets" && !Ability->VfxSystem.empty()
+		&& CastStrip(Ability) == TMCast::EStrip::None
 		&& (Event.Kind == TMSim::EEventKind::Hit || Event.Kind == TMSim::EEventKind::Evaded
 			|| Event.Kind == TMSim::EEventKind::Absorbed || Event.Kind == TMSim::EEventKind::Revived
 			|| Event.Kind == TMSim::EEventKind::StatusApplied)
@@ -748,6 +788,11 @@ void ATMBattleDirector::ShowOne(const TMSim::FEvent& Event, const TMSim::FAbilit
 		FFlash& Flash = Flashes.AddDefaulted_GetRef();
 		Flash.UnitId = Event.Unit;
 		Flash.Colour = FlashColour;
+		// A wound flares by how much it took (2026-10-03): a scratch as before, a big blow twice as bright.
+		if (Event.Kind == TMSim::EEventKind::Hit && Harms(Event))
+		{
+			Flash.Strength = 1.0f + FMath::Min(1.5f, 4.0f * Event.Amount / static_cast<float>(FMath::Max(1, Unit->MaxHp())));
+		}
 	}
 }
 
@@ -920,7 +965,26 @@ void ATMBattleDirector::React(const TMSim::FEvent& Event, int32 CasterId)
 		{
 			const bool bHeavy = Motion.bCritPending;
 			Motion.bCritPending = false;
-			Jolt(i, Away, bHeavy ? 32.0f : 14.0f);
+			// How much of it this took: knocked back by that, and the blow felt by
+			// that (2026-10-03, TMBattleDirectorFeel.cpp) -- an instant's stillness as
+			// a big one lands, a slowed beat for a critical, the camera kicked.
+			const float Share = FMath::Clamp(Event.Amount / static_cast<float>(FMath::Max(1, Unit.MaxHp())), 0.0f, 1.0f);
+			Jolt(i, Away, (bHeavy ? 30.0f : 12.0f) + 40.0f * FMath::Min(Share, 0.5f));
+			if (Event.By >= 0 && IsSeen(Unit))
+			{
+				if (bHeavy || Share >= 0.15f)
+				{
+					HitStop(bHeavy ? 0.09f : 0.05f);
+				}
+				if (bHeavy)
+				{
+					SlowWorld(0.4f, 0.3f);
+				}
+				if (bHeavy || Share >= 0.06f)
+				{
+					Jolt(FMath::Clamp(Share * 3.0f, 0.15f, 1.0f) * (bHeavy ? 1.4f : 1.0f));
+				}
+			}
 			// A grunt, not every time: a critical nearly always, a scratch now and then.
 			if (Unit.IsAlive())
 			{
@@ -1024,6 +1088,11 @@ void ATMBattleDirector::ShowStatuses(int32 Index, float DeltaSeconds)
 	{
 		Rate = 1.0f;
 	}
+	// A long walk's quicker pace (AdvanceMotion), in its steps too.
+	if (Motion.Path.Num() > 0 && !Motion.bDown && Motion.OneShotLeft <= 0.0f)
+	{
+		Rate *= Motion.Pace;
+	}
 	if (Rate != Motion.PlayRate && UnitVisuals.IsValidIndex(Index) && UnitVisuals[Index])
 	{
 		UnitVisuals[Index]->SetPlayRate(Rate);
@@ -1089,11 +1158,13 @@ void ATMBattleDirector::UltimateBeat(const TMSim::FEvent& Event)
 	FFlash& Flash = Flashes.AddDefaulted_GetRef();
 	Flash.UnitId = User->Id;
 	Flash.Colour = FLinearColor(1.0f, 0.8f, 0.3f);
-	if (!FApp::IsUnattended())
-	{
-		UGameplayStatics::SetGlobalTimeDilation(this, 0.35f);
-		SlowUntil = FPlatformTime::Seconds() + 0.9;
-	}
+	SlowWorld(0.35f, 0.9f);
+	// And the camera closes in on it and what it is aimed at, for a moment
+	// (Options: close-ups; any key or click skips it).
+	const FTransform& Board = GetActorTransform();
+	const FVector From = Board.TransformPosition(WorldFor(*User));
+	const FVector To = Board.TransformPosition(WorldFromMetres(Event.Where, Battle.Map.NodeLevel(TMSim::FMap::NodeOf(Event.Where))));
+	CloseUp(FVector((From.X + To.X) * 0.5, (From.Y + To.Y) * 0.5, From.Z), User->Id);
 }
 
 void ATMBattleDirector::Celebrate()

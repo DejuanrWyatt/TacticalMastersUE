@@ -383,6 +383,163 @@ namespace TMSim
 		return Out;
 	}
 
+	bool FBattle::HoldsTheLine(const FUnit& Unit)
+	{
+		const FJobDef* Job = FindJob(Unit.Job);
+		return Job && !Job->Roles.empty() && Job->Roles.front() == "tank";
+	}
+
+	std::vector<FNode> FBattle::ZoneShadow(const FUnit& Unit, const std::vector<FVec2>& Via, bool bSprint)
+	{
+		std::vector<FNode> Out;
+		if (Tuning.ZoneOfControl < 1.0)
+		{
+			return Out;
+		}
+		const std::vector<std::pair<FNode, double>> With = ReachableVia(Unit, Via, bSprint);
+		const double Saved = Tuning.ZoneOfControl;
+		Tuning.ZoneOfControl = 0.0;
+		const std::vector<std::pair<FNode, double>> Without = ReachableVia(Unit, Via, bSprint);
+		Tuning.ZoneOfControl = Saved;
+		std::vector<uint8_t> Kept(static_cast<size_t>(Map.NavX * Map.NavY), 0);
+		for (const std::pair<FNode, double>& Entry : With)
+		{
+			Kept[static_cast<size_t>(Map.NodeIndex(Entry.first))] = 1;
+		}
+		for (const std::pair<FNode, double>& Entry : Without)
+		{
+			if (Kept[static_cast<size_t>(Map.NodeIndex(Entry.first))] == 0)
+			{
+				Out.push_back(Entry.first);
+			}
+		}
+		return Out;
+	}
+
+	std::vector<FVec2> FBattle::PathIgnoringZones(const FUnit& Unit, const std::vector<FVec2>& Via, const FNode& To, bool bSprint)
+	{
+		const double Saved = Tuning.ZoneOfControl;
+		Tuning.ZoneOfControl = 0.0;
+		std::vector<FVec2> Path = PathVia(Unit, Via, To, bSprint);
+		Tuning.ZoneOfControl = Saved;
+		return Path;
+	}
+
+	double FBattle::StrikeReach(const FUnit& Unit) const
+	{
+		// As ThreatOn counts them: ready by its next turn, or now on its turn.
+		const int ReadyBy = Unit.bReady ? 0 : 1;
+		double Best = 0.0;
+		for (int Slot = 0; Slot < AbilitySlots; ++Slot)
+		{
+			const FAbility* Ability = Unit.Ability(Slot);
+			if (!Ability || Ability->Effect != EEffect::Damage || Ability->Target != ETargetSide::Enemy
+				|| Ability->Kind == "passive" || Ability->Kind == "aura" || Ability->Kind == "toggle"
+				|| Unit.Cooldowns[Slot] > ReadyBy || (Slot == 3 && Unit.Ult < Pace::UltMax))
+			{
+				continue;
+			}
+			Best = std::max(Best, static_cast<double>(Ability->MaxRange) + Ability->Aoe + Ground::HitRadius);
+		}
+		return Best;
+	}
+
+	std::vector<FLane> FBattle::TankLanes(int TankId, const FVec2& At, const std::vector<int>& Enemies, const std::vector<int>& BackLine)
+	{
+		std::vector<FLane> Out;
+		FUnit* Tank = FindUnit(TankId);
+		if (!Tank)
+		{
+			return Out;
+		}
+		// Which of the back line the enemy can stand within striking reach of
+		// this turn, and the nearest spot to each.
+		auto Strikes = [&](const FUnit& Enemy, std::vector<int>& Reached, std::vector<int>& Nearest)
+		{
+			const double Reach = StrikeReach(Enemy);
+			Reached.clear();
+			Nearest.assign(BackLine.size(), -1);
+			if (Reach <= 0.0)
+			{
+				return;
+			}
+			RunDijkstra({ FMap::NodeOf(Enemy.Pos) }, MoveOf(Enemy), Enemy.Team, JumpOf(Enemy));
+			std::vector<double> Closest(BackLine.size(), Infinity);
+			for (int i = 0; i < static_cast<int>(Cost.size()); ++i)
+			{
+				if (Cost[i] == Infinity)
+				{
+					continue;
+				}
+				const FVec2 P = FMap::NodePos(Map.NodeAt(i));
+				for (size_t k = 0; k < BackLine.size(); ++k)
+				{
+					const FUnit* Target = FindUnit(BackLine[k]);
+					if (!Target)
+					{
+						continue;
+					}
+					const double Apart = P.DistanceTo(Target->Pos);
+					if (Apart < Closest[k])
+					{
+						Closest[k] = Apart;
+						Nearest[k] = i;
+					}
+				}
+			}
+			for (size_t k = 0; k < BackLine.size(); ++k)
+			{
+				if (Closest[k] <= Reach)
+				{
+					Reached.push_back(BackLine[k]);
+				}
+			}
+		};
+		const FVec2 Was = Tank->Pos;
+		for (const int Id : Enemies)
+		{
+			const FUnit* Enemy = FindUnit(Id);
+			if (!Enemy || !Enemy->IsAlive() || Enemy->Team == Tank->Team)
+			{
+				continue;
+			}
+			FLane Lane;
+			Lane.EnemyId = Id;
+			std::vector<int> Nearest;
+			Strikes(*Enemy, Lane.Before, Nearest);
+			Tank->Pos = At;
+			Strikes(*Enemy, Lane.After, Nearest);
+			if (Lane.Before.empty() && Lane.After.empty())
+			{
+				Tank->Pos = Was;
+				continue;
+			}
+			// Toward the first it loses, else the first it still reaches.
+			for (const int Lost : Lane.Before)
+			{
+				if (Lane.TowardId < 0 && std::find(Lane.After.begin(), Lane.After.end(), Lost) == Lane.After.end())
+				{
+					Lane.TowardId = Lost;
+				}
+			}
+			if (Lane.TowardId < 0)
+			{
+				Lane.TowardId = Lane.After.empty() ? Lane.Before.front() : Lane.After.front();
+			}
+			for (size_t k = 0; k < BackLine.size(); ++k)
+			{
+				if (BackLine[k] == Lane.TowardId && Nearest[k] >= 0)
+				{
+					Lane.Path = PathTo(*Enemy, Map.NodeAt(Nearest[k]));
+				}
+			}
+			Tank->Pos = Was;
+			Out.push_back(Lane);
+		}
+		Tank->Pos = Was;
+		return Out;
+	}
+
 	std::vector<FVec2> FBattle::PathVia(const FUnit& Unit, const std::vector<FVec2>& Via, const FNode& To, bool bSprint)
 	{
 		if (Via.empty())
@@ -546,7 +703,7 @@ namespace TMSim
 		return "It can't reach there.";
 	}
 
-	bool FBattle::ApplyMove(int UnitId, const FVec2& To, bool bSprint, FTickReport& Report, const std::vector<FVec2>& Via)
+	bool FBattle::ApplyMove(int UnitId, const FVec2& To, bool bSprint, FTickReport& Report, const std::vector<FVec2>& Via, int Face)
 	{
 		FUnit* Unit = FindUnit(UnitId);
 		if (!Unit)
@@ -571,10 +728,19 @@ namespace TMSim
 		{
 			Step = Path[Path.size() - 1] - Path[Path.size() - 2];
 		}
-		// Off-Balance: it can't turn to face anything until it is hit.
-		if (Step.Length() > 0.001f && !Unit->HasStatus("offbalance"))
+		// Off-Balance: it can't turn to face anything until it is hit. Told which
+		// way to face on arrival (2026-10-03), it turns that way instead: a walk
+		// can end with its back to a wall and its front to the enemy.
+		if (!Unit->HasStatus("offbalance"))
 		{
-			Unit->Facing = Step.Normalized();
+			if (Face >= 0)
+			{
+				Unit->Facing = FacingWay(Face);
+			}
+			else if (Step.Length() > 0.001f)
+			{
+				Unit->Facing = Step.Normalized();
+			}
 		}
 
 		Unit->Pos = To;

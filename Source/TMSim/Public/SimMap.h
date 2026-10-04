@@ -13,6 +13,7 @@
 #include "SimTypes.h"
 
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace TMSim
@@ -63,6 +64,11 @@ namespace TMSim
 		 * are written: only half is given, so the two sides are the same ground.
 		 */
 		void BuildMirrored(const std::vector<std::string>& TopRows);
+		/**
+		 * The same, and tall grass on these tiles of the top half ([x, y], the
+		 * map file's "grass") and on the same tiles turned about.
+		 */
+		void BuildMirrored(const std::vector<std::string>& TopRows, const std::vector<std::pair<int, int>>& TopGrass);
 
 		/** Builds from rows that are already the whole map. */
 		void Build(const std::vector<std::string>& Rows);
@@ -78,6 +84,13 @@ namespace TMSim
 		std::vector<int> Hazards;
 		/** 1 where the ground blocks sight as well as movement. */
 		std::vector<int> Covers;
+		/**
+		 * 1 where tall grass grows (v19 play test, 2026-10-04): a unit standing in
+		 * it is hidden from the enemy (FBattle::Hidden) unless they are close.
+		 */
+		std::vector<int> Grass;
+		/** Whether a point in metres is in tall grass. */
+		bool InGrass(const FVec2& Point) const;
 		/** The height of every navigation node, worked out once. */
 		std::vector<int> NavLevels;
 
@@ -126,6 +139,8 @@ namespace TMSim
 		std::vector<std::string> Top;
 		/** Blue's starting spots in metres, on navigation node centres. */
 		std::vector<FVec2> Spawns;
+		/** Tiles of the top half in tall grass, [x, y] (mirrored like the ground). Optional. */
+		std::vector<std::pair<int, int>> Grass;
 		/**
 		 * The boss that wakes in the middle when a battle has neutral camps
 		 * (a monster class id, Docs/design/feat-neutral-camps.md 14), or empty

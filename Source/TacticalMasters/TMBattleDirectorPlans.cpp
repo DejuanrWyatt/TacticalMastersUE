@@ -9,6 +9,13 @@
 // rules then. So a plan that has gone stale -- its spot taken, its target
 // gone, the unit stunned -- is simply refused, dropped, and the turn is the
 // player's as usual.
+//
+// 2026-10-03 ("the queue needs polish"): a Go To whose next walk would be short
+// -- the last stretch, or as far as a blocked way lets it -- hands the unit to
+// the player before walking, so no turn goes on a step; an ability aimed out of
+// reach becomes a Go To that uses it the turn it gets in range; and a queued
+// unit that sees an enemy it did not see before has its queue cancelled and is
+// handed back at once.
 
 #include "TMBattleDirector.h"
 #include "TMSettings.h"
@@ -160,9 +167,11 @@ void ATMBattleDirector::RefreshReachable()
 	if (!Unit)
 	{
 		Reachable.clear();
+		ZoneShadow.clear();
 		return;
 	}
 	Reachable = Battle.ReachableVia(*Unit, WayPoints, bSprinting);
+	RefreshZoneShadow();
 	PathNode = TMSim::FNode{ -9999, -9999 };
 	PathShown.clear();
 }
@@ -297,7 +306,7 @@ void ATMBattleDirector::PlanKey()
 	AutoSelect();
 }
 
-void ATMBattleDirector::PlanWalk(const TMSim::FVec2& To)
+void ATMBattleDirector::PlanWalk(const TMSim::FVec2& To, int32 Face)
 {
 	const TMSim::FUnit* Unit = SelectedUnit();
 	if (!Unit)
@@ -308,10 +317,12 @@ void ATMBattleDirector::PlanWalk(const TMSim::FVec2& To)
 	FTMPlan& Plan = Plans.FindOrAdd(Unit->Id);
 	Plan.Serial = Unit->Serial;
 	Plan.bThisTurn = Unit->bReady;
+	Plan.Seen = EnemiesInOwnSight(*Unit);
 	Plan.bWalk = true;
 	Plan.bSprint = bSprinting;
 	Plan.Via = WayPoints;
 	Plan.To = TMSim::FMap::Snap(To);
+	Plan.Face = Face;
 	Plan.Path = Battle.PathVia(*Unit, Plan.Via, TMSim::FMap::NodeOf(Plan.To), bSprinting);
 	Plan.Metres = 0.0;
 	const TMSim::FNode End = TMSim::FMap::NodeOf(Plan.To);
@@ -357,6 +368,7 @@ void ATMBattleDirector::PlanAbility(int32 Slot, const TMSim::FVec2& Target, int3
 	FTMPlan& Plan = Plans.FindOrAdd(Unit->Id);
 	Plan.Serial = Unit->Serial;
 	Plan.bThisTurn = Unit->bReady;
+	Plan.Seen = EnemiesInOwnSight(*Unit);
 	Plan.Slot = Slot;
 	Plan.Target = Target;
 	Plan.Follow = Follow;
@@ -487,20 +499,17 @@ bool ATMBattleDirector::RunPlan(int32 UnitId)
 	}
 	// It takes the selection, unless the player is in the middle of ordering
 	// another ready unit: then it runs where it stands and leaves them be.
+	// Not from one being planned either (2026-10-03, camera rules B).
 	const TMSim::FUnit* Busy = SelectedUnit();
-	const bool bTakeSelection = !Busy || Busy->Id == UnitId || !PlayerCanOrder(Busy) || bPlanMode;
+	const bool bTakeSelection = !bPlanMode && (!Busy || Busy->Id == UnitId || !PlayerCanOrder(Busy));
 	if (bTakeSelection)
 	{
-		if (bPlanMode)
-		{
-			StopPlanning();
-		}
 		SelectUnit(UnitId);
 	}
 	const int32 Serial = Unit->Serial;
 	if (Plan.bWalk)
 	{
-		const TMSim::FOrder Walk = TMSim::FOrder::MakeMove(UnitId, Serial, Plan.To, Plan.bSprint, Plan.Via);
+		const TMSim::FOrder Walk = TMSim::FOrder::MakeMove(UnitId, Serial, Plan.To, Plan.bSprint, Plan.Via, Plan.Face);
 		const std::string Refused = Battle.Validate(Walk);
 		if (!Refused.empty())
 		{
@@ -529,10 +538,14 @@ bool ATMBattleDirector::RunPlan(int32 UnitId)
 			PendingAbility.Target = Plan.Target;
 			PendingAbility.Follow = Plan.Follow;
 			PendingAbility.bAfterWalk = true;
-			AimMode = EAimMode::None;
-			AimSlot = -1;
-			Reachable.clear();
-			PathShown.clear();
+			// The aim on screen is this unit's only if it took the selection.
+			if (bTakeSelection)
+			{
+				AimMode = EAimMode::None;
+				AimSlot = -1;
+				Reachable.clear();
+				PathShown.clear();
+			}
 		}
 		return true;
 	}
@@ -612,6 +625,134 @@ TSet<int32> ATMBattleDirector::EnemiesInSight(const TMSim::FUnit& Unit) const
 	return Out;
 }
 
+TSet<int32> ATMBattleDirector::EnemiesInOwnSight(const TMSim::FUnit& Unit) const
+{
+	// What the unit itself has in view -- within its sight, nothing in the way --
+	// rather than all its side knows: an enemy a far-off ally spots is no reason
+	// to stop this one.
+	TSet<int32> Out;
+	const double Sight = Battle.SightOf(Unit);
+	for (const TMSim::FUnit& Other : Battle.Units)
+	{
+		if (Other.IsAlive() && !Other.bMonster && (Other.Team == 0 || Other.Team == 1) && Other.Team != Unit.Team && IsSeen(Other)
+			&& static_cast<double>(Unit.Pos.DistanceTo(Other.Pos)) <= Sight && Battle.HasLineOfSight(Unit.Pos, Other.Pos))
+		{
+			Out.Add(Other.Id);
+		}
+	}
+	return Out;
+}
+
+void ATMBattleDirector::CancelQueuesOnSight()
+{
+	// Online, a walk still with the host has not moved anyone yet.
+	if (bWaitingForHost || Battle.Winner != -1)
+	{
+		return;
+	}
+	auto FirstNew = [](const TSet<int32>& Now, const TSet<int32>& Before)
+	{
+		for (const int32 Id : Now)
+		{
+			if (!Before.Contains(Id))
+			{
+				return Id;
+			}
+		}
+		return -1;
+	};
+	// Go Tos: an enemy coming into the unit's view ends it, wherever it is.
+	TArray<TPair<int32, int32>> Seen;
+	for (TPair<int32, FTMGoTo>& Pair : GoTos)
+	{
+		const TMSim::FUnit* Unit = TMPlans::Find(Battle, Pair.Key);
+		if (!Unit || !Unit->IsAlive())
+		{
+			continue;
+		}
+		const TSet<int32> Now = EnemiesInOwnSight(*Unit);
+		// The unit it was sent to use an ability on is no news: it is going to it.
+		TSet<int32> Known = Pair.Value.Seen;
+		if (Pair.Value.Follow >= 0)
+		{
+			Known.Add(Pair.Value.Follow);
+		}
+		const int32 New = FirstNew(Now, Known);
+		// What it sees now is what is news against next time: one that leaves and comes back is news again.
+		Pair.Value.Seen = Now;
+		if (New >= 0)
+		{
+			Seen.Add(TPair<int32, int32>(Pair.Key, New));
+		}
+	}
+	for (const TPair<int32, int32>& Each : Seen)
+	{
+		const int32 UnitId = Each.Key;
+		GoTos.Remove(UnitId);
+		// A walk-and-end step that saw it on the way: the turn is not ended, the
+		// unit can still act.
+		if (GoToEndUnit == UnitId)
+		{
+			GoToEndUnit = -1;
+		}
+		const TMSim::FUnit* Unit = TMPlans::Find(Battle, UnitId);
+		if (!Unit)
+		{
+			continue;
+		}
+		const bool bTurn = PlayerCanOrder(Unit);
+		if (bTurn)
+		{
+			// Its turn: taken up if the player is busy with nobody else; then the
+			// camera may go to it, by the camera rules. Busy (ordering another, or
+			// planning), it is pointed out instead (2026-10-03).
+			const TMSim::FUnit* Busy = SelectedUnit();
+			if (!bPlanMode && (!Busy || Busy->Id == UnitId || !PlayerCanOrder(Busy)))
+			{
+				SelectUnit(UnitId);
+				RequestFollow(UnitId);
+			}
+			else
+			{
+				PointOut(UnitId);
+			}
+		}
+		Tell(FString::Printf(TEXT("%s sees %s: its Go To is cancelled.%s"), *PlanName(*Unit), *LogName(Each.Value),
+			bTurn ? TEXT(" Its turn is yours.") : TEXT(" Give it new orders.")));
+	}
+	// Plans for a coming turn: the same news makes them stale.
+	TArray<TPair<int32, int32>> Stale;
+	for (TPair<int32, FTMPlan>& Pair : Plans)
+	{
+		const TMSim::FUnit* Unit = TMPlans::Find(Battle, Pair.Key);
+		if (!Unit || !Unit->IsAlive() || Pair.Value.bThisTurn)
+		{
+			continue;
+		}
+		// While it is being aimed it stands where its walk ends (FPlanStandIn); not now.
+		const TSet<int32> Now = EnemiesInOwnSight(*Unit);
+		TSet<int32> Known = Pair.Value.Seen;
+		if (Pair.Value.Follow >= 0)
+		{
+			Known.Add(Pair.Value.Follow);
+		}
+		const int32 New = FirstNew(Now, Known);
+		Pair.Value.Seen = Now;
+		if (New >= 0)
+		{
+			Stale.Add(TPair<int32, int32>(Pair.Key, New));
+		}
+	}
+	for (const TPair<int32, int32>& Each : Stale)
+	{
+		ClearPlan(Each.Key);
+		if (const TMSim::FUnit* Unit = TMPlans::Find(Battle, Each.Key))
+		{
+			Tell(FString::Printf(TEXT("%s sees %s: its plan is dropped. Give it new orders."), *PlanName(*Unit), *LogName(Each.Value)));
+		}
+	}
+}
+
 std::vector<TMSim::FVec2> ATMBattleDirector::SplitRoute(const TMSim::FUnit& Unit, const std::vector<TMSim::FVec2>& Route) const
 {
 	// Each turn walks as far as its move goes, step by step along the way.
@@ -658,7 +799,7 @@ bool ATMBattleDirector::SetGoTo(int32 UnitId, const TMSim::FVec2& Dest)
 	Order.Dest = To;
 	Order.Via = WayPoints;
 	Order.Hp = Unit->Hp;
-	Order.Seen = EnemiesInSight(*Unit);
+	Order.Seen = EnemiesInOwnSight(*Unit);
 	Order.Route = Route;
 	Order.Stops = SplitRoute(*Unit, Route);
 	const int32 Turns = static_cast<int32>(Order.Stops.size());
@@ -702,19 +843,18 @@ void ATMBattleDirector::StopGoTo(int32 UnitId, const FString& Why)
 	Order->bStopped = true;
 	Order->StoppedSerial = Unit->Serial;
 	Order->Why = Why;
-	// Handed back: the camera goes to it, unless the player is busy with another.
+	// Handed back: taken up, and the camera may go to it (by the camera rules),
+	// unless the player is busy with another unit or planning: then it is
+	// pointed out (2026-10-03).
 	const TMSim::FUnit* Busy = SelectedUnit();
-	if (!Busy || Busy->Id == UnitId || !PlayerCanOrder(Busy) || bPlanMode)
+	if (!bPlanMode && (!Busy || Busy->Id == UnitId || !PlayerCanOrder(Busy)))
 	{
-		if (bPlanMode)
-		{
-			StopPlanning();
-		}
 		SelectUnit(UnitId);
-		if (FTMSettings::Get().bAutoRecenter)
-		{
-			CenterCamera();
-		}
+		RequestFollow(UnitId);
+	}
+	else if (PlayerCanOrder(Unit))
+	{
+		PointOut(UnitId);
 	}
 	Tell(FString::Printf(TEXT("%s stopped on the way: %s. %s: keep going; %s: cancel the order."), *PlanName(*Unit), *Why,
 		*FTMSettings::Get().KeyName(ETMAction::PlanTurn), *FTMSettings::Get().KeyName(ETMAction::PlanUndo)));
@@ -735,6 +875,230 @@ void ATMBattleDirector::CancelGoTo(int32 UnitId, bool bTell)
 	}
 }
 
+std::vector<TMSim::FVec2> ATMBattleDirector::ApproachRoute(const TMSim::FUnit& Unit, int32 Slot, const TMSim::FVec2& Target, double* OutMetres)
+{
+	// The way towards the target, cut at the first spot along it the ability
+	// can be used from: in range, in sight of the target where it needs that,
+	// and nobody else standing there.
+	const TMSim::FAbility* Ability = Unit.Ability(Slot);
+	if (!Ability)
+	{
+		return {};
+	}
+	double Metres = 0.0;
+	const TMSim::FNode Aimed = TMSim::FMap::NodeOf(Target);
+	std::vector<TMSim::FVec2> Route = Battle.RouteTo(Unit, {}, Aimed, &Metres);
+	// A unit aimed at stands on its spot, which no way ends on: towards the
+	// nearest open spot by it instead, the few nearest the walker first.
+	for (int Ring = 1; Ring <= 4 && Route.size() < 2; ++Ring)
+	{
+		std::vector<TMSim::FNode> Around;
+		for (int DX = -Ring; DX <= Ring; ++DX)
+		{
+			for (int DY = -Ring; DY <= Ring; ++DY)
+			{
+				if (FMath::Max(FMath::Abs(DX), FMath::Abs(DY)) == Ring)
+				{
+					Around.push_back(TMSim::FNode{ Aimed.X + DX, Aimed.Y + DY });
+				}
+			}
+		}
+		std::sort(Around.begin(), Around.end(), [&Unit](const TMSim::FNode& A, const TMSim::FNode& B)
+		{
+			return TMSim::FMap::NodePos(A).DistanceTo(Unit.Pos) < TMSim::FMap::NodePos(B).DistanceTo(Unit.Pos);
+		});
+		for (size_t k = 0; k < Around.size() && k < 3 && Route.size() < 2; ++k)
+		{
+			Route = Battle.RouteTo(Unit, {}, Around[k], &Metres);
+		}
+	}
+	if (Route.size() < 2)
+	{
+		return {};
+	}
+	double Walked = 0.0;
+	for (size_t i = 1; i < Route.size(); ++i)
+	{
+		Walked += Route[i - 1].DistanceTo(Route[i]);
+		const TMSim::FVec2& Spot = Route[i];
+		bool bTaken = false;
+		for (const TMSim::FUnit& Other : Battle.Units)
+		{
+			bTaken = bTaken || (Other.Id != Unit.Id && Other.IsAlive() && TMSim::FMap::NodeOf(Other.Pos) == TMSim::FMap::NodeOf(Spot));
+		}
+		if (bTaken || !Battle.InAbilityRange(Unit, Slot, Spot, Target)
+			|| (TMSim::NeedsLineOfSight(*Ability) && !Battle.HasLineOfSight(Spot, Target)))
+		{
+			continue;
+		}
+		Route.resize(i + 1);
+		if (OutMetres)
+		{
+			*OutMetres = Walked;
+		}
+		return Route;
+	}
+	return {};
+}
+
+bool ATMBattleDirector::SetAbilityGoTo(int32 UnitId, int32 Slot, const TMSim::FVec2& Target, int32 Follow)
+{
+	const TMSim::FUnit* Unit = TMPlans::Find(Battle, UnitId);
+	const TMSim::FAbility* Ability = Unit ? Unit->Ability(Slot) : nullptr;
+	if (!PlayerCanPlan(Unit) || !Ability)
+	{
+		return false;
+	}
+	double Metres = 0.0;
+	const std::vector<TMSim::FVec2> Route = ApproachRoute(*Unit, Slot, Target, &Metres);
+	if (Route.size() < 2)
+	{
+		// The click says so (TMBattleDirector.cpp).
+		return false;
+	}
+	// A Go To to where it can be used from, carrying the ability.
+	WayPoints.clear();
+	Plans.Remove(UnitId);
+	FTMGoTo Order;
+	Order.Dest = Route.back();
+	Order.Hp = Unit->Hp;
+	Order.Seen = EnemiesInOwnSight(*Unit);
+	Order.Route = Route;
+	Order.Stops = SplitRoute(*Unit, Route);
+	Order.Slot = Slot;
+	Order.Target = Target;
+	Order.Follow = Follow;
+	const int32 Turns = static_cast<int32>(Order.Stops.size());
+	GoTos.Add(UnitId, Order);
+	AimMode = EAimMode::None;
+	AimSlot = -1;
+	bSprinting = false;
+	Reachable.clear();
+	PathShown.clear();
+	GoToHoverStops.clear();
+	bAbilityHoverGoTo = false;
+	PathNode = TMSim::FNode{ -9999, -9999 };
+	Tell(FString::Printf(TEXT("%s goes into range: %.0f m, %d turn%s, then %hs. It walks and ends each turn; it stops if it sees an enemy."),
+		*PlanName(*Unit), Metres, Turns, Turns == 1 ? TEXT("") : TEXT("s"), Ability->Name.c_str()));
+	if (Unit->bReady && PlayerCanOrder(Unit) && !Unit->bMoved && !Unit->bActed && !Unit->IsCasting())
+	{
+		if (bPlanMode)
+		{
+			bPlanMode = false;
+		}
+		StepGoTo(UnitId, true);
+	}
+	else if (bPlanMode && SelectedId == UnitId)
+	{
+		StopPlanning();
+		AutoSelect();
+	}
+	return true;
+}
+
+bool ATMBattleDirector::StepAbilityGoTo(int32 UnitId)
+{
+	FTMGoTo* Order = GoTos.Find(UnitId);
+	const TMSim::FUnit* Unit = TMPlans::Find(Battle, UnitId);
+	if (!Order || !Unit || !Order->HasAbility())
+	{
+		return false;
+	}
+	const FString Name = PlanName(*Unit);
+	// The turn is the player's to see: it takes the selection, unless they are busy with another unit.
+	// Not from one being planned, nor from another being ordered (2026-10-03, camera rules B).
+	auto Take = [this, UnitId]()
+	{
+		const TMSim::FUnit* Busy = SelectedUnit();
+		if (!bPlanMode && (!Busy || Busy->Id == UnitId || !PlayerCanOrder(Busy)))
+		{
+			SelectUnit(UnitId);
+			return true;
+		}
+		return false;
+	};
+	// A unit aimed at is followed to where it stands now, while it can be seen.
+	if (Order->Follow >= 0)
+	{
+		const TMSim::FUnit* Followed = TMPlans::Find(Battle, Order->Follow);
+		if (!Followed || !Followed->IsAlive() || !IsSeen(*Followed))
+		{
+			GoTos.Remove(UnitId);
+			if (Take())
+			{
+				RequestFollow(UnitId);
+			}
+			else
+			{
+				PointOut(UnitId);
+			}
+			Tell(FString::Printf(TEXT("%s's target is gone or out of sight: its Go To is over. Its turn is yours."), *Name));
+			return true;
+		}
+		Order->Target = Followed->Pos;
+	}
+	const int32 Slot = Order->Slot;
+	const TMSim::FVec2 Target = Order->Target;
+	const int32 Follow = Order->Follow;
+	const int32 Serial = Unit->Serial;
+	// From where it stands.
+	const TMSim::FOrder Use = TMSim::FOrder::MakeUseAbility(UnitId, Serial, Slot, Target, Follow);
+	if (Battle.Validate(Use).empty())
+	{
+		GoTos.Remove(UnitId);
+		TGuardValue<bool> Own(bGoToOrdering, true);
+		if (Take())
+		{
+			OrderSelected(Use);
+		}
+		else
+		{
+			Submit(Use);
+		}
+		return true;
+	}
+	// From a spot this turn's walk reaches: there, then it, as a walk into range does.
+	TMSim::FVec2 Spot;
+	double Walk = 0.0;
+	if (ClosestSpotInRange(*Unit, Slot, Target, Spot, Walk))
+	{
+		GoTos.Remove(UnitId);
+		TGuardValue<bool> Own(bGoToOrdering, true);
+		const bool bTook = Take();
+		const FString Refused = Submit(TMSim::FOrder::MakeMove(UnitId, Serial, Spot));
+		if (!Refused.IsEmpty())
+		{
+			Tell(FString::Printf(TEXT("%s's Go To stopped: %s"), *Name, *Refused));
+			return true;
+		}
+		PendingAbility.UnitId = UnitId;
+		PendingAbility.Serial = Serial;
+		PendingAbility.Slot = Slot;
+		PendingAbility.Target = Target;
+		PendingAbility.Follow = Follow;
+		PendingAbility.bAfterWalk = true;
+		// The aim on screen is this unit's only if it took the selection.
+		if (bTook)
+		{
+			AimMode = EAimMode::None;
+			AimSlot = -1;
+			Reachable.clear();
+			PathShown.clear();
+		}
+		return true;
+	}
+	// Not yet: on towards it, the way worked out again from where the target is now.
+	const std::vector<TMSim::FVec2> Route = ApproachRoute(*Unit, Slot, Target);
+	if (Route.size() < 2)
+	{
+		StopGoTo(UnitId, TEXT("there is no way into range any more"));
+		return true;
+	}
+	Order->Dest = Route.back();
+	Order->Via.clear();
+	return false;
+}
+
 bool ATMBattleDirector::StepGoTo(int32 UnitId, bool bResume)
 {
 	FTMGoTo* Order = GoTos.Find(UnitId);
@@ -752,20 +1116,23 @@ bool ATMBattleDirector::StepGoTo(int32 UnitId, bool bResume)
 			StopGoTo(UnitId, TEXT("it was hurt"));
 			return false;
 		}
-		for (const int32 Id : EnemiesInSight(*Unit))
-		{
-			if (!Order->Seen.Contains(Id))
-			{
-				StopGoTo(UnitId, FString::Printf(TEXT("an enemy %s came into sight"), *LogName(Id)));
-				return false;
-			}
-		}
+		// An enemy coming into view cancels it outright (CancelQueuesOnSight).
+	}
+	// Into range of what it was sent to use, this turn: used, and the order is over.
+	if (Order->HasAbility() && StepAbilityGoTo(UnitId))
+	{
+		return true;
+	}
+	Order = GoTos.Find(UnitId);
+	if (!Order)
+	{
+		return false;
 	}
 	Order->bStopped = false;
 	Order->Why.Reset();
 	Order->LastSerial = Unit->Serial;
 	Order->Hp = Unit->Hp;
-	Order->Seen = EnemiesInSight(*Unit);
+	Order->Seen = EnemiesInOwnSight(*Unit);
 
 	// The way from here, and how far along it this turn's move goes: the
 	// farthest spot on it the rules would let it walk to now.
@@ -843,6 +1210,24 @@ bool ATMBattleDirector::StepGoTo(int32 UnitId, bool bResume)
 		bTaken = bTaken || (Other.Id != UnitId && Other.IsAlive() && TMSim::FMap::NodeOf(Other.Pos) == End);
 	}
 	const bool bArrives = Best == Route.size() - 1 || (bTaken && Metres <= Move + 0.001);
+	// A short walk -- the last stretch, or as far as a blocked way lets it --
+	// would spend the turn on a step (2026-10-03): the player takes the unit
+	// first, and may walk it on (Keep going) or use the turn better.
+	if (!bResume)
+	{
+		double Walked = 0.0;
+		for (size_t i = 1; i <= Best; ++i)
+		{
+			Walked += Route[i - 1].DistanceTo(Route[i]);
+		}
+		if (Walked < Move - FMath::Max(1.0, Move * 0.15))
+		{
+			StopGoTo(UnitId, bArrives
+				? FString::Printf(TEXT("the last stretch is only %.1f m of its %.1f m move"), Walked, Move)
+				: FString::Printf(TEXT("the way is blocked after %.1f m"), Walked));
+			return false;
+		}
+	}
 	const std::vector<TMSim::FVec2> Via = ViaBefore(Best);
 	const int32 Serial = Unit->Serial;
 	const TMSim::FOrder Walk = TMSim::FOrder::MakeMove(UnitId, Serial, Route[Best], false, Via);
@@ -867,18 +1252,16 @@ bool ATMBattleDirector::StepGoTo(int32 UnitId, bool bResume)
 	{
 		// The turn is the player's after this walk: it takes the selection,
 		// unless they are busy with another unit.
+		// Not from one being planned either (2026-10-03, camera rules B): then it
+		// is pointed out once it has walked.
 		const TMSim::FUnit* Busy = SelectedUnit();
-		const bool bTake = !Busy || Busy->Id == UnitId || !PlayerCanOrder(Busy) || bPlanMode;
+		const bool bTake = !bPlanMode && (!Busy || Busy->Id == UnitId || !PlayerCanOrder(Busy));
 		if (bArrives)
 		{
 			GoTos.Remove(UnitId);
 		}
 		if (bTake)
 		{
-			if (bPlanMode)
-			{
-				StopPlanning();
-			}
 			SelectUnit(UnitId);
 			OrderSelected(Walk);
 		}
@@ -891,6 +1274,10 @@ bool ATMBattleDirector::StepGoTo(int32 UnitId, bool bResume)
 				GoTos.Remove(UnitId);
 				return false;
 			}
+		}
+		if (!bTake && PlayerCanOrder(Unit))
+		{
+			PointOut(UnitId);
 		}
 		Tell(bArrives ? FString::Printf(TEXT("%s has arrived: its turn is yours."), *Name)
 			: FString::Printf(TEXT("%s walked on (%d turn%s to go): its turn is yours."), *Name,

@@ -9,7 +9,7 @@
     "damage"
   ],
   "stats": {
-    "hp": 75,
+    "hp": 92,
     "attdef": 8,
     "magdef": 6,
     "aeva": 18,
@@ -30,7 +30,7 @@
       "scale": "att",
       "target": "enemy",
       "shape": "unit",
-      "power": 32,
+      "power": 45,
       "min_range": 0,
       "max_range": 1.8,
       "aoe": 0,
@@ -52,7 +52,7 @@
       "scale": "att",
       "target": "enemy",
       "shape": "unit",
-      "power": 44,
+      "power": 62,
       "min_range": 0,
       "max_range": 1.8,
       "aoe": 0,
@@ -102,7 +102,7 @@
       "scale": "att",
       "target": "enemy",
       "shape": "self",
-      "power": 49,
+      "power": 69,
       "min_range": 0,
       "max_range": 0,
       "aoe": 2.5,
@@ -119,5 +119,11 @@
         "scale": 1
       }
     }
-  ]
+  ],
+  "creator": {
+    "rebalanced": {
+      "on": "2026-10-04",
+      "why": "Held buffs 2026-10-04 (lab 23% on fresh seeds, standard teams): HP 75->92, Thunder Jab 32->45, Thunder Uppercut 44->62, Thunder Fury 49->69; now 49%"
+    }
+  }
 }

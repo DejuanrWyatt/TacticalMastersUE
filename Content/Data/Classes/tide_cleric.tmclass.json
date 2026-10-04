@@ -24,7 +24,7 @@
     {
       "id": "tide_cleric_rod",
       "name": "Rod",
-      "desc": "Strike an adjacent enemy",
+      "desc": "Strike an adjacent enemy; it is Wet for 2 turns: lightning shocks it, ice freezes it.",
       "kind": "active",
       "effect": "damage",
       "scale": "att",
@@ -36,6 +36,10 @@
       "aoe": 0,
       "cooldown": 0,
       "cast": 0,
+      "status": {
+        "id": "wet",
+        "turns": 2
+      },
       "fx": "attack",
       "vfx": {
         "system": "/Game/ParagonMuriel/FX/Particles/Abilities/Primary/FX/P_Muriel_Primary_HitCharacter.P_Muriel_Primary_HitCharacter",
@@ -140,6 +144,10 @@
       }
     ],
     "description": "Healer who revives",
-    "measured": -40
+    "measured": -40,
+    "rebalanced": {
+      "on": "2026-10-03",
+      "why": "Rod leaves the target Wet"
+    }
   }
 }

@@ -31,7 +31,7 @@
       "scale": "mag",
       "target": "enemy",
       "shape": "unit",
-      "power": 36,
+      "power": 28,
       "min_range": 1,
       "max_range": 7,
       "aoe": 0,
@@ -45,35 +45,27 @@
       }
     },
     {
-      "id": "oracle_curse",
-      "name": "Curse",
-      "desc": "Lower an enemy's AttDef and MagDef by 6 for 2 turns (2-8 m, 1 s).",
+      "id": "oracle_foretell",
+      "name": "Foretell",
+      "desc": "Foretell an enemy's fall, 2-8 m away: a light hit, and Marked for 1 turn: the next hit on it lands harder.",
       "kind": "active",
-      "effect": "support",
+      "effect": "damage",
       "scale": "mag",
       "target": "enemy",
       "shape": "unit",
-      "power": 0,
+      "power": 10,
       "min_range": 2,
       "max_range": 8,
       "aoe": 0,
       "cooldown": 3,
-      "cast": 1,
-      "buffs": [
-        {
-          "stat": "attdef",
-          "amount": -6,
-          "turns": 2
-        },
-        {
-          "stat": "magdef",
-          "amount": -6,
-          "turns": 2
-        }
-      ],
+      "cast": 0,
+      "status": {
+        "id": "marked",
+        "turns": 1
+      },
       "fx": "pin_shot",
       "vfx": {
-        "system": "/Game/ParagonMuriel/FX/Particles/Abilities/LifeLock/FX/P_LifeLock_HitCharacter.P_LifeLock_HitCharacter",
+        "system": "/Game/ParagonKwang/FX/Particles/Abilities/LightStrike/FX/P_LightStrikeImpact.P_LightStrikeImpact",
         "at": "targets",
         "scale": 1
       }
@@ -113,7 +105,7 @@
       "scale": "mag",
       "target": "enemy",
       "shape": "global",
-      "power": 27,
+      "power": 22,
       "min_range": 0,
       "max_range": 20,
       "aoe": 0,
@@ -121,7 +113,7 @@
       "cast": 2.5,
       "status": {
         "id": "slow",
-        "turns": 3
+        "turns": 1
       },
       "fx": "blizzard",
       "vfx": {
@@ -135,6 +127,29 @@
     "reworded": {
       "on": "2026-10-02",
       "why": "Descriptions say what the abilities do (2026-10-02): Stun not sleep, Crit not the old Power, turns not seconds"
+    },
+    "rebalanced": {
+      "on": "2026-10-04",
+      "why": "Held nerfs 2026-10-04 (lab 59%): Divination 27->22; now 55%. Before that (2026-10-04): Status curse in place of Curse (never used): a light hit that Marks the enemy for 2 turns (the next hit on it lands harder). Before that (2026-10-03): Tuning pass 2026-10-03 (lab 83% in place of the Archer): Divination slow 3->1 turns. Before that (2026-10-02): Balance audit 2026-10-02: everyday hex power 32 (it won 83-96% in place of the Archer)"
+    },
+    "changedAt": "2026-10-03T03:45:00.000Z",
+    "icons": {
+      "abilities": [
+        null,
+        {
+          "backing": "circle",
+          "glyph": "eye",
+          "colour": "#e8b95a",
+          "style": "light",
+          "mark": "unit",
+          "scale": 1,
+          "rotate": 0,
+          "badge": "none",
+          "finish": "lit"
+        },
+        null,
+        null
+      ]
     }
   }
 }

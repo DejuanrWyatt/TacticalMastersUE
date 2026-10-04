@@ -88,11 +88,20 @@ void ATMBattleDirector::WearBody(USkeletalMeshComponent* Visual, const FTMBody& 
 	Visual->bDisableClothSimulation = true;
 	Visual->bDisableMorphTarget = true;
 	Visual->ClearMorphTargets();
+	// No material curves either (2026-10-02): v17 crashed twice in the base pass
+	// (RHISetShaderParameters, a freed uniform buffer) while drawing Sparrow with
+	// MID_M_ArrowString3 and MID_M_Sparrow_Torso_Arms -- dynamic materials none of
+	// our code makes. The hero's animations carry material curves, and the engine
+	// makes a dynamic material for every slot they touch and changes it each
+	// frame. Units never need that, so curves are not evaluated on their bodies,
+	// and no material from the body worn before is carried onto this one.
+	Visual->SetAllowAnimCurveEvaluation(false);
+	Visual->EmptyOverrideMaterials();
 	Visual->SetSkeletalMeshAsset(Body.Mesh);
 	// A slot whose material was cooked without shaders (Narbash's legs) is
 	// drawn with the default surface instead (TMDrawable.h).
 	TMDrawable::MendBody(Visual);
-	Visual->SetRelativeScale3D(FVector(Body.Scale));
+	Visual->SetRelativeScale3D(FVector(Body.Scale * UnitSize));
 }
 
 bool ATMBattleDirector::IsBodyLoaded(const FTMBody& Body) const
@@ -141,7 +150,9 @@ bool ATMBattleDirector::LoadBodiesInBackground()
 	}
 	TArray<FSoftObjectPath> Paths;
 	UnreadPaths(Wanted, Paths);
-	// The effects and sounds too, so nothing is read from disk mid-battle.
+	// The effects and sounds too, so nothing is read from disk mid-battle --
+	// Cast Studio's published looks among them.
+	LoadCastLooks();
 	LookAssetPaths(Paths);
 	SoundAssetPaths(Paths);
 	Paths.RemoveAll([](const FSoftObjectPath& Path) { return !Path.IsValid() || Path.ResolveObject() != nullptr; });
@@ -170,7 +181,10 @@ bool ATMBattleDirector::LoadBodiesInBackground()
 		FStreamableDelegate::CreateWeakLambda(this, [this, Began, Count = Paths.Num()]()
 		{
 			UE_LOG(LogTemp, Log, TEXT("heroes loaded in the background: %d files in %.1f s"), Count, FPlatformTime::Seconds() - Began);
+			// Held, not let go: the old set goes only now, once the new one is in.
+			BodyKept = BodyLoad;
 			BodyLoad.Reset();
+			TMDrawable::KeepBrokenLoaded();
 			DressUnits();
 		}),
 		FStreamableManager::AsyncLoadHighPriority);

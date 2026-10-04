@@ -14,7 +14,7 @@
     "attdef": 9,
     "magdef": 9,
     "aeva": 10,
-    "meva": 13,
+    "meva": 10,
     "crit": 14,
     "speed": 10,
     "move": 7,
@@ -134,5 +134,11 @@
         "scale": 1
       }
     }
-  ]
+  ],
+  "creator": {
+    "rebalanced": {
+      "on": "2026-10-03",
+      "why": "Tuning pass 2026-10-03 (lab 69% in place of the Knight): Evasion 13->10"
+    }
+  }
 }

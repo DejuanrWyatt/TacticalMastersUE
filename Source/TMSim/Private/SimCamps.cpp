@@ -474,6 +474,11 @@ namespace TMSim
 			M.RouteStep = 0;
 			M.Stagger = 0;
 			M.TamedTurns = 0;
+			M.Wrath.clear();
+			M.HuntTarget = -1;
+			M.HuntLost = 0;
+			M.Claim[0] = 0;
+			M.Claim[1] = 0;
 			M.Team = 2;
 			for (const FItemDef*& Item : M.Gear)
 			{
@@ -492,6 +497,26 @@ namespace TMSim
 			M.Hp = M.MaxHp();
 			Report.Say(EEventKind::Moved, M.Id);
 		}
+		// Woken by noise (2026-10-02, A): it goes for the side that made the most
+		// (on a tie, the side that made the last of it), at whoever of that side was
+		// loudest last. Set off, it fights from its next turn: no free move.
+		if (Held.bNoiseWake)
+		{
+			const int Side = Held.NoiseBy[1] > Held.NoiseBy[0] ? 1 : Held.NoiseBy[0] > Held.NoiseBy[1] ? 0 : Held.LastLoudSide;
+			const FUnit* Loud = FindUnit(Held.LoudUnit[Side]);
+			FUnit* First = Held.Members.empty() ? nullptr : FindUnit(Held.Members[0]);
+			if (Loud && IsQuarry(*Loud) && First)
+			{
+				AlertMonster(*First, Loud->Id, Report);
+			}
+		}
+		Held.Noise = 0;
+		Held.NoiseQuiet = 0;
+		Held.NoiseBy[0] = 0;
+		Held.NoiseBy[1] = 0;
+		Held.LoudUnit[0] = -1;
+		Held.LoudUnit[1] = -1;
+		Held.bNoiseWake = false;
 		FEvent Event;
 		Event.Kind = EEventKind::CampAwake;
 		Event.Slot = Index;
@@ -510,6 +535,12 @@ namespace TMSim
 			}
 			if (Held.State == ECampState::Waiting)
 			{
+				// Noise fades: one step for each stretch of quiet (A).
+				if (Held.Noise > 0 && !Held.bNoiseWake && ++Held.NoiseQuiet >= Camp::NoiseQuietSeconds * TicksPerSecond)
+				{
+					--Held.Noise;
+					Held.NoiseQuiet = 0;
+				}
 				--Held.Timer;
 				if (Held.Timer == Camp::Warning[Held.Tier] * TicksPerSecond)
 				{
@@ -544,6 +575,14 @@ namespace TMSim
 				continue;
 			}
 			const FCampKind* Kind = Held.Kind >= 0 ? &CampKinds()[static_cast<size_t>(Held.Kind)] : nullptr;
+			if (Held.Tier == 3)
+			{
+				// The boss is gone, and with it whatever it hunted (C).
+				for (FUnit& Each : Units)
+				{
+					RemoveStatus(Each, "hunted");
+				}
+			}
 			std::vector<const FItemDef*> Loot;
 			if (Held.Tier == 3)
 			{
@@ -721,6 +760,148 @@ namespace TMSim
 			Unit.TamedTurns = 0;
 			Unit.Team = 2;
 		}
+		if (Unit.PetOf >= 0)
+		{
+			Unit.bOffBoard = true;
+			Unit.PetTurns = 0;
+		}
+	}
+
+	void FBattle::PlacePets()
+	{
+		// One pet waiting off the board for each unit whose class can call one,
+		// so every id is fixed before anybody moves. Its class is a monster file
+		// (Content/Data/Monsters); one that is not loaded makes no pet.
+		int NextId = 0;
+		for (const FUnit& Unit : Units)
+		{
+			NextId = std::max(NextId, Unit.Id + 1);
+		}
+		const size_t Count = Units.size();
+		for (size_t i = 0; i < Count; ++i)
+		{
+			const FUnit Owner = Units[i];
+			if (Owner.bMonster || Owner.PetOf >= 0)
+			{
+				continue;
+			}
+			std::vector<std::string> Jobs;
+			for (int Slot = 0; Slot < AbilitySlots; ++Slot)
+			{
+				const FAbility* Ability = Owner.Ability(Slot);
+				if (Ability && Ability->Special == "pet" && FindJob(Ability->PetJob)
+					&& std::find(Jobs.begin(), Jobs.end(), Ability->PetJob) == Jobs.end())
+				{
+					Jobs.push_back(Ability->PetJob);
+				}
+			}
+			for (const std::string& Job : Jobs)
+			{
+				FUnit Pet;
+				Pet.Id = NextId++;
+				Pet.Team = Owner.Team;
+				Pet.Job = Job;
+				Pet.Stats = &FindJob(Job)->Stats;
+				Pet.PetOf = Owner.Id;
+				Pet.bOffBoard = true;
+				Pet.Pos = Owner.Pos;
+				Pet.Facing = Owner.Facing;
+				Pet.Hp = 0;
+				Pet.KoTicks = 0;
+				Units.push_back(Pet);
+			}
+		}
+	}
+
+	void FBattle::CallPet(FUnit& Owner, const FAbility& Ability, const FVec2& Where, FTickReport& Report)
+	{
+		FUnit* Pet = nullptr;
+		for (FUnit& Each : Units)
+		{
+			if (Each.PetOf == Owner.Id && Each.Job == Ability.PetJob)
+			{
+				Pet = &Each;
+			}
+		}
+		if (!Pet)
+		{
+			return;
+		}
+		// Called again while it is out: it comes to the new spot, whole, its time
+		// started afresh. Taken off first, so it is not in its own way.
+		Pet->Hp = 0;
+		auto Open = [this](const FVec2& Spot)
+		{
+			return InBounds(Spot) && Map.NodeWalkable(FMap::NodeOf(Spot)) && !UnitNear(Spot, Ground::UnitSpacing);
+		};
+		// Where it was aimed, else round there, else round its caller.
+		FVec2 Spot = FMap::Snap(Where);
+		bool bFound = Open(Spot);
+		for (const FVec2& Middle : { Where, Owner.Pos })
+		{
+			for (int k = 0; k < 8 && !bFound; ++k)
+			{
+				const float Angle = 0.7853982f * static_cast<float>(k);
+				const FVec2 Near = FMap::Snap(FVec2(Middle.X + 1.5f * std::cos(Angle), Middle.Y + 1.5f * std::sin(Angle)));
+				if (Open(Near))
+				{
+					Spot = Near;
+					bFound = true;
+				}
+			}
+		}
+		if (!bFound)
+		{
+			Pet->bOffBoard = true;
+			return;
+		}
+		Pet->bOffBoard = false;
+		Pet->Team = Owner.HomeTeam();
+		Pet->Pos = Spot;
+		Pet->Facing = Owner.Facing;
+		Pet->Hp = Pet->MaxHp();
+		Pet->KoTicks = 0;
+		Pet->Tg = 0;
+		Pet->bReady = false;
+		Pet->Clock = 0;
+		Pet->bMoved = false;
+		Pet->bActed = false;
+		Pet->Ult = 0;
+		Pet->Statuses.clear();
+		Pet->Buffs.clear();
+		Pet->Casting = FCast();
+		Pet->Channeling = FChannel();
+		for (int Slot = 0; Slot < AbilitySlots; ++Slot)
+		{
+			Pet->Cooldowns[Slot] = 0;
+		}
+		// Its turns, counted as each begins (BecomeReady).
+		Pet->PetTurns = Ability.PetTurns + 1;
+		FEvent Event;
+		Event.Kind = EEventKind::Teleported;
+		Event.Unit = Pet->Id;
+		Event.By = Owner.Id;
+		Event.Where = Pet->Pos;
+		Event.Id = "pet";
+		Report.Events.push_back(Event);
+	}
+
+	void FBattle::SendPetAway(FUnit& Pet, FTickReport& Report)
+	{
+		Pet.Hp = 0;
+		Pet.KoTicks = 0;
+		Pet.Tg = 0;
+		Pet.bReady = false;
+		Pet.Clock = 0;
+		Pet.bMoved = false;
+		Pet.bActed = false;
+		Pet.Statuses.clear();
+		Pet.Buffs.clear();
+		Pet.Casting = FCast();
+		Pet.Channeling = FChannel();
+		Pet.bOffBoard = true;
+		Pet.PetTurns = 0;
+		Report.Say(EEventKind::Gone, Pet.Id);
 	}
 
 	int FBattle::CacheNear(const FVec2& Point) const
@@ -1084,6 +1265,11 @@ namespace TMSim
 			const FMonsterInfo* Info = Unit.MonsterInfo();
 			bHidden = Info && Info->Has(MonsterTrait::Ambush);
 		}
+		// In tall grass and not given away since its turn began (2026-10-04).
+		if (!bHidden && !Unit.bSpotted && !Map.Grass.empty() && Map.InGrass(Unit.Pos))
+		{
+			bHidden = true;
+		}
 		if (!bHidden)
 		{
 			return false;
@@ -1308,12 +1494,24 @@ namespace TMSim
 			Event.Where = Monster.Pos;
 			Report.Events.push_back(Event);
 		}
-		// Hits from behind, three of them, stagger it.
-		if (Info->Has(MonsterTrait::Stagger) && Flank >= Tuning.BackBonus && Tuning.BackBonus > Tuning.SideBonus)
+		// Hits from behind, three of them, stagger it. A boss winding up an attack
+		// can be staggered too, and a stagger breaks the wind-up (2026-10-02, B).
+		const bool bWindUp = Info->Tier >= 3 && Monster.IsCasting();
+		if ((Info->Has(MonsterTrait::Stagger) || bWindUp) && Flank >= Tuning.BackBonus && Tuning.BackBonus > Tuning.SideBonus)
 		{
 			if (++Monster.Stagger >= Camp::StaggerHits)
 			{
 				Monster.Stagger = 0;
+				if (Monster.IsCasting())
+				{
+					FEvent Broken;
+					Broken.Kind = EEventKind::CastFizzled;
+					Broken.Unit = Monster.Id;
+					Broken.Slot = Monster.Casting.Slot;
+					Broken.Where = Monster.Pos;
+					Report.Events.push_back(Broken);
+					Monster.Casting = FCast();
+				}
 				AddStatus(Monster, "staggered", 1);
 				FEvent Event;
 				Event.Kind = EEventKind::Staggered;
@@ -1392,6 +1590,10 @@ namespace TMSim
 		if (Unit.GrudgeTurns > 0 && --Unit.GrudgeTurns == 0)
 		{
 			Unit.Grudge = -1;
+		}
+		if (Info->Tier >= 3 && Tuning.BossHunt >= 0.5)
+		{
+			UpdateHunt(Unit, Report);
 		}
 		FCamp* Held = Unit.Camp >= 0 && Unit.Camp < static_cast<int>(Camps.size()) ? &Camps[static_cast<size_t>(Unit.Camp)] : nullptr;
 		int By = -1;
@@ -1622,5 +1824,198 @@ namespace TMSim
 			Event.Id = "rewind";
 			Report.Events.push_back(Event);
 		}
+	}
+
+	// ------------------------------------------- noise, the hunt and the claim
+	// 2026-10-02, "Camps and Bosses Mockups" A, C and D.
+
+	void FBattle::MakeNoise(const FVec2& Where, const FUnit& By, int Amount, FTickReport& Report)
+	{
+		if (Camps.empty() || Amount <= 0 || By.bMonster || (By.Team != 0 && By.Team != 1))
+		{
+			return;
+		}
+		for (int i = 0; i < static_cast<int>(Camps.size()); ++i)
+		{
+			FCamp& Held = Camps[static_cast<size_t>(i)];
+			// Only a camp still to wake: not the boss's, not one cleared for good,
+			// not one already giving its warning.
+			if (Held.State != ECampState::Waiting || Held.Kind < 0 || (Held.Wakes > 0 && Tuning.CampRespawn < 0.5)
+				|| Held.Timer <= Camp::Warning[Held.Tier] * TicksPerSecond + 1
+				|| static_cast<double>(Where.DistanceTo(Held.Spot)) > Camp::NoiseReach)
+			{
+				continue;
+			}
+			Held.Noise = std::min(Camp::NoiseFull, Held.Noise + Amount);
+			Held.NoiseQuiet = 0;
+			Held.NoiseBy[By.Team] += Amount;
+			Held.LoudUnit[By.Team] = By.Id;
+			Held.LastLoudSide = By.Team;
+			FEvent Event;
+			Event.Kind = EEventKind::CampNoise;
+			Event.Slot = i;
+			Event.Unit = By.Id;
+			Event.Amount = Held.Noise;
+			Event.Where = Held.Spot;
+			Report.Events.push_back(Event);
+			if (Held.Noise >= Camp::NoiseFull)
+			{
+				// Full: it gives its warning now, and wakes when that runs out.
+				Held.Timer = Camp::Warning[Held.Tier] * TicksPerSecond + 1;
+				Held.bNoiseWake = true;
+			}
+		}
+	}
+
+	void FBattle::BossHurtBy(FUnit& Boss, const FUnit& Attacker, int Amount)
+	{
+		const FMonsterInfo* Info = Boss.MonsterInfo();
+		if (!Info || Info->Tier < 3 || Amount <= 0 || Attacker.bMonster)
+		{
+			return;
+		}
+		auto Found = std::find_if(Boss.Wrath.begin(), Boss.Wrath.end(),
+			[&Attacker](const std::pair<int, int>& Entry) { return Entry.first == Attacker.Id; });
+		if (Found != Boss.Wrath.end())
+		{
+			Found->second += Amount;
+		}
+		else
+		{
+			Boss.Wrath.emplace_back(Attacker.Id, Amount);
+		}
+		const int Side = Attacker.HomeTeam();
+		if (Side == 0 || Side == 1)
+		{
+			Boss.Claim[Side] += Amount;
+		}
+	}
+
+	void FBattle::UpdateHunt(FUnit& Boss, FTickReport& Report)
+	{
+		auto Prey = [this](int Id) -> FUnit*
+		{
+			FUnit* Each = FindUnit(Id);
+			return Each && !Each->bOffBoard && IsQuarry(*Each) ? Each : nullptr;
+		};
+		// The one it hunts: gone, or out of its sight for too long, and it lets go.
+		if (Boss.HuntTarget >= 0)
+		{
+			FUnit* Held = Prey(Boss.HuntTarget);
+			bool bLetGo = Held == nullptr;
+			if (Held && !CanSeeUnit(Boss.Team, *Held))
+			{
+				if (++Boss.HuntLost >= Camp::ScentTurns)
+				{
+					// The scent is lost: it forgets that one, and turns to the next.
+					bLetGo = true;
+					const int Lost = Boss.HuntTarget;
+					Boss.Wrath.erase(std::remove_if(Boss.Wrath.begin(), Boss.Wrath.end(),
+						[Lost](const std::pair<int, int>& Entry) { return Entry.first == Lost; }), Boss.Wrath.end());
+				}
+			}
+			else if (Held)
+			{
+				Boss.HuntLost = 0;
+			}
+			if (bLetGo)
+			{
+				if (FUnit* Was = FindUnit(Boss.HuntTarget))
+				{
+					RemoveStatus(*Was, "hunted");
+				}
+				Boss.HuntTarget = -1;
+				Boss.HuntLost = 0;
+			}
+		}
+		// Whoever has hurt it most, of those it could go for; the first to hurt it on a tie.
+		int Best = -1;
+		int Most = 0;
+		for (const std::pair<int, int>& Entry : Boss.Wrath)
+		{
+			if (Entry.second > Most && Prey(Entry.first))
+			{
+				Best = Entry.first;
+				Most = Entry.second;
+			}
+		}
+		if (Best >= 0 && Best != Boss.HuntTarget)
+		{
+			if (FUnit* Was = FindUnit(Boss.HuntTarget))
+			{
+				RemoveStatus(*Was, "hunted");
+			}
+			Boss.HuntTarget = Best;
+			Boss.HuntLost = 0;
+			FUnit& Hunted = *FindUnit(Best);
+			AddStatus(Hunted, "hunted", 99, 0, Boss.Id);
+			FEvent Event;
+			Event.Kind = EEventKind::Hunting;
+			Event.Unit = Boss.Id;
+			Event.By = Best;
+			Event.Where = Hunted.Pos;
+			Report.Events.push_back(Event);
+		}
+		if (Boss.HuntTarget >= 0)
+		{
+			// Its grudge is its prey, so it walks after it as it walks after a grudge.
+			Boss.Grudge = Boss.HuntTarget;
+			Boss.GrudgeTurns = std::max(Boss.GrudgeTurns, 1);
+		}
+	}
+
+	void FBattle::ClaimBoss(FUnit& Boss, const FUnit& Killer, FTickReport& Report)
+	{
+		const FMonsterInfo* Info = Boss.MonsterInfo();
+		if (!Info || Info->Tier < 3)
+		{
+			return;
+		}
+		if (FUnit* Prey = FindUnit(Boss.HuntTarget))
+		{
+			RemoveStatus(*Prey, "hunted");
+		}
+		Boss.HuntTarget = -1;
+		Boss.HuntLost = 0;
+		const int Side = Killer.HomeTeam();
+		if (Tuning.BossClaim >= 0.5 && (Side == 0 || Side == 1))
+		{
+			// The last blow takes the boon, for every one of its side still standing.
+			for (FUnit& Each : Units)
+			{
+				if (Each.IsAlive() && !Each.bMonster && Each.Team == Side)
+				{
+					AddStatus(Each, "boon", Camp::BoonTurns);
+				}
+			}
+			FEvent Claimed;
+			Claimed.Kind = EEventKind::BossClaimed;
+			Claimed.Unit = Boss.Id;
+			Claimed.By = Killer.Id;
+			Claimed.Amount = Side;
+			Claimed.Where = Boss.Pos;
+			Report.Events.push_back(Claimed);
+			// And the other side, for a big enough share of the work, a rare item.
+			const int Other = 1 - Side;
+			if (Boss.MaxHp() > 0 && Boss.Claim[Other] * 100 >= Camp::ClaimSharePercent * Boss.MaxHp())
+			{
+				std::vector<const FItemDef*> Prize;
+				RollLoot(2, 1, Prize);
+				if (!Prize.empty())
+				{
+					ToStash(Other, Prize[0], 0);
+					FEvent Share;
+					Share.Kind = EEventKind::ClaimShare;
+					Share.Unit = Boss.Id;
+					Share.Amount = Other;
+					Share.Id = Prize[0]->Id;
+					Share.Where = Boss.Pos;
+					Report.Events.push_back(Share);
+				}
+			}
+		}
+		Boss.Wrath.clear();
+		Boss.Claim[0] = 0;
+		Boss.Claim[1] = 0;
 	}
 }

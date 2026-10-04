@@ -10,7 +10,7 @@
     "damage"
   ],
   "stats": {
-    "hp": 88,
+    "hp": 79,
     "attdef": 6,
     "magdef": 13,
     "aeva": 6,
@@ -31,7 +31,7 @@
       "scale": "mag",
       "target": "enemy",
       "shape": "unit",
-      "power": 44,
+      "power": 30,
       "min_range": 1,
       "max_range": 7,
       "aoe": 0,
@@ -53,7 +53,7 @@
       "scale": "mag",
       "target": "enemy",
       "shape": "line",
-      "power": 22,
+      "power": 17,
       "min_range": 0,
       "max_range": 7,
       "aoe": 1,
@@ -105,7 +105,7 @@
       "scale": "mag",
       "target": "enemy",
       "shape": "circle",
-      "power": 56,
+      "power": 44,
       "min_range": 3,
       "max_range": 9,
       "aoe": 3,
@@ -188,6 +188,11 @@
         56
       ],
       "against": "reference team, medium"
-    }
+    },
+    "rebalanced": {
+      "on": "2026-10-03",
+      "why": "Tuning pass 2026-10-03 (lab 90% in place of the Archer): HP 88->79, power -21%. Before that (2026-10-02): Balance audit 2026-10-02: everyday hex power 38 (it won 83-96% in place of the Archer)"
+    },
+    "changedAt": "2026-10-03T03:45:00.000Z"
   }
 }

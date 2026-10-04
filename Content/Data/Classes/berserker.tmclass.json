@@ -10,10 +10,10 @@
     "damage"
   ],
   "stats": {
-    "hp": 115,
+    "hp": 136,
     "attdef": 7,
     "magdef": 4,
-    "aeva": 8,
+    "aeva": 12,
     "meva": 5,
     "crit": 18,
     "speed": 8,
@@ -31,7 +31,7 @@
       "scale": "att",
       "target": "enemy",
       "shape": "cone",
-      "power": 34,
+      "power": 46,
       "min_range": 0,
       "max_range": 3,
       "aoe": 0,
@@ -77,13 +77,13 @@
     {
       "id": "berserker_leap_smash",
       "name": "Leap Smash",
-      "desc": "Smash every enemy within 1.5 m of a point 2-5 m away; Stuns for 1 turn. (1 s)",
+      "desc": "Leap to a point 2-5 m away and smash every enemy within 1.5 m of where you land; Stuns for 1 turn. (1 s)",
       "kind": "active",
       "effect": "damage",
       "scale": "att",
       "target": "enemy",
       "shape": "circle",
-      "power": 46,
+      "power": 63,
       "min_range": 2,
       "max_range": 5,
       "aoe": 1.5,
@@ -98,7 +98,9 @@
         "system": "/Game/PotaVFX_Smoke/VFX/System/SmokeBurst/NS_MagicSmokeBurstAir.NS_MagicSmokeBurstAir",
         "at": "targets",
         "scale": 1
-      }
+      },
+      "anim": "heavy",
+      "special": "leap"
     },
     {
       "id": "berserker_rampage",
@@ -109,7 +111,7 @@
       "scale": "att",
       "target": "enemy",
       "shape": "self",
-      "power": 65,
+      "power": 89,
       "min_range": 0,
       "max_range": 0,
       "aoe": 2.5,
@@ -125,8 +127,8 @@
   ],
   "creator": {
     "rebalanced": {
-      "on": "2026-10-01",
-      "why": "Rage described as it plays (Crit, not the old AttPwr)"
+      "on": "2026-10-03",
+      "why": "Tuning pass 2026-10-03 (lab 25% in place of the Black Mage): HP 115->136, Evasion 8->12, power +36%. Before that (2026-10-03): Leap Smash leaps: he lands where he smashes"
     },
     "reworded": {
       "on": "2026-10-02",

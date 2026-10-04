@@ -30,7 +30,7 @@
       "scale": "mag",
       "target": "enemy",
       "shape": "unit",
-      "power": 37,
+      "power": 33,
       "min_range": 1,
       "max_range": 7,
       "aoe": 0,
@@ -44,37 +44,29 @@
       }
     },
     {
-      "id": "warlock_shadow_curse",
-      "name": "Shadow Curse",
-      "desc": "Weaken an enemy 2-8 m away for 2 turns; AttDef -5, MagDef -5. (1 s)",
+      "id": "warlock_rot_curse",
+      "name": "Rot Curse",
+      "desc": "Curse an enemy 2-8 m away with rot: a light hit, and Decay for 2 turns: healing on it hurts instead.",
       "kind": "active",
-      "effect": "support",
+      "effect": "damage",
       "scale": "mag",
       "target": "enemy",
       "shape": "unit",
-      "power": 0,
+      "power": 10,
       "min_range": 2,
       "max_range": 8,
       "aoe": 0,
       "cooldown": 3,
-      "cast": 1,
-      "buffs": [
-        {
-          "stat": "attdef",
-          "amount": -5,
-          "turns": 2
-        },
-        {
-          "stat": "magdef",
-          "amount": -5,
-          "turns": 2
-        }
-      ],
+      "cast": 0,
+      "status": {
+        "id": "decay",
+        "turns": 2
+      },
       "fx": "pin_shot",
       "vfx": {
-        "system": "/Game/ParagonGideon/FX/Particles/Gideon/Abilities/Burden/FX/P_Gideon_Burden_HitCharacter.P_Gideon_Burden_HitCharacter",
+        "system": "/Game/PotaVFX_Smoke/VFX/System/SmokeBurst/NS_MagicSmokeBurstAir.NS_MagicSmokeBurstAir",
         "at": "targets",
-        "scale": 1
+        "scale": 0.8
       }
     },
     {
@@ -142,6 +134,28 @@
     "reworded": {
       "on": "2026-10-02",
       "why": "Descriptions say what the abilities do (2026-10-02): Stun not sleep, Crit not the old Power, turns not seconds"
+    },
+    "icons": {
+      "abilities": [
+        null,
+        {
+          "backing": "circle",
+          "glyph": "skull",
+          "colour": "#9b6fd0",
+          "style": "light",
+          "mark": "unit",
+          "scale": 1,
+          "rotate": 0,
+          "badge": "none",
+          "finish": "lit"
+        },
+        null,
+        null
+      ]
+    },
+    "rebalanced": {
+      "on": "2026-10-04",
+      "why": "Status curse in place of Shadow Curse (never used): a light hit that leaves Decay for 2 turns (healing on it hurts instead)"
     }
   }
 }

@@ -138,14 +138,14 @@ int main(int ArgCount, char** Args)
 	const std::vector<std::string> GodotRows = { "112233211111", "112233211111", "111222111111", "111111111111", "122111121111", "123111121111" };
 	if (Highlands.Top != GodotRows)
 	{
-		Fail("Highlands is not Godot's map");
+		Fail("Highlands is not the map the baselines were recorded on");
 	}
 	const float GodotSpawns[4][2] = { { 2.75f, 4.75f }, { 0.75f, 8.75f }, { 4.75f, 6.75f }, { 2.75f, 10.75f } };
 	for (int i = 0; i < 4; ++i)
 	{
 		if (Highlands.Spawns.size() != 4 || Highlands.Spawns[i].X != GodotSpawns[i][0] || Highlands.Spawns[i].Y != GodotSpawns[i][1])
 		{
-			Fail("Highlands' spawns are not Godot's WEST_SPAWNS");
+			Fail("Highlands' spawns are not the recorded ones");
 		}
 	}
 	if (!CheckMap(Highlands).empty())

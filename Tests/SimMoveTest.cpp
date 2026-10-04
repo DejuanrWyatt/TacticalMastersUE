@@ -1,5 +1,9 @@
-// Checks walking against the Godot version: the ground, where a unit can get
-// to, what it costs, and the way it goes.
+// Checks walking against its recorded baseline (Baselines/MoveTable.txt, first
+// recorded from the Godot version): the ground, where a unit can get to, what
+// it costs, and the way it goes. With --rebaseline the table is written again
+// from the rules (Baseline.h).
+//
+//   SimMoveTest [Baselines/MoveTable.txt] [--rebaseline]
 //
 // The last of those is the fussy one and the reason the pathfinder was ported
 // as a transcription rather than rewritten. Two routes of the same length are
@@ -7,8 +11,10 @@
 // order and the neighbours are tried in the same order. A replay that picks the
 // other route is a replay that goes wrong, quietly, several seconds later.
 
+#include "Baseline.h"
 #include "SimBattle.h"
 
+#include <algorithm>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -233,6 +239,202 @@ namespace
 		return Checks;
 	}
 
+	/**
+	 * Facing on arrival (2026-10-03): a walk told which way to face ends facing
+	 * exactly that way, every one of the eight; one not told faces its last
+	 * step, as before; Off-Balance keeps it from turning either way; and a way
+	 * that isn't one of the eight is refused.
+	 */
+	int CheckFacing(const FBattle& Original)
+	{
+		int Checks = 0;
+		for (const FUnit& Each : Original.Units)
+		{
+			if (!Each.IsAlive())
+			{
+				continue;
+			}
+			FBattle Probe = Original;
+			FUnit& Walker = *Probe.FindUnit(Each.Id);
+			Walker.bReady = true;
+			Walker.bMoved = false;
+			Walker.bActed = false;
+			const FNode Start = FMap::NodeOf(Walker.Pos);
+			FNode Far = Start;
+			double FarCost = -1.0;
+			for (const auto& Pair : Probe.ReachableNodes(Walker))
+			{
+				if (!(Pair.first == Start) && Pair.second > FarCost)
+				{
+					Far = Pair.first;
+					FarCost = Pair.second;
+				}
+			}
+			if (FarCost < 0.0)
+			{
+				continue;
+			}
+			const FVec2 To = FMap::NodePos(Far);
+			for (int Way = -1; Way < FacingWays; ++Way)
+			{
+				FBattle Battle = Probe;
+				FUnit& Unit = *Battle.FindUnit(Each.Id);
+				FOrder Order = FOrder::MakeMove(Unit.Id, -1, To, false, {}, Way);
+				const std::string Refused = Battle.Validate(Order);
+				FTickReport Report;
+				++Checks;
+				if (!Refused.empty() || !Battle.Apply(Order, Report))
+				{
+					Fail("unit " + std::to_string(Unit.Id) + ": a walk with a facing is refused: " + Refused);
+					continue;
+				}
+				const bool bRight = Way >= 0
+					? (Unit.Facing.X == FacingWay(Way).X && Unit.Facing.Y == FacingWay(Way).Y)
+					: std::abs(Unit.Facing.Length() - 1.0f) < 0.001f;
+				if (!(Unit.Pos == To) || !bRight)
+				{
+					Fail("unit " + std::to_string(Unit.Id) + ": a walk told to face way " + std::to_string(Way) + " faces otherwise");
+				}
+			}
+			// Off-Balance: told to face a way, it still faces as it did.
+			{
+				FBattle Battle = Probe;
+				FUnit& Unit = *Battle.FindUnit(Each.Id);
+				FStatus Off;
+				Off.Id = "offbalance";
+				Off.Turns = 2;
+				Unit.Statuses.push_back(Off);
+				const FVec2 Before = Unit.Facing;
+				FTickReport Report;
+				++Checks;
+				Battle.ApplyMove(Unit.Id, To, false, Report, {}, 2);
+				if (!(Unit.Facing.X == Before.X && Unit.Facing.Y == Before.Y))
+				{
+					Fail("unit " + std::to_string(Unit.Id) + ": Off-Balance turned to face the way it was told");
+				}
+			}
+			// Not one of the eight.
+			for (const int Bad : { -2, FacingWays, 99 })
+			{
+				FBattle Battle = Probe;
+				++Checks;
+				if (Battle.Validate(FOrder::MakeMove(Each.Id, -1, To, false, {}, Bad)).empty())
+				{
+					Fail("unit " + std::to_string(Each.Id) + ": a facing of " + std::to_string(Bad) + " is allowed");
+				}
+			}
+			break;  // one unit shows it; the rest walk the same way
+		}
+		return Checks;
+	}
+
+	// Zones of control as the HUD shows them (2026-10-02, "Zone of Control Mockups"
+	// B and D): the ground an enemy tank takes away is what the walk can reach
+	// without zones and cannot with them; and a tank stood in the way can cut an
+	// enemy's way to the back line, and is back where it was afterwards.
+	int CheckZones()
+	{
+		int Checks = 0;
+		const FMapDef Def = FindMap("highlands");
+		FBattle Battle;
+		Battle.Map.BuildMirrored(Def.Top);
+		const FVec2 Size = Battle.Map.SizeMeters();
+		Battle.SpawnPoints[0] = Def.Spawns[0];
+		Battle.SpawnPoints[1] = FVec2(Size.X - Def.Spawns[0].X, Size.Y - Def.Spawns[0].Y);
+		const FVec2 Middle(Size.X * 0.5f, Size.Y * 0.5f);
+		const char* Jobs[] = { "archer", "knight", "white_mage", "knight" };
+		const int Teams[] = { 0, 1, 0, 0 };
+		const FVec2 Spots[] = { Middle + FVec2(-4.0f, 0.0f), Middle, Middle + FVec2(-6.0f, 3.0f), Middle + FVec2(-3.0f, -4.0f) };
+		for (int i = 0; i < 4; ++i)
+		{
+			FUnit Unit;
+			Unit.Id = i;
+			Unit.Team = Teams[i];
+			Unit.Job = Jobs[i];
+			Unit.Pos = FMap::Snap(Spots[i]);
+			Battle.Units.push_back(Unit);
+		}
+		Battle.Start(3);
+		for (FUnit& Unit : Battle.Units)
+		{
+			Unit.Pos = FMap::Snap(Spots[Unit.Id]);
+		}
+		Battle.Tuning.ZoneOfControl = 1.0;
+		const FUnit& Archer = Battle.Units[0];
+
+		++Checks;
+		if (!FBattle::HoldsTheLine(Battle.Units[1]) || FBattle::HoldsTheLine(Archer))
+		{
+			Fail("zones: a knight holds the line and an archer does not");
+		}
+		const std::vector<FNode> Shadow = Battle.ZoneShadow(Archer, {});
+		const std::vector<std::pair<FNode, double>> With = Battle.ReachableNodes(Archer);
+		Battle.Tuning.ZoneOfControl = 0.0;
+		const std::vector<std::pair<FNode, double>> Without = Battle.ReachableNodes(Archer);
+		Battle.Tuning.ZoneOfControl = 1.0;
+		++Checks;
+		if (Shadow.empty() || With.size() + Shadow.size() != Without.size())
+		{
+			Fail("zones: the ground a tank takes away should be what the walk loses to it (" + std::to_string(Shadow.size()) + ")");
+		}
+		for (const FNode& Node : Shadow)
+		{
+			for (const std::pair<FNode, double>& Entry : With)
+			{
+				if (Entry.first == Node)
+				{
+					Fail("zones: ground taken away is still in the walk");
+				}
+			}
+		}
+		++Checks;
+		if (!Shadow.empty())
+		{
+			const std::vector<FVec2> Ghost = Battle.PathIgnoringZones(Archer, {}, Shadow.back());
+			if (Ghost.empty() || !Battle.PathVia(Archer, {}, Shadow.back()).empty())
+			{
+				Fail("zones: past a zone there is a way only when zones are ignored");
+			}
+		}
+		Battle.Tuning.ZoneOfControl = 0.0;
+		++Checks;
+		if (!Battle.ZoneShadow(Archer, {}).empty())
+		{
+			Fail("zones: with the rule off nothing is taken away");
+		}
+		Battle.Tuning.ZoneOfControl = 1.0;
+
+		// Somewhere the blue knight can stand cuts the red knight's way to the
+		// archer or the white mage, and the knight is put back each time.
+		const FVec2 Home = Battle.Units[3].Pos;
+		bool bCut = false;
+		bool bReached = false;
+		for (const std::pair<FNode, double>& Entry : Battle.ReachableNodes(Battle.Units[3]))
+		{
+			const std::vector<FLane> Lanes = Battle.TankLanes(3, FMap::NodePos(Entry.first), { 1 }, { 0, 2 });
+			for (const FLane& Lane : Lanes)
+			{
+				bReached = bReached || !Lane.Before.empty();
+				bCut = bCut || Lane.After.size() < Lane.Before.size();
+				if (Lane.TowardId < 0 || (!Lane.After.empty() && Lane.Path.empty()))
+				{
+					Fail("zones: a lane without its target or its walk");
+				}
+			}
+			if (!(Battle.Units[3].Pos == Home))
+			{
+				Fail("zones: the tank was not put back where it stood");
+				break;
+			}
+		}
+		++Checks;
+		if (!bReached || !bCut)
+		{
+			Fail("zones: the red knight should reach the back line, and a spot for the blue knight should cut it");
+		}
+		return Checks;
+	}
+
 	struct FSeedUnit
 	{
 		int Id = 0;
@@ -244,7 +446,12 @@ namespace
 
 int main(int argc, char** argv)
 {
-	const char* Path = argc > 1 ? argv[1] : "GodotMoveTable.txt";
+	const std::vector<std::string> Args = TMBaseline::Paths(argc, argv);
+	const std::string PathText = Args.empty() ? std::string("Baselines/MoveTable.txt") : Args[0];
+	const char* Path = PathText.c_str();
+	TMBaseline::FWriter Writer;
+	Writer.bOn = TMBaseline::Asked(argc, argv);
+	Writer.Path = PathText;
 	std::ifstream File(Path);
 	if (!File)
 	{
@@ -268,13 +475,14 @@ int main(int argc, char** argv)
 		{
 			Line.pop_back();
 		}
+		Writer.Read(Line);
 
 		if (Line.rfind("MAP ", 0) == 0)
 		{
 			const int TilesX = static_cast<int>(ValueOf(Line, "tiles", 0));
 			if (Battle.Map.TilesX != 12 || Battle.Map.NavX != 48)
 			{
-				Fail("the ported map is " + std::to_string(Battle.Map.TilesX) + " tiles wide, Godot's is 12");
+				Fail("the map is " + std::to_string(Battle.Map.TilesX) + " tiles wide, the baseline's is 12");
 			}
 			(void)TilesX;
 			continue;
@@ -292,16 +500,29 @@ int main(int argc, char** argv)
 					Want.push_back(std::atoi(Cell.c_str()));
 				}
 			}
-			if (Want != Battle.Map.Heights)
+			if (Writer.bOn)
 			{
-				Fail("the ground does not match Godot's (" + std::to_string(Want.size())
+				if (Want != Battle.Map.Heights)
+				{
+					std::string Row = "HEIGHTS ";
+					for (const int Height : Battle.Map.Heights)
+					{
+						Row += std::to_string(Height) + ",";
+					}
+					Row.pop_back();
+					Writer.Set(Row);
+				}
+			}
+			else if (Want != Battle.Map.Heights)
+			{
+				Fail("the ground does not match the baseline's (" + std::to_string(Want.size())
 					+ " tiles expected, " + std::to_string(Battle.Map.Heights.size()) + " built)");
 				for (size_t i = 0; i < Want.size() && i < Battle.Map.Heights.size(); ++i)
 				{
 					if (Want[i] != Battle.Map.Heights[i])
 					{
-						Fail("  first difference at tile " + std::to_string(i) + ": ported "
-							+ std::to_string(Battle.Map.Heights[i]) + ", Godot " + std::to_string(Want[i]));
+						Fail("  first difference at tile " + std::to_string(i) + ": the rules "
+							+ std::to_string(Battle.Map.Heights[i]) + ", the baseline " + std::to_string(Want[i]));
 						break;
 					}
 				}
@@ -350,10 +571,17 @@ int main(int argc, char** argv)
 			if (const FJobDef* Job2 = FindJob(Seed.Job))
 			{
 				JobStats[Seed.Job] = Job2->Stats;
-				if (Job2->Stats.Get(EStat::Move) != static_cast<int>(ValueOf(Line, "move", -1)))
+				if (Writer.bOn && Job2->Stats.Get(EStat::Move) != static_cast<int>(ValueOf(Line, "move", -1)))
+				{
+					const size_t MoveAt = Line.find("move=");
+					const size_t MoveEnd = Line.find(' ', MoveAt);
+					Writer.Set(Line.substr(0, MoveAt) + "move=" + std::to_string(Job2->Stats.Get(EStat::Move))
+						+ (MoveEnd == std::string::npos ? std::string() : Line.substr(MoveEnd)));
+				}
+				else if (Job2->Stats.Get(EStat::Move) != static_cast<int>(ValueOf(Line, "move", -1)))
 				{
 					Fail(Seed.Job + " walks " + std::to_string(Job2->Stats.Get(EStat::Move))
-						+ " here and " + std::to_string(static_cast<int>(ValueOf(Line, "move", -1))) + " in Godot");
+						+ " here and " + std::to_string(static_cast<int>(ValueOf(Line, "move", -1))) + " in the baseline");
 				}
 			}
 			else
@@ -361,7 +589,7 @@ int main(int argc, char** argv)
 				Fail("no class registered called " + Seed.Job);
 			}
 
-			// Put the units on the board as Godot has them, so what follows is
+			// Put the units on the board as the baseline has them, so what follows is
 			// about walking rather than about where anybody started.
 			FUnit Unit;
 			Unit.Id = Seed.Id;
@@ -405,10 +633,32 @@ int main(int argc, char** argv)
 
 			const auto Got = Battle.ReachableNodes(*Unit, Mode == "sprint");
 			++Checked;
+			if (Writer.bOn)
+			{
+				// Written in the table's order, row by row, if anything differs.
+				auto Cells = Got;
+				std::sort(Cells.begin(), Cells.end(), [](const auto& A, const auto& B)
+					{ return A.first.Y != B.first.Y ? A.first.Y < B.first.Y : A.first.X < B.first.X; });
+				bool bDiffers = static_cast<int>(Cells.size()) != Count;
+				std::string Row = "  " + std::to_string(Id) + " " + Mode + " " + std::to_string(Cells.size());
+				for (const auto& Pair : Cells)
+				{
+					char Written[48];
+					std::snprintf(Written, sizeof(Written), " %d:%d:%.4f", Pair.first.X, Pair.first.Y, Pair.second);
+					Row += Written;
+					const auto Found = Want.find(static_cast<long long>(Pair.first.Y) * 1000 + Pair.first.X);
+					bDiffers = bDiffers || Found == Want.end() || std::abs(Found->second - Pair.second) > 0.001;
+				}
+				if (bDiffers)
+				{
+					Writer.Set(Row);
+				}
+				continue;
+			}
 			if (static_cast<int>(Got.size()) != Count)
 			{
 				Fail("unit " + std::to_string(Id) + " " + Mode + ": reaches "
-					+ std::to_string(Got.size()) + " spots, Godot reaches " + std::to_string(Count));
+					+ std::to_string(Got.size()) + " spots, the baseline reaches " + std::to_string(Count));
 				continue;
 			}
 			for (const auto& Pair : Got)
@@ -419,14 +669,14 @@ int main(int argc, char** argv)
 				{
 					Fail("unit " + std::to_string(Id) + " " + Mode + ": reaches "
 						+ std::to_string(Pair.first.X) + "," + std::to_string(Pair.first.Y)
-						+ " and Godot does not");
+						+ " and the baseline does not");
 					break;
 				}
 				if (std::abs(Found->second - Pair.second) > 0.001)
 				{
 					char Buffer[192];
 					std::snprintf(Buffer, sizeof(Buffer),
-						"unit %d %s: %d,%d costs %.4f here and %.4f in Godot",
+						"unit %d %s: %d,%d costs %.4f here and %.4f in the baseline",
 						Id, Mode.c_str(), Pair.first.X, Pair.first.Y, Pair.second, Found->second);
 					Fail(Buffer);
 					break;
@@ -466,10 +716,27 @@ int main(int argc, char** argv)
 
 			const auto Got = Battle.PathTo(*Unit, FNode{ Nx, Ny });
 			++Checked;
+			if (Writer.bOn)
+			{
+				bool bDiffers = Got.size() != Want.size();
+				std::string Row = "  " + std::to_string(Id) + " " + Target;
+				for (size_t i = 0; i < Got.size(); ++i)
+				{
+					char Written[48];
+					std::snprintf(Written, sizeof(Written), " %.2f,%.2f", Got[i].X, Got[i].Y);
+					Row += Written;
+					bDiffers = bDiffers || std::abs(Got[i].X - Want[i].X) > 0.01f || std::abs(Got[i].Y - Want[i].Y) > 0.01f;
+				}
+				if (bDiffers)
+				{
+					Writer.Set(Row);
+				}
+				continue;
+			}
 			if (Got.size() != Want.size())
 			{
 				Fail("unit " + std::to_string(Id) + " to " + Target + ": path is "
-					+ std::to_string(Got.size()) + " steps, Godot's is " + std::to_string(Want.size()));
+					+ std::to_string(Got.size()) + " steps, the baseline's is " + std::to_string(Want.size()));
 				continue;
 			}
 			for (size_t i = 0; i < Got.size(); ++i)
@@ -478,7 +745,7 @@ int main(int argc, char** argv)
 				{
 					char Buffer[192];
 					std::snprintf(Buffer, sizeof(Buffer),
-						"unit %d to %s: step %d is %.2f,%.2f here and %.2f,%.2f in Godot",
+						"unit %d to %s: step %d is %.2f,%.2f here and %.2f,%.2f in the baseline",
 						Id, Target.c_str(), static_cast<int>(i), Got[i].X, Got[i].Y, Want[i].X, Want[i].Y);
 					Fail(Buffer);
 					break;
@@ -489,6 +756,10 @@ int main(int argc, char** argv)
 	}
 
 	std::printf("%d checks over %d units\n", Checked, static_cast<int>(Battle.Units.size()));
+	if (Writer.bOn && !Writer.Finish())
+	{
+		return 1;
+	}
 	const int Before = Failures;
 	const int WayChecks = CheckWaypoints(Battle);
 	std::printf("waypoints: %d checks, %s\n", WayChecks, Failures == Before && WayChecks > 0 ? "as the rules say" : "WRONG");
@@ -496,13 +767,23 @@ int main(int argc, char** argv)
 	{
 		Fail("no waypoint was checked");
 	}
+	const int BeforeFacing = Failures;
+	const int FacingChecks = CheckFacing(Battle);
+	std::printf("facing on arrival: %d checks, %s\n", FacingChecks, Failures == BeforeFacing && FacingChecks > 0 ? "as the rules say" : "WRONG");
+	if (FacingChecks == 0)
+	{
+		Fail("no facing was checked");
+	}
+	const int BeforeZones = Failures;
+	const int ZoneChecks = CheckZones();
+	std::printf("zones of control: %d checks, %s\n", ZoneChecks, Failures == BeforeZones ? "as the rules say" : "WRONG");
 	if (Checked == 0)
 	{
 		std::printf("\nNOTHING WAS CHECKED\n");
 		return 1;
 	}
 	std::printf("\n%s\n", Failures == 0
-		? "WALKING GOES WHERE IT GOES IN GODOT"
-		: "DIVERGED FROM GODOT");
+		? "WALKING GOES WHERE ITS BASELINE SAYS"
+		: "DIVERGED FROM THE BASELINE");
 	return Failures == 0 ? 0 : 1;
 }

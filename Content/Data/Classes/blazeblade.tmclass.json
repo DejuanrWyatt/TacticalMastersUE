@@ -10,7 +10,7 @@
     "damage"
   ],
   "stats": {
-    "hp": 90,
+    "hp": 78,
     "attdef": 10,
     "magdef": 8,
     "aeva": 10,
@@ -31,7 +31,7 @@
       "scale": "att",
       "target": "enemy",
       "shape": "unit",
-      "power": 31,
+      "power": 23,
       "min_range": 0,
       "max_range": 1.8,
       "aoe": 0,
@@ -53,7 +53,7 @@
       "scale": "mag",
       "target": "enemy",
       "shape": "unit",
-      "power": 38,
+      "power": 28,
       "min_range": 0,
       "max_range": 1.8,
       "aoe": 0,
@@ -79,7 +79,7 @@
       "scale": "mag",
       "target": "enemy",
       "shape": "line",
-      "power": 26,
+      "power": 19,
       "min_range": 2,
       "max_range": 7,
       "aoe": 0.7,
@@ -101,7 +101,7 @@
       "scale": "mag",
       "target": "enemy",
       "shape": "self",
-      "power": 42,
+      "power": 31,
       "min_range": 0,
       "max_range": 0,
       "aoe": 2.5,
@@ -118,5 +118,11 @@
         "scale": 1
       }
     }
-  ]
+  ],
+  "creator": {
+    "rebalanced": {
+      "on": "2026-10-03",
+      "why": "Tuning pass 2026-10-03 (lab 70% in place of the Knight): HP 90->78, power -26%"
+    }
+  }
 }

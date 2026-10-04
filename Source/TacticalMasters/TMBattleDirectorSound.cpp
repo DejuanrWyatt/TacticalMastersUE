@@ -218,7 +218,12 @@ void ATMBattleDirector::SoundBlowStarts(const FTMBlow& Blow, int32 Slot)
 		return;
 	}
 	const FVector Where = WorldFor(Battle.Units[Caster]) + FVector(0.0f, 0.0f, 100.0f);
-	PlaySound(SoundsOf(Blow.Ability, Blow.Motion).Key, &Where);
+	// An ability with sounds of its own from Cast Studio plays those instead (TMBattleDirectorCast.cpp).
+	const TMCast::FLook* Authored = CastLookOf(Blow.Ability);
+	if (!Authored || !Authored->HasSound())
+	{
+		PlaySound(SoundsOf(Blow.Ability, Blow.Motion).Key, &Where);
+	}
 	// The hero's own effort with it: its primary, Q, E or ultimate by slot.
 	static const TCHAR* BySlot[4] = { TEXT("primary"), TEXT("q"), TEXT("e"), TEXT("ultimate") };
 	PlayVoice(Caster, BySlot[FMath::Clamp(Slot, 0, 3)], Slot == 3 ? 1.0f : 0.6f);
@@ -244,7 +249,8 @@ void ATMBattleDirector::SoundBlowLands(const FTMBlow& Blow)
 			break;
 		}
 	}
-	if (IsPointSeen(Blow.Aim))
+	const TMCast::FLook* Authored = CastLookOf(Blow.Ability);
+	if (IsPointSeen(Blow.Aim) && (!Authored || !Authored->HasSound()))
 	{
 		PlaySound(SoundsOf(Blow.Ability, Blow.Motion).Value, &Where);
 	}

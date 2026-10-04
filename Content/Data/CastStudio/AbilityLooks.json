@@ -1,0 +1,468 @@
+{
+  "format": "tactical-masters-ability-looks",
+  "schemaVersion": 1,
+  "abilities": {
+    "aeromancer_tailwind": {
+      "strip": "none",
+      "events": [
+        {
+          "moment": "castStart",
+          "effect": "sound",
+          "sound": "/Game/FreeModularMagicSFX/A_Chant/Mono/SW_MagicChant_WindCharge_1.SW_MagicChant_WindCharge_1",
+          "volume": 0.8
+        },
+        {
+          "moment": "impact",
+          "effect": "/Game/FreeParticle_SoftTofu/Niagara/NS_feather.NS_feather",
+          "size": 160,
+          "duration": 1.5
+        },
+        {
+          "moment": "impact",
+          "effect": "light",
+          "tint": [
+            0.6,
+            1,
+            0.75
+          ],
+          "brightness": 6000,
+          "radius": 250
+        },
+        {
+          "moment": "impact",
+          "effect": "sound",
+          "sound": "/Game/FreeModularMagicSFX/C_Cast/Mono/SW_MagicCast_Buff2_1.SW_MagicCast_Buff2_1",
+          "volume": 0.7
+        },
+        {
+          "moment": "allyStatus",
+          "effect": "/Game/FreeParticle_SoftTofu/Niagara/NS_Sparkling_Glow.NS_Sparkling_Glow",
+          "size": 120
+        }
+      ]
+    },
+    "ash_witch_pitch_curse": {
+      "strip": "none",
+      "events": [
+        {
+          "moment": "release",
+          "effect": "sound",
+          "sound": "/Game/FreeModularMagicSFX/C_Cast/Mono/SW_MagicCast_ThrowToxin_2.SW_MagicCast_ThrowToxin_2"
+        },
+        {
+          "moment": "impact",
+          "effect": "/Game/PotaVFX_Smoke/VFX/System/ColorSmoke/NS_SmokeGradient_Loop.NS_SmokeGradient_Loop",
+          "size": 110,
+          "duration": 1.2
+        },
+        {
+          "moment": "impact",
+          "effect": "sound",
+          "sound": "/Game/FreeModularMagicSFX/E_Impact/Mono/SW_MagicImpact_Fire_2.SW_MagicImpact_Fire_2",
+          "volume": 0.6
+        },
+        {
+          "moment": "targetStatus",
+          "effect": "/Game/ParagonIggyScorch/FX/Particles/IggyScorch/Abilities/Passive/FX/P_IggyScorch_OilDebuff.P_IggyScorch_OilDebuff",
+          "size": 120
+        }
+      ]
+    },
+    "berserker_cleave": {
+      "strip": "none",
+      "events": [
+        {
+          "moment": "impact",
+          "effect": "/Game/ParagonGreystone/FX/Particles/Greystone/Abilities/ClearAPath/FX/P_Greystone_SwordSpinning_Start.P_Greystone_SwordSpinning_Start",
+          "follow": true,
+          "size": 180
+        },
+        {
+          "moment": "castStart",
+          "effect": "sound",
+          "sound": "/Game/ParagonGrux/Characters/Heroes/Grux/Sounds/SoundCues/Grux_Ability_E_Engage.Grux_Ability_E_Engage"
+        },
+        {
+          "moment": "impact",
+          "effect": "sound",
+          "sound": "/Game/Essential_Foosteps_SK/WAV/Dirt/Footstep_Dirt_Boots_Jump_1.Footstep_Dirt_Boots_Jump_1"
+        }
+      ]
+    },
+    "berserker_rage": {
+      "strip": "none",
+      "events": [
+        {
+          "moment": "castStart",
+          "effect": "sound",
+          "sound": "/Game/ParagonGrux/Characters/Heroes/Grux/Sounds/SoundCues/Grux_Effort_Cheer.Grux_Effort_Cheer"
+        }
+      ]
+    },
+    "berserker_rampage": {
+      "strip": "none",
+      "events": [
+        {
+          "moment": "impact",
+          "effect": "/Game/ParagonGreystone/FX/Particles/Greystone/Abilities/ClearAPath/FX/P_Greystone_SwordSpinning_Start.P_Greystone_SwordSpinning_Start",
+          "size": 180
+        },
+        {
+          "moment": "castStart",
+          "effect": "sound",
+          "sound": "/Game/ParagonGrux/Characters/Heroes/Grux/Sounds/SoundCues/Grux_Ability_Ultimate_Ally.Grux_Ability_Ultimate_Ally"
+        }
+      ]
+    },
+    "cryomancer_frost_armor": {
+      "strip": "none",
+      "events": [
+        {
+          "moment": "castStart",
+          "effect": "sound",
+          "sound": "/Game/FreeModularMagicSFX/C_Cast/Mono/SW_MagicCast_IceCrystal2_1.SW_MagicCast_IceCrystal2_1"
+        },
+        {
+          "moment": "impact",
+          "effect": "/Game/ParagonAurora/FX/Particles/Abilities/Leap/FX/P_Aurora_Decoy_Frost.P_Aurora_Decoy_Frost",
+          "anchor": "ground",
+          "size": 140
+        },
+        {
+          "moment": "impact",
+          "effect": "light",
+          "tint": [
+            0.6,
+            0.85,
+            1.2
+          ],
+          "brightness": 7000,
+          "radius": 250
+        },
+        {
+          "moment": "impact",
+          "effect": "sound",
+          "sound": "/Game/FreeModularMagicSFX/C_Cast/Mono/SW_MagicCast_CreatingBarrier1_1.SW_MagicCast_CreatingBarrier1_1",
+          "volume": 0.7
+        },
+        {
+          "moment": "allyStatus",
+          "effect": "/Game/ParagonGRIMexe/FX/Particles/Abilities/EnergyShield/FX/p_GRIM_EnergyShield_Resizable.p_GRIM_EnergyShield_Resizable",
+          "size": 170
+        }
+      ]
+    },
+    "druid_entangle": {
+      "strip": "none",
+      "events": [
+        {
+          "moment": "castStart",
+          "effect": "sound",
+          "sound": "/Game/FreeModularMagicSFX/C_Cast/Mono/SW_MagicCast_StaffStrikeGround_1.SW_MagicCast_StaffStrikeGround_1"
+        },
+        {
+          "moment": "area",
+          "effect": "/Game/ParagonFey/FX/Particles/Fey/Abilities/Ultimate/FX/P_Ultimate_Root_Spikes.P_Ultimate_Root_Spikes",
+          "fit": "area"
+        },
+        {
+          "moment": "area",
+          "effect": "/Game/FreeParticle_SoftTofu/Niagara/NS_leaf.NS_leaf",
+          "fit": "area",
+          "duration": 1.5
+        },
+        {
+          "moment": "area",
+          "effect": "light",
+          "fit": "area",
+          "tint": [
+            0.6,
+            1.1,
+            0.5
+          ],
+          "brightness": 6000
+        },
+        {
+          "moment": "area",
+          "effect": "sound",
+          "sound": "/Game/FreeModularMagicSFX/C_Cast/Mono/SW_MagicCast_GroundStrike_1.SW_MagicCast_GroundStrike_1",
+          "volume": 0.8
+        },
+        {
+          "moment": "targetStatus",
+          "effect": "/Game/ParagonFey/FX/Particles/Fey/Abilities/Growth/FX/P_Fey_Growth_Plants_Individual.P_Fey_Growth_Plants_Individual",
+          "anchor": "ground",
+          "size": 130
+        }
+      ]
+    },
+    "exorcist_banish": {
+      "strip": "none",
+      "events": [
+        {
+          "moment": "release",
+          "effect": "sound",
+          "sound": "/Game/FreeModularMagicSFX/B_Transition/Mono/SW_MagicFade_LightingAppear_1.SW_MagicFade_LightingAppear_1",
+          "volume": 0.8
+        },
+        {
+          "moment": "impact",
+          "effect": "/Game/ParagonKwang/FX/Particles/Abilities/LightStrike/FX/P_KwangBuff.P_KwangBuff",
+          "size": 120
+        },
+        {
+          "moment": "impact",
+          "effect": "light",
+          "tint": [
+            1.2,
+            1.1,
+            0.8
+          ],
+          "brightness": 8000,
+          "radius": 250
+        },
+        {
+          "moment": "impact",
+          "effect": "sound",
+          "sound": "/Game/FreeModularMagicSFX/E_Impact/Mono/SW_MagicImpact_Barrier_1.SW_MagicImpact_Barrier_1"
+        },
+        {
+          "moment": "targetStatus",
+          "effect": "/Game/FreeParticle_SoftTofu/Niagara/NS_Sparkling_Moon.NS_Sparkling_Moon",
+          "anchor": "head",
+          "size": 80
+        }
+      ]
+    },
+    "flame_sorcerer_kindling": {
+      "strip": "none",
+      "events": [
+        {
+          "moment": "release",
+          "effect": "sound",
+          "sound": "/Game/FreeModularMagicSFX/C_Cast/Mono/SW_MagicCast_ThrowToxin_1.SW_MagicCast_ThrowToxin_1"
+        },
+        {
+          "moment": "impact",
+          "effect": "/Game/PotaVFX_Smoke/VFX/System/ColorSmoke/NS_SmokeGradient_Loop.NS_SmokeGradient_Loop",
+          "size": 110,
+          "duration": 1.2
+        },
+        {
+          "moment": "impact",
+          "effect": "sound",
+          "sound": "/Game/FreeModularMagicSFX/C_Cast/Mono/SW_MagicCast_Liquid_Gore_1.SW_MagicCast_Liquid_Gore_1",
+          "volume": 0.8
+        },
+        {
+          "moment": "targetStatus",
+          "effect": "/Game/ParagonIggyScorch/FX/Particles/IggyScorch/Abilities/Passive/FX/P_IggyScorch_OilDebuff.P_IggyScorch_OilDebuff",
+          "size": 120
+        }
+      ]
+    },
+    "frost_hexer_hex": {
+      "strip": "none",
+      "events": [
+        {
+          "moment": "castStart",
+          "effect": "/Game/FreeNiagaraPack/Effects/NS_ActiveAtom.NS_ActiveAtom",
+          "anchor": "hand",
+          "size": 180
+        }
+      ]
+    },
+    "necromancer_wither": {
+      "strip": "none",
+      "events": [
+        {
+          "moment": "release",
+          "effect": "sound",
+          "sound": "/Game/FreeModularMagicSFX/B_Transition/Mono/SW_MagicFade_Bass1_1.SW_MagicFade_Bass1_1"
+        },
+        {
+          "moment": "impact",
+          "effect": "/Game/ParagonKallari/FX/Particles/Kallari/Skins/Rogue/P_Shadow_Bonus_Damage_Rogue.P_Shadow_Bonus_Damage_Rogue",
+          "size": 120
+        },
+        {
+          "moment": "impact",
+          "effect": "light",
+          "tint": [
+            0.8,
+            0.4,
+            1
+          ],
+          "brightness": 5000,
+          "radius": 200
+        },
+        {
+          "moment": "impact",
+          "effect": "sound",
+          "sound": "/Game/FreeModularMagicSFX/C_Cast/Mono/SW_MagicCast_Liquid_Gore_2.SW_MagicCast_Liquid_Gore_2",
+          "volume": 0.7
+        },
+        {
+          "moment": "targetStatus",
+          "effect": "/Game/FreeParticle_SoftTofu/Niagara/NS_Sparkling_Skull.NS_Sparkling_Skull",
+          "anchor": "head",
+          "size": 110
+        }
+      ]
+    },
+    "oracle_foretell": {
+      "strip": "none",
+      "events": [
+        {
+          "moment": "release",
+          "effect": "sound",
+          "sound": "/Game/FreeModularMagicSFX/A_Chant/Mono/SW_MagicChant_HighPitch_1.SW_MagicChant_HighPitch_1",
+          "volume": 0.7
+        },
+        {
+          "moment": "impact",
+          "effect": "/Game/ParagonKwang/FX/Particles/Abilities/LightStrike/FX/P_LightStrikeImpact.P_LightStrikeImpact",
+          "size": 120
+        },
+        {
+          "moment": "impact",
+          "effect": "sound",
+          "sound": "/Game/FreeModularMagicSFX/E_Impact/Mono/SW_MagicImpact_Crystal_1.SW_MagicImpact_Crystal_1"
+        },
+        {
+          "moment": "targetStatus",
+          "effect": "/Game/ParagonGRIMexe/FX/Particles/Abilities/Ultimate/FX/P_GRIM_Ultimate_Target_EnemyAttached.P_GRIM_Ultimate_Target_EnemyAttached",
+          "size": 110
+        }
+      ]
+    },
+    "sea_witch_drown_curse": {
+      "strip": "none",
+      "events": [
+        {
+          "moment": "release",
+          "effect": "sound",
+          "sound": "/Game/FreeModularMagicSFX/C_Cast/Mono/SW_MagicCast_Liquid_Water_2.SW_MagicCast_Liquid_Water_2",
+          "volume": 0.8
+        },
+        {
+          "moment": "impact",
+          "effect": "/Game/ParagonDekker/FX/Particles/Abilities/Line/FX/P_DekkerLineGroundDamage_Water.P_DekkerLineGroundDamage_Water",
+          "size": 120
+        },
+        {
+          "moment": "impact",
+          "effect": "sound",
+          "sound": "/Game/FreeModularMagicSFX/E_Impact/Mono/SW_MagicImpact_Water_2.SW_MagicImpact_Water_2"
+        },
+        {
+          "moment": "targetStatus",
+          "effect": "/Game/ParticleSystemVFXVol1/Systems/NS_EnergyVortex.NS_EnergyVortex",
+          "anchor": "ground",
+          "size": 110
+        }
+      ]
+    },
+    "stormcaller_downpour": {
+      "strip": "none",
+      "events": [
+        {
+          "moment": "castStart",
+          "effect": "sound",
+          "sound": "/Game/FreeModularMagicSFX/C_Cast/Mono/SW_MagicCast_Liquid_Water_1.SW_MagicCast_Liquid_Water_1",
+          "volume": 0.8
+        },
+        {
+          "moment": "area",
+          "effect": "/Game/FreeNiagaraPack/Effects/NS_Worm-Hole.NS_Worm-Hole",
+          "fit": "area",
+          "duration": 1.5
+        },
+        {
+          "moment": "area",
+          "effect": "light",
+          "fit": "area",
+          "tint": [
+            0.5,
+            0.7,
+            1.3
+          ],
+          "brightness": 6000
+        },
+        {
+          "moment": "impact",
+          "effect": "/Game/ParagonDekker/FX/Particles/Abilities/Line/FX/P_DekkerLineGroundDamage_Water.P_DekkerLineGroundDamage_Water",
+          "size": 120
+        },
+        {
+          "moment": "area",
+          "effect": "sound",
+          "sound": "/Game/FreeModularMagicSFX/E_Impact/Mono/SW_MagicImpact_Water_1.SW_MagicImpact_Water_1"
+        }
+      ]
+    },
+    "thunder_brawler_jab": {
+      "strip": "none",
+      "events": [
+        {
+          "moment": "swing",
+          "effect": "sound",
+          "sound": "/Game/FreeModularMagicSFX/A_Chant/Mono/SW_MagicChant_Charge3States1_1.SW_MagicChant_Charge3States1_1",
+          "anchor": "hand",
+          "part": "release",
+          "share": 0.45
+        }
+      ]
+    },
+    "warlock_rot_curse": {
+      "strip": "none",
+      "events": [
+        {
+          "moment": "release",
+          "effect": "sound",
+          "sound": "/Game/FreeModularMagicSFX/B_Transition/Mono/SW_MagicFade_Bass1_1.SW_MagicFade_Bass1_1"
+        },
+        {
+          "moment": "impact",
+          "effect": "/Game/PotaVFX_Smoke/VFX/System/SmokeBurst/NS_MagicSmokeBurstAir.NS_MagicSmokeBurstAir",
+          "size": 130
+        },
+        {
+          "moment": "impact",
+          "effect": "sound",
+          "sound": "/Game/FreeModularMagicSFX/C_Cast/Mono/SW_MagicCast_Liquid_Gore_2.SW_MagicCast_Liquid_Gore_2",
+          "volume": 0.7
+        },
+        {
+          "moment": "targetStatus",
+          "effect": "/Game/ParagonRevenant/FX/Particles/Revenant/Abilities/Mark/FX/P_Revenant_Mark_Targeting.P_Revenant_Mark_Targeting",
+          "size": 120
+        }
+      ]
+    }
+  },
+  "footprints": {
+    "/Game/FreeNiagaraPack/Effects/NS_ActiveAtom.NS_ActiveAtom": 3450,
+    "/Game/FreeNiagaraPack/Effects/NS_Worm-Hole.NS_Worm-Hole": 1264,
+    "/Game/FreeParticle_SoftTofu/Niagara/NS_Sparkling_Glow.NS_Sparkling_Glow": 274,
+    "/Game/FreeParticle_SoftTofu/Niagara/NS_Sparkling_Moon.NS_Sparkling_Moon": 174,
+    "/Game/FreeParticle_SoftTofu/Niagara/NS_Sparkling_Skull.NS_Sparkling_Skull": 312,
+    "/Game/FreeParticle_SoftTofu/Niagara/NS_feather.NS_feather": 164,
+    "/Game/FreeParticle_SoftTofu/Niagara/NS_leaf.NS_leaf": 124,
+    "/Game/ParagonAurora/FX/Particles/Abilities/Leap/FX/P_Aurora_Decoy_Frost.P_Aurora_Decoy_Frost": 278,
+    "/Game/ParagonDekker/FX/Particles/Abilities/Line/FX/P_DekkerLineGroundDamage_Water.P_DekkerLineGroundDamage_Water": 540,
+    "/Game/ParagonFey/FX/Particles/Fey/Abilities/Growth/FX/P_Fey_Growth_Plants_Individual.P_Fey_Growth_Plants_Individual": 332,
+    "/Game/ParagonFey/FX/Particles/Fey/Abilities/Ultimate/FX/P_Ultimate_Root_Spikes.P_Ultimate_Root_Spikes": 610,
+    "/Game/ParagonGRIMexe/FX/Particles/Abilities/EnergyShield/FX/p_GRIM_EnergyShield_Resizable.p_GRIM_EnergyShield_Resizable": 466,
+    "/Game/ParagonGRIMexe/FX/Particles/Abilities/Ultimate/FX/P_GRIM_Ultimate_Target_EnemyAttached.P_GRIM_Ultimate_Target_EnemyAttached": 64,
+    "/Game/ParagonGreystone/FX/Particles/Greystone/Abilities/ClearAPath/FX/P_Greystone_SwordSpinning_Start.P_Greystone_SwordSpinning_Start": 326,
+    "/Game/ParagonIggyScorch/FX/Particles/IggyScorch/Abilities/Passive/FX/P_IggyScorch_OilDebuff.P_IggyScorch_OilDebuff": 270,
+    "/Game/ParagonKallari/FX/Particles/Kallari/Skins/Rogue/P_Shadow_Bonus_Damage_Rogue.P_Shadow_Bonus_Damage_Rogue": 24,
+    "/Game/ParagonKwang/FX/Particles/Abilities/LightStrike/FX/P_KwangBuff.P_KwangBuff": 56,
+    "/Game/ParagonKwang/FX/Particles/Abilities/LightStrike/FX/P_LightStrikeImpact.P_LightStrikeImpact": 364,
+    "/Game/ParagonRevenant/FX/Particles/Revenant/Abilities/Mark/FX/P_Revenant_Mark_Targeting.P_Revenant_Mark_Targeting": 72,
+    "/Game/ParticleSystemVFXVol1/Systems/NS_EnergyVortex.NS_EnergyVortex": 486,
+    "/Game/PotaVFX_Smoke/VFX/System/ColorSmoke/NS_SmokeGradient_Loop.NS_SmokeGradient_Loop": 378,
+    "/Game/PotaVFX_Smoke/VFX/System/SmokeBurst/NS_MagicSmokeBurstAir.NS_MagicSmokeBurstAir": 366
+  }
+}

@@ -68,6 +68,8 @@ namespace TMSim
 		// The camps and their monsters, waiting off the board, after both sides'
 		// units so every id is fixed before anybody moves. Their own generators.
 		PlaceCamps(InSeed);
+		// Pets, after the camps so every monster keeps the id it had.
+		PlacePets();
 	}
 
 	int FBattle::BaseTgGain(const FUnit& Unit) const
@@ -461,6 +463,103 @@ namespace TMSim
 		return std::max(0, std::min(100, Chance));
 	}
 
+	FOdds FBattle::OddsOf(const FUnit& User, const FAbility& Ability, const FUnit& Target, int Amount) const
+	{
+		FOdds Odds;
+		if (Ability.Effect != EEffect::Damage)
+		{
+			return Odds;
+		}
+		Odds.Evade = EvadeChance(Target, Ability, &User);
+		// First Strike Gauntlet: its first hit that lands is critical, no roll.
+		const bool bFirstStrike = User.HasItems() && !User.bFirstStrikeUsed && GearHas(User, &FItemDef::bFirstStrike);
+		Odds.CritChance = bFirstStrike ? 100 : CritChance(User);
+		const double Evaded = Odds.Evade / 100.0;
+		const double Lands = 1.0 - Evaded;
+		Odds.Dodge = NewDefense() ? Evaded / Combat::DodgeOneIn * 100.0 : Evaded * 100.0;
+		Odds.Graze = Evaded * 100.0 - Odds.Dodge;
+		Odds.Crit = Lands * Odds.CritChance;
+		Odds.Hit = Lands * (100.0 - Odds.CritChance);
+		Odds.HitAmount = Amount;
+		Odds.CritAmount = std::max(1, RoundToInt(Amount * Tuning.CritMultiplier));
+		Odds.GrazeAmount = std::max(Combat::MinimumDamage, RoundToInt(Amount * Combat::GrazeDamage));
+		// Shields soak first (TakeFromShield), so they count as health here.
+		int Soak = 0;
+		for (const FStatus& Status : Target.Statuses)
+		{
+			const FStatusDef* Def = FindStatus(Status.Id);
+			Soak += (Def && Def->bAbsorbs) ? Status.Amount : 0;
+		}
+		const int Lasts = Target.Hp + Soak;
+		Odds.bHitKo = Odds.HitAmount >= Lasts;
+		Odds.bCritKo = Odds.CritAmount >= Lasts;
+		Odds.bGrazeKo = Odds.GrazeAmount >= Lasts;
+		Odds.Ko = (Odds.bHitKo ? Odds.Hit : 0.0) + (Odds.bCritKo ? Odds.Crit : 0.0) + (Odds.bGrazeKo ? Odds.Graze : 0.0);
+		return Odds;
+	}
+
+	FThreat FBattle::ThreatOn(const FUnit& Attacker, const FUnit& Target, const FVec2& TargetPos) const
+	{
+		FThreat Best;
+		if (!Attacker.IsAlive() || !Target.IsAlive() || Attacker.IsSilenced())
+		{
+			return Best;
+		}
+		// Each count goes down by one as its next turn begins, so one at 1 is
+		// ready then; on its turn, only what is ready now.
+		const int ReadyBy = Attacker.bReady ? 0 : 1;
+		const bool bCanWalk = !(Attacker.bReady && Attacker.bMoved);
+		const double Walk = bCanWalk ? MoveOf(Attacker) : 0.0;
+		const double Apart = Attacker.Pos.DistanceTo(TargetPos);
+		double BestAverage = -1.0;
+		for (int Slot = 0; Slot < AbilitySlots; ++Slot)
+		{
+			const FAbility* Ability = Attacker.Ability(Slot);
+			if (!Ability || Ability->Effect != EEffect::Damage || Ability->Target != ETargetSide::Enemy
+				|| Ability->Kind == "passive" || Ability->Kind == "aura" || Ability->Kind == "toggle"
+				|| Attacker.Cooldowns[Slot] > ReadyBy || (Slot == 3 && Attacker.Ult < Pace::UltMax))
+			{
+				continue;
+			}
+			// How far off it can catch someone: its range, and the blast round
+			// where it lands. Only something with reach touches a flier.
+			if (Target.Flies() && Ability->MaxRange <= Ground::MeleeRange)
+			{
+				continue;
+			}
+			const double Reach = static_cast<double>(Ability->MaxRange) + Ability->Aoe + Ground::HitRadius;
+			const bool bHere = Apart <= Reach && Apart + Ability->Aoe + Ground::HitRadius >= Ability->MinRange;
+			const bool bAfterWalk = !bHere && Apart <= Reach + Walk;
+			if (!bHere && !bAfterWalk)
+			{
+				continue;
+			}
+			// Struck from where it stands, or from the edge of its reach after the walk.
+			FVec2 From = Attacker.Pos;
+			if (bAfterWalk && Apart > 0.01)
+			{
+				const double Keep = std::max(0.0, std::min(static_cast<double>(Ability->MaxRange), Apart));
+				From = TargetPos + (Attacker.Pos - TargetPos) * static_cast<float>(Keep / Apart);
+			}
+			const int Amount = CalcAmount(Attacker, *Ability, From, Target, TargetPos, LevelAt(From), LevelAt(TargetPos));
+			const FOdds Odds = OddsOf(Attacker, *Ability, Target, Amount);
+			const double Average = (Odds.Hit * Odds.HitAmount + Odds.Crit * Odds.CritAmount + Odds.Graze * Odds.GrazeAmount) / 100.0;
+			// Not having to walk beats walking; then the likelier knockout; then the harder blow.
+			const bool bBetter = Best.Slot < 0
+				|| (Best.bMoves && !bAfterWalk)
+				|| (Best.bMoves == bAfterWalk && (Odds.Ko > Best.Odds.Ko + 0.001
+					|| (std::fabs(Odds.Ko - Best.Odds.Ko) <= 0.001 && Average > BestAverage)));
+			if (bBetter)
+			{
+				Best.Slot = Slot;
+				Best.bMoves = bAfterWalk;
+				Best.Odds = Odds;
+				BestAverage = Average;
+			}
+		}
+		return Best;
+	}
+
 	void FBattle::TickStatuses(FUnit& Unit, FTickReport& Report)
 	{
 		// Statuses act on the unit's own turn and then count down, so "two turns"
@@ -580,6 +679,22 @@ namespace TMSim
 
 	void FBattle::GroundEffect(FUnit& Unit, FTickReport& Report)
 	{
+		// Whether the spring underfoot is dry, before this turn counts it down; a
+		// dry spring counts down on its user's turns, on anyone's once that one is gone.
+		const bool bDry = SpringRestAt(Unit.Pos) > 0;
+		if (!SpringRests.empty())
+		{
+			for (FSpringRest& Rest : SpringRests)
+			{
+				const FUnit* Owner = FindUnit(Rest.UnitId);
+				if (Rest.UnitId == Unit.Id || !Owner || !Owner->IsAlive())
+				{
+					--Rest.Turns;
+				}
+			}
+			SpringRests.erase(std::remove_if(SpringRests.begin(), SpringRests.end(),
+				[](const FSpringRest& Rest) { return Rest.Turns <= 0; }), SpringRests.end());
+		}
 		// Burning ground hurts and a spring heals, and either happens when the
 		// unit's turn comes round rather than when it walks on.
 		int Kind = HazardAt(Unit.Pos);
@@ -587,7 +702,11 @@ namespace TMSim
 		{
 			return;
 		}
-		const int Amount = std::max(1, RoundToInt(Unit.MaxHp() * Tuning.HazardPercent * 0.01));
+		if (Kind > 0 && bDry)
+		{
+			return;  // dry for now
+		}
+		const int Amount = std::max(1, RoundToInt(Unit.MaxHp() * (Kind > 0 ? Tuning.SpringPercent : Tuning.HazardPercent) * 0.01));
 		if (Kind < 0 && !Unit.Statuses.empty())
 		{
 			// Embers dry the Wet and thaw the Chilled.
@@ -629,7 +748,34 @@ namespace TMSim
 			Event.Where = Unit.Pos;
 			Event.Id = "ground";
 			Report.Events.push_back(Event);
+			// Used: it rests now, dry through that many of the user's turns.
+			const int Rest = RoundToInt(Tuning.SpringRestTurns);
+			if (Rest > 0)
+			{
+				FSpringRest Dry;
+				Dry.Tile = static_cast<int>(std::floor(Unit.Pos.Y / Ground::TileSize)) * Map.TilesX
+					+ static_cast<int>(std::floor(Unit.Pos.X / Ground::TileSize));
+				Dry.UnitId = Unit.Id;
+				Dry.Turns = Rest;
+				SpringRests.push_back(Dry);
+			}
 		}
+	}
+
+	int FBattle::SpringRestAt(const FVec2& Point) const
+	{
+		if (SpringRests.empty() || !InBounds(Point))
+		{
+			return 0;
+		}
+		const int Tile = static_cast<int>(std::floor(Point.Y / Ground::TileSize)) * Map.TilesX
+			+ static_cast<int>(std::floor(Point.X / Ground::TileSize));
+		int Left = 0;
+		for (const FSpringRest& Rest : SpringRests)
+		{
+			Left = Rest.Tile == Tile ? std::max(Left, Rest.Turns) : Left;
+		}
+		return Left;
 	}
 
 	void FBattle::UndamagedRegen(FUnit& Unit, FTickReport& Report)
@@ -667,6 +813,16 @@ namespace TMSim
 		// so each is followed by a check that there is still anybody to give a turn
 		// to.
 
+		// A pet's time: counted as each of its turns begins, and when it runs out
+		// the pet leaves instead of taking the turn.
+		if (Unit.PetOf >= 0 && Unit.PetTurns > 0 && --Unit.PetTurns == 0)
+		{
+			SendPetAway(Unit, Report);
+			return;
+		}
+
+		// A new turn: whatever gave it away in the grass is behind it.
+		Unit.bSpotted = false;
 		// Read before the statuses count down, because the status taking its orders
 		// away costs it this turn and then wears off in the same breath.
 		const std::string BlockedBy = Unit.NoOrdersStatus();
@@ -785,7 +941,7 @@ namespace TMSim
 		double Total = 0.0;
 		for (const FUnit& Unit : Units)
 		{
-			if (Unit.HomeTeam() == Team && !Unit.bMonster)
+			if (Unit.HomeTeam() == Team && !Unit.bMonster && Unit.PetOf < 0)
 			{
 				Total += Unit.MaxHp();
 				Alive += std::max(0, Unit.Hp);
@@ -858,6 +1014,12 @@ namespace TMSim
 			const int Index = Map.NodeIndex(Node);
 			if (!InBounds(Point) || !Map.NodeWalkable(Node) || HazardAt(Point) != 0 || IsCover(Point)
 				|| Index < 0 || Index >= static_cast<int>(Walk.size()) || !std::isfinite(Walk[static_cast<size_t>(Index)]))
+			{
+				return false;
+			}
+			// Not against the edge of the map, where a tower watches nothing but the
+			// way round it (2026-10-02).
+			if (static_cast<double>(std::min(std::min(Point.X, Size.X - Point.X), std::min(Point.Y, Size.Y - Point.Y))) < Watchtower::FromEdge)
 			{
 				return false;
 			}

@@ -9,7 +9,7 @@
     "damage"
   ],
   "stats": {
-    "hp": 82,
+    "hp": 93,
     "attdef": 8,
     "magdef": 5,
     "aeva": 18,
@@ -30,7 +30,7 @@
       "scale": "att",
       "target": "enemy",
       "shape": "unit",
-      "power": 32,
+      "power": 40,
       "min_range": 0,
       "max_range": 1.8,
       "aoe": 0,
@@ -52,7 +52,7 @@
       "scale": "att",
       "target": "enemy",
       "shape": "unit",
-      "power": 44,
+      "power": 56,
       "min_range": 0,
       "max_range": 1.8,
       "aoe": 0,
@@ -102,7 +102,7 @@
       "scale": "att",
       "target": "enemy",
       "shape": "self",
-      "power": 49,
+      "power": 62,
       "min_range": 0,
       "max_range": 0,
       "aoe": 2.5,
@@ -124,6 +124,10 @@
     "reworded": {
       "on": "2026-10-02",
       "why": "Descriptions say what the abilities do (2026-10-02): Stun not sleep, Crit not the old Power, turns not seconds"
+    },
+    "rebalanced": {
+      "on": "2026-10-03",
+      "why": "Tuning pass 2026-10-03 (lab 30% in place of the Black Mage): HP 82->93, power +26%"
     }
   }
 }

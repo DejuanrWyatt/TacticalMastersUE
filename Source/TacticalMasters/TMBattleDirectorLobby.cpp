@@ -74,6 +74,12 @@ int32 ATMBattleDirector::UnitOwner(const TMSim::FUnit& Unit) const
 
 bool ATMBattleDirector::ComputerPlaysUnit(const TMSim::FUnit& Unit) const
 {
+	// A pet (2026-10-02) is always the computer's, for the side that called it;
+	// online, the host's computer plays it, as it does a unit nobody holds.
+	if (Unit.PetOf >= 0)
+	{
+		return !bOnline || bOnlineHost;
+	}
 	if (!bOnline || Unit.Team == 2 || !UnitPlayer.IsValidIndex(Unit.Id))
 	{
 		return ComputerPlays(Unit.Team);
@@ -241,6 +247,7 @@ void ATMBattleDirector::BroadcastLobby()
 	Message->SetStringField(TEXT("map"), UTF8_TO_TCHAR(TMSim::FindMap(Setup.MapId).Name.c_str()));
 	Message->SetStringField(TEXT("rules"), LobbyRules());
 	Message->SetBoolField(TEXT("draft"), Setup.bDraft);
+	Message->SetBoolField(TEXT("unique"), Setup.bUniqueClasses);
 	Message->SetNumberField(TEXT("draft_seconds"), Setup.DraftSeconds);
 	// Each player is told which of the list they are.
 	for (int32 i = 1; i < Players.Num(); ++i)
@@ -259,12 +266,24 @@ FString ATMBattleDirector::LobbyRules() const
 	{
 		Parts.Add(FString::Printf(TEXT("%d watchtowers"), Setup.Watchtowers));
 	}
+	if (Setup.bUniqueClasses)
+	{
+		Parts.Add(TEXT("one of each class"));
+	}
 	if (Setup.CampLevel > 0)
 	{
 		Parts.Add(Setup.CampLevel == 1 ? TEXT("light camps") : Setup.CampLevel == 2 ? TEXT("standard camps") : TEXT("wild camps"));
 		if (Setup.bCampRespawn)
 		{
 			Parts.Add(TEXT("camps respawn"));
+		}
+		if (Setup.bBossHunt)
+		{
+			Parts.Add(TEXT("bosses hunt"));
+		}
+		if (Setup.bBossClaim)
+		{
+			Parts.Add(TEXT("claim the boss"));
 		}
 	}
 	if (Setup.CaptureSeconds > 0.0)
@@ -410,9 +429,67 @@ bool ATMBattleDirector::LobbyMayPick(int32 Player, int32 SlotCode) const
 	return Holder == Player || (Holder < 0 && Player == 0);
 }
 
+bool ATMBattleDirector::ClassTaken(const std::string& JobId, int32 Team, int32 Slot) const
+{
+	for (int32 T = 0; T < 2; ++T)
+	{
+		for (int32 S = 0; S < 4; ++S)
+		{
+			if ((T != Team || S != Slot) && Setup.Rosters[T][S] == JobId)
+			{
+				return true;
+			}
+		}
+	}
+	return false;
+}
+
+void ATMBattleDirector::DedupeRosters()
+{
+	if (!Setup.bUniqueClasses)
+	{
+		return;
+	}
+	TSet<FString> Seen;
+	for (int32 T = 0; T < 2; ++T)
+	{
+		for (int32 S = 0; S < 4; ++S)
+		{
+			std::string& Held = Setup.Rosters[T][S];
+			if (!Seen.Contains(UTF8_TO_TCHAR(Held.c_str())))
+			{
+				Seen.Add(UTF8_TO_TCHAR(Held.c_str()));
+				continue;
+			}
+			// A class of the same first role nobody has, else any nobody has.
+			const TMSim::FJobDef* Was = TMSim::FindJob(Held);
+			const std::string FirstRole = Was && !Was->Roles.empty() ? Was->Roles[0] : std::string();
+			const TMSim::FJobDef* Instead = nullptr;
+			for (int32 Pass = 0; Pass < 2 && !Instead; ++Pass)
+			{
+				for (const TMSim::FJobDef* Job : TMSim::AllJobs())
+				{
+					if (!Seen.Contains(UTF8_TO_TCHAR(Job->Id.c_str())) && !ClassTaken(Job->Id, T, S)
+						&& (Pass == 1 || FirstRole.empty() || TMSim::JobHasRole(Job->Id, FirstRole)))
+					{
+						Instead = Job;
+						break;
+					}
+				}
+			}
+			if (Instead)
+			{
+				Held = Instead->Id;
+				Seen.Add(UTF8_TO_TCHAR(Held.c_str()));
+			}
+		}
+	}
+}
+
 void ATMBattleDirector::LobbyApplyPick(int32 Player, int32 SlotCode, const std::string& JobId)
 {
-	if (Setup.bDraft || !LobbyMayPick(Player, SlotCode) || !TMSim::FindJob(JobId))
+	if (Setup.bDraft || !LobbyMayPick(Player, SlotCode) || !TMSim::FindJob(JobId)
+		|| (Setup.bUniqueClasses && ClassTaken(JobId, SlotCode / TMLobby::Slots, SlotCode % TMLobby::Slots)))
 	{
 		return;
 	}
@@ -538,6 +615,7 @@ void ATMBattleDirector::ApplyLobby(const FJsonObject& Message)
 	Message.TryGetStringField(TEXT("map"), LobbyMap);
 	Message.TryGetStringField(TEXT("rules"), LobbyRulesLine);
 	Message.TryGetBoolField(TEXT("draft"), Setup.bDraft);
+	Message.TryGetBoolField(TEXT("unique"), Setup.bUniqueClasses);
 	Message.TryGetNumberField(TEXT("draft_seconds"), Setup.DraftSeconds);
 	OnlineStatus.Reset();
 	Setup.Mode = TEXT("online");

@@ -1,7 +1,7 @@
-// Replays a battle's clock against the Godot version, tick by tick.
+// Replays a battle's clock against its recorded baseline, tick by tick.
 //
-// GodotTickTrace.txt was produced by the Godot game itself: eight units on
-// Highlands, nobody giving an order, four hundred ticks. With no orders every
+// Baselines/TickTrace.txt: eight units on Highlands, nobody giving an order,
+// four hundred ticks (first recorded from the Godot version). With no orders every
 // turn is lost to the countdown, which runs the whole cycle over and over --
 // the gauge filling, a unit becoming ready, the countdown draining, the turn
 // ending and the gauge starting again.
@@ -9,7 +9,11 @@
 // Every unit's gauge, ready flag and countdown is compared on every tick. If
 // this passes, the port keeps the same time as the original; if it drifts, the
 // tick it first drifts on is printed, which is usually enough to find why.
+// With --rebaseline the trace is written again from the rules (Baseline.h).
+//
+//   SimTickTest [Baselines/TickTrace.txt] [--rebaseline]
 
+#include "Baseline.h"
 #include "SimBattle.h"
 
 #include <cstdio>
@@ -138,7 +142,30 @@ namespace
 
 int main(int argc, char** argv)
 {
-	const char* Path = argc > 1 ? argv[1] : "GodotTickTrace.txt";
+	const std::vector<std::string> Args = TMBaseline::Paths(argc, argv);
+	const std::string PathText = Args.empty() ? std::string("Baselines/TickTrace.txt") : Args[0];
+	const char* Path = PathText.c_str();
+	TMBaseline::FWriter Writer;
+	Writer.bOn = TMBaseline::Asked(argc, argv);
+	Writer.Path = PathText;
+	// The table's lines as they are, and where each tick's row is among them.
+	std::vector<size_t> RowLine;
+	{
+		std::ifstream Raw(Path);
+		std::string Line;
+		bool bTrace = false;
+		while (std::getline(Raw, Line))
+		{
+			if (!Line.empty() && Line.back() == '\r')
+			{
+				Line.pop_back();
+			}
+			Writer.Read(Line);
+			int Tick = 0;
+			if (Line.rfind("TRACE", 0) == 0) { bTrace = true; }
+			else if (bTrace && std::sscanf(Line.c_str(), "%d", &Tick) == 1) { RowLine.push_back(Writer.Lines.size() - 1); }
+		}
+	}
 	FTraceFile Trace;
 	if (!Load(Path, Trace))
 	{
@@ -157,7 +184,7 @@ int main(int argc, char** argv)
 	}
 	Battle.Start(12345);
 
-	std::printf("%d units, %d ticks of Godot to match\n",
+	std::printf("%d units, %d ticks of the baseline to match\n",
 		static_cast<int>(Battle.Units.size()), static_cast<int>(Trace.Ticks.size()));
 
 	// The head start each unit gets from its Speed, before any time passes.
@@ -167,15 +194,36 @@ int main(int argc, char** argv)
 		const int Want = Unit.Stat(EStat::Speed) * Pace::StartTgPerSpeed;
 		if (Unit.Tg != Want)
 		{
-			std::printf("  unit %d starts on %d, Godot starts it on %d\n", Unit.Id, Unit.Tg, Want);
+			std::printf("  unit %d starts on %d, the rules say %d\n", Unit.Id, Unit.Tg, Want);
 			++Failures;
 		}
 	}
 
-	for (size_t i = 0; i < Trace.Ticks.size() && Failures < 5; ++i)
+	for (size_t i = 0; i < Trace.Ticks.size() && (Failures < 5 || Writer.bOn); ++i)
 	{
 		FTickReport Report;
 		Battle.Tick(Report);
+
+		if (Writer.bOn && i < RowLine.size())
+		{
+			// The row as the rules have it now, in the table's own order of units.
+			std::string Row = std::to_string(i + 1);
+			bool bDiffers = false;
+			for (const FUnit& Unit : Battle.Units)
+			{
+				Row += " " + std::to_string(Unit.Id) + ":" + std::to_string(Unit.Tg) + ":" + std::to_string(Unit.bReady ? 1 : 0)
+					+ ":" + std::to_string(Unit.Clock);
+				const auto Found = Trace.Ticks[i].find(Unit.Id);
+				bDiffers = bDiffers || Found == Trace.Ticks[i].end() || Found->second.Tg != Unit.Tg
+					|| Found->second.Ready != (Unit.bReady ? 1 : 0) || Found->second.Clock != Unit.Clock;
+			}
+			if (bDiffers)
+			{
+				Writer.Lines[RowLine[i]] = "  " + Row;
+				++Writer.Changed;
+			}
+			continue;
+		}
 
 		for (const FUnit& Unit : Battle.Units)
 		{
@@ -188,7 +236,7 @@ int main(int argc, char** argv)
 			const int Ready = Unit.bReady ? 1 : 0;
 			if (Unit.Tg != Want.Tg || Ready != Want.Ready || Unit.Clock != Want.Clock)
 			{
-				std::printf("  tick %d unit %d: got tg=%d ready=%d clock=%d, Godot had tg=%d ready=%d clock=%d\n",
+				std::printf("  tick %d unit %d: got tg=%d ready=%d clock=%d, the baseline has tg=%d ready=%d clock=%d\n",
 					static_cast<int>(i) + 1, Unit.Id, Unit.Tg, Ready, Unit.Clock,
 					Want.Tg, Want.Ready, Want.Clock);
 				++Failures;
@@ -196,8 +244,12 @@ int main(int argc, char** argv)
 		}
 	}
 
+	if (Writer.bOn)
+	{
+		return Writer.Finish() ? 0 : 1;
+	}
 	std::printf("\n%s\n", Failures == 0
-		? "THE CLOCK KEEPS THE SAME TIME AS GODOT"
-		: "DRIFTED FROM GODOT");
+		? "THE CLOCK KEEPS THE SAME TIME AS ITS BASELINE"
+		: "DRIFTED FROM THE BASELINE");
 	return Failures == 0 ? 0 : 1;
 }

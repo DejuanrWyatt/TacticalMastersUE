@@ -10,13 +10,13 @@
     "damage"
   ],
   "stats": {
-    "hp": 63,
+    "hp": 68,
     "attdef": 4,
     "magdef": 12,
     "aeva": 5,
     "meva": 14,
     "crit": 10,
-    "speed": 6,
+    "speed": 8,
     "move": 6,
     "patience": 9,
     "sight": 10
@@ -25,15 +25,15 @@
     {
       "id": "summoner_rod",
       "name": "Rod",
-      "desc": "Strike an adjacent enemy.",
+      "desc": "Strikes an enemy 1-7 m away.",
       "kind": "active",
       "effect": "damage",
       "scale": "att",
       "target": "enemy",
       "shape": "unit",
       "power": 34,
-      "min_range": 0,
-      "max_range": 1.8,
+      "min_range": 1,
+      "max_range": 7,
       "aoe": 0,
       "cooldown": 0,
       "cast": 0,
@@ -42,23 +42,24 @@
         "system": "/Game/ParagonGideon/FX/Particles/Gideon/Abilities/Primary/FX/P_Gideon_Primary_HitCharacter.P_Gideon_Primary_HitCharacter",
         "at": "targets",
         "scale": 1
-      }
+      },
+      "anim": "bolt"
     },
     {
       "id": "summoner_ifrit",
       "name": "Ifrit",
-      "desc": "Hellfire on every enemy within 2 m of a point 3-9 m away; Burns for 2 turns.",
+      "desc": "Strikes every enemy within 2 m of a point 3-9 m away; Burns for 2 turns, and calls up the Ifrit there to fight for 3 of its turns. (1 s)",
       "kind": "active",
       "effect": "damage",
       "scale": "mag",
       "target": "enemy",
       "shape": "circle",
-      "power": 42,
+      "power": 49,
       "min_range": 3,
       "max_range": 9,
       "aoe": 2,
-      "cooldown": 2,
-      "cast": 2,
+      "cooldown": 3,
+      "cast": 1,
       "status": {
         "id": "burn",
         "turns": 2
@@ -68,6 +69,11 @@
         "system": "/Game/ParagonGideon/FX/Particles/Gideon/Abilities/ProjectileMeteor/FX/P_Gideon_RMB_Proj.P_Gideon_RMB_Proj",
         "at": "point",
         "scale": 1
+      },
+      "special": "pet",
+      "pet": {
+        "job": "ifrit_pet",
+        "turns": 3
       }
     },
     {
@@ -102,18 +108,18 @@
     {
       "id": "summoner_bahamut",
       "name": "Bahamut",
-      "desc": "ULTIMATE: Megaflare on every enemy within 4 m of a point 4-11 m away (4 s).",
+      "desc": "ULTIMATE: Megaflare on every enemy within 4 m of a point 4-11 m away (3 s).",
       "kind": "active",
       "effect": "damage",
       "scale": "mag",
       "target": "enemy",
       "shape": "circle",
-      "power": 61,
+      "power": 71,
       "min_range": 4,
       "max_range": 11,
       "aoe": 4,
       "cooldown": 0,
-      "cast": 4,
+      "cast": 3,
       "fx": "meteor",
       "vfx": {
         "system": "/Game/ParagonGideon/FX/Particles/Gideon/Abilities/ProjectileMeteor/FX/P_Gideon_RMB_HitWorld.P_Gideon_RMB_HitWorld",
@@ -126,6 +132,11 @@
     "reworded": {
       "on": "2026-10-02",
       "why": "Descriptions say what the abilities do (2026-10-02): Stun not sleep, Crit not the old Power, turns not seconds"
-    }
+    },
+    "rebalanced": {
+      "on": "2026-10-03",
+      "why": "Tuning pass 2026-10-03 (lab 15% in place of the Black Mage): HP 63->68, Speed 6->8, power +17%. Before that (2026-10-02): Balance audit 2026-10-02: rod reaches 1-7 m (power -15%); the summon casts in 1 s, every 3 turns, and calls up a computer-played pet for 3 turns; ultimate 1 s quicker"
+    },
+    "changedAt": "2026-10-03T03:45:00.000Z"
   }
 }

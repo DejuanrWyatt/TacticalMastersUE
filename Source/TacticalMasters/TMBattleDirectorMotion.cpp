@@ -19,7 +19,9 @@
 #include "Components/SkeletalMeshComponent.h"
 #include "Components/TextRenderComponent.h"
 #include "Dom/JsonObject.h"
+#include "Animation/Skeleton.h"
 #include "Engine/SkeletalMesh.h"
+#include "HAL/FileManager.h"
 #include "Misc/FileHelper.h"
 #include "Misc/PackageName.h"
 #include "Misc/ScopeExit.h"
@@ -38,6 +40,49 @@ namespace
 	constexpr float TurnRate = 540.0f;
 	/** A walk longer than this, in metres, is run rather than walked. */
 	constexpr float RunFrom = 3.5f;
+
+	/**
+	 * A walk from From along Path with its corners cut (Chaikin's corner
+	 * cutting, twice), so a unit walks a curve instead of turning on each node.
+	 * Only where both ends of a stretch are at one height: a step up or down a
+	 * level is walked as it was, so no corner is cut across a cliff. The end
+	 * stays exactly where the rules put the unit.
+	 */
+	TArray<FVector> SmoothedWalk(const FVector& From, const TArray<FVector>& Path)
+	{
+		if (Path.Num() < 2)
+		{
+			return Path;
+		}
+		TArray<FVector> Points;
+		Points.Add(From);
+		Points.Append(Path);
+		for (int32 Pass = 0; Pass < 2; ++Pass)
+		{
+			TArray<FVector> Cut;
+			Cut.Add(Points[0]);
+			const int32 Last = Points.Num() - 1;
+			for (int32 k = 0; k < Last; ++k)
+			{
+				const FVector& A = Points[k];
+				const FVector& B = Points[k + 1];
+				if (FMath::Abs(A.Z - B.Z) > 1.0f)
+				{
+					Cut.Add(A);
+					Cut.Add(B);
+					continue;
+				}
+				if (k > 0)
+				{
+					Cut.Add(FMath::Lerp(A, B, 0.25f));
+				}
+				Cut.Add(k + 1 < Last ? FMath::Lerp(A, B, 0.75f) : B);
+			}
+			Points = MoveTemp(Cut);
+		}
+		Points.RemoveAt(0);
+		return Points;
+	}
 
 	float YawOf(const TMSim::FVec2& Facing)
 	{
@@ -159,6 +204,83 @@ bool ATMBattleDirector::LoadCharacterMap()
 	return Bodies.Num() > 0;
 }
 
+void ATMBattleDirector::LoadCastAnimation()
+{
+	// Written by the class creator's Publish (Cast Studio). Read again only when
+	// it changes, so a battle started after a Publish plays the new picks
+	// without restarting the game.
+	const FString File = FPaths::ProjectContentDir() / TEXT("Data/CastStudio/AbilityAnimation.json");
+	const FDateTime Time = IFileManager::Get().GetTimeStamp(*File);
+	if (Time == CastAnimationTime)
+	{
+		return;
+	}
+	CastAnimationTime = Time;
+	CastAnimation = TMCast::FAnimationFile();
+	CastWarned.Reset();
+	FString Text;
+	if (Time == FDateTime::MinValue() || !FFileHelper::LoadFileToString(Text, *File))
+	{
+		UE_LOG(LogTemp, Log, TEXT("Cast Studio: no animation picks published; every ability moves as the character map says"));
+		return;
+	}
+	const bool bRead = TMCast::ReadAnimationFile(TCHAR_TO_UTF8(*Text), CastAnimation);
+	for (const std::string& Problem : CastAnimation.Problems)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Cast Studio: %s: %hs"), *File, Problem.c_str());
+	}
+	UE_LOG(LogTemp, Log, TEXT("Cast Studio: %s animation picks for %d abilities"), bRead ? TEXT("read") : TEXT("could not read"),
+		static_cast<int32>(CastAnimation.Abilities.size()));
+}
+
+ATMBattleDirector::FTMCastClips ATMBattleDirector::CastClipsFor(const FTMBody& Body, const TMSim::FAbility& Ability)
+{
+	FTMCastClips Out;
+	const TMCast::FAnimationPicks* Picks = CastAnimation.Find(Ability.Id, TCHAR_TO_UTF8(*Body.SetName));
+	if (!Picks)
+	{
+		return Out;
+	}
+	USkeletalMesh* Mesh = MeshOf(Body);
+	const USkeleton* Skeleton = Mesh ? Mesh->GetSkeleton() : nullptr;
+	// A clip is made for one skeleton. Played on another it bends the body into
+	// nonsense, so it is left out -- and said, once, never quietly replaced.
+	auto Load = [&](const TMCast::FClipPick& Pick, const TCHAR* Part) -> UAnimSequence*
+	{
+		if (Pick.Clip.empty())
+		{
+			return nullptr;
+		}
+		const FString Path = UTF8_TO_TCHAR(Pick.Clip.c_str());
+		UAnimSequence* Clip = LoadNamed<UAnimSequence>(Path, CharacterAssets);
+		FString Why;
+		if (!Clip)
+		{
+			Why = TEXT("there is no playable clip at that path");
+		}
+		else if (Skeleton && Clip->GetSkeleton() != Skeleton)
+		{
+			Why = FString::Printf(TEXT("it is made for %s, and the body is %s"),
+				Clip->GetSkeleton() ? *Clip->GetSkeleton()->GetName() : TEXT("no skeleton"), *Skeleton->GetName());
+			Clip = nullptr;
+		}
+		const FString Key = FString::Printf(TEXT("%hs/%s/%s"), Ability.Id.c_str(), *Body.SetName, Part);
+		if (!Why.IsEmpty() && !CastWarned.Contains(Key))
+		{
+			CastWarned.Add(Key);
+			UE_LOG(LogTemp, Warning, TEXT("Cast Studio: %hs's %s on %s can't play: %s (%s). Today's clip plays instead."),
+				Ability.Id.c_str(), Part, *Body.SetName, *Why, *Path);
+		}
+		return Clip;
+	};
+	Out.Windup = Load(Picks->Windup, TEXT("wind-up"));
+	Out.Release = Load(Picks->Release, TEXT("release"));
+	Out.Loop = Load(Picks->Loop, TEXT("loop"));
+	Out.Recover = Load(Picks->Recover, TEXT("recover"));
+	Out.Contact = static_cast<float>(Picks->Release.Contact);
+	return Out;
+}
+
 USkeletalMesh* ATMBattleDirector::MeshOf(const FTMBody& Body)
 {
 	if (Body.Mesh && Body.Animations)
@@ -276,6 +398,41 @@ void ATMBattleDirector::BuildAnimSet(const FJsonObject& Set, FTMAnimSet& Out)
 			Out.Extras.Add(Key, Clips);
 		}
 	}
+	// A jump and a landing for leaps (2026-10-03): named in the set, or else the
+	// clips Paragon heroes keep beside their idle under the usual names.
+	if (Out.Idle)
+	{
+		const FString Folder = FPackageName::GetLongPackagePath(Out.Idle->GetOutermost()->GetName());
+		auto Beside = [&](std::initializer_list<const TCHAR*> Names) -> UAnimSequence*
+		{
+			for (const TCHAR* Name : Names)
+			{
+				const FString Package = Folder / Name;
+				if (FPackageName::DoesPackageExist(Package))
+				{
+					if (UAnimSequence* Clip = LoadNamed<UAnimSequence>(Package + TEXT(".") + Name, CharacterAssets))
+					{
+						return Clip;
+					}
+				}
+			}
+			return nullptr;
+		};
+		if (!Out.Extras.Contains(TEXT("jump")))
+		{
+			if (UAnimSequence* Jump = Beside({ TEXT("Jump_Start"), TEXT("JumpStart"), TEXT("Jump_Up"), TEXT("Jump_Loop"), TEXT("JumpApex"), TEXT("Jump_Apex") }))
+			{
+				Out.Extras.Add(TEXT("jump"), { Jump });
+			}
+		}
+		if (!Out.Extras.Contains(TEXT("land")))
+		{
+			if (UAnimSequence* Land = Beside({ TEXT("Jump_Land"), TEXT("JumpLand"), TEXT("Land") }))
+			{
+				Out.Extras.Add(TEXT("land"), { Land });
+			}
+		}
+	}
 	const TSharedPtr<FJsonObject>* Idles = nullptr;
 	if (Set.TryGetObjectField(TEXT("idles"), Idles))
 	{
@@ -336,7 +493,10 @@ const ATMBattleDirector::FTMBody* ATMBattleDirector::BodyForJob(const std::strin
 void ATMBattleDirector::ResetMotion()
 {
 	ClearBlows();
+	ClearCast();
 	bCelebrated = false;
+	LoadCastAnimation();
+	LoadCastLooks();
 	Motions.Reset();
 	Motions.SetNum(Battle.Units.size());
 	for (int32 i = 0; i < Motions.Num(); ++i)
@@ -344,6 +504,13 @@ void ATMBattleDirector::ResetMotion()
 		const TMSim::FUnit& Unit = Battle.Units[i];
 		FTMMotion& Motion = Motions[i];
 		Motion.Body = BodyFor(Unit);
+		for (int32 Slot = 0; Slot < TMSim::AbilitySlots && Motion.Body; ++Slot)
+		{
+			if (const TMSim::FAbility* Ability = Unit.Ability(Slot))
+			{
+				Motion.Picked[Slot] = CastClipsFor(*Motion.Body, *Ability);
+			}
+		}
 		Motion.Shown = WorldFor(Unit);
 		Motion.Yaw = YawOf(Unit.Facing);
 		Motion.SimPos = Unit.Pos;
@@ -384,6 +551,9 @@ void ATMBattleDirector::Animate(int32 Index, UAnimSequence* Clip, bool bLoop, fl
 		return;
 	}
 	UnitVisuals[Index]->PlayAnimation(Clip, bLoop);
+	// Anything else played cuts a chain short (a flinch mid-swing); a chain
+	// carries itself on by setting Then again after this (AdvanceMotion).
+	Motion.Then.Reset();
 	Motion.Playing = Clip;
 	Motion.OneShotLeft = bLoop ? 0.0f : Clip->GetPlayLength();
 	if (!bLoop && MaxSeconds > 0.0f)
@@ -452,6 +622,10 @@ UAnimSequence* ATMBattleDirector::StandingClip(int32 Index) const
 	int32 Slot = Unit.IsCasting() ? Unit.Casting.Slot : (Unit.IsChanneling() ? Unit.Channeling.Slot : -1);
 	if (Slot >= 0)
 	{
+		if (Slot < TMSim::AbilitySlots && Motion.Picked[Slot].Loop)
+		{
+			return Motion.Picked[Slot].Loop;
+		}
 		if (const TMSim::FAbility* Ability = Unit.Ability(Slot))
 		{
 			const FTMMotionClips* Clips = FindMotion(*Set, UTF8_TO_TCHAR(TMSim::MotionOf(*Ability, Slot).c_str()));
@@ -517,9 +691,12 @@ void ATMBattleDirector::AnimateEvents(const TMSim::FTickReport& Report)
 			{
 				Motion.Yaw = YawOf(Toward);
 			}
-			if (Clips && Clips->Intro && Motion.Path.Num() == 0)
+			// A picked wind-up starts the cast in place of the set's intro.
+			UAnimSequence* Picked = Event.Slot >= 0 && Event.Slot < TMSim::AbilitySlots ? Motion.Picked[Event.Slot].Windup : nullptr;
+			UAnimSequence* Intro = Picked ? Picked : (Clips ? Clips->Intro : nullptr);
+			if (Intro && Motion.Path.Num() == 0)
 			{
-				Animate(i, Clips->Intro, false);
+				Animate(i, Intro, false);
 			}
 			continue;
 		}
@@ -542,14 +719,23 @@ void ATMBattleDirector::AnimateEvents(const TMSim::FTickReport& Report)
 			const FString Named = Ability ? FString(UTF8_TO_TCHAR(TMSim::MotionOf(*Ability, Event.Slot).c_str())) : FString(TEXT("none"));
 			const bool bCharged = Motion.bWasCasting;
 			Motion.bWasCasting = false;
-			if (Named == TEXT("none"))
+			// What Cast Studio picked for it on this body (ResetMotion), if anything.
+			const FTMCastClips NoPicks;
+			const FTMCastClips& Picks = Event.Slot >= 0 && Event.Slot < TMSim::AbilitySlots ? Motion.Picked[Event.Slot] : NoPicks;
+			Motion.LastLead = 0.0f;
+			Motion.LastContact = Picks.Contact;
+			if (Named == TEXT("none") && !Picks.Release)
 			{
 				continue;
 			}
-			UAnimSequence* Clip = nullptr;
+			UAnimSequence* Clip = Picks.Release;
 			// An ultimate may have clips of its own: "<motion>_ult".
 			const FTMMotionClips* Ultimate = Event.Slot == 3 ? Set.Motions.Find(Named + TEXT("_ult")) : nullptr;
-			if (Ultimate && Ultimate->Release.Num() > 0)
+			if (Clip)
+			{
+				// Picked: it plays whatever the set has.
+			}
+			else if (Ultimate && Ultimate->Release.Num() > 0)
 			{
 				Clip = Ultimate->Release[0];
 			}
@@ -572,18 +758,84 @@ void ATMBattleDirector::AnimateEvents(const TMSim::FTickReport& Report)
 				Clip = bWeapon && Set.Attack.Num() > 0 ? Set.Attack[FMath::Max(0, Event.Slot) % Set.Attack.Num()] : Set.Cast;
 			}
 			Motion.LastRelease = Clip;
+			// The swing in order: a picked wind-up first (unless a cast already
+			// wound up), the release, then a picked recover.
+			TArray<UAnimSequence*> Swing;
+			if (Picks.Windup && !bCharged && Clip)
+			{
+				Swing.Add(Picks.Windup);
+				Motion.LastLead = Picks.Windup->GetPlayLength();
+			}
+			Swing.Add(Clip);
+			if (Picks.Recover && Clip)
+			{
+				Swing.Add(Picks.Recover);
+			}
+			UAnimSequence* First = Swing[0];
+			Swing.RemoveAt(0);
 			const TMSim::FVec2 Toward = Event.Where - Unit.Pos;
 			const float Yaw = Toward.Length() > 0.05f ? YawOf(Toward) : YawOf(Unit.Facing);
-			if (Motion.Path.Num() > 0)
+			// A movement skill (2026-10-03) moved it as it went off: through the
+			// air (a leap), along the ground (a dash) or through smoke (a step
+			// behind) -- not walked there by the way a walk would go.
+			const bool bMovedBy = Ability && !(Unit.Pos == Motion.SimPos);
+			uint8 Flight = 0;
+			if (bMovedBy && Ability->Special == "leap")
+			{
+				Flight = 1;
+			}
+			else if (bMovedBy && Ability->Special == "behind")
+			{
+				Flight = 3;
+			}
+			else if (bMovedBy && TMSim::ShapeOf(*Ability) == "vector")
+			{
+				// The Dragoon's Jump goes up; a charge or a rush stays low.
+				const FString Id = UTF8_TO_TCHAR(Ability->Id.c_str());
+				Flight = Id.Contains(TEXT("jump")) || Id.Contains(TEXT("leap")) ? 1 : 2;
+			}
+			if (Flight != 0)
+			{
+				const FVector Landing = WorldFromMetres(Unit.Pos, Battle.Map.NodeLevel(TMSim::FMap::NodeOf(Unit.Pos)));
+				const float Distance = FVector::Dist2D(Motion.Shown, Landing);
+				Motion.Flight = Flight;
+				Motion.FlightFrom = Motion.Shown;
+				Motion.FlightAge = 0.0f;
+				Motion.FlightTime = Flight == 1 ? FMath::Clamp(0.35f + Distance / 1200.0f, 0.45f, 0.9f)
+					: (Flight == 2 ? FMath::Clamp(0.15f + Distance / 1800.0f, 0.2f, 0.55f) : 0.3f);
+				Motion.FlightArc = Flight == 1 ? FMath::Clamp(Distance * 0.35f, 90.0f, 280.0f) : 0.0f;
+				Motion.SimPos = Unit.Pos;
+				Motion.Path.Reset();
+				Motion.Path.Add(Landing);
+				Motion.OneShotLeft = 0.0f;
+				Motion.Yaw = YawOf(Toward.Length() > 0.05f ? Toward : Unit.Facing);
+				if (Flight == 1)
+				{
+					// Up: the body's jump, if it has one; the blow comes on landing.
+					if (UAnimSequence* Jump = Set.Extra(TEXT("jump")))
+					{
+						Animate(i, Jump, false);
+					}
+				}
+				else if (Flight == 3 && IsSeen(Unit))
+				{
+					// Gone in a puff of smoke where it stood (its ability's own effect plays where it lands).
+					PlayFx(TEXT("/Game/PotaVFX_Smoke/VFX/System/SmokeBurst/NS_MagicSmokeBurstAir.NS_MagicSmokeBurstAir"),
+						Motion.Shown + FVector(0.0f, 0.0f, 60.0f), 180.0f, 100.0f);
+				}
+			}
+			if (Motion.Path.Num() > 0 && Motion.Flight != 2)
 			{
 				// Still walking there: the swing comes on arrival.
-				Motion.Queued = Clip;
+				Motion.Queued = First;
+				Motion.QueuedThen = Swing;
 				Motion.QueuedYaw = Yaw;
 			}
 			else
 			{
 				Motion.Yaw = Yaw;
-				Animate(i, Clip, false);
+				Animate(i, First, false);
+				Motion.Then = Swing;
 			}
 		}
 		else if (Event.Kind == TMSim::EEventKind::BecameReady && Unit.IsAlive()
@@ -600,6 +852,87 @@ void ATMBattleDirector::AnimateEvents(const TMSim::FTickReport& Report)
 				Animate(i, Ready, false);
 			}
 		}
+	}
+}
+
+void ATMBattleDirector::PredictWalk(const TMSim::FOrder& Order)
+{
+	int32 i = INDEX_NONE;
+	for (int32 k = 0; k < static_cast<int32>(Battle.Units.size()); ++k)
+	{
+		if (Battle.Units[k].Id == Order.UnitId)
+		{
+			i = k;
+		}
+	}
+	if (!Motions.IsValidIndex(i) || !UnitVisuals.IsValidIndex(i))
+	{
+		return;
+	}
+	const TMSim::FUnit& Unit = Battle.Units[i];
+	FTMMotion& Motion = Motions[i];
+	if (!Unit.IsAlive() || Motion.bDown)
+	{
+		return;
+	}
+	// The way it will walk, found as AdvanceMotion finds it once the rules have it there.
+	TMSim::FBattle Copy = Battle;
+	std::vector<TMSim::FVec2> Way;
+	if (const TMSim::FUnit* Walker = Copy.FindUnit(Unit.Id))
+	{
+		Way = Order.Via.empty() ? Copy.PathTo(*Walker, TMSim::FMap::NodeOf(Order.To), true)
+			: Copy.PathVia(*Walker, Order.Via, TMSim::FMap::NodeOf(Order.To), true);
+	}
+	if (Way.empty() || !(Way.back() == Order.To))
+	{
+		return;
+	}
+	TArray<FVector> Path;
+	float Length = 0.0f;
+	TMSim::FVec2 Last = Unit.Pos;
+	for (const TMSim::FVec2& Point : Way)
+	{
+		Path.Add(WorldFromMetres(Point, Battle.Map.NodeLevel(TMSim::FMap::NodeOf(Point))));
+		Length += Last.DistanceTo(Point);
+		Last = Point;
+	}
+	Motion.Path = SmoothedWalk(Motion.Shown, Path);
+	Motion.bRun = Length > RunFrom;
+	Motion.Pace = 1.0f + FMath::Clamp((Length - 8.0f) / 16.0f, 0.0f, 1.0f) * 0.35f;
+	Motion.WalkAge = 0.0f;
+	Motion.OneShotLeft = 0.0f;
+	FTMPredicted& Predicted = PredictedWalks.Add(Unit.Id);
+	Predicted.To = Order.To;
+	Predicted.Sent = FPlatformTime::Seconds();
+}
+
+void ATMBattleDirector::SettlePredictions()
+{
+	const double Now = FPlatformTime::Seconds();
+	for (auto It = PredictedWalks.CreateIterator(); It; ++It)
+	{
+		const TMSim::FUnit* Unit = Battle.FindUnit(It.Key());
+		if (Unit && Unit->Pos == It.Value().To)
+		{
+			continue;  // taken: AdvanceMotion carries on with it
+		}
+		// Still out with the host: wait for it, for a few seconds at most.
+		if (Unit && Unit->IsAlive() && !bHostRefused && Now - It.Value().Sent < 3.0)
+		{
+			continue;
+		}
+		// Refused, or never answered: back to where the rules have it.
+		for (int32 k = 0; Unit && k < static_cast<int32>(Battle.Units.size()) && k < Motions.Num(); ++k)
+		{
+			if (Battle.Units[k].Id == Unit->Id)
+			{
+				Motions[k].Path.Reset();
+				Motions[k].Path.Add(WorldFor(*Unit));
+				Motions[k].Pace = 1.0f;
+				Motions[k].WalkAge = 0.0f;
+			}
+		}
+		It.RemoveCurrent();
 	}
 }
 
@@ -630,6 +963,16 @@ void ATMBattleDirector::AdvanceMotion(float DeltaSeconds)
 			Motion.Shown = WorldFromMetres(Unit.Pos, Battle.Map.NodeLevel(TMSim::FMap::NodeOf(Unit.Pos)));
 			Motion.Path.Reset();
 		}
+		// A walk already shown setting off before the host answered (PredictWalk):
+		// the rules now have it where it was going, so it simply walks on.
+		if (const FTMPredicted* Predicted = PredictedWalks.Find(Unit.Id))
+		{
+			if (Predicted->To == Unit.Pos)
+			{
+				Motion.SimPos = Unit.Pos;
+				PredictedWalks.Remove(Unit.Id);
+			}
+		}
 		if (!(Unit.Pos == Motion.SimPos))
 		{
 			const TMSim::FVec2 From = Motion.SimPos;
@@ -658,7 +1001,14 @@ void ATMBattleDirector::AdvanceMotion(float DeltaSeconds)
 				Length += Last.DistanceTo(Point);
 				Last = Point;
 			}
+			// The way is from node to node, all corners; it is walked with its
+			// corners cut, where the ground is level (2026-10-03).
+			Motion.Path = SmoothedWalk(Motion.Shown, Motion.Path);
 			Motion.bRun = Length > RunFrom;
+			// A long walk goes a little faster, up to a third, so the battle is not
+			// spent watching it; its steps quicken to match (ShowStatuses).
+			Motion.Pace = 1.0f + FMath::Clamp((Length - 8.0f) / 16.0f, 0.0f, 1.0f) * 0.35f;
+			Motion.WalkAge = 0.0f;
 			Motion.OneShotLeft = 0.0f;
 		}
 
@@ -679,6 +1029,9 @@ void ATMBattleDirector::AdvanceMotion(float DeltaSeconds)
 					const FVector Where = WorldFor(Unit) + FVector(0.0f, 0.0f, 50.0f);
 					PlayEventSound(TEXT("knockout"), &Where);
 					PlayVoice(i, TEXT("death"), 1.0f);
+					// It has weight (2026-10-03): the world slows as it goes down, the camera shakes.
+					SlowWorld(0.45f, 0.5f);
+					Jolt(0.7f);
 				}
 			};
 			if (!Motion.bDown && Unit.IsKo() && Set && (Motion.DeathClip || Set->Death.Num() > 0))
@@ -696,10 +1049,54 @@ void ATMBattleDirector::AdvanceMotion(float DeltaSeconds)
 			Animate(i, Set ? (Set->Rise ? Set->Rise : Set->Idle) : nullptr, Set && !Set->Rise);
 		}
 
-		if (Motion.Path.Num() > 0 && !Motion.bDown)
+		if (Motion.Path.Num() > 0 && !Motion.bDown && Motion.Flight != 0)
+		{
+			// A movement skill under way (AnimateEvents): along a line to where the
+			// rules put it, up in an arc for a leap, gone and back for a step.
+			Motion.FlightAge += DeltaSeconds;
+			const float T = FMath::Clamp(Motion.FlightAge / FMath::Max(0.01f, Motion.FlightTime), 0.0f, 1.0f);
+			const FVector Landing = Motion.Path.Last();
+			if (Motion.Flight == 3)
+			{
+				Motion.Shown = T < 0.5f ? Motion.FlightFrom : Landing;
+			}
+			else
+			{
+				const float Along = Motion.Flight == 2 ? FMath::InterpEaseOut(0.0f, 1.0f, T, 2.0f) : T;
+				Motion.Shown = FMath::Lerp(Motion.FlightFrom, Landing, Along);
+				Motion.Shown.Z += Motion.FlightArc * 4.0f * T * (1.0f - T);
+			}
+			if (T >= 1.0f)
+			{
+				Motion.Shown = Landing;
+				Motion.Path.Reset();
+				// Down: a leap lands with a thump and the camera feels it.
+				if (Motion.Flight == 1 && IsSeen(Unit))
+				{
+					Jolt(0.35f);
+				}
+				Motion.Flight = 0;
+			}
+			if (Motion.Path.Num() == 0 && Motion.Queued)
+			{
+				// Arrived with something to do: the blow (AdvanceBlows times it from now).
+				Motion.Yaw = Motion.QueuedYaw;
+				Animate(i, Motion.Queued, false);
+				Motion.Then = Motion.QueuedThen;
+				Motion.QueuedThen.Reset();
+				Motion.Queued = nullptr;
+			}
+		}
+		else if (Motion.Path.Num() > 0 && !Motion.bDown)
 		{
 			SoundStep(i, DeltaSeconds);
-			const float Speed = Set ? (Motion.bRun ? Set->RunSpeed : Set->WalkSpeed) : 400.0f;
+			Motion.WalkAge += DeltaSeconds;
+			// Eased: into its stride over a fifth of a second, and slowing over the last
+			// half metre, rather than at full speed from the first frame to the last.
+			const float Into = FMath::Clamp(0.4f + Motion.WalkAge / 0.2f * 0.6f, 0.4f, 1.0f);
+			const float Left = FVector::Dist2D(Motion.Shown, Motion.Path.Last());
+			const float Out = Motion.Queued ? 1.0f : FMath::Clamp(Left / 50.0f, 0.5f, 1.0f);
+			const float Speed = (Set ? (Motion.bRun ? Set->RunSpeed : Set->WalkSpeed) : 400.0f) * Motion.Pace * Into * Out;
 			float Step = Speed * DeltaSeconds;
 			while (Step > 0.0f && Motion.Path.Num() > 0)
 			{
@@ -732,12 +1129,16 @@ void ATMBattleDirector::AdvanceMotion(float DeltaSeconds)
 				// starts counting towards landing now (AdvanceBlows).
 				Motion.Yaw = Motion.QueuedYaw;
 				Animate(i, Motion.Queued, false);
+				Motion.Then = Motion.QueuedThen;
+				Motion.QueuedThen.Reset();
 				Motion.Queued = nullptr;
 			}
 		}
 		else if (!Motion.bDown)
 		{
-			Motion.Shown = WorldFor(Unit);
+			// Arrived ahead of the host's answer: waits where it walked to.
+			const FTMPredicted* Waiting = PredictedWalks.Find(Unit.Id);
+			Motion.Shown = Waiting ? WorldFromMetres(Waiting->To, Battle.Map.NodeLevel(TMSim::FMap::NodeOf(Waiting->To))) : WorldFor(Unit);
 			// Standing: turn to face the way the rules say it faces.
 			if (Motion.OneShotLeft <= 0.0f)
 			{
@@ -751,7 +1152,23 @@ void ATMBattleDirector::AdvanceMotion(float DeltaSeconds)
 			Motion.OneShotLeft -= DeltaSeconds * Motion.PlayRate;
 			if (Motion.OneShotLeft <= 0.0f && !Motion.bDown && Set)
 			{
-				Animate(i, Motion.Path.Num() > 0 ? (Motion.bRun && Set->Run ? Set->Run : Set->Walk) : StandingClip(i), true);
+				if (Motion.Then.Num() > 0 && Motion.Path.Num() == 0)
+				{
+					// The next part of a picked swing: release after wind-up, recover after release.
+					TArray<UAnimSequence*> Rest = Motion.Then;
+					UAnimSequence* Next = Rest[0];
+					Rest.RemoveAt(0);
+					Animate(i, Next, false);
+					Motion.Then = Rest;
+				}
+				else
+				{
+					// Mid-leap or mid-dash, nothing takes over until it lands.
+					if (Motion.Flight == 0)
+					{
+						Animate(i, Motion.Path.Num() > 0 ? (Motion.bRun && Set->Run ? Set->Run : Set->Walk) : StandingClip(i), true);
+					}
+				}
 			}
 		}
 		else if (Motion.Path.Num() == 0 && !Motion.bDown && Set)
@@ -802,7 +1219,7 @@ void ATMBattleDirector::AdvanceMotion(float DeltaSeconds)
 		}
 		if (Plates.IsValidIndex(i) && Plates[i])
 		{
-			Plates[i]->SetRelativeLocation(Motion.Shown + Offset + FVector(0.0f, 0.0f, 150.0f));
+			Plates[i]->SetRelativeLocation(Motion.Shown + Offset + FVector(0.0f, 0.0f, 150.0f * UnitSize));
 		}
 		if (ReadyLights.IsValidIndex(i) && ReadyLights[i])
 		{

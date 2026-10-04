@@ -16,7 +16,7 @@
     "aeva": 6,
     "meva": 8,
     "crit": 5,
-    "speed": 6,
+    "speed": 8,
     "move": 5,
     "patience": 8,
     "sight": 8
@@ -120,5 +120,12 @@
         "scale": 1
       }
     }
-  ]
+  ],
+  "creator": {
+    "rebalanced": {
+      "on": "2026-10-02",
+      "why": "Balance audit 2026-10-02: Speed 6 -> 8 (the slowest tanks were the two weakest)"
+    },
+    "changedAt": "2026-10-03T03:45:00.000Z"
+  }
 }

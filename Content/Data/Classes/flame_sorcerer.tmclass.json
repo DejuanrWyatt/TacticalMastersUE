@@ -70,26 +70,31 @@
       }
     },
     {
-      "id": "flame_sorcerer_staff",
-      "name": "Staff",
-      "desc": "Strike an adjacent enemy",
+      "id": "flame_sorcerer_kindling",
+      "name": "Kindling",
+      "desc": "Splash pitch on an enemy 2-6 m away: a light hit, and Oiled for 2 turns, so fire lasts twice as long on it.",
       "kind": "active",
       "effect": "damage",
-      "scale": "att",
+      "scale": "mag",
       "target": "enemy",
       "shape": "unit",
-      "power": 29,
-      "min_range": 0,
-      "max_range": 1.8,
+      "power": 30,
+      "min_range": 2,
+      "max_range": 6,
       "aoe": 0,
-      "cooldown": 0,
+      "cooldown": 3,
       "cast": 0,
-      "fx": "attack",
+      "status": {
+        "id": "oiled",
+        "turns": 2
+      },
+      "fx": "fire",
       "vfx": {
-        "system": "/Game/ParagonIggyScorch/FX/Particles/IggyScorch/Abilities/Turret/FX/P_IggyScorch_Turret_Impact.P_IggyScorch_Turret_Impact",
+        "system": "/Game/PotaVFX_Smoke/VFX/System/ColorSmoke/NS_SmokeGradient_Loop.NS_SmokeGradient_Loop",
         "at": "targets",
-        "scale": 1
-      }
+        "scale": 0.6
+      },
+      "anim": "bolt"
     },
     {
       "id": "flame_sorcerer_cataclysm",
@@ -149,6 +154,29 @@
       }
     ],
     "description": "Area magic damage",
-    "measured": -66
+    "measured": -66,
+    "rebalanced": {
+      "on": "2026-10-04",
+      "why": "Signature in place of Staff (never used): Oils an enemy for 2 turns with a light hit, so Burst and Cataclysm burn it twice as long. Before that (2026-10-02): Balance audit 2026-10-02: the staff strikes from 1-5 m (power -15%) instead of only at arm's length, which the computer never used"
+    },
+    "changedAt": "2026-10-03T03:45:00.000Z",
+    "icons": {
+      "abilities": [
+        null,
+        null,
+        {
+          "backing": "circle",
+          "glyph": "drop",
+          "colour": "#d08a3a",
+          "style": "light",
+          "mark": "unit",
+          "scale": 1,
+          "rotate": 0,
+          "badge": "none",
+          "finish": "lit"
+        },
+        null
+      ]
+    }
   }
 }

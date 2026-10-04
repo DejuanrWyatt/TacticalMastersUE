@@ -10,14 +10,14 @@
     "support"
   ],
   "stats": {
-    "hp": 75,
+    "hp": 90,
     "attdef": 6,
     "magdef": 12,
     "aeva": 5,
     "meva": 14,
     "crit": 10,
-    "speed": 6,
-    "move": 5,
+    "speed": 9,
+    "move": 6,
     "patience": 9,
     "sight": 10
   },
@@ -25,15 +25,15 @@
     {
       "id": "golem_master_stone_rod",
       "name": "Stone Rod",
-      "desc": "Strike an adjacent enemy.",
+      "desc": "Strikes an enemy 1-7 m away.",
       "kind": "active",
       "effect": "damage",
       "scale": "att",
       "target": "enemy",
       "shape": "unit",
-      "power": 34,
-      "min_range": 0,
-      "max_range": 1.8,
+      "power": 40,
+      "min_range": 1,
+      "max_range": 7,
       "aoe": 0,
       "cooldown": 0,
       "cast": 0,
@@ -42,23 +42,24 @@
         "system": "/Game/ParagonMinions/FX/Particles/Minions/Shared/P_Minion_Melee_Impact.P_Minion_Melee_Impact",
         "at": "targets",
         "scale": 1
-      }
+      },
+      "anim": "bolt"
     },
     {
       "id": "golem_master_summon_golem",
       "name": "Summon Golem",
-      "desc": "The Golem strikes every enemy within 2 m of a point 3-9 m away; Stuns for 1 turn. (2 s)",
+      "desc": "Strikes every enemy within 2 m of a point 3-9 m away; Stuns for 1 turn, and calls up the Golem there to fight for 3 of its turns. (1 s)",
       "kind": "active",
       "effect": "damage",
       "scale": "mag",
       "target": "enemy",
       "shape": "circle",
-      "power": 46,
+      "power": 64,
       "min_range": 3,
       "max_range": 9,
       "aoe": 2,
       "cooldown": 2,
-      "cast": 2,
+      "cast": 1,
       "status": {
         "id": "stun",
         "turns": 1
@@ -68,6 +69,11 @@
         "system": "/Game/ParagonGadget/FX/Abilities/StickyBomb/FX/P_StickyBomb_Explosion_Unattached.P_StickyBomb_Explosion_Unattached",
         "at": "point",
         "scale": 1
+      },
+      "special": "pet",
+      "pet": {
+        "job": "golem_pet",
+        "turns": 3
       }
     },
     {
@@ -102,18 +108,18 @@
     {
       "id": "golem_master_golem_ascendant",
       "name": "Golem Ascendant",
-      "desc": "ULTIMATE: Every enemy within 4 m of a point 4-11 m away; Stuns for 1 turn. (4 s)",
+      "desc": "ULTIMATE: Every enemy within 4 m of a point 4-11 m away; Stuns for 1 turn. (3 s)",
       "kind": "active",
       "effect": "damage",
       "scale": "mag",
       "target": "enemy",
       "shape": "circle",
-      "power": 61,
+      "power": 85,
       "min_range": 4,
       "max_range": 11,
       "aoe": 4,
       "cooldown": 0,
-      "cast": 4,
+      "cast": 3,
       "status": {
         "id": "stun",
         "turns": 1
@@ -125,5 +131,12 @@
         "scale": 1
       }
     }
-  ]
+  ],
+  "creator": {
+    "rebalanced": {
+      "on": "2026-10-03",
+      "why": "Tuning pass 2026-10-03 (lab 6% in place of the Black Mage): HP 75->90, Speed 6->9, Move 5->6, power +40%, Summon Golem cooldown 3->2. Before that (2026-10-02): Balance audit 2026-10-02: rod reaches 1-7 m (power -15%); the summon casts in 1 s, every 3 turns, and calls up a computer-played pet for 3 turns; ultimate 1 s quicker"
+    },
+    "changedAt": "2026-10-03T03:45:00.000Z"
+  }
 }

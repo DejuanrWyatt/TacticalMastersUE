@@ -35,6 +35,9 @@ namespace TMIndicatorPaint
 	const FLinearColor Sprint(1.0f, 0.62f, 0.2f);
 	const FLinearColor Refused(1.0f, 0.32f, 0.28f);
 	const FLinearColor PathGold(1.0f, 0.88f, 0.35f);
+	/** Zones of control (2026-10-02): an enemy tank's, and your own. */
+	const FLinearColor ZoneOrange(1.0f, 0.54f, 0.36f);
+	const FLinearColor ZoneBlue(0.43f, 0.63f, 1.0f);
 	/** Width of the line round the walk area, in picture pixels (24 to a metre): as thin as
 	 *  the picture allows (2026-10-01: "as thin as possible"), and no glow round it. */
 	constexpr float MoveEdgeWidth = 1.0f;
@@ -43,6 +46,8 @@ namespace TMIndicatorPaint
 	/** Width of every aiming line -- a cone's edges, a lane, a charge, a ring where a
 	 *  blow lands -- in picture pixels: thin as the walk's, and no glow (2026-10-01). */
 	constexpr float AimWidth = 1.25f;
+	/** How much of a fill's own opacity is kept: nearly none (2026-10-03). */
+	constexpr float GroundFillOpacity = 0.3f;
 
 	/** Painting into the picture, in metres. */
 	struct FPainter
@@ -60,12 +65,23 @@ namespace TMIndicatorPaint
 			T.V0_Color = T.V1_Color = T.V2_Color = Colour;
 			Tris.Add(T);
 		}
+		/**
+		 * A fill's colour, nearly see-through (2026-10-03: "the brightness of the
+		 * fill-in ground effects makes it hard to understand the targeting").
+		 * Fills are the faint colours (under half opaque); dots, rims and lines
+		 * keep theirs, so the shapes still read by their edges.
+		 */
+		static FLinearColor Faint(const FLinearColor& Colour)
+		{
+			return Colour.A < 0.5f ? FLinearColor(Colour.R, Colour.G, Colour.B, Colour.A * GroundFillOpacity) : Colour;
+		}
 		/** A convex shape, as a fan from its first corner. */
 		void Poly(const TArray<FVector2D>& Pts, const FLinearColor& Colour)
 		{
+			const FLinearColor Fill = Faint(Colour);
 			for (int32 i = 1; i + 1 < Pts.Num(); ++i)
 			{
-				Tri(Pts[0], Pts[i], Pts[i + 1], Colour);
+				Tri(Pts[0], Pts[i], Pts[i + 1], Fill);
 			}
 		}
 		void Flush()
@@ -113,8 +129,9 @@ namespace TMIndicatorPaint
 				Glow(Centre + FVector2D(FMath::Cos(A0), FMath::Sin(A0)) * Radius, Centre + FVector2D(FMath::Cos(A1), FMath::Sin(A1)) * Radius, Colour, Width);
 			}
 		}
-		void Disc(const FVector2D& Centre, float Radius, const FLinearColor& Colour, float From = 0.0f, float To = 360.0f)
+		void Disc(const FVector2D& Centre, float Radius, const FLinearColor& InColour, float From = 0.0f, float To = 360.0f)
 		{
+			const FLinearColor Colour = Faint(InColour);
 			const int32 Steps = FMath::Max(12, FMath::CeilToInt(FMath::Abs(To - From) / 5.0f));
 			for (int32 i = 0; i < Steps; ++i)
 			{
@@ -221,6 +238,10 @@ void ATMBattleDirector::AdvanceIndicators()
 	// (2026-10-01).
 	const int32 TowerHovered = HoveredTower();
 	FString Rings = TowerHovered >= 0 ? FString::Printf(TEXT("w%d"), TowerHovered) : FString();
+	// Monsters' wind-ups, as they fill (2026-10-02).
+	Rings += CastSignature();
+	// Zones of control (2026-10-02).
+	Rings += ZoneSignature();
 	// And a ring at the edge of each hazard tile, so it reads as "this tile does
 	// something" before its look is made out: orange burns, cyan mends.
 	for (const int Each : Battle.Map.Hazards)
@@ -331,6 +352,8 @@ void ATMBattleDirector::AdvanceIndicators()
 				Paint.Band(Middle, Edge - 1.6f, Edge, Alpha(Cue, 0.85f));
 			}
 		}
+		PaintCasts(&Paint);
+		PaintZones(&Paint, bShow && AimMode == EAimMode::Move);
 	}
 	if (bBattle && !Planned.IsEmpty())
 	{
@@ -345,6 +368,7 @@ void ATMBattleDirector::AdvanceIndicators()
 	if (AimMode == EAimMode::Move)
 	{
 		PaintMoveArea(&Paint, *Unit);
+		PaintZoneShadow(&Paint);
 	}
 	else if (AimMode == EAimMode::Ability)
 	{
@@ -353,14 +377,57 @@ void ATMBattleDirector::AdvanceIndicators()
 		PaintAbility(&Paint, *Unit, Where);
 	}
 	// The way there, whether a walk or a walk into range: a thin line, and a
-	// small dot where it ends.
-	for (size_t i = 1; i < PathShown.size(); ++i)
-	{
-		Paint.Thin(Paint.P(PathShown[i - 1]), Paint.P(PathShown[i]), PathWidth, Alpha(PathGold, 0.95f));
-	}
+	// small dot where it ends. Coloured by what it meets (2026-10-03): gold;
+	// orange where it sets off from inside an enemy's reach (breaking away costs
+	// extra); red where it ends in a tank's zone (the zone stops it there). Its
+	// corners are cut, as the walk itself cuts them (AdvanceMotion).
 	if (!PathShown.empty())
 	{
-		Paint.Disc(Paint.P(PathShown.back()), 0.12f * Ppm, Alpha(PathGold, 0.9f));
+		const int32 Mine = FriendTeam();
+		const double Reach = Battle.Tuning.EngageRadius;
+		const bool bCosts = Reach > 0.0 && Battle.Tuning.EngageCost > 0.0;
+		const bool bStops = Reach > 0.0 && Battle.Tuning.ZoneOfControl >= 1.0;
+		std::vector<const TMSim::FUnit*> Foes;
+		for (const TMSim::FUnit& Each : Battle.Units)
+		{
+			if (Each.IsAlive() && Each.Team != Mine && IsSeen(Each))
+			{
+				Foes.push_back(&Each);
+			}
+		}
+		auto NearFoe = [&Foes, Reach](const TMSim::FVec2& Point, bool bTanksOnly)
+		{
+			for (const TMSim::FUnit* Foe : Foes)
+			{
+				if ((!bTanksOnly || TMSim::FBattle::HoldsTheLine(*Foe)) && static_cast<double>(Point.DistanceTo(Foe->Pos)) <= Reach + 0.01)
+				{
+					return true;
+				}
+			}
+			return false;
+		};
+		const FLinearColor StopRed(1.0f, 0.32f, 0.26f);
+		const int32 Legs = static_cast<int32>(PathShown.size()) - 1;
+		FLinearColor Last = PathGold;
+		for (int32 k = 0; k < Legs; ++k)
+		{
+			const TMSim::FVec2& A = PathShown[static_cast<size_t>(k)];
+			const TMSim::FVec2& B = PathShown[static_cast<size_t>(k + 1)];
+			const FLinearColor Colour = bStops && k + 1 == Legs && NearFoe(B, true) ? StopRed
+				: (bCosts && NearFoe(A, false) ? ZoneOrange : PathGold);
+			// This leg from a quarter along to three quarters along (its ends where
+			// the path does), then the cut corner into the next.
+			const FVector2D From = Paint.P(k == 0 ? A : A + (B - A) * 0.25f);
+			const FVector2D To = Paint.P(k + 1 == Legs ? B : A + (B - A) * 0.75f);
+			Paint.Thin(From, To, PathWidth, Alpha(Colour, 0.95f));
+			if (k + 1 < Legs)
+			{
+				const TMSim::FVec2& C = PathShown[static_cast<size_t>(k + 2)];
+				Paint.Thin(To, Paint.P(B + (C - B) * 0.25f), PathWidth, Alpha(Colour, 0.95f));
+			}
+			Last = Colour;
+		}
+		Paint.Disc(Paint.P(PathShown.back()), 0.12f * Ppm, Alpha(Last, 0.9f));
 	}
 	Paint.Flush();
 	UKismetRenderingLibrary::EndDrawCanvasToRenderTarget(this, Context);
@@ -384,7 +451,7 @@ FString ATMBattleDirector::PlanSignature() const
 	{
 		const FTMGoTo& Order = Pair.Value;
 		Out += FString::Printf(TEXT("g%d:%.2f,%.2f:%d:%d:%d:%.2f,%.2f;"), Pair.Key, Order.Dest.X, Order.Dest.Y, static_cast<int32>(Order.Route.size()),
-			static_cast<int32>(Order.Stops.size()), Pair.Key == SelectedId ? 1 : 0,
+			static_cast<int32>(Order.Stops.size()), GoToShown(Pair.Key) ? 1 : 0,
 			Order.Stops.empty() ? 0.0 : Order.Stops.front().X, Order.Stops.empty() ? 0.0 : Order.Stops.front().Y);
 	}
 	if (!GoToHoverStops.empty())
@@ -454,19 +521,20 @@ void ATMBattleDirector::PaintPlans(void* Painter)
 			Paint.Band(Paint.P(Target), Reach * Ppm - AimWidth, Reach * Ppm, Alpha(Aimed, 0.85f));
 		}
 	}
-	// Each Go To's road (2026-10-01): dashed blue, the selected unit's bright,
-	// a ring where each turn's walk ends and a gold one at the end. The numbers
-	// are the HUD's (ATMBattleHud::DrawGoToMarks).
+	// Each Go To's road (2026-10-01): dashed blue, a ring where each turn's walk
+	// ends and a gold one at the end. The numbers are the HUD's
+	// (ATMBattleHud::DrawGoToMarks). Only while its unit is pointed at
+	// (2026-10-03: "hidden unless the unit is hovered over").
 	const FLinearColor GoBlue(0.44f, 0.66f, 1.0f);
 	for (const TPair<int32, FTMGoTo>& Pair : GoTos)
 	{
 		const FTMGoTo& Order = Pair.Value;
 		const TMSim::FUnit* Unit = const_cast<TMSim::FBattle&>(Battle).FindUnit(Pair.Key);
-		if (!Unit || !Unit->IsAlive())
+		if (!Unit || !Unit->IsAlive() || !GoToShown(Pair.Key))
 		{
 			continue;
 		}
-		const float Strength = Pair.Key == SelectedId ? 0.85f : 0.45f;
+		const float Strength = 0.85f;
 		TMSim::FVec2 Last = Unit->Pos;
 		for (const TMSim::FVec2& Point : Order.Route)
 		{
@@ -745,6 +813,124 @@ void ATMBattleDirector::PaintAbility(void* Painter, const TMSim::FUnit& Unit, co
 	}
 }
 
+FString ATMBattleDirector::CastSignature() const
+{
+	// Painted again as each wind-up fills by a sixteenth, starts, ends or moves.
+	FString Out;
+	for (const TMSim::FUnit& Unit : Battle.Units)
+	{
+		if (Unit.IsAlive() && !Unit.bOffBoard && Unit.IsCasting() && IsSeen(Unit))
+		{
+			const int32 Total = FMath::Max(1, Unit.Casting.Total);
+			Out += FString::Printf(TEXT("c%d/%d/%d/%.1f,%.1f/%.1f,%.1f"), Unit.Id, Unit.Casting.Slot,
+				((Total - Unit.Casting.Ticks) * 16) / Total, Unit.Pos.X, Unit.Pos.Y, Unit.Casting.Target.X, Unit.Casting.Target.Y);
+		}
+	}
+	return Out;
+}
+
+void ATMBattleDirector::PaintCasts(void* Painter)
+{
+	// "Camps and Bosses Mockups" B: a monster's wind-up drawn where it will land,
+	// hatched faint and filling from its middle as the cast runs out, edged in
+	// purple; round a boss, a gold arc behind it, where three hits break it.
+	using namespace TMIndicatorPaint;
+	FPainter& Paint = *static_cast<FPainter*>(Painter);
+	const FLinearColor Wind(0.69f, 0.49f, 1.0f);
+	const FLinearColor BackGold(0.94f, 0.81f, 0.45f);
+	for (const TMSim::FUnit& Unit : Battle.Units)
+	{
+		// Every caster in sight since the v19 play test (Cast A), not only a monster.
+		if (!Unit.IsAlive() || Unit.bOffBoard || !Unit.IsCasting() || !IsSeen(Unit))
+		{
+			continue;
+		}
+		const TMSim::FAbility* Ability = Unit.Ability(Unit.Casting.Slot);
+		if (!Ability)
+		{
+			continue;
+		}
+		TMSim::FVec2 Aim = Unit.Casting.Target;
+		if (Unit.Casting.FollowId >= 0)
+		{
+			if (const TMSim::FUnit* Followed = Battle.FindUnit(Unit.Casting.FollowId))
+			{
+				Aim = Followed->Pos;
+			}
+		}
+		const float Done = FMath::Clamp(1.0f - static_cast<float>(Unit.Casting.Ticks) / FMath::Max(1, Unit.Casting.Total), 0.0f, 1.0f);
+		const std::string Shape = TMSim::ShapeOf(*Ability);
+		const FVector2D Me = Paint.P(Unit.Pos);
+		const FVector2D At = Paint.P(Aim);
+		const FVector2D Toward = (At - Me).GetSafeNormal();
+		const FVector2D Across(-Toward.Y, Toward.X);
+		const float Deg = FMath::RadiansToDegrees(FMath::Atan2(Toward.Y, Toward.X));
+		if (Shape == "cone")
+		{
+			const float Reach = Ability->MaxRange * Ppm;
+			const float Half = Ability->Angle * 0.5f;
+			Paint.Disc(Me, Reach, Alpha(Wind, 0.12f), Deg - Half, Deg + Half);
+			Paint.Disc(Me, Reach * Done, Alpha(Wind, 0.28f), Deg - Half, Deg + Half);
+			const FVector2D EdgeA = Me + FVector2D(FMath::Cos(FMath::DegreesToRadians(Deg - Half)), FMath::Sin(FMath::DegreesToRadians(Deg - Half))) * Reach;
+			const FVector2D EdgeB = Me + FVector2D(FMath::Cos(FMath::DegreesToRadians(Deg + Half)), FMath::Sin(FMath::DegreesToRadians(Deg + Half))) * Reach;
+			Paint.Thin(Me, EdgeA, 3.0f, Alpha(Wind, 0.95f));
+			Paint.Thin(Me, EdgeB, 3.0f, Alpha(Wind, 0.95f));
+			Paint.Arc(Me, Reach, Deg - Half, Deg + Half, Wind, 3.0f);
+		}
+		else if (Shape == "line")
+		{
+			const float Width = FMath::Max(Ability->Aoe, 0.6f) * Ppm;
+			Paint.Poly({ Me + Across * Width, At + Across * Width, At - Across * Width, Me - Across * Width }, Alpha(Wind, 0.12f));
+			const FVector2D Reached = Me + (At - Me) * Done;
+			Paint.Poly({ Me + Across * Width, Reached + Across * Width, Reached - Across * Width, Me - Across * Width }, Alpha(Wind, 0.28f));
+			Paint.Thin(Me + Across * Width, At + Across * Width, 3.0f, Alpha(Wind, 0.95f));
+			Paint.Thin(Me - Across * Width, At - Across * Width, 3.0f, Alpha(Wind, 0.95f));
+		}
+		else
+		{
+			// A circle: where it lands, or round the caster; one target gets a ring of its own size.
+			const FVector2D Centre = Shape == "self" ? Me : At;
+			const float Radius = FMath::Max(Ability->Aoe, TMSim::Ground::HitRadius) * Ppm;
+			// Dashes from the caster to where it lands (Cast A), stopping at the rim.
+			const float Gap = FVector2D::Distance(Me, Centre) - Radius;
+			if (Shape != "self" && Gap > 8.0f)
+			{
+				const FVector2D Way = (Centre - Me).GetSafeNormal();
+				for (float Along = 0.0f; Along < Gap; Along += 14.0f)
+				{
+					Paint.Thin(Me + Way * Along, Me + Way * FMath::Min(Along + 8.0f, Gap), 2.5f, Alpha(Wind, 0.85f));
+				}
+			}
+			Paint.Disc(Centre, Radius, Alpha(Wind, 0.12f));
+			Paint.Disc(Centre, Radius * Done, Alpha(Wind, 0.28f));
+			Paint.Band(Centre, Radius - 3.0f, Radius, Alpha(Wind, 0.95f));
+			// The time running out, round the rim, from the top.
+			Paint.Band(Centre, Radius + 2.0f, Radius + 6.0f, Alpha(Wind, 0.25f));
+			const int32 Steps = FMath::Max(1, FMath::CeilToInt(72.0f * Done));
+			for (int32 i = 0; i < Steps; ++i)
+			{
+				const float A0 = -UE_HALF_PI + UE_TWO_PI * i / 72.0f;
+				const float A1 = -UE_HALF_PI + UE_TWO_PI * FMath::Min(i + 1.0f, 72.0f * Done) / 72.0f;
+				const FVector2D D0(FMath::Cos(A0), FMath::Sin(A0));
+				const FVector2D D1(FMath::Cos(A1), FMath::Sin(A1));
+				Paint.Tri(Centre + D0 * (Radius + 2.0f), Centre + D0 * (Radius + 6.0f), Centre + D1 * (Radius + 6.0f), Alpha(Wind, 0.95f));
+				Paint.Tri(Centre + D0 * (Radius + 2.0f), Centre + D1 * (Radius + 6.0f), Centre + D1 * (Radius + 2.0f), Alpha(Wind, 0.95f));
+			}
+		}
+		// A boss: the arc behind it to strike from (its back, as the rules judge a flank).
+		const TMSim::FMonsterInfo* Info = Unit.MonsterInfo();
+		if (Info && Info->Tier >= 3)
+		{
+			const float Back = FMath::RadiansToDegrees(FMath::Atan2(-Unit.Facing.Y, -Unit.Facing.X));
+			const float Ring = 1.4f * Ppm;
+			for (int32 k = 0; k < 3; ++k)
+			{
+				Paint.Arc(Me, Ring + k * 1.5f, Back - 55.0f, Back + 55.0f, BackGold, 3.0f);
+			}
+		}
+	}
+}
+
 int32 ATMBattleDirector::HoveredTower() const
 {
 	// The pointer is on a tower if it is near the line from its foot to its fire
@@ -786,4 +972,134 @@ int32 ATMBattleDirector::HoveredTower() const
 		}
 	}
 	return Best;
+}
+
+// ------------------------------------------------------- zones of control
+
+FString ATMBattleDirector::ZoneSignature() const
+{
+	// What PaintZones draws, in a line: the seen tanks where they stand, and
+	// while walking, every seen enemy and how much ground zones take away.
+	if (Battle.Tuning.EngageRadius <= 0.0)
+	{
+		return FString();
+	}
+	const bool bMoving = AimMode == EAimMode::Move;
+	FString Out = TEXT("z");
+	for (const TMSim::FUnit& Each : Battle.Units)
+	{
+		if (Each.IsAlive() && IsSeen(Each)
+			&& ((Battle.Tuning.ZoneOfControl >= 1.0 && TMSim::FBattle::HoldsTheLine(Each)) || (bMoving && Each.Team != FriendTeam())))
+		{
+			Out += FString::Printf(TEXT("%d:%.1f,%.1f;"), Each.Id, Each.Pos.X, Each.Pos.Y);
+		}
+	}
+	if (bMoving)
+	{
+		Out += FString::Printf(TEXT("s%d"), static_cast<int32>(ZoneShadow.size()));
+	}
+	return Out;
+}
+
+void ATMBattleDirector::RefreshZoneShadow()
+{
+	ZoneShadow.clear();
+	const TMSim::FUnit* Unit = SelectedUnit();
+	if (Unit && AimMode == EAimMode::Move)
+	{
+		ZoneShadow = Battle.ZoneShadow(*Unit, WayPoints, bSprinting);
+	}
+}
+
+void ATMBattleDirector::PaintZones(void* Painter, bool bMoving)
+{
+	// "Zone of Control Mockups" A (2026-10-02): every tank this side can see wears
+	// its zone on the ground, bold and orange for the enemy's (a walk into it
+	// ends there), quieter and blue for your own. A tank in the fog draws
+	// nothing. While a walk is aimed, a thin ring round every enemy in sight is
+	// its reach (breaking away from it costs extra), and a tank being walked
+	// shows its zone where the walk ends (D).
+	using namespace TMIndicatorPaint;
+	FPainter& Paint = *static_cast<FPainter*>(Painter);
+	const float Radius = static_cast<float>(Battle.Tuning.EngageRadius) * Ppm;
+	if (Radius <= 0.0f)
+	{
+		return;
+	}
+	const bool bZones = Battle.Tuning.ZoneOfControl >= 1.0;
+	const int32 Mine = FriendTeam();
+	auto Dashed = [&Paint, Radius](const FVector2D& Middle, const FLinearColor& Colour, float Width, float Dash)
+	{
+		const int32 Steps = FMath::Max(16, FMath::CeilToInt(UE_TWO_PI * Radius / Dash));
+		for (int32 i = 0; i < Steps; i += 2)
+		{
+			const float A0 = UE_TWO_PI * i / Steps;
+			const float A1 = UE_TWO_PI * (i + 1) / Steps;
+			Paint.Thin(Middle + FVector2D(FMath::Cos(A0), FMath::Sin(A0)) * Radius,
+				Middle + FVector2D(FMath::Cos(A1), FMath::Sin(A1)) * Radius, Width, Colour);
+		}
+	};
+	auto Solid = [&Paint, Radius](const FVector2D& Middle, const FLinearColor& Colour, float Width)
+	{
+		const int32 Steps = 48;
+		for (int32 i = 0; i < Steps; ++i)
+		{
+			const float A0 = UE_TWO_PI * i / Steps;
+			const float A1 = UE_TWO_PI * (i + 1) / Steps;
+			Paint.Thin(Middle + FVector2D(FMath::Cos(A0), FMath::Sin(A0)) * Radius,
+				Middle + FVector2D(FMath::Cos(A1), FMath::Sin(A1)) * Radius, Width, Colour);
+		}
+	};
+	for (const TMSim::FUnit& Each : Battle.Units)
+	{
+		if (!Each.IsAlive() || !IsSeen(Each))
+		{
+			continue;
+		}
+		const FVector2D Middle = Paint.P(Each.Pos);
+		const bool bEnemy = Each.Team != Mine;
+		if (bZones && TMSim::FBattle::HoldsTheLine(Each))
+		{
+			// v19 play test: the zone reads by its shields now, circling its edge
+			// (ATMBattleHud::DrawZoneShields), an enemy tank's while it is in sight
+			// and one of yours under the pointer. On the ground only a faint edge.
+			if (bEnemy)
+			{
+				Paint.Disc(Middle, Radius, Alpha(ZoneOrange, 0.05f));
+				Dashed(Middle, Alpha(ZoneOrange, 0.5f), 1.5f, 6.0f);
+			}
+		}
+		else if (bMoving && bEnemy && Battle.Tuning.EngageCost > 0.0)
+		{
+			Solid(Middle, FLinearColor(1.0f, 1.0f, 1.0f, 0.35f), 1.0f);
+		}
+	}
+	// A tank's zone where its walk would end.
+	const TMSim::FUnit* Unit = SelectedUnit();
+	if (bMoving && bZones && Unit && TMSim::FBattle::HoldsTheLine(*Unit) && !PathShown.empty() && TankLanesFor == Unit->Id)
+	{
+		const FVector2D Middle = Paint.P(PathShown.back());
+		Paint.Disc(Middle, Radius, Alpha(ZoneBlue, 0.12f));
+		Dashed(Middle, Alpha(ZoneBlue, 0.95f), 2.5f, 9.0f);
+	}
+}
+
+void ATMBattleDirector::PaintZoneShadow(void* Painter)
+{
+	// "Zone of Control Mockups" B: the ground the enemy's tanks take away from
+	// this walk, hatched over the walk area so its notch has a reason.
+	using namespace TMIndicatorPaint;
+	FPainter& Paint = *static_cast<FPainter*>(Painter);
+	const float Half = TMSim::Ground::NavStep * 0.5f * Ppm;
+	for (const TMSim::FNode& Node : ZoneShadow)
+	{
+		const FVector2D Middle = Paint.P(TMSim::FMap::NodePos(Node));
+		TArray<FVector2D> Square;
+		Square.Add(Middle + FVector2D(-Half, -Half));
+		Square.Add(Middle + FVector2D(Half, -Half));
+		Square.Add(Middle + FVector2D(Half, Half));
+		Square.Add(Middle + FVector2D(-Half, Half));
+		Paint.Poly(Square, Alpha(ZoneOrange, 0.12f));
+		Paint.Thin(Middle + FVector2D(-Half, Half), Middle + FVector2D(Half, -Half), 1.5f, Alpha(ZoneOrange, 0.55f));
+	}
 }
