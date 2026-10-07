@@ -20,6 +20,7 @@
 #include "SimTypes.h"
 #include "SimUnit.h"
 
+#include <algorithm>
 #include <map>
 #include <string>
 #include <utility>
@@ -115,6 +116,13 @@ namespace TMSim
 		ClaimShare,
 		/** Unit killed monster By from whole in one blow: Amount percent of a gauge is owed it, paid as its turn ends. */
 		CleanKill,
+		// Ground zones (2026-10-04, Docs/design/feat-ground-zones.md). Not Godot's.
+		/** Unit laid ground with ability Id (its Slot) at Where, lasting Amount of its turns. */
+		ZoneLaid,
+		/** A zone ran out, its caster fell, or water put it out: Unit laid it, Id its ability, at Where. */
+		ZoneEnded,
+		/** Fire caught a flammable zone (Id) at Where: it burns now. Unit laid it, By set it alight. */
+		ZoneIgnited,
 	};
 
 	/**
@@ -485,6 +493,15 @@ namespace TMSim
 		 * block, and stepping out of an enemy's reach costs extra.
 		 */
 		TMSIM_API std::vector<std::pair<FNode, double>> ReachableNodes(const FUnit& Unit, bool bSprint = false);
+		/**
+		 * With tile movement on (FTuning::TileMove): the one node of each 2 m tile a
+		 * walk can end on, the node of the tile Point is in; a walk goes from one to
+		 * the next. Off, Point's own node.
+		 */
+		TMSIM_API static FNode TileNode(const FVec2& Point);
+		/** Where a walk aimed at Point would end: its tile's spot with tile movement on, else its node's. */
+		TMSIM_API FVec2 TileSpot(const FVec2& Point) const;
+		TMSIM_API bool TilesOn() const { return Tuning.TileMove >= 0.5; }
 
 		/** The way there, both ends included, or empty if there is no way. */
 		TMSIM_API std::vector<FVec2> PathTo(const FUnit& Unit, const FNode& To, bool bSprint = false);
@@ -586,6 +603,46 @@ namespace TMSim
 		 * every machine lands on the same one.
 		 */
 		TMSIM_API bool LandingFor(const FUnit& User, const FAbility& Ability, const FVec2& Target, FVec2& OutSpot) const;
+		/** The same, the user casting from From rather than where it stands (the computer weighing a spot). */
+		TMSIM_API bool LandingFrom(const FUnit& User, const FAbility& Ability, const FVec2& From, const FVec2& Target, FVec2& OutSpot) const;
+		/**
+		 * The new spells (2026-10-05, SimSpells.cpp): why this ability's special
+		 * can't work used from From at Target ("" if it can) -- nowhere to land, no
+		 * cover to hop into, nowhere to dash. Validate and the computer both ask.
+		 */
+		TMSIM_API std::string SpecialProblem(const FUnit& User, const FAbility& Ability, const FVec2& From, const FVec2& Target) const;
+		/**
+		 * A walkable node within Reach of Centre (and not nearer than Closest) that
+		 * no unit but IgnoreId stands on, the nearest to Want; false if none. Rows
+		 * then columns, the first of equals kept: the same spot on every machine.
+		 */
+		TMSIM_API bool SpotNear(const FVec2& Centre, const FVec2& Want, float Reach, float Closest, int IgnoreId, FVec2& OutSpot) const;
+		/**
+		 * Where a unit sliding from its spot along Dir would stop, at most Max
+		 * metres on: half a metre a step, stopping before ground it can't stand on,
+		 * a climb too steep for it, or another unit (allies passable, not stood on,
+		 * when bPassAllies). Its own spot if it can't move at all.
+		 */
+		TMSIM_API FVec2 SlideEnd(const FUnit& Mover, const FVec2& Dir, float Max, bool bPassAllies) const;
+		/**
+		 * Echo (2026-10-05): power is multiplied by this while an echoed ability
+		 * goes off a second time. 1 otherwise; never left at anything else.
+		 */
+		double EchoScale = 1.0;
+		/**
+		 * A "warned" ability (2026-10-06) landing: true while it goes off at the
+		 * start of its caster's turn, from where it was drawn (WarnedFrom), not
+		 * drawn again. False otherwise; never left at anything else.
+		 */
+		bool bWarnedStrike = false;
+		FVec2 WarnedFrom;
+		/** Cire's Spell Codex picks (2026-10-06): Verdict's share of missing health, Echo Slam's per extra enemy. */
+		static constexpr double ExecuteShare = 0.25;
+		static constexpr double CrowdShare = 0.2;
+		/** Shield Toss: bounces, how far each may leap, and how much weaker each lands. */
+		static constexpr int RicochetBounces = 2;
+		static constexpr float RicochetReach = 5.0f;
+		static constexpr double RicochetFalloff = 0.8;
 
 		// ------------------------------------------------- what an ability does
 
@@ -756,6 +813,51 @@ namespace TMSim
 		/** The turns a spring at this point has still to rest, or 0. */
 		TMSIM_API int SpringRestAt(const FVec2& Point) const;
 
+		/**
+		 * Ground zones (2026-10-04, Docs/design/feat-ground-zones.md): ground laid by
+		 * an ability with "special": "zone", in the order laid. Its shape is the
+		 * ability's, aimed from From at Target, as when it went off; Team the side
+		 * its caster was on then. Turns count down as the caster's turns begin.
+		 */
+		struct FZone
+		{
+			int Owner = -1;
+			int Team = -1;
+			int Slot = -1;
+			std::string AbilityId;
+			FVec2 From;
+			FVec2 Target;
+			int Turns = 0;
+			int Total = 0;
+			/** Fire caught it (bZoneFlammable): it burns as burning ground now. */
+			bool bIgnited = false;
+			/** Who it touched, and on which of their turns (FUnit::Serial): once a turn each. */
+			std::vector<std::pair<int, int>> Touched;
+			/** bZoneOnce: who has had its statuses already. */
+			std::vector<int> Once;
+		};
+		std::vector<FZone> Zones;
+		/** What a zone does when it burns (bIgnited): % max HP, and Burn for a turn. */
+		static constexpr float IgnitedPercent = 6.0f;
+		/** The ability a zone was laid with, or null. */
+		TMSIM_API const FAbility* ZoneAbility(const FZone& Zone) const;
+		/**
+		 * Whether this zone is a "warned" ability waiting to land (2026-10-06): drawn
+		 * where it will strike, it touches nobody until it does, at the start of its
+		 * caster's next turn.
+		 */
+		TMSIM_API bool ZoneIsWarning(const FZone& Zone) const;
+		/** Whether its caster is still standing: a fallen caster's zone does nothing, and goes as the next turn begins. */
+		TMSIM_API bool ZoneLive(const FZone& Zone) const;
+		/** Whether this point is in the zone's ground. */
+		TMSIM_API bool ZoneCovers(const FZone& Zone, const FVec2& Point) const;
+		/** Whether the zone would touch this unit standing at Point: the side it is for, on the ground, in it. */
+		TMSIM_API bool ZoneTouches(const FZone& Zone, const FUnit& Unit, const FVec2& Point) const;
+		/** How much the zones would hurt this unit standing at Point, roughly, for the computer: 0 for none. */
+		TMSIM_API double ZoneHarm(const FUnit& Unit, const FVec2& Point) const;
+		/** Whether a zone of this side's sees this point (ZoneSight). */
+		TMSIM_API bool ZoneSees(int Team, const FVec2& Point) const;
+
 		// ------------------------------------------------- neutral camps
 
 		/** The map's boss class (the map file's "boss"), or empty. Set before Start. */
@@ -800,6 +902,8 @@ namespace TMSim
 		TMSIM_API bool IsAlone(const FUnit& Unit, const FVec2& At) const;
 		/** Whether a wild monster has anyone it may fight within its leash. */
 		TMSIM_API bool HasQuarry(const FUnit& Monster) const;
+		/** A monster's notice and chase ranges times this: FTuning::BossAggro for a boss (tier 3), else 1. */
+		TMSIM_API double AggroScale(const FMonsterInfo& Info) const { return Info.Tier >= 3 ? std::max(0.5, Tuning.BossAggro) : 1.0; }
 
 		/** How far the middle reaches, in metres (game_state.gd:75). */
 		static constexpr double CaptureRadius = 4.0;
@@ -841,6 +945,32 @@ namespace TMSim
 		void PlaceWatchtowers(uint64_t InSeed);
 		/** A turn spent at a tower: its side's progress, and the tower if that is enough. */
 		void ApplyCapture(FUnit& Unit, int Tower, FTickReport& Report);
+		/** One turn's progress on a tower for the unit's side, and the tower if that is enough. */
+		void CaptureProgress(FUnit& Unit, int Tower, FTickReport& Report);
+		/**
+		 * The v20 play test (2026-10-04): a unit of a side that ends its turn at a
+		 * watchtower its side doesn't hold, uncontested, puts a turn into it, as the
+		 * Capture order does. Called as every turn ends.
+		 */
+		void AutoCapture(FUnit& Unit, FTickReport& Report);
+		/** Lays a zone for this ability where it was aimed, in place of the caster's last of it. */
+		void LayZone(FUnit& User, int Slot, const FAbility& Ability, const FVec2& Target, FTickReport& Report, int Turns = 0);
+		/**
+		 * A unit's turn begins: the zones it laid count down, those whose caster has
+		 * fallen go, and the zones it stands in touch it. True if a zone took the turn
+		 * from it (a shock, a freeze).
+		 */
+		bool ZonesAtTurnStart(FUnit& Unit, FTickReport& Report);
+		/** The zones a unit ended a walk in touch it. */
+		void ZonesAfterWalk(FUnit& Unit, FTickReport& Report);
+		/** One zone touching one unit, once a turn: harm, element, statuses. */
+		void ZoneTouch(FZone& Zone, FUnit& Unit, bool bTurnStart, FTickReport& Report);
+		/** Fire reaching flammable zones sets them alight; water reaching burning ones puts them out. */
+		void ZonesMeetElement(const FUnit& User, const FAbility& Ability, const FVec2& Target, FTickReport& Report);
+		/** Whether an ability aimed from From at Target reaches any of the zone's ground. */
+		bool ReachesZone(const FAbility& Ability, const FVec2& From, const FVec2& Target, const FZone& Zone) const;
+		/** Set while a Capture order ends its turn, so that turn counts once. */
+		bool bCaptureOrder = false;
 		/** Puts the camps the rules ask for on the board, their monsters waiting off it. */
 		void PlaceCamps(uint64_t InSeed);
 		/** Counts camps down, wakes them, clears them, rests shrines. */
@@ -891,6 +1021,28 @@ namespace TMSim
 		void PutInSlot(FUnit& Unit, int Slot, const FItemDef* Item, int Cooldown);
 		/** An ability's special (FAbility::Special) on whoever it reached. */
 		void ApplySpecial(FUnit& User, const FAbility& Ability, const FVec2& Target, FUnit* Struck, FTickReport& Report);
+		/** The new spells' specials on one unit reached (SimSpells.cpp); called by ApplySpecial. */
+		void ApplySpellSpecial(FUnit& User, const FAbility& Ability, const FVec2& Target, FUnit& Struck, FTickReport& Report);
+		/** The new spells' moves of the user, before anything is hit: dash, disengage, shadow hop, recall. */
+		void MoveForSpell(FUnit& User, int Slot, const FAbility& Ability, const FVec2& Target, FTickReport& Report);
+		/** What the new spells do once everything is hit: Soul Link's share, Retribution, Chain Mend's leaps, Riptide. */
+		struct FSpellAfter
+		{
+			/** Soul Link: who takes how much, because of whom. */
+			std::vector<std::pair<int, int>> Shared;
+			/** Retribution: struck by the user. */
+			bool bRetribution = false;
+			/** Units this ability healed (Chain Mend leaps from the last), and units it struck alive (Riptide). */
+			std::vector<int> Healed;
+			std::vector<int> Struck;
+		};
+		void AfterSpell(FUnit& User, int Slot, const FAbility& Ability, const FVec2& Target, const FSpellAfter& After, FTickReport& Report);
+		/** Contagion: a carrier ending its turn passes it to its allies within 2 m. */
+		void SpreadPlague(FUnit& Unit, FTickReport& Report);
+		/** Time Bomb going off on its carrier, for Amount, set by By. */
+		void Detonate(FUnit& Carrier, int Amount, int By, FTickReport& Report);
+		/** Moves a unit somewhere by a spell, and says so (Teleported, Id says how). */
+		void SpellMoved(FUnit& Unit, const FVec2& To, const char* How, FTickReport& Report);
 
 		/** The time limit ran out: the healthier side wins, level shares draw. */
 		void FinishOnTime(FTickReport& Report);

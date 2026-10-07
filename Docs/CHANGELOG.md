@@ -3,7 +3,191 @@
 Newest first. Each version lists what changed since the one before it. Both players in an online match need the
 same version (the online protocol number must match).
 
-## v20 (not released yet, protocol 21)
+## Next (not built yet)
+
+- The walk area and aims show on grass again. v26 faded ground marks on steep faces to stop them streaking down
+  cliffs, but every grass blade counted as steep, so in tall grass the walk area all but vanished. The fade now
+  works only within a metre of a cliff: grass everywhere else carries the marks as in v25, and cliff faces still
+  stay clean. Online protocol 27, as v26.
+
+## v26 (2026-10-06, protocol 27)
+
+- Play online with a join code (Docs/design/feat-online-eos.md). Hosting gives a six-letter code (never 0, O, 1, I or
+  L) shown big in the lobby with a Copy button; a friend types it on Play Online and joins. No addresses, ports,
+  router settings, VPN or accounts: each PC signs in to Epic's free online services by itself, and Epic's servers
+  connect the players, through Epic's relays when the routers won't let the PCs meet. A friend on another build is
+  told before connecting. Joining by address is still there, under "Advanced: direct IP", and a host takes players
+  both ways at once. Same online protocol (27).
+- Sharper lines everywhere (the "Sharper lines" mockups, all four):
+  - Unit outlines stop at a hard 2-pixel edge instead of fading, with a thin near-black rim just outside, so they
+    read on bright grass and dark ground alike. The glow round a unit under the pointer is fainter.
+  - Combat text and every other word on screen sit on whole pixels, with a firm dark edge on whole pixels too, so
+    they no longer look smeared. The ember glow on dark red numbers is gone (they keep their pale edge).
+  - Ground marks -- zones, aim rings and cones, auras, the capture ring, hazard tiles, the walk area -- lose the
+    wide faint band inside their edges: one solid edge with a thin dark rim each side and a light flat fill. And
+    they no longer streak up rock walls and cliff faces: they paint only ground that is flat enough to stand on.
+  - Walk tiles (tile movement) have a thin white edge, with a thin dark line just outside it, for contrast with
+    the ground; the fill keeps its colour (teal, or orange when sprinting).
+- The unit you have selected is easy to find: its outline breathes from its blue to near-white and back, every
+  1.2 seconds. Every other unit keeps a steady line.
+- Cancelling a queued order is one action now, never a race against the clock:
+  - Backspace cancels the selected unit's whole queue at once -- its plan, its Go To, its waypoints -- from any
+    mode; Shift+Backspace cancels every unit's. (The undo that took a plan apart one step at a time is gone.)
+  - On the squad strip, a unit with something queued has a tab beside its row saying what ("Go To: 3 turns",
+    "Walk, then Volley") with an x that cancels it, without selecting it. Pointing at the tab lights the unit up.
+  - Right-click a unit's card -- its row or tab on the squad strip, or its turn square -- to cancel its queue. (With
+    nothing queued, a right click drops an aim as before.)
+  - Where the selected unit's queue ends on the board (or the queue of a unit you point at), a small x cancels it.
+  - The plan strip's Undo and Clear are one button: Cancel.
+
+## v25 (2026-10-06, protocol 27)
+
+- Thirteen new abilities from Cire's Spell Codex (Docs/design/feat-codex-picks.md), each in place of a bland or
+  repeated one, each with its own look and icon. Blight Sigil (Dust Hexer: a circle that wounds), Crimson Crystals
+  (Hexblade: blood crystals, Bleed), Storm Slash (Thunder Fist: a cone that Silences), Night Spear (Night Hunter: a
+  line that Silences), Thornweave (Sylvan Muse: a line of thorns that lasts), Owl Scout (Roc Caller: sight and Marked
+  into the fog), Beacon of Return (Cantor: ground that heals and hastens allies), Frost Pirouette (Frost Brawler), Stone
+  Henge (Mountain Sentinel: a ring that taunts). And four with rules of their own: Faultline (Earthshaker) is drawn on
+  the ground with hazard stripes and erupts as the Earthshaker's next turn begins, on whoever is still on it; Shield
+  Toss (Bastion) bounces on to two more enemies, each weaker, taunting each; Verdict (Inquisitor's ultimate) adds a
+  quarter of the target's missing health, and a kill gives back half the gauge; Echo Slam (Stone Brawler) lands a fifth
+  harder for each enemy caught beyond the first. Online protocol 27.
+
+- Fixed (we hope; play it long and run the crash hunt): the mid-battle crashes of v24 (three, at 10 to 20 minutes, all
+  while filming a unit's face for its turn card or portrait). The Paragon packs bring 83 copies of a few shared
+  material settings files (36 named OrionGlobalGameplayCollection); when one was unloaded, the renderer could still be
+  using it. They are now all loaded once at the start and kept.
+- Fixed (we hope; the crash hunt will tell): the crash that came about 26 minutes into v23 and in 18 seconds with
+  "Play crash hunt". A battle's unit bodies were destroyed the moment a new battle began, and the renderer could
+  still be drawing them. They are now hidden at once and destroyed three seconds later.
+- Smoother, steadier blue and red outlines: drawn before the anti-aliasing (it smooths them now, and they no longer
+  flicker by a pixel each frame), with a soft edge worked out from sixteen samples instead of a hard four, so thin
+  parts such as a bowstring keep their outline.
+- Aiming a blow: no more card over the target. Its own health bar shows the blow -- the part a hit would take cut out,
+  striped and pulsing, what a crit takes on top in gold dashes, a white tick where a graze leaves it -- with one small
+  row under it: Hit, Crit, Graze and Dodge, each with its chance and damage, then the KO chance and any status. Units
+  aimed at show their full bar while aimed at. Pointing at the bar gives the rest (Evasion, critical chance).
+- Tile movement's walk squares are plates on each tile's own top -- lifted a little over a faint shadow, edged, tilted
+  on a ramp -- instead of being painted on the ground from above, which bent them on slopes and hung them down cliffs.
+  A tile above or below the unit's ground has a small badge saying how many levels ("+2", "-1").
+- A beep at 3, 2 and 1 seconds left on the turn of the unit you are ordering, the last one louder.
+- Sharper lines on the ground: walk areas, aim shapes, auras, zones and every other ground mark are drawn three times
+  finer, so they stay crisp up close and at low angles.
+- Statuses beside each unit's ring only on the unit you are ordering, or for a moment after a status is put on a unit;
+  pointing at a unit, the turn order and the squad strip still show them all.
+- Ground zones have their own look for as long as they last (Cast Studio's new "On its ground" moment): flames on the
+  Ember Field, frost on the Frost Patch, thorns, poison, smoke, tar, water, sparks and light on the other ten.
+- Fixed: clicking an enemy out of range sometimes made your unit walk over and strike the empty square the enemy had
+  left. The attack now locks onto the enemy and follows it to where it stands when the walk ends. If it has got out of
+  reach by then (or died, or gone into the fog), no blow is thrown: the action is kept and a note says why.
+- Less text over the board: the notice, a Go To's strip and the "what a click does here" line are now one slim line of
+  small text along the top of the action bar, the newest notice first. The Go To's buttons are small buttons in that
+  line. Hold Alt for the long wording.
+
+## v24 (2026-10-05, protocol 26)
+
+- Fixed: with tile movement on, no watchtowers and no camps but the boss (every map). The ground's distances that
+  place them were worked out tile by tile, which reached only tiles' middles, so nowhere else counted as reachable.
+  The computer and the monsters, which steer by the same distances, are steadier on tiles too. Online protocol 26.
+- The boss bar shows only while the pointer is on the boss (on the board, its turn chip or square, or the bar
+  itself), and sits out of the way on top of the enemy panel, bottom right, instead of mid-screen under the turn
+  order. A boss's announcements (a hunt, a claim) stay in the log. Movable in Layout as before (its place is reset).
+- Ability cards ("Ability Info Mockups" D with A's chips and E): pointing at an ability shows a card with its damage,
+  range, target, cooldown and cast as chips, its statuses as pills with their turns (red harms, green helps) and its
+  first sentence; hold Alt for the whole of it (every field on its own row, each status explained, the full
+  description). While aiming, the card sits above the action bar instead of following the pointer. The line above
+  the bar that named a hovered ability is gone; the enemy panel's ability tiles show the same card.
+- Casting cards over heads shrink: full size as a cast starts, then within about a second down to a small chip (icon,
+  seconds left, bar) with the name gone, so several casts at once don't crowd the screen. Pointing at a caster shows
+  its card full size.
+- A tank's zone-of-control ring goes behind the units standing on it instead of being drawn over them; a shield
+  behind a unit shows faintly.
+
+## v23 (2026-10-05, protocol 25)
+
+Unique and mobility spells (Docs/design/feat-new-spells.md): thirty new abilities, each in place of one ability
+of one class.
+- Unique: Contagion (Lich Caller, for Lich Pact), Soul Link (Hexblade, for Shadow Lance), Time Bomb (Arc Warlock,
+  for Thunder Slumber), Gravity Well (Time Mage, for Slowga), Life Tether (Warlock, for Shadow Slumber), Echo (Bard,
+  for Song of Haste), Retribution (Paladin, for Aegis), Purge Transfer (Exorcist, for Holy Slumber), Overcharge (War
+  Drummer, for Flame Anthem), Blood Pact (Dread Knight, for Shadow Ward), Chain Mend (Tide Cleric, for Mend), Undying
+  (Holy Guardian, for Bash), Spirit Swap (Sylvan Muse, for Thorn Anthem), Reckoning (Berserker, for Rage), Death Mark
+  (Shadow Assassin, for Veil).
+- Mobility: Dash (Wind Dancer, for Gale Veil), Grapple (Sky Lancer, for Take Wing), Rally Call (War Marshal, for
+  Shield Slam), Lure (Siren, for Tide Ballad), Hook (Tide Brawler, for Tide Stance), Shove (Stone Fist, for Stone
+  Stance), Vault (Gale Dancer, for Gale Stance), Charge (Crusader, for Holy Lance), Disengage (Steel Ranger, for
+  Barb), Fair Winds (Aeromancer, for Tailwind), Rift Gate (Summoner, for Carbuncle), Recall (Chrono Sage, for
+  Quicken), Ice Slide (Frost Stalker, for Frost Veil), Riptide (Leviathan Caller, for Leviathan Pact), Shadow Hop
+  (Night Hunter, for Shadow Barb).
+- Eight new statuses: Plague, Soul Link, Time Bomb, Tethered, Echo, Retribution, Undying, Death Mark.
+- Their own looks, made in Cast Studio: effects, lights, sounds and jolts for each spell's cast, flight, landing, the
+  status it leaves and its end (a plague cloud, a soul ring, a ticking core that bursts, a collapsing well, music
+  notes, golden wings, a chain hook, wind and dust trails, portals, ice, water...). None keeps the effect of the
+  ability it replaced.
+- Online protocol 25.
+
+Every ability has its own look: 469 more abilities (every class, monster, pet and item ability that had none) given
+their own effects and sounds in Cast Studio. Each has a signature effect no other ability uses, chosen by its element
+(fire, frost, storm, tide, stone, wind, holy, shadow, nature, time, arcane, song, steel) and what it does (a blade, a
+blow, a bolt, an arrow, a blast, a ward...), with its own cast and landing sounds.
+
+Ground zones (area denial; Docs/design/feat-ground-zones.md)
+- Twelve abilities lay ground that lasts a few of their caster's turns. It does nothing as it lands; a unit that
+  starts its turn in it, or stops in it, is touched once a turn. It goes if its caster falls.
+- Damage: Ember Field (Flame Sorcerer, for Burst), Static Mire (Stormcaller, for Chain Lightning), Caustic Pool
+  (Necromancer, for Umbral Burst).
+- Debuffs: Frost Patch (Cryomancer, for Hailstorm), Tar Slick (Snare Hunter, for Hamstring; fire lights it), Bramble
+  Thicket (Druid, for Entangle), Hush Circle (Null Monk, for Hush), Tide Pool (Sea Witch, for Drown Curse; puts out
+  burning ground).
+- Sight: Scout Flare (Sun Archer, for Holy Barb; thrown even into the fog, finds units in grass and smoke), Watcher's
+  Eye (Oracle, for Sleep), Lantern Glow (Lumimancer, for Radiance; Blinds), Smoke Veil (Shadow Stalker, for Shadow
+  Veil; hides your units in it).
+- On the board: each zone painted on the ground in its colour, pips over it for its turns left, the pointer on them
+  says what it is. The Unit Guide's Ground page lists them.
+
+## v22 (built 2026-10-04, protocol 23)
+
+From the v21 play test
+- Every cast takes four times as long (Developer Tools, "Cast time multiplier", now 4; up to 8).
+- Bosses notice you and chase from half as far again (Developer Tools, "Boss aggro range", 1.5).
+- Units drawn a quarter smaller; summons about half as tall as whoever summoned them.
+- Auras: no ring on the ground for their reach; the owner wears its aura's effect at its feet.
+- The walk's end shows only a circle and the arrows, no body outline.
+- Options: "Enemy odds on the board" (off by default) for the box over your unit most at risk.
+- Setup screen: Start Battle (or Host Game) sits beside Back, clear of the rules.
+- Online protocol 23.
+
+## v21 (built 2026-10-04, protocol 22)
+
+From the v20 play test
+- Auras and buffs on the ground: an aura's reach round its owner, faint in the ability's colour; a gold-green ring
+  with arrows out under a unit with a boon (a stat raised, a helpful status), a violet one with arrows in for a bane.
+- Watchtowers: a unit that ends its turn at one (no enemy there) puts that turn into taking it, whatever else it
+  did that turn. Capture still spends the whole turn there; it counts once.
+- Picking units that stand close together: the pointer anywhere on a body picks it, two overlapping bodies go to
+  the nearer middle, and while an ability is aimed a unit it can be used on is chosen over one it can't.
+- Battle report, revalued: each enemy that falls is worth 15 points shared by everyone who hurt or held it in the
+  minute before, and 3 more for the last blow (it was 12 to the last blow, 5 to anyone else); damage to monsters
+  counts less than to the other side; being hit counts less and what armour, dodges and shields stopped counts
+  more, as does damage taken for an ally; shields on allies count as healing. A unit's page shows where its points
+  came from; the Support tab has Shielding.
+- Online lobby: every battle setting is on the lobby screen (the host's to change, everyone sees them); each player
+  buys their own units' items there with the side's points; Random in the class picker, Random classes for all
+  your units, and Random pick / Random ban in the draft.
+- Less text in a fight (the "Candidates to cut" list): no labels over chests (the beam's colour, and the pointer
+  lists them); camps show a small clock and the time, or "!", with the full label under the pointer; dry springs
+  and part-taken watchtowers show pips; your unit hidden in grass shows an eye struck through; a status put on pops
+  its icon, not its name; ticks on a unit (burns, bleeds, regen) add into one number; no health number beside the
+  bar after a blow; an enemy's odds on the board only over your unit most at risk (the card keeps them all); no
+  "Waiting: ... is up in" banner, your next unit's turn chip glows instead; walking near zones, only the costs; the
+  hover line above the action bar is short, the full words after resting 0.4 s; the combat log shows its 4 newest
+  lines until the pointer is on it.
+- Movement, a setup and lobby option: Free walking (as before), Tiles 4 ways, Tiles 8 ways. With tiles, a walk
+  goes tile to tile, 2 m of Move a step (a diagonal 3 m), the reachable tiles drawn as squares; ranges and areas
+  are unchanged.
+- Online protocol 22.
+
+## v20 (built 2026-10-04, protocol 21)
 
 From the v19 play test
 - Turns: no light under a unit whose turn is up (it washed out the ground); a gold READY tag over its health bar instead.

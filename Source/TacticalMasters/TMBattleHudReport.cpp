@@ -177,13 +177,8 @@ void ATMBattleHud::DrawBattleReport(ATMBattleDirector& From, const FString& Line
 		Text(FString::Printf(TEXT("%.1f"), ATMBattleDirector::ScoreOf(T)), CX + LeftW - 60.0f * S, Top + 66.0f * S, Dim, Font, 0.52f * S);
 
 		// Where the points came from, biggest first.
-		struct FPart { const TCHAR* Label; double Points; };
-		TArray<FPart> Parts = {
-			{ TEXT("Damage"), T.Damage * 0.1 }, { TEXT("Damage taken"), T.Taken * 0.04 }, { TEXT("Mitigated"), T.Mitigated * 0.03 },
-			{ TEXT("Healing"), T.Healing * 0.1 }, { TEXT("Knock-outs"), T.Kills * 12.0 }, { TEXT("Assists"), T.Assists * 5.0 },
-			{ TEXT("Knocked out"), T.Deaths * -10.0 }, { TEXT("Monsters"), T.Monsters * 4.0 }, { TEXT("Boss"), T.Bosses * 15.0 },
-			{ TEXT("Buffs"), T.Buffs * 2.0 }, { TEXT("Debuffs"), T.Debuffs * 2.0 }, { TEXT("Control"), T.Control * 3.0 },
-			{ TEXT("Revives"), T.Revives * 10.0 }, { TEXT("Towers"), T.Towers * 8.0 } };
+		using FPart = ATMBattleDirector::FTMValuePart;
+		TArray<FPart> Parts = ATMBattleDirector::ValueParts(T);
 		Parts.RemoveAll([](const FPart& Part) { return FMath::Abs(Part.Points) < 0.5; });
 		Parts.Sort([](const FPart& A, const FPart& B) { return A.Points > B.Points; });
 		double Most = 1.0;
@@ -216,7 +211,7 @@ void ATMBattleHud::DrawBattleReport(ATMBattleDirector& From, const FString& Line
 			Text(TEXT("Carried"), CX + 18.0f * S, GearY + 8.0f * S, Dim, Font, 0.5f * S);
 			ReportGear(*Star, CX + 140.0f * S, GearY, 34.0f * S);
 		}
-		AddTip(CX, Top, LeftW, CH - 56.0f * S, TEXT("Points: 1 per 10 damage, 0.4 per 10 taken, 0.3 per 10 mitigated, 1 per 10 healed; 12 a knock-out, 5 an assist (help in the minute before), -10 knocked out; 4 a monster, 15 a boss; 2 a buff or debuff, 3 a turn of control, 10 a revive, 8 a tower."));
+		AddTip(CX, Top, LeftW, CH - 56.0f * S, ATMBattleDirector::ValueRules());
 	}
 
 	// ---- the moments, to watch again
@@ -334,10 +329,36 @@ void ATMBattleHud::DrawBattleReport(ATMBattleDirector& From, const FString& Line
 			const TMSim::FUnit* Source = From.Battle.FindUnit(Pair.Key);
 			Taken.Emplace(Source ? JobName(*Source) : FString(TEXT("the ground")), Pair.Value);
 		}
-		const float ColW = (RW - 60.0f * S) * 0.5f;
+		const float ColW = (RW - 80.0f * S) / 3.0f;
 		const float By = UY + 270.0f * S;
 		Bars(RX + 20.0f * S, By, ColW, TEXT("DAMAGE BY ABILITY"), Dealt, Unit ? TeamColour(Unit->Team) : Gold);
 		Bars(RX + 40.0f * S + ColW, By, ColW, TEXT("DAMAGE TAKEN, FROM"), Taken, Unit ? TeamColour(1 - Unit->Team) : Urgent);
+		// Where its points came from (v20: the revalued points, so a tank or a
+		// healer can see what its work was worth).
+		{
+			const float PX2 = RX + 60.0f * S + 2.0f * ColW;
+			Text(TEXT("POINTS FROM"), PX2, By, Dim, Font, 0.48f * S);
+			TArray<ATMBattleDirector::FTMValuePart> Parts = ATMBattleDirector::ValueParts(T);
+			Parts.RemoveAll([](const ATMBattleDirector::FTMValuePart& Part) { return FMath::Abs(Part.Points) < 0.5; });
+			Parts.Sort([](const ATMBattleDirector::FTMValuePart& A, const ATMBattleDirector::FTMValuePart& B) { return A.Points > B.Points; });
+			double Most = 1.0;
+			for (const ATMBattleDirector::FTMValuePart& Part : Parts)
+			{
+				Most = FMath::Max(Most, FMath::Abs(Part.Points));
+			}
+			float RowY = By + 28.0f * S;
+			for (int32 Index = 0; Index < FMath::Min(Parts.Num(), 6); ++Index)
+			{
+				const ATMBattleDirector::FTMValuePart& Part = Parts[Index];
+				Text(Part.Label, PX2, RowY, TextColour, Font, 0.52f * S);
+				const FString Value = FString::Printf(TEXT("%+.0f"), Part.Points);
+				Text(Value, PX2 + ColW - TextSize(Value, Font, 0.52f * S).X, RowY, TextColour, Font, 0.52f * S);
+				DrawRect(FLinearColor(1.0f, 1.0f, 1.0f, 0.06f), PX2, RowY + 24.0f * S, ColW, 6.0f * S);
+				DrawRect(Part.Points < 0.0 ? FLinearColor(0.69f, 0.48f, 0.48f) : Gold, PX2, RowY + 24.0f * S, ColW * FMath::Abs(Part.Points) / Most, 6.0f * S);
+				RowY += 42.0f * S;
+			}
+			AddTip(PX2, By, ColW, 300.0f * S, ATMBattleDirector::ValueRules());
+		}
 		return;
 	}
 
@@ -359,10 +380,10 @@ void ATMBattleHud::DrawBattleReport(ATMBattleDirector& From, const FString& Line
 	case 2:
 		Columns = {
 			{ TEXT("Healing"), [Int](const FTally& T, double) { return Int(T.Healing); }, [](const FTally& T) { return T.Healing; } },
+			{ TEXT("Shielding"), [Int](const FTally& T, double) { return Int(T.Shielding); }, [](const FTally& T) { return T.Shielding; } },
 			{ TEXT("Revives"), [Int](const FTally& T, double) { return Int(T.Revives); }, [](const FTally&) { return -1; } },
 			{ TEXT("Buffs on allies"), [Int](const FTally& T, double) { return Int(T.Buffs); }, [](const FTally& T) { return T.Buffs; } },
 			{ TEXT("Taken for allies"), [Int](const FTally& T, double) { return Int(T.Guarded); }, [](const FTally& T) { return T.Guarded; } },
-			{ TEXT("Towers"), [Int](const FTally& T, double) { return Int(T.Towers); }, [](const FTally&) { return -1; } },
 			{ TEXT("Healing received"), [Int](const FTally& T, double) { return Int(T.HealingReceived); }, [](const FTally& T) { return T.HealingReceived; } } };
 		break;
 	case 3:
@@ -371,7 +392,7 @@ void ATMBattleHud::DrawBattleReport(ATMBattleDirector& From, const FString& Line
 			{ TEXT("Turns of control"), [Int](const FTally& T, double) { return Int(T.Control); }, [](const FTally& T) { return T.Control; } },
 			{ TEXT("Monsters"), [Int](const FTally& T, double) { return Int(T.Monsters); }, [](const FTally&) { return -1; } },
 			{ TEXT("Bosses"), [Int](const FTally& T, double) { return Int(T.Bosses); }, [](const FTally&) { return -1; } },
-			{ TEXT("Knocked out"), [Int](const FTally& T, double) { return Int(T.Deaths); }, [](const FTally&) { return -1; } },
+			{ TEXT("Towers"), [Int](const FTally& T, double) { return Int(T.Towers); }, [](const FTally&) { return -1; } },
 			{ TEXT("Assists"), [Int](const FTally& T, double) { return Int(T.Assists); }, [](const FTally&) { return -1; } } };
 		break;
 	default:

@@ -426,6 +426,7 @@ void ATMBattleDirector::ClearCast()
 		}
 	}
 	CastLive.Reset();
+	CastZones.Reset();
 	CastPending.Reset();
 	CastStatuses.Reset();
 	CastCasting.Reset();
@@ -467,6 +468,46 @@ void ATMBattleDirector::AdvanceCast(float DeltaSeconds)
 		}
 	}
 	CastNoticeEnds();
+
+	// Ground laid by an ability (2026-10-06, Cast Studio's "zone" moment): its look's
+	// zone events play on the ground it covers for as long as it lasts and this side
+	// sees it, and go with it.
+	{
+		TSet<FString> Present;
+		for (const TMSim::FBattle::FZone& Zone : Battle.Zones)
+		{
+			const TMSim::FAbility* Laid = Battle.ZoneAbility(Zone);
+			const TMCast::FLook* Look = Laid ? CastLookOf(Laid) : nullptr;
+			if (!Look || !GroundZoneShown(Zone))
+			{
+				continue;
+			}
+			const FString Which = FString::Printf(TEXT("%d/%hs/%.2f,%.2f/%d"), Zone.Owner, Zone.AbilityId.c_str(), Zone.Target.X, Zone.Target.Y, Zone.Total);
+			Present.Add(Which);
+			if (CastZones.Contains(Which))
+			{
+				continue;
+			}
+			const uint64 Key = CastNewKey();
+			CastZones.Add(Which, Key);
+			const std::string Shape = TMSim::ShapeOf(*Laid);
+			const FVector Aimed = WorldFromMetres(Zone.Target, Battle.Map.NodeLevel(TMSim::FMap::NodeOf(Zone.Target))) + FVector(0.0f, 0.0f, BoardHeight);
+			const FVector Thrower = WorldFromMetres(Zone.From, Battle.Map.NodeLevel(TMSim::FMap::NodeOf(Zone.From))) + FVector(0.0f, 0.0f, BoardHeight);
+			FTMCastAt Ground;
+			Ground.Aim = Aimed;
+			Ground.Centre = ToVector(TMCast::AreaCentre(Shape, Laid->MaxRange, ToCast(Thrower), ToCast(Aimed)));
+			Ground.AreaCm = static_cast<float>(TMCast::AreaAcross(Shape, Laid->Aoe, Laid->MaxRange));
+			CastRaise(Look, TMCast::EMoment::Zone, TMCast::FMomentContext(), Ground, Key);
+		}
+		for (auto It = CastZones.CreateIterator(); It; ++It)
+		{
+			if (!Present.Contains(It.Key()))
+			{
+				CastEnd(It.Value());
+				It.RemoveCurrent();
+			}
+		}
+	}
 
 	// Delays run out.
 	for (int32 i = 0; i < CastPending.Num();)
@@ -651,7 +692,9 @@ uint64 ATMBattleDirector::CastShot(const FTMBlow& Blow, USceneComponent* Carrier
 void ATMBattleDirector::CastLand(const FTMBlow& Blow)
 {
 	const TMCast::FLook* Look = CastLookOf(Blow.Ability);
-	if (!Look || !Blow.Ability)
+	// A warned blow being drawn (2026-10-06) lands on nothing yet: its ground is
+	// its zone moment, and it lands as its caster's next turn begins.
+	if (!Look || !Blow.Ability || Blow.Warned == 2)
 	{
 		return;
 	}

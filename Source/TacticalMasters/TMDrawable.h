@@ -43,6 +43,22 @@ namespace TMDrawable
 	 */
 	void KeepBrokenLoaded();
 
-	/** Runs KeepBrokenLoaded before every garbage collection from now on. Once per run, however often called. */
+	/**
+	 * Keeps every material parameter collection loaded for the rest of the run
+	 * (2026-10-06). The Paragon packs each bring their own copies -- 36 named
+	 * OrionGlobalGameplayCollection, 17 GlobalArtCollection, 83 in all -- with
+	 * the same names and layouts. When the garbage collector unloads one (an
+	 * effect's material read in, used and let go), the D3D12 renderer can still
+	 * hold its uniform buffer in a cached binding, and the next draw reads freed
+	 * memory: SetShaderParameters, ValidateStaticUniformBuffer, reading
+	 * 0xffffffffffffffff, the v23 and v24 play-test crashes (three in v24, all
+	 * mid-battle). UE 5.8.1's D3D12 never registers the listeners meant to
+	 * refresh those bindings; Epic's own advice is to keep the collections
+	 * loaded. All are read in once at the start and never let go; any read
+	 * in another way later is kept as well. Cheap: each is a few numbers.
+	 */
+	void KeepCollectionsLoaded();
+
+	/** Runs KeepBrokenLoaded and KeepCollectionsLoaded before every garbage collection from now on. Once per run, however often called. */
 	void WatchBrokenMaterials();
 }

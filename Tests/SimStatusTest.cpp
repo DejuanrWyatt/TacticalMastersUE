@@ -254,7 +254,7 @@ int main(int ArgCount, char** Args)
 		auto ElementNamed = [](const char* Id) { const FAbility* Found = FindAbility(Id); return Found ? ElementOf(*Found) : std::string("?"); };
 		Check(ElementNamed("t_spark") == "lightning" && ElementNamed("t_bolt").empty() && ElementNamed("frost_brawler_frost_jab") == "ice"
 			&& ElementNamed("helix_prime_flare").empty() && ElementNamed("stormcaller_thunder_bolt") == "lightning"
-			&& ElementNamed("cryomancer_hailstorm") == "ice" && ElementNamed("fire") == "fire",
+			&& ElementNamed("cryomancer_frost_patch") == "ice" && ElementNamed("fire") == "fire",
 			"an ability's element should come from its file, else the words of its id");
 		if (Failures == Before)
 		{

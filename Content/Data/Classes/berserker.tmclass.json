@@ -46,33 +46,23 @@
       }
     },
     {
-      "id": "berserker_rage",
-      "name": "Rage",
-      "desc": "Switched on: Crit +10 but Armor -4 while it lasts.",
-      "kind": "toggle",
-      "effect": "support",
-      "scale": "mag",
-      "target": "ally",
-      "shape": "self",
-      "power": 0,
+      "id": "berserker_reckoning",
+      "name": "Reckoning",
+      "desc": "Strike an adjacent enemy, 1% harder for every 1% of your own health you have lost (twice as hard near death).",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "att",
+      "target": "enemy",
+      "shape": "unit",
+      "power": 40,
       "min_range": 0,
-      "max_range": 0,
+      "max_range": 1.8,
       "aoe": 0,
-      "cooldown": 0,
+      "cooldown": 2,
       "cast": 0,
-      "buffs": [
-        {
-          "stat": "crit",
-          "amount": 10,
-          "turns": 2
-        },
-        {
-          "stat": "attdef",
-          "amount": -4,
-          "turns": 2
-        }
-      ],
-      "fx": "focus"
+      "fx": "focus",
+      "anim": "heavy",
+      "special": "reckoning"
     },
     {
       "id": "berserker_leap_smash",
@@ -127,8 +117,8 @@
   ],
   "creator": {
     "rebalanced": {
-      "on": "2026-10-03",
-      "why": "Tuning pass 2026-10-03 (lab 25% in place of the Black Mage): HP 115->136, Evasion 8->12, power +36%. Before that (2026-10-03): Leap Smash leaps: he lands where he smashes"
+      "on": "2026-10-05",
+      "why": "Reckoning in place of Rage (unique and mobility spells, 2026-10-05). Before that (2026-10-03): Tuning pass 2026-10-03 (lab 25% in place of the Black Mage): HP 115->136, Evasion 8->12, power +36%. Before that (2026-10-03): Leap Smash leaps: he lands where he smashes"
     },
     "reworded": {
       "on": "2026-10-02",

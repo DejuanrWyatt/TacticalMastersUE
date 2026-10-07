@@ -178,6 +178,11 @@ struct FTMFloater
 	/** A small word after it, as "graze". */
 	FString Tag;
 	FColor TagTint = FColor::White;
+	/** A status put on: its icon pops instead of its name, when it has one (v20 play test, less text). */
+	FString StatusIcon;
+	/** A tick (a status, the ground, regen) and its amount: ticks on a unit close together add into one number. */
+	bool bTick = false;
+	int32 Amount = 0;
 };
 
 /** How a floater looks, when it is not the plain kind. */
@@ -189,6 +194,10 @@ struct FTMFloatLook
 	bool bEmber = false;
 	FString Tag;
 	FColor TagTint = FColor::White;
+	FString StatusIcon;
+	bool bTick = false;
+	/** Signed: down for harm, up for healing. */
+	int32 Amount = 0;
 };
 
 UCLASS()
@@ -221,9 +230,10 @@ public:
 	/**
 	 * Every unit's body drawn this much bigger than its mesh (times the map's
 	 * bodyScale), and what stands over a head raised with it: half as big again
-	 * since the v19 play test (2026-10-04). A head is about UnitHeadCm up.
+	 * since the v19 play test (2026-10-04), then a quarter smaller after the v21
+	 * one (1.5 x 0.75). A head is about UnitHeadCm up.
 	 */
-	static constexpr float UnitSize = 1.5f;
+	static constexpr float UnitSize = 1.125f;
 	static constexpr float UnitHeadCm = 180.0f * UnitSize;
 
 	/** The mesh each tile of the board is built from. */
@@ -598,6 +608,8 @@ private:
 		bool bBossHunt = false;
 		/** The side landing a boss's last blow claims its boon (FTuning::BossClaim, D): off unless chosen. */
 		bool bBossClaim = false;
+		/** Walking (FTuning::TileMove, v20 play test): 0 free, 1 tile to tile four ways, 2 eight ways. */
+		int32 TileMove = 0;
 		uint64 FixedSeed = 12345;
 		/** The map, by id (TMSim::FindMap), and the look it is dressed in: empty for the map's own. */
 		std::string MapId = "highlands";
@@ -668,12 +680,19 @@ private:
 	/** This player and the other have asked for a rematch (net.gd:139-143). */
 	bool bWantRematch = false;
 	bool bOpponentWantsRematch = false;
-	/** Typed fields: the host to join, the port, and a chat line. */
-	enum class ETypeField : uint8 { None, Address, Port, Chat };
+	/** Typed fields: the host to join, the port, a chat line, and a join code. */
+	enum class ETypeField : uint8 { None, Address, Port, Chat, Code };
 	ETypeField Typing = ETypeField::None;
 	FString JoinAddress;
 	FString JoinPort = TEXT("7777");
 	FString ChatLine;
+	FString JoinCodeText;
+	/** The join code of the game this machine hosts or joined (Docs/design/feat-online-eos.md), shown in the lobby. */
+	FString OnlineCode;
+	/** The online screen shows joining by address (Advanced). */
+	bool bOnlineAdvanced = false;
+	/** When the lobby's Copy last put the code on the clipboard (real seconds), to say "Copied" for a moment. */
+	double CodeCopiedAt = -100.0;
 
 	/** The online screen: host or join. */
 	void OpenOnline();
@@ -681,6 +700,10 @@ private:
 	void HostOnline();
 	/** Starts connecting to JoinAddress:JoinPort. */
 	void JoinOnline();
+	/** Starts joining the game with the join code typed (JoinCodeText), through Epic Online Services. */
+	void JoinByCode();
+	/** Puts the join code on the clipboard. */
+	void CopyOnlineCode();
 	/** Leaves: closes the connection and forgets the match. */
 	void LeaveOnline();
 	void RequestRematch();
@@ -699,8 +722,10 @@ private:
 	int32 ItemPickerTier = -1;
 	/** Rows of the item picker's grid scrolled past (the mouse wheel); the HUD keeps it in range. */
 	int32 ItemPickerScroll = 0;
-	/** Puts an item in a setup slot, or says why not. */
+	/** Puts an item in a setup slot, or says why not. Online, in the lobby, it asks the host (LobbyItem). */
 	void ChooseItem(int32 SlotCode, int32 ItemIndex);
+	/** Why that item can't go in that setup slot (team * 12 + unit * 3 + slot), or "" if it can; "" clears. */
+	FString ItemChoiceProblem(int32 SlotCode, const std::string& ItemId) const;
 	/** The Unit Guide's page: 0 the classes, 1 the items. */
 	int32 GuideTab = 0;
 
@@ -764,6 +789,8 @@ private:
 	 * alone. Only the aim moves; the mouse pointer stays free for the HUD.
 	 */
 	void TetherAim();
+	/** Whether this ability could be used on that unit, by side and by standing (KO allies for a revive). Picking prefers these. */
+	bool CanAimAt(const TMSim::FUnit& User, const TMSim::FAbility& Ability, const TMSim::FUnit& Target) const;
 	/** Where the aimed ability could be used from, and the board it was worked out for. */
 	std::vector<TMSim::FVec2> TetherFrom;
 	FString TetherKey;
@@ -790,7 +817,11 @@ private:
 		int32 Serial = -1;
 		int32 Slot = -1;
 		TMSim::FVec2 Target;
-		/** A unit to aim at where it stands when the walk ends (a plan's), or -1 for Target. */
+		/**
+		 * A unit to aim at where it stands when the walk ends, or -1 for Target
+		 * ("Attack Out of Range Mockups" A, 2026-10-06: a click on a unit locks
+		 * onto it, so the blow follows it rather than the square it stood on).
+		 */
 		int32 Follow = -1;
 		/** Not before the walk ordered with it has been applied (online: the host's answer). */
 		bool bAfterWalk = false;
@@ -798,8 +829,12 @@ private:
 	FPendingAbility PendingAbility;
 	/** The reachable spot this ability could be used from with the shortest walk; false if none. */
 	bool ClosestSpotInRange(const TMSim::FUnit& Unit, int32 Slot, const TMSim::FVec2& Point, TMSim::FVec2& OutSpot, double& OutWalk);
-	bool WalkIntoRange(const TMSim::FUnit& Unit, const TMSim::FVec2& Point);
-	/** Uses the ability the unit walked over for, once its walk has ended on screen. */
+	bool WalkIntoRange(const TMSim::FUnit& Unit, const TMSim::FVec2& Point, int32 Follow = -1);
+	/**
+	 * Uses the ability the unit walked over for, once its walk has ended on
+	 * screen. If the rules would refuse it there (its target stepped out of
+	 * reach, say), nothing is used and the action is kept (mockups B, 2026-10-06).
+	 */
 	void FirePendingAbility();
 	static constexpr const char* OutOfRange = "That target is out of range.";
 
@@ -851,13 +886,23 @@ private:
 	void StopPlanning();
 	/** The plan key: plan the selected ready unit's turn; with a plan, go; planning a waiting unit, done. */
 	void PlanKey();
-	/** The plan's last step back: a waypoint, then its ability, then its walk. */
-	void UndoPlanStep();
+	/**
+	 * Cancels everything queued for a unit in one go (2026-10-06, "Queued orders" B
+	 * and C; the step-by-step undo is gone): its plan, its Go To, an ability waiting
+	 * on its walk, the waypoints being clicked. True if there was anything.
+	 */
+	bool CancelQueue(int32 UnitId, bool bTell = true);
+	/** Every one of this player's units' queues. */
+	void CancelAllQueues();
+	/** The cancel key: the selected unit's queue, or, with Shift held, every unit's. */
+	void CancelQueueKey();
+	/** What a unit has queued, in a few words for the squad strip ("Go To: 3 turns"); "" if nothing. */
+	FString QueueSummary(const TMSim::FUnit& Unit) const;
 	void ClearPlan(int32 UnitId);
 	void PlanWalk(const TMSim::FVec2& To, int32 Face = -1);
 	void PlanAbility(int32 Slot, const TMSim::FVec2& Target, int32 Follow);
 	/** Out of range while planning: the walk to the nearest spot it can be used from, then it. */
-	bool PlanWalkIntoRange(const TMSim::FUnit& Unit, const TMSim::FVec2& Point);
+	bool PlanWalkIntoRange(const TMSim::FUnit& Unit, const TMSim::FVec2& Point, int32 Follow = -1);
 	/** Carries a plan out now. False, and the plan dropped with a word why, if the rules refuse it. */
 	bool RunPlan(int32 UnitId);
 	/** Each frame: a plan whose unit's turn has begun runs. */
@@ -1003,6 +1048,44 @@ private:
 	void PaintZones(void* Painter, bool bMoving);
 	void PaintZoneShadow(void* Painter);
 	FString ZoneSignature() const;
+	/**
+	 * Auras and buffs on the ground (v20 play test, "Ground VFX for Auras and
+	 * Buffs"): an aura's reach round its owner, faint in the ability's colour;
+	 * under a unit with a boon (a stat raised, a helpful status) a gold-green ring
+	 * with arrows out, with a bane (a stat cut, a harmful status) a violet one
+	 * with arrows in. Painted with the other ground indicators.
+	 */
+	void PaintAuras(void* Painter);
+	/**
+	 * Auras as effects round their owners (v21 play test: "this is what auras
+	 * should look like", ring aura effects): each living unit in sight with an
+	 * aura ability wears its look's aura effect at its feet, small, kept playing.
+	 */
+	void AdvanceAuraFx();
+	struct FTMAuraFx
+	{
+		TWeakObjectPtr<class UFXSystemComponent> Playing;
+		FString Path;
+	};
+	TMap<int32, FTMAuraFx> AuraFx;
+	/** Summons drawn about half as tall as whoever called them (v21 play test). */
+	void FitPets();
+	/** What PaintAuras draws, in a line, so the ground is painted again only when it changes. */
+	FString AuraSignature() const;
+	/**
+	 * Ground zones (2026-10-04, area denial; Docs/design/feat-ground-zones.md):
+	 * each zone this screen may show painted on the ground in its own colour --
+	 * its side's always, the other side's where it can see the middle -- a faint
+	 * fill and a rim, dashed for one that sees. Its turns left are pips over it
+	 * (ATMBattleHud::DrawWorldWords).
+	 */
+	void PaintGroundZones(void* Painter);
+	FString GroundZoneSignature() const;
+	bool GroundZoneShown(const TMSim::FBattle::FZone& Zone) const;
+	/** A zone's colour: by what it does (burning, its element, its status, sight, smoke). */
+	static FLinearColor GroundZoneColour(const TMSim::FAbility& Ability, bool bIgnited);
+	/** A unit's boons and banes now: +1 a boon, +2 a bane. */
+	static int32 BoonsAndBanes(const TMSim::FUnit& Unit);
 	/** ZoneShadow, for the walk being aimed. */
 	void RefreshZoneShadow();
 	FString CastSignature() const;
@@ -1016,10 +1099,37 @@ private:
 	/** The walk area's edge, in metres, as painted: the HUD draws it again over
 	 *  the scenery, which can stand over the ground and hide the decal. */
 	TArray<TPair<FVector2D, FVector2D>> MoveEdgeMetres;
+	/**
+	 * Tile movement's walk area as plates on each tile's own top, not painted on the
+	 * ground decal (TMBattleDirectorPlates.cpp, 2026-10-06): shown by PaintMoveArea,
+	 * hidden whenever the ground is painted again.
+	 */
+	void ShowMovePlates(const TMSim::FUnit& Unit, const FString& Key);
+	void HideMovePlates();
+	UPROPERTY()
+	TObjectPtr<class UInstancedStaticMeshComponent> PlateFills = nullptr;
+	UPROPERTY()
+	TObjectPtr<class UInstancedStaticMeshComponent> PlateEdges = nullptr;
+	UPROPERTY()
+	TObjectPtr<class UInstancedStaticMeshComponent> PlateShadows = nullptr;
+	/** A thin dark line just outside each plate's white edge (2026-10-06), so the edge holds on bright grass. */
+	UPROPERTY()
+	TObjectPtr<class UInstancedStaticMeshComponent> PlateRims = nullptr;
+	FString PlateKey;
+	bool bPlatesShown = false;
+	/** Plates above or below the unit's ground, for the HUD's badges: where (board space) and how many levels. */
+	TArray<TPair<FVector, int32>> PlateSteps;
 	UPROPERTY()
 	TObjectPtr<class UDecalComponent> IndicatorDecal = nullptr;
 	UPROPERTY()
 	TObjectPtr<class UTextureRenderTarget2D> IndicatorFilm = nullptr;
+	/**
+	 * Where the board has cliffs: white within a metre of every tall step, black elsewhere (PaintCliffMask).
+	 * The indicator decal fades on steep faces only there, so grass blades elsewhere keep the marks (v26 play test).
+	 */
+	UPROPERTY()
+	TObjectPtr<class UTextureRenderTarget2D> CliffMaskFilm = nullptr;
+	void PaintCliffMask(class UMaterialInstanceDynamic* Mid);
 
 	// ------------------------------------------------ fog of war on the ground
 	// (TMBattleDirectorFog.cpp): what this screen's side sees now is clear and
@@ -1337,6 +1447,8 @@ private:
 
 	bool bHaveHover = false;
 	TMSim::FVec2 HoverPoint;
+	/** The ground under the pointer before any tile snapping (HoverPoint is a tile's spot with tile movement on). */
+	TMSim::FVec2 HoverGround;
 	int32 HoverUnitId = -1;
 	/** The unit whose turn chip, square or cooldown pin the pointer is on (the HUD sets it each frame): outlined as if pointed at. */
 	int32 HudHoverUnitId = -1;
@@ -1570,6 +1682,27 @@ private:
 
 	UPROPERTY()
 	TArray<TObjectPtr<USkeletalMeshComponent>> UnitVisuals;
+	/**
+	 * The last battle's unit bodies, hidden and still, destroyed only a few
+	 * seconds after the battle is torn down (RetireOldVisuals). v23 crashed at
+	 * random and the v24 crash hunt (garbage collected every frame) in 18 s,
+	 * the same way: the renderer drawing Sparrow and Greystone, bodies of the
+	 * menu's battle destroyed and collected a few frames after they were put on,
+	 * as Start was clicked. Kept a while, nothing still drawing them is left
+	 * holding freed memory.
+	 */
+	UPROPERTY()
+	TArray<TObjectPtr<USkeletalMeshComponent>> RetiringVisuals;
+	TArray<double> RetiringSince;
+	/** Destroys retired bodies once they have been out of sight long enough. */
+	void RetireOldVisuals();
+	/**
+	 * A beep each of the last three seconds of the selected unit's turn (2026-10-06,
+	 * TMBattleDirectorSound.cpp), once a second, the last one louder.
+	 */
+	void AdvanceClockWarning();
+	int32 ClockWarnUnit = -1;
+	int32 ClockWarnSecond = -1;
 
 	// ------------------------------------------------ bodies and animation
 	// (TMBattleDirectorMotion.cpp). What each unit wears and how it moves, from
@@ -1864,6 +1997,12 @@ private:
 		/** Its slot, and whether its launch has been heard (SoundBlowStarts). */
 		int32 Slot = 0;
 		bool bSounded = false;
+		/**
+		 * A "warned" ability (2026-10-06, Cire's Spell Codex): 2 as it is drawn on
+		 * the ground (the swing, no landing), 1 as it lands at the start of its
+		 * caster's next turn (the landing, no swing); 0 for any other blow.
+		 */
+		int32 Warned = 0;
 	};
 	TArray<FTMBlow> Blows;
 
@@ -1918,6 +2057,8 @@ public:
 	static FLinearColor LookColour(const FTMLook& Look);
 	/** Units under the pointer or in the aim, outlined red (TMBattleDirectorLooks.cpp). */
 	TSet<int32> MarkedUnits;
+	/** The selected unit whose outline breathes (stencil 4, 2026-10-06), so a new selection redraws them. */
+	int32 OutlinedSelected = -1;
 	void UpdateMarks();
 	/** The outline post-process, kept so the hover colour can follow who is marked. */
 	UPROPERTY()
@@ -2047,6 +2188,11 @@ private:
 		float NextRepeat = 0.0f;
 	};
 	TArray<FTMCastLive> CastLive;
+	/**
+	 * Ground zones playing their look's "zone" events (2026-10-06): each zone by who
+	 * laid it, with what and where, and the key its events live under until it goes.
+	 */
+	TMap<FString, uint64> CastZones;
 
 	/** An event waiting out its delay. */
 	struct FTMCastPending
@@ -2183,6 +2329,21 @@ private:
 	/** What a player who joined is told of the host's setup: the map's name and the rules in a line. */
 	FString LobbyMap;
 	FString LobbyRulesLine;
+	/**
+	 * One of the battle's settings as the lobby shows them (v20 play test: "all
+	 * battle settings should be on the lobby screen"): its label and value, the
+	 * setup button that changes it (an ETMHudAction, for the host), and a tip.
+	 */
+	struct FTMSettingRow
+	{
+		FString Label;
+		FString Value;
+		int32 Action = 0;
+		FString Tip;
+	};
+	/** The host's settings, now (the host), or as last told (a player who joined: label and value only). */
+	TArray<FTMSettingRow> LobbySettingRows() const;
+	TArray<FTMSettingRow> LobbySettingsTold;
 	/** This machine's name, as the others see it. */
 	FString LocalName() const;
 	int32 PlayerOfPeer(int32 Peer) const;
@@ -2218,6 +2379,13 @@ private:
 	/** With one of each class: every slot holding a class an earlier slot has gets another of its role. */
 	void DedupeRosters();
 	void LobbyApplyPick(int32 Player, int32 SlotCode, const std::string& JobId);
+	/** An item for a unit's slot (team * 12 + unit * 3 + slot; "" empties it): the host's own, or asked of it (v20). */
+	void LobbyItem(int32 SlotCode, const std::string& ItemId);
+	void LobbyApplyItem(int32 Player, int32 SlotCode, const std::string& ItemId);
+	/** A class at random for each of this player's slots (v20: "ability to random in online play"). */
+	void LobbyRandom();
+	/** A class at random for a slot: of that role (0-3, -1 any), not one taken when classes are one of each; "" if none. */
+	std::string RandomClassFor(int32 Team, int32 Slot, const TSet<FString>& AlsoAvoid, int32 RoleIndex) const;
 	/** The lobby's messages: true if it was one. */
 	bool OnLobbyMessage(const FString& Kind, const FJsonObject& Message, int32 From);
 
@@ -2686,14 +2854,29 @@ public:
 		int32 Crits = 0;
 		/** Damage taken in an ally's place (Guard). */
 		int32 Guarded = 0;
+		/** Of Damage, what went into monsters (v20: worth less than damage to the other side). */
+		int32 MonsterDamage = 0;
+		/** Damage this unit's shields (Shield, Barrier) soaked for allies. */
+		int32 Shielding = 0;
+		/** Its share of the points for enemies that fell: shared by who hurt or held them in the minute before (v20). */
+		double Takedowns = 0.0;
 		/** Damage dealt by each ability, by name; and damage taken from each unit, by id. */
 		TMap<FString, int32> ByAbility;
 		TMap<int32, int32> TakenFrom;
 	};
 	/** By unit id; the eight units of the two sides. */
 	TMap<int32, FTMUnitTally> Tallies;
-	/** A unit's points for the MVP, kept to the tenth. */
+	/** A unit's points for the MVP, kept to the tenth: the sum of its ValueParts. */
 	static double ScoreOf(const FTMUnitTally& Tally);
+	/** Where a unit's points come from, each with its label (Docs/design/feat-battle-report.md, "Value", v20). */
+	struct FTMValuePart
+	{
+		const TCHAR* Label = TEXT("");
+		double Points = 0.0;
+	};
+	static TArray<FTMValuePart> ValueParts(const FTMUnitTally& Tally);
+	/** The points per thing, in words, for the report's tip. */
+	static FString ValueRules();
 	/** The MVP: the most points; a tie to fewer falls, then more damage. -1 before anything happened. */
 	int32 MvpId() const;
 	/** The report's tab: 0 overview, 1 damage, 2 support, 3 control; the unit opened in it, or -1. */
@@ -2710,6 +2893,15 @@ private:
 	TMap<int32, int32> TallyHp;
 	/** Who last hurt each unit (its killer when it falls), and who helped, with the tick. */
 	TMap<int32, int32> LastHurtBy;
+	/** Each unit's recent hurt, by whom and when: damage, and turns of control. Shares out a takedown. */
+	struct FTMHurt
+	{
+		int32 By = -1;
+		int32 Tick = 0;
+		int32 Amount = 0;
+		int32 ControlTurns = 0;
+	};
+	TMap<int32, TArray<FTMHurt>> RecentHurt;
 	TMap<int32, TMap<int32, int32>> HelpedAgainst;
 	/** Who put each status on each unit ("unit:status"), so a burn's ticks are its caster's. */
 	TMap<FString, int32> StatusFrom;

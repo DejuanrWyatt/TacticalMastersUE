@@ -70,15 +70,15 @@
       }
     },
     {
-      "id": "druid_entangle",
-      "name": "Entangle",
-      "desc": "Roots burst under every enemy within 2 m of a point 2-7 m away: a light hit, and Rooted for 1 turn (1 s).",
+      "id": "druid_bramble_thicket",
+      "name": "Bramble Thicket",
+      "desc": "Grow brambles within 2 m of a point 2-7 m away for 2 of your turns. The first time each enemy starts a turn there, or stops there, it is Rooted for that turn (or its next).",
       "kind": "active",
-      "effect": "damage",
+      "effect": "support",
       "scale": "mag",
       "target": "enemy",
       "shape": "circle",
-      "power": 30,
+      "power": 0,
       "min_range": 2,
       "max_range": 7,
       "aoe": 2,
@@ -91,8 +91,15 @@
       "fx": "earth_slash",
       "vfx": {
         "system": "/Game/ParagonFey/FX/Particles/Fey/Abilities/Ultimate/FX/P_Ultimate_Root_Spikes.P_Ultimate_Root_Spikes",
-        "at": "targets",
+        "at": "point",
         "scale": 0.5
+      },
+      "anim": "area",
+      "special": "zone",
+      "element": "none",
+      "zone": {
+        "turns": 2,
+        "once": true
       }
     },
     {
@@ -126,24 +133,14 @@
   "creator": {
     "rebalanced": {
       "on": "2026-10-04",
-      "why": "Signature in place of Thorn Staff (never used): roots every enemy within 2 m of a point for 1 turn, with a light hit. Before that (2026-10-02): Balance audit 2026-10-02: the staff strikes from 1-5 m (power -15%) instead of only at arm's length, which the computer never used"
+      "why": "Ground zone Bramble Thicket in place of Entangle (area denial, 2026-10-04). Before that (2026-10-04): Signature in place of Thorn Staff (never used): roots every enemy within 2 m of a point for 1 turn, with a light hit. Before that (2026-10-02): Balance audit 2026-10-02: the staff strikes from 1-5 m (power -15%) instead of only at arm's length, which the computer never used"
     },
     "changedAt": "2026-10-03T03:45:00.000Z",
     "icons": {
       "abilities": [
         null,
         null,
-        {
-          "backing": "circle",
-          "glyph": "leaf",
-          "colour": "#8fd99f",
-          "style": "light",
-          "mark": "circle",
-          "scale": 1,
-          "rotate": 0,
-          "badge": "none",
-          "finish": "lit"
-        },
+        null,
         null
       ]
     }

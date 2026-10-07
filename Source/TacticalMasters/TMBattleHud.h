@@ -54,13 +54,19 @@ enum class ETMHudAction : uint8
 	Quit,
 	// Online (main_menu.gd:79-230): the title's button, then host or join.
 	// OnlineField's value is the field to type in (ATMBattleDirector::ETypeField).
+	// OnlineJoin joins by address, OnlineJoinCode by a join code (Docs/design/feat-online-eos.md);
+	// OnlineAdvanced shows or hides joining by address; LobbyCopyCode copies the join code.
 	TitleOnline,
 	OnlineHost,
 	OnlineJoin,
 	OnlineField,
 	OnlineBack,
+	OnlineJoinCode,
+	OnlineAdvanced,
+	LobbyCopyCode,
 	// The lobby (TMBattleHudLobby.cpp). LobbySide's value is the side; LobbySlot's
-	// the slot code (team * 4 + slot); DraftChoose's the class's index, -1 to let a ban go.
+	// the slot code (team * 4 + slot); DraftChoose's the class's index, -1 to let a ban go,
+	// -2 one at random (as is PickerChoose's -2). LobbyRandom rolls the player's own classes.
 	LobbySide,
 	LobbyReady,
 	LobbyStart,
@@ -70,6 +76,9 @@ enum class ETMHudAction : uint8
 	DraftChoose,
 	DraftToggle,
 	DraftTimer,
+	LobbyRandom,
+	// Tile movement, a setup option (v20 play test): free, four ways, eight ways, round.
+	SetupTileMove,
 
 	// The setup screen. SetupClass's value is team * 4 + slot; the others' is the team.
 	SetupClass,
@@ -186,8 +195,8 @@ enum class ETMHudAction : uint8
 
 	// Queued orders (2026-10-01): the plan strip's Go (or Plan, or Done), Undo and Clear.
 	PlanGo,
-	PlanUndo,
-	PlanClear,
+	/** Cancels a unit's whole queue: Value is the unit's id (2026-10-06, "Queued orders" B and C). */
+	QueueCancel,
 	// Go To (2026-10-01): GoToMode's value 0 walks and ends each turn, 1 walks and waits.
 	GoToMode,
 	GoToCancel,
@@ -222,6 +231,9 @@ struct FTMHudTip
 {
 	FBox2D Area;
 	FString Text;
+	/** An ability's card instead of the words (AbilityCard): the unit and its slot, or -1. */
+	int32 CardUnit = -1;
+	int32 CardSlot = -1;
 };
 
 struct FTMHudButton
@@ -368,7 +380,11 @@ private:
 	 * the ability's icon and name, the seconds left and a thick bar, its bottom
 	 * edge centred on (X, Bottom). Its height.
 	 */
-	float CastCard(const TMSim::FUnit& Unit, float X, float Bottom, float Scale);
+	/**
+	 * A cast in progress over the caster's head; returns its height. It shrinks to a
+	 * small chip (icon, seconds, bar) a moment after the cast starts, unless bFull.
+	 */
+	float CastCard(const TMSim::FUnit& Unit, float X, float Bottom, float Scale, bool bFull = false);
 	/**
 	 * A tank's zone of control as shields circling its edge (v19 play test,
 	 * "Battle Indicator Alternatives" Tank B): every enemy tank in sight, and
@@ -386,7 +402,7 @@ private:
 	/** What an item does, in one line: "+12 max HP, +10% ability damage". */
 	static FString ItemSummary(const TMSim::FItemDef& Item);
 	static FLinearColor TierColour(int32 Tier);
-	void DrawTooltip();
+	void DrawTooltip(ATMBattleDirector* Director = nullptr);
 	/** A bar while heroes, shaders or graphics pipelines are still loading. */
 	void DrawLoading(ATMBattleDirector& Director);
 
@@ -451,6 +467,16 @@ private:
 	FString ExplainMove(ATMBattleDirector& Director, const TMSim::FUnit& Unit) const;
 	FString ExplainSight(ATMBattleDirector& Director, const TMSim::FUnit& Unit) const;
 	FString ExplainAbility(ATMBattleDirector& Director, const TMSim::FUnit& Unit, int32 Slot) const;
+	/**
+	 * An ability's card ("Ability Info Mockups" D with A's chips, 2026-10-05): its
+	 * fields as chips, its statuses and a sentence, or with bDetail every field on a
+	 * row and each status explained. DrawH 0 only measures; its size comes back.
+	 */
+	FVector2D AbilityCard(ATMBattleDirector& Director, const TMSim::FUnit& Unit, int32 Slot, float X, float Y, bool bDetail, float DrawH, const FString& Note);
+	/** A tip that shows an ability's card under the pointer. */
+	void AddAbilityTip(float X, float Y, float W, float H, const TMSim::FUnit& Unit, int32 Slot);
+	/** Alt is held: ability cards show the whole of it. */
+	bool AltHeld() const;
 	static FString BuffText(const TMSim::FUnit& Unit);
 
 	void AddTip(float X, float Y, float W, float H, const FString& Tip);
@@ -540,6 +566,10 @@ private:
 
 	/** The bottom of the log window, so the field list can sit under it. */
 	float LogBottom = 0.0f;
+	/** The pointer was on the log last frame: it opens from its few newest lines (v20 play test, less text). */
+	bool bLogHovered = false;
+	/** Your unit whose turn comes next while none of yours is ready, for its turn chip to glow, or -1. */
+	int32 NextOwnUnit(ATMBattleDirector& From, float* Seconds = nullptr) const;
 	/** The bottom of the squad strip, or 0 when it is off, so the field list can sit under it. */
 	float SquadBottom = 0.0f;
 	/** The squad row the pointer was on last frame, which stays open while it is. */
@@ -547,4 +577,32 @@ private:
 
 	/** The top of the action bar, so the preview and notices can sit on it. */
 	float ActionBarTop = 0.0f;
+	/** The action bar's dark strip, left and right (both 0 when it is not drawn), for the slim line along its top. */
+	float ActionBarLeft = 0.0f;
+	float ActionBarRight = 0.0f;
+	/** The top and right edge of the enemy panel this frame (0 when none), so the boss bar can sit on it. */
+	float InspectTop = 0.0f;
+	float InspectRight = 0.0f;
+	/** The boss whose bar was shown last frame and where, so the bar stays while the pointer is on it. */
+	int32 BossBarUnitId = -1;
+	FBox2D BossBarRect = FBox2D(ForceInit);
+	/**
+	 * The odds of the blow being aimed, on each unit it would reach ("Hit Preview
+	 * Mockups" B, 2026-10-06): worked out in DrawBoardAids, drawn on the unit's own
+	 * overhead bar in DrawOverheads. Cleared every frame.
+	 */
+	struct FTMAimOdds
+	{
+		float Hit = 0.0f, Crit = 0.0f, Graze = 0.0f, Dodge = 0.0f, Ko = 0.0f;
+		int32 HitAmount = 0, CritAmount = 0, GrazeAmount = 0;
+		int32 Evade = 0, CritChance = 0;
+	};
+	TMap<int32, FTMAimOdds> AimOdds;
+	FString AimOddsExtra;
+	/**
+	 * Each unit's statuses as last seen (",burn,slow,") and until when its chips
+	 * show beside its ring (2026-10-06: statuses only on highlighted units, or for a
+	 * moment after one is put on).
+	 */
+	TMap<int32, TPair<FString, double>> StatusSeen;
 };

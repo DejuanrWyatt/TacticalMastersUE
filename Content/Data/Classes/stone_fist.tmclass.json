@@ -70,28 +70,23 @@
       }
     },
     {
-      "id": "stone_fist_stone_stance",
-      "name": "Stone Stance",
-      "desc": "Take a fighting stance; AttDef +6 for 2 turns. Switched on and off.",
-      "kind": "toggle",
-      "effect": "support",
-      "scale": "mag",
-      "target": "ally",
-      "shape": "self",
-      "power": 0,
+      "id": "stone_fist_shove",
+      "name": "Shove",
+      "desc": "Shove an adjacent enemy 2 tiles (4 m) straight back; if rock, a cliff or a unit stops it short, it is Stunned.",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "att",
+      "target": "enemy",
+      "shape": "unit",
+      "power": 25,
       "min_range": 0,
-      "max_range": 0,
+      "max_range": 1.8,
       "aoe": 0,
-      "cooldown": 0,
+      "cooldown": 2,
       "cast": 0,
-      "buffs": [
-        {
-          "stat": "attdef",
-          "amount": 6,
-          "turns": 2
-        }
-      ],
-      "fx": "focus"
+      "fx": "focus",
+      "anim": "melee",
+      "special": "shove"
     },
     {
       "id": "stone_fist_stone_fury",
@@ -122,8 +117,8 @@
   ],
   "creator": {
     "rebalanced": {
-      "on": "2026-10-03",
-      "why": "Tuning pass 2026-10-03 (lab 12% in place of the Black Mage): HP 90->109, power +42%"
+      "on": "2026-10-05",
+      "why": "Shove in place of Stone Stance (unique and mobility spells, 2026-10-05). Before that (2026-10-03): Tuning pass 2026-10-03 (lab 12% in place of the Black Mage): HP 90->109, power +42%"
     }
   }
 }

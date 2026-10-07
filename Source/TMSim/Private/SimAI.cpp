@@ -42,6 +42,13 @@ namespace TMSim
 
 	double FAIPlayer::GroundValue(const FBattle& Battle, const FUnit& Unit, const FVec2& Spot) const
 	{
+		// Ground zones (2026-10-04): the other side's are worth keeping out of.
+		const double Zoned = Battle.Zones.empty() ? 0.0 : -Battle.ZoneHarm(Unit, Spot);
+		return Zoned + HazardValue(Battle, Unit, Spot);
+	}
+
+	double FAIPlayer::HazardValue(const FBattle& Battle, const FUnit& Unit, const FVec2& Spot) const
+	{
 		const int Kind = Battle.HazardAt(Spot);
 		if (Kind == 0 || (Kind > 0 && Battle.SpringRestAt(Spot) > 0))
 		{
@@ -251,6 +258,11 @@ namespace TMSim
 		// does not think about statuses, channels or when to spend an ultimate.
 		const bool bSmart = Level.Mistakes < 0.4;
 
+		if (Ability.LaysZone())
+		{
+			return ZoneScore(Battle, User, Ability, Hits, bSmart);
+		}
+
 		for (const FHit& Hit : Hits)
 		{
 			const FUnit* Target = Battle.FindUnit(Hit.UnitId);
@@ -344,8 +356,19 @@ namespace TMSim
 						}
 					}
 				}
+				// A harm laid on its own side counts against it (2026-10-05: Overcharge's Slow).
+				if (Def && Def->bHarmful && Target->Team == User.Team && Ability.Effect == EEffect::Support)
+				{
+					Worth = -Worth;
+				}
 				Total += Worth;
 			}
+		}
+
+		// The new spells that do nothing a number shows (2026-10-05).
+		if (!Ability.Special.empty())
+		{
+			Total += SpellWorth(Battle, User, Ability, Hits);
 		}
 
 		// A channelled ability keeps working over its turns.
@@ -371,6 +394,141 @@ namespace TMSim
 			if (Caught < 2 && !bFinishes)
 			{
 				Total *= 0.4;
+			}
+		}
+		return Total;
+	}
+
+	double FAIPlayer::ZoneScore(FBattle& Battle, const FUnit& User, const FAbility& Ability,
+		const std::vector<FHit>& Hits, bool bSmart) const
+	{
+		// Ground (2026-10-04): what it does to each unit standing in it now, which
+		// will be touched as its turn begins unless something moves it first, and
+		// a little more for every turn the ground stays to keep others out.
+		double Total = 0.0;
+		for (const FHit& Hit : Hits)
+		{
+			const FUnit* Target = Battle.FindUnit(Hit.UnitId);
+			if (!Target || !Target->IsAlive())
+			{
+				continue;
+			}
+			if (Ability.bZoneHide)
+			{
+				// Smoke over its own: more for the hurt, nothing for one already hidden.
+				if (Target->Team == User.Team && !Battle.Hidden(1 - User.Team, *Target))
+				{
+					Total += 6.0 + (Target->Hp < Target->MaxHp() / 2 ? 6.0 : 0.0);
+				}
+				continue;
+			}
+			if (Target->Team == User.Team)
+			{
+				// Ground that helps its own side (2026-10-05, Ice Slide).
+				Total += Ability.Target == ETargetSide::Ally && Ability.HasStatus() && !Target->HasStatus(Ability.StatusId) ? 5.0 : 0.0;
+				continue;
+			}
+			// Its harm most likely lands twice before it walks clear, and ground it
+			// stands in is ground it has to give up.
+			double Worth = Hit.Amount * 2.0 * TargetWorth(User, *Target, bSmart) + (Ability.ZoneSight > 0.0f ? 0.0 : 4.0);
+			if (Ability.HasStatus() && !Target->HasStatus(Ability.StatusId))
+			{
+				Worth += Ability.StatusId == "silence" ? 16.0 : Ability.StatusId == "root" ? 12.0 : 10.0;
+			}
+			if (!Ability.ZoneStatus2.empty() && !Target->HasStatus(Ability.ZoneStatus2))
+			{
+				Worth += 6.0;
+			}
+			const std::string& Element = ElementOf(Ability);
+			if ((Element == "lightning" || Element == "ice") && Target->HasStatus("wet"))
+			{
+				Worth += 12.0;  // a shock or a freeze waiting for it
+			}
+			else if (Element == "fire" && Target->HasStatus("oiled"))
+			{
+				Worth += 8.0;
+			}
+			else if (!Element.empty())
+			{
+				Worth += 3.0;
+			}
+			if (Ability.ZoneSight > 0.0f)
+			{
+				// Light where its side is blind: worth most on what it can't see now.
+				Worth += Battle.CanSeeUnit(User.Team, *Target) ? 2.0 : 12.0;
+			}
+			Total += Worth;
+		}
+		if (bSmart)
+		{
+			Total *= 1.0 + 0.15 * (Ability.ZoneTurns - 1);
+		}
+		return Total;
+	}
+
+	double FAIPlayer::SpellWorth(FBattle& Battle, const FUnit& User, const FAbility& Ability, const std::vector<FHit>& Hits) const
+	{
+		// Rough worths for what the new spells do (2026-10-05) that no damage,
+		// healing or status number says. Nothing here for a spell it can't judge
+		// (Dash, Grapple, Recall, gates): it leaves those to a person.
+		const std::string& Special = Ability.Special;
+		double Total = 0.0;
+		const FVec2 Stand = Hits.empty() ? User.Pos : Hits[0].Where;
+		if (Special == "disengage")
+		{
+			// Out of reach of an enemy at its elbow, for anything but a tank.
+			if (!FBattle::HoldsTheLine(User))
+			{
+				for (const FUnit& Other : Battle.Units)
+				{
+					if (Other.IsAlive() && !Other.bOffBoard && Other.Team != User.Team && Other.Pos.DistanceTo(Stand) <= 2.0f)
+					{
+						return 14.0;
+					}
+				}
+			}
+			return 0.0;
+		}
+		for (const FHit& Hit : Hits)
+		{
+			const FUnit* Target = Battle.FindUnit(Hit.UnitId);
+			if (!Target || !Target->IsAlive() || Target->Id == User.Id || Target->Team != User.Team)
+			{
+				continue;
+			}
+			const double Share = Target->MaxHp() > 0 ? static_cast<double>(Target->Hp) / Target->MaxHp() : 1.0;
+			const double Mine = User.MaxHp() > 0 ? static_cast<double>(User.Hp) / User.MaxHp() : 1.0;
+			if (Special == "transfer")
+			{
+				for (const FStatus& Status : Target->Statuses)
+				{
+					const FStatusDef* Def = FindStatus(Status.Id);
+					Total += Def && Def->bHarmful && Status.Id != "charmed" && Status.Id != "hunted" ? 8.0 : 0.0;
+				}
+			}
+			else if (Special == "pact")
+			{
+				int Waiting = 0;
+				for (int Slot = 0; Slot < 3; ++Slot)
+				{
+					Waiting += Target->Cooldowns[Slot];
+				}
+				Total += Waiting >= 3 && Mine > 0.5 ? 10.0 : 0.0;
+			}
+			else if (Special == "spiritswap")
+			{
+				Total += Share < 0.35 && Mine > 0.7 ? (Mine - Share) * 40.0 : 0.0;
+			}
+			else if (Special == "rally" && Share < 0.4)
+			{
+				for (const FUnit& Other : Battle.Units)
+				{
+					if (Other.IsAlive() && !Other.bOffBoard && Other.Team != User.Team && Other.Pos.DistanceTo(Target->Pos) <= 2.0f)
+					{
+						Total += 12.0;
+						break;
+					}
+				}
 			}
 		}
 		return Total;
@@ -438,6 +596,11 @@ namespace TMSim
 		if (Worth <= 0.0)
 		{
 			return 0.0;  // nothing worth doing is worth nothing, not a small amount
+		}
+		// Somewhere to land, a vault's far side, cover to hop into (2026-10-05).
+		if (!Ability->Special.empty() && !Battle.SpecialProblem(Unit, *Ability, Spot, Target).empty())
+		{
+			return 0.0;
 		}
 		// A slow cast gives its target time to walk out of it.
 		double Value = Worth * (1.0 - 0.08 * Ability->Cast);

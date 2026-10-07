@@ -73,30 +73,31 @@
       }
     },
     {
-      "id": "arc_warlock_thunder_slumber",
-      "name": "Thunder Slumber",
-      "desc": "Lull an enemy 2-7 m away into a stupor; Stuns for 1 turn. (2 s)",
+      "id": "arc_warlock_time_bomb",
+      "name": "Time Bomb",
+      "desc": "Plant a charge on an enemy 2-8 m away. As its second turn begins it goes off: 45 damage to everyone within 4 m of it, its own side and yours alike.",
       "kind": "active",
       "effect": "support",
       "scale": "mag",
       "target": "enemy",
       "shape": "unit",
-      "power": 0,
+      "power": 45,
       "min_range": 2,
-      "max_range": 7,
+      "max_range": 8,
       "aoe": 0,
-      "cooldown": 3,
-      "cast": 2,
+      "cooldown": 4,
+      "cast": 1,
       "status": {
-        "id": "stun",
-        "turns": 1
+        "id": "bomb",
+        "turns": 2
       },
       "fx": "haste",
       "vfx": {
         "system": "/Game/ParagonGideon/FX/Particles/Gideon/Abilities/Meteor/FX/P_Gideon_MeteorBigImpact.P_Gideon_MeteorBigImpact",
         "at": "targets",
         "scale": 1
-      }
+      },
+      "anim": "bolt"
     },
     {
       "id": "arc_warlock_thunder_doom",
@@ -129,6 +130,10 @@
     "reworded": {
       "on": "2026-10-02",
       "why": "Descriptions say what the abilities do (2026-10-02): Stun not sleep, Crit not the old Power, turns not seconds"
+    },
+    "rebalanced": {
+      "on": "2026-10-05",
+      "why": "Time Bomb in place of Thunder Slumber (unique and mobility spells, 2026-10-05)."
     }
   }
 }

@@ -120,8 +120,15 @@ namespace TMSim
 			const std::vector<std::pair<FNode, double>>& Reach) const;
 		/** The reachable spot furthest from the enemies it can see. */
 		FVec2 RetreatSpot(FBattle& Battle, const FUnit& Unit, bool bSprint);
-		/** What standing on this ground is worth: embers hurt, springs help. */
+		/** What standing on this ground is worth: embers and the other side's zones hurt, springs help. */
 		double GroundValue(const FBattle& Battle, const FUnit& Unit, const FVec2& Spot) const;
+		/** The map's own ground alone: embers and springs. */
+		double HazardValue(const FBattle& Battle, const FUnit& Unit, const FVec2& Spot) const;
+		/** What the new spells (2026-10-05) do that no number says: rough worths for some of them. */
+		double SpellWorth(FBattle& Battle, const FUnit& User, const FAbility& Ability, const std::vector<FHit>& Hits) const;
+		/** What laying a ground zone (2026-10-04) aimed one way would be worth. */
+		double ZoneScore(FBattle& Battle, const FUnit& User, const FAbility& Ability,
+			const std::vector<FHit>& Hits, bool bSmart) const;
 
 		/** Its own seeded generator, so a battle against it replays the same. */
 		FSimRandom Rng;

@@ -83,33 +83,23 @@
       }
     },
     {
-      "id": "dread_knight_shadow_ward",
-      "name": "Shadow Ward",
-      "desc": "Every ally within 4 m is shielded; AttDef +5, Crit +8. Always on, for allies nearby.",
-      "kind": "aura",
+      "id": "dread_knight_blood_pact",
+      "name": "Blood Pact",
+      "desc": "Pay 15% of your own health (never the last of it): an ally 1-6 m away has every cooldown cleared.",
+      "kind": "active",
       "effect": "support",
       "scale": "mag",
       "target": "ally",
-      "shape": "self",
+      "shape": "unit",
       "power": 0,
-      "min_range": 0,
-      "max_range": 0,
-      "aoe": 4,
-      "cooldown": 0,
+      "min_range": 1,
+      "max_range": 6,
+      "aoe": 0,
+      "cooldown": 4,
       "cast": 0,
-      "buffs": [
-        {
-          "stat": "attdef",
-          "amount": 5,
-          "turns": 2
-        },
-        {
-          "stat": "crit",
-          "amount": 8,
-          "turns": 2
-        }
-      ],
-      "fx": "guard"
+      "fx": "guard",
+      "anim": "buff",
+      "special": "pact"
     },
     {
       "id": "dread_knight_shadow_bastion",
@@ -152,8 +142,8 @@
       "why": "Descriptions say what the abilities do (2026-10-02): Stun not sleep, Crit not the old Power, turns not seconds"
     },
     "rebalanced": {
-      "on": "2026-10-03",
-      "why": "Shadow Bash terrifies"
+      "on": "2026-10-05",
+      "why": "Blood Pact in place of Shadow Ward (unique and mobility spells, 2026-10-05). Before that (2026-10-03): Shadow Bash terrifies"
     }
   }
 }

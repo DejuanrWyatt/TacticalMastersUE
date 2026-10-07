@@ -382,10 +382,10 @@ void ATMBattleDirector::PlanAbility(int32 Slot, const TMSim::FVec2& Target, int3
 	bSprinting = false;
 }
 
-bool ATMBattleDirector::PlanWalkIntoRange(const TMSim::FUnit& Unit, const TMSim::FVec2& Point)
+bool ATMBattleDirector::PlanWalkIntoRange(const TMSim::FUnit& Unit, const TMSim::FVec2& Point, int32 Follow)
 {
 	// As WalkIntoRange, into the plan: the walk to the nearest spot it can be
-	// used from, and the ability from there.
+	// used from, and the ability from there, locked onto a unit clicked on.
 	const FTMPlan* Plan = Plans.Find(Unit.Id);
 	if ((Plan && Plan->bWalk) || Unit.bMoved || Unit.IsCasting())
 	{
@@ -401,57 +401,128 @@ bool ATMBattleDirector::PlanWalkIntoRange(const TMSim::FUnit& Unit, const TMSim:
 	WayPoints.clear();
 	Reachable = Battle.ReachableNodes(Unit);
 	PlanWalk(Spot);
-	PlanAbility(Slot, Point, -1);
+	PlanAbility(Slot, Point, Follow);
 	return true;
 }
 
-void ATMBattleDirector::UndoPlanStep()
+bool ATMBattleDirector::CancelQueue(int32 UnitId, bool bTell)
 {
-	const TMSim::FUnit* Unit = SelectedUnit();
-	if (!Unit)
+	// 2026-10-06 ("sometimes it's difficult to cancel a unit's queue before it moves
+	// again"): all of it at once, from any mode, the unit selected or not. The undo
+	// that took it apart a step at a time is gone (the human: "not many use cases").
+	const TMSim::FUnit* Unit = TMPlans::Find(Battle, UnitId);
+	bool bHad = Plans.Contains(UnitId) || GoTos.Contains(UnitId);
+	if (PendingAbility.UnitId == UnitId && PendingAbility.bAfterWalk)
 	{
+		// An ability waiting on the walk now under way: the walk ends where it ends, nothing after.
+		PendingAbility = FPendingAbility();
+		bHad = true;
+	}
+	if (UnitId == SelectedId && !WayPoints.empty())
+	{
+		bHad = true;
+	}
+	if (Plans.Contains(UnitId))
+	{
+		ClearPlan(UnitId);
+	}
+	else if (UnitId == SelectedId && !WayPoints.empty())
+	{
+		WayPoints.clear();
+		if (AimMode == EAimMode::Move)
+		{
+			RefreshReachable();
+		}
+	}
+	CancelGoTo(UnitId, false);
+	if (bTell && Unit)
+	{
+		Tell(bHad ? FString::Printf(TEXT("%s's queue is cancelled."), *PlanName(*Unit))
+			: FString::Printf(TEXT("%s has nothing queued."), *PlanName(*Unit)));
+	}
+	return bHad;
+}
+
+void ATMBattleDirector::CancelAllQueues()
+{
+	TSet<int32> Ids;
+	for (const TPair<int32, FTMPlan>& Pair : Plans)
+	{
+		Ids.Add(Pair.Key);
+	}
+	for (const TPair<int32, FTMGoTo>& Pair : GoTos)
+	{
+		Ids.Add(Pair.Key);
+	}
+	if (PendingAbility.UnitId >= 0 && PendingAbility.bAfterWalk)
+	{
+		Ids.Add(PendingAbility.UnitId);
+	}
+	if (!WayPoints.empty() && SelectedId >= 0)
+	{
+		Ids.Add(SelectedId);
+	}
+	int32 Count = 0;
+	for (const int32 Id : Ids)
+	{
+		const TMSim::FUnit* Unit = TMPlans::Find(Battle, Id);
+		if (Unit && PlayerCanPlan(Unit) && CancelQueue(Id, false))
+		{
+			++Count;
+		}
+	}
+	Tell(Count > 0 ? FString::Printf(TEXT("Every queue is cancelled (%d unit%s)."), Count, Count == 1 ? TEXT("") : TEXT("s"))
+		: FString(TEXT("Nothing is queued.")));
+}
+
+void ATMBattleDirector::CancelQueueKey()
+{
+	const APlayerController* Player = GetWorld() ? GetWorld()->GetFirstPlayerController() : nullptr;
+	if (Player && (Player->IsInputKeyDown(EKeys::LeftShift) || Player->IsInputKeyDown(EKeys::RightShift)))
+	{
+		CancelAllQueues();
 		return;
 	}
-	// A waypoint, planned or not.
-	if (!WayPoints.empty())
+	if (const TMSim::FUnit* Unit = SelectedUnit())
 	{
-		WayPoints.pop_back();
-		RefreshReachable();
-		return;
+		CancelQueue(Unit->Id, true);
 	}
-	// Then its Go To, if it has one.
-	if (GoTos.Contains(Unit->Id))
+}
+
+FString ATMBattleDirector::QueueSummary(const TMSim::FUnit& Unit) const
+{
+	auto AbilityName = [&Unit](int32 Slot)
 	{
-		CancelGoTo(Unit->Id, true);
-		return;
-	}
-	if (!bPlanMode)
+		const TMSim::FAbility* Ability = Unit.Ability(Slot);
+		return FString(UTF8_TO_TCHAR(Ability ? Ability->Name.c_str() : "its ability"));
+	};
+	if (const FTMGoTo* Order = GoTos.Find(Unit.Id))
 	{
-		return;
+		if (Order->bStopped)
+		{
+			return TEXT("Go To: stopped");
+		}
+		const int32 Turns = static_cast<int32>(Order->Stops.size());
+		return Order->HasAbility() ? FString::Printf(TEXT("Go To, then %s"), *AbilityName(Order->Slot))
+			: FString::Printf(TEXT("Go To: %d turn%s"), Turns, Turns == 1 ? TEXT("") : TEXT("s"));
 	}
-	FTMPlan* Plan = Plans.Find(Unit->Id);
-	if (!Plan)
+	if (const FTMPlan* Plan = Plans.Find(Unit.Id))
 	{
-		return;
+		const FString Walk = Plan->bSprint ? TEXT("Sprint") : TEXT("Walk");
+		if (Plan->bWalk && Plan->HasAbility())
+		{
+			return FString::Printf(TEXT("%s, then %s"), *Walk, *AbilityName(Plan->Slot));
+		}
+		if (Plan->bWalk)
+		{
+			return Walk;
+		}
+		if (Plan->HasAbility())
+		{
+			return AbilityName(Plan->Slot);
+		}
 	}
-	if (Plan->HasAbility())
-	{
-		Plan->Slot = -1;
-		Plan->Follow = -1;
-		Tell(TEXT("Its planned ability is taken back."));
-	}
-	else if (Plan->bWalk)
-	{
-		Plan->bWalk = false;
-		Plan->Via.clear();
-		Plan->Path.clear();
-		Tell(TEXT("Its planned walk is taken back."));
-		EnterMoveMode(false);
-	}
-	if (Plan->IsEmpty())
-	{
-		Plans.Remove(Unit->Id);
-	}
+	return FString();
 }
 
 void ATMBattleDirector::ClearPlan(int32 UnitId)
@@ -857,7 +928,7 @@ void ATMBattleDirector::StopGoTo(int32 UnitId, const FString& Why)
 		PointOut(UnitId);
 	}
 	Tell(FString::Printf(TEXT("%s stopped on the way: %s. %s: keep going; %s: cancel the order."), *PlanName(*Unit), *Why,
-		*FTMSettings::Get().KeyName(ETMAction::PlanTurn), *FTMSettings::Get().KeyName(ETMAction::PlanUndo)));
+		*FTMSettings::Get().KeyName(ETMAction::PlanTurn), *FTMSettings::Get().KeyName(ETMAction::PlanCancel)));
 }
 
 void ATMBattleDirector::CancelGoTo(int32 UnitId, bool bTell)
@@ -886,11 +957,15 @@ std::vector<TMSim::FVec2> ATMBattleDirector::ApproachRoute(const TMSim::FUnit& U
 		return {};
 	}
 	double Metres = 0.0;
-	const TMSim::FNode Aimed = TMSim::FMap::NodeOf(Target);
+	// With tile movement only tiles' spots are walked to (v20 play test): the
+	// target's tile, and rings of whole tiles round it.
+	const bool bTiles = Battle.TilesOn();
+	const int Stride = bTiles ? TMSim::Ground::NodesPerTile : 1;
+	const TMSim::FNode Aimed = bTiles ? TMSim::FBattle::TileNode(Target) : TMSim::FMap::NodeOf(Target);
 	std::vector<TMSim::FVec2> Route = Battle.RouteTo(Unit, {}, Aimed, &Metres);
 	// A unit aimed at stands on its spot, which no way ends on: towards the
 	// nearest open spot by it instead, the few nearest the walker first.
-	for (int Ring = 1; Ring <= 4 && Route.size() < 2; ++Ring)
+	for (int Ring = 1; Ring <= (bTiles ? 2 : 4) && Route.size() < 2; ++Ring)
 	{
 		std::vector<TMSim::FNode> Around;
 		for (int DX = -Ring; DX <= Ring; ++DX)
@@ -899,7 +974,7 @@ std::vector<TMSim::FVec2> ATMBattleDirector::ApproachRoute(const TMSim::FUnit& U
 			{
 				if (FMath::Max(FMath::Abs(DX), FMath::Abs(DY)) == Ring)
 				{
-					Around.push_back(TMSim::FNode{ Aimed.X + DX, Aimed.Y + DY });
+					Around.push_back(TMSim::FNode{ Aimed.X + DX * Stride, Aimed.Y + DY * Stride });
 				}
 			}
 		}

@@ -189,10 +189,26 @@ namespace TMCodex
 			"Summer Meadow: smouldering grass.  Autumn Ruins: burning rubble.  Ashen Caldera: a lava vent.  Winter Pass: a fire pit in the snow.  Moonlit Glade: a witchfire ring."), BurnCue));
 		Out.Add(Row(TEXT("Healing spring"), TEXT("Heals 8% of its max HP at the start of its turn there, then runs dry for 3 of that unit's turns (it says so on the board). A unit with Decay is hurt instead. Both numbers are in Developer Tools.\n"
 			"Summer Meadow: a spring pool.  Autumn Ruins: an old fountain.  Ashen Caldera: a hot spring.  Winter Pass: a steaming ice spring.  Moonlit Glade: a fairy pool."), SpringCue));
+		Out.Add(Heading(TEXT("Ground zones")));
+		Out.Add(Para(TEXT("Some abilities lay ground that lasts a number of their caster's turns, its turns left shown as pips over it. "
+			"It touches a unit of the side it is for that starts its turn in it or stops in it, once a turn; nothing as it is laid, and nothing flying. "
+			"It goes when its caster falls. Point at its pips to read it.")));
+		Out.Add(Row(TEXT("Ember Field"), TEXT("Flame Sorcerer. 6% of max HP and Burn; Oiled units catch fire. Water puts it out.")));
+		Out.Add(Row(TEXT("Static Mire"), TEXT("Stormcaller. 3% of max HP; a Wet unit is shocked and loses that turn.")));
+		Out.Add(Row(TEXT("Caustic Pool"), TEXT("Necromancer. 4% of max HP and Decay: healing hurts.")));
+		Out.Add(Row(TEXT("Frost Patch"), TEXT("Cryomancer. Chilled, a layer a turn (three freeze); a Wet unit freezes and loses that turn.")));
+		Out.Add(Row(TEXT("Tar Slick"), TEXT("Snare Hunter. A line of tar: Oiled and Slowed. Any fire lights it, and then it burns as Ember Field.")));
+		Out.Add(Row(TEXT("Bramble Thicket"), TEXT("Druid. Rooted, the first time each unit is caught.")));
+		Out.Add(Row(TEXT("Hush Circle"), TEXT("Null Monk. Silenced and Shredded.")));
+		Out.Add(Row(TEXT("Tide Pool"), TEXT("Sea Witch. Wet, ready for lightning and ice; puts out burning ground it reaches.")));
+		Out.Add(Row(TEXT("Scout Flare"), TEXT("Sun Archer. Thrown even into the fog: its side sees 4 m round it and finds units hiding in grass or smoke.")));
+		Out.Add(Row(TEXT("Watcher's Eye"), TEXT("Oracle. Its side sees 3.5 m round it for 4 turns, as from a tower.")));
+		Out.Add(Row(TEXT("Lantern Glow"), TEXT("Lumimancer. Its side sees round it and finds what hides; enemies in it are Blinded.")));
+		Out.Add(Row(TEXT("Smoke Veil"), TEXT("Shadow Stalker. Its own side hides in it as in tall grass.")));
 		Out.Add(Heading(TEXT("Terrain")));
 		Out.Add(Row(TEXT("Height"), TEXT("Walkable ground stands at levels. A step may climb or drop 2 levels; more is a cliff (fliers cross any). Higher ground hits harder and sees over lower.")));
 		Out.Add(Row(TEXT("Water"), TEXT("Can't be walked or waded. It is low, so units see and aim across it.")));
-		Out.Add(Row(TEXT("Tall grass"), TEXT("Thick grass over knee height. A unit standing in it can't be seen by an enemy more than 3 m away, so it can't be targeted from further off. Striking out, or being struck, gives it away until its next turn. Yours says \"hidden in grass\" under its feet.")));
+		Out.Add(Row(TEXT("Tall grass"), TEXT("Thick grass over knee height. A unit standing in it can't be seen by an enemy more than 3 m away, so it can't be targeted from further off. Striking out, or being struck, gives it away until its next turn. Yours shows an eye struck through under its feet.")));
 		Out.Add(Row(TEXT("Rock and ruins"), TEXT("Can't be walked. Block sight and every line aimed through them.")));
 		Out.Add(Row(TEXT("Hills"), TEXT("Ground rising between two points hides one from the other.")));
 		Out.Add(Row(TEXT("Trees and grass"), TEXT("Only scenery: they block nothing.")));
@@ -205,7 +221,7 @@ namespace TMCodex
 	void PageObjectives(TArray<FEntry>& Out, const FLinearColor* Tiers)
 	{
 		Out.Add(Heading(TEXT("Watchtowers")));
-		Out.Add(Row(TEXT("Capturing"), TEXT("Stand within 2.5 m of a tower, on ground within 2 levels of its foot, and use Capture. It is the turn's action and ends the turn; walking there first is allowed. Two such turns take the tower.")));
+		Out.Add(Row(TEXT("Capturing"), TEXT("End a unit's turn within 2.5 m of a tower, on ground within 2 levels of its foot: that turn goes into it, whatever else the unit did. Capture spends the whole turn there at once. The turns it takes are the rule number (Developer Tools).")));
 		Out.Add(Row(TEXT("Not while"), TEXT("an enemy or a monster stands within 2.5 m of it, or your side already holds it. If the other side starts capturing, your progress is wiped.")));
 		Out.Add(Row(TEXT("Holding"), TEXT("Its beacon burns in your colour, and your side sees everything within 14 m of it, over any wall or hill. The other side can take it from you.")));
 		Out.Add(Heading(TEXT("The middle")));
@@ -251,7 +267,7 @@ namespace TMCodex
 		Out.Add(Row(TEXT("Next ready unit"), Key(ETMAction::NextUnit)));
 		Out.Add(Row(TEXT("Waypoint"), Key(ETMAction::Waypoint) + TEXT(" held while clicking a walk")));
 		Out.Add(Row(TEXT("Plan a turn / go"), Key(ETMAction::PlanTurn)));
-		Out.Add(Row(TEXT("Undo plan step"), Key(ETMAction::PlanUndo)));
+		Out.Add(Row(TEXT("Cancel a unit's queue (Shift: every unit's)"), Key(ETMAction::PlanCancel) + TEXT(", or right-click its card")));
 		Out.Add(Row(TEXT("Mouse"), TEXT("Left click to select, aim and confirm; click one of your waiting units to plan its turn. Items, Take and Capture are buttons on the screen.")));
 		Out.Add(Heading(TEXT("Camera")));
 		Out.Add(Row(TEXT("Pan"), FString::Printf(TEXT("%s %s %s %s, or drag with the middle button"), *Key(ETMAction::CamForward), *Key(ETMAction::CamLeft),

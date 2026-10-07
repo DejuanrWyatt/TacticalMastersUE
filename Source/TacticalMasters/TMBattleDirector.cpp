@@ -23,6 +23,7 @@
 #include "TMAnimStudio.h"
 #include "TMRobotPlayer.h"
 #include "TMSettings.h"
+#include "TMEos.h"
 #include "NiagaraFunctionLibrary.h"
 #include "NiagaraSystem.h"
 #include "Particles/ParticleSystem.h"
@@ -251,10 +252,25 @@ void ATMBattleDirector::BeginPlay()
 	// the other switches set up, -tmjoin=address[:port] joins one, -tmnetbots
 	// has the computer play this machine's side through the online path, and
 	// -tmnetdesync makes the joiner's game differ once, to prove it is caught.
+	// Through Epic (Docs/design/feat-online-eos.md): -tmeos with -tmhost offers a
+	// join code too (-tmcode=ABCDEF picks it, for a test), -tmjoincode=ABCDEF joins
+	// by one, and -tmeosuser=2 makes a second copy on this PC another device.
 	bNetBots = FParse::Param(FCommandLine::Get(), TEXT("tmnetbots"));
 	bNetDesync = FParse::Param(FCommandLine::Get(), TEXT("tmnetdesync"));
 	FString NetSwitch;
-	if (FParse::Value(FCommandLine::Get(), TEXT("tmhost="), NetSwitch) || FParse::Param(FCommandLine::Get(), TEXT("tmhost")))
+	FString CodeSwitch;
+	if (FParse::Param(FCommandLine::Get(), TEXT("tmeos")) || FParse::Value(FCommandLine::Get(), TEXT("tmjoincode="), CodeSwitch))
+	{
+		FTMEos::Get().Start(LocalName());
+	}
+	if (FParse::Value(FCommandLine::Get(), TEXT("tmjoincode="), CodeSwitch))
+	{
+		JoinCodeText = CodeSwitch;
+		OfflineSetup = Setup;
+		Screen = EScreen::Online;
+		JoinByCode();
+	}
+	else if (FParse::Value(FCommandLine::Get(), TEXT("tmhost="), NetSwitch) || FParse::Param(FCommandLine::Get(), TEXT("tmhost")))
 	{
 		JoinPort = NetSwitch.IsNumeric() ? NetSwitch : FString::FromInt(FTMNet::DefaultPort);
 		OfflineSetup = Setup;
@@ -282,11 +298,18 @@ void ATMBattleDirector::ClearBattle()
 	BufferedKey = FKey();
 	CloseUpUntil = 0.0;
 	WalkPress = FTMWalkPress();
+	// Not destroyed yet: hidden, stopped and set aside, destroyed a few seconds
+	// on (RetiringVisuals, RetireOldVisuals).
+	const double RetiredAt = FPlatformTime::Seconds();
 	for (TObjectPtr<USkeletalMeshComponent>& Visual : UnitVisuals)
 	{
 		if (Visual)
 		{
-			Visual->DestroyComponent();
+			Visual->SetVisibility(false);
+			Visual->Stop();
+			Visual->SetComponentTickEnabled(false);
+			RetiringVisuals.Add(Visual);
+			RetiringSince.Add(RetiredAt);
 		}
 	}
 	UnitVisuals.Reset();
@@ -587,6 +610,7 @@ void ATMBattleDirector::BuildBattle()
 	Battle.Tuning.CampRespawn = Setup.bCampRespawn ? 1.0 : 0.0;
 	Battle.Tuning.BossHunt = Setup.bBossHunt ? 1.0 : 0.0;
 	Battle.Tuning.BossClaim = Setup.bBossClaim ? 1.0 : 0.0;
+	Battle.Tuning.TileMove = FMath::Clamp(Setup.TileMove, 0, 2);
 	Battle.BossJob = MapDef.Boss;
 	const std::string Loadout = Battle.LoadoutProblem();
 	if (!Loadout.empty())
@@ -724,6 +748,7 @@ void ATMBattleDirector::BuildBattle()
 	BuildFog();
 
 	bBuilt = true;
+	FitPets();
 	ResetMotion();
 	RefreshVisuals();
 	LoadBodiesInBackground();
@@ -935,7 +960,7 @@ FString ATMBattleDirector::MoveUnitTo(int32 UnitId, float MetresX, float MetresY
 	}
 	// Snapped first: a unit stands on a navigation node, not wherever a click
 	// happened to land.
-	const TMSim::FVec2 To = TMSim::FMap::Snap(TMSim::FVec2(MetresX, MetresY));
+	const TMSim::FVec2 To = Battle.TileSpot(TMSim::FVec2(MetresX, MetresY));
 
 	const TMSim::FUnit* Unit = Battle.FindUnit(UnitId);
 	if (!Unit)
@@ -1331,7 +1356,10 @@ void ATMBattleDirector::Narrate(const TMSim::FTickReport& Report)
 			Line = FString::Printf(TEXT("%s's spell fizzles"), *NameOf(Event.Unit));
 			break;
 		case TMSim::EEventKind::Resolved:
-			Line = FString::Printf(TEXT("%s uses %hs"), *NameOf(Event.Unit), Event.Id.c_str());
+			// A warned blow (2026-10-06): drawn now (2), landing now (1).
+			Line = Event.Amount == 2 ? FString::Printf(TEXT("%s draws %hs: it lands as its next turn begins"), *NameOf(Event.Unit), Event.Id.c_str())
+				: Event.Amount == 1 ? FString::Printf(TEXT("%s's %hs lands"), *NameOf(Event.Unit), Event.Id.c_str())
+				: FString::Printf(TEXT("%s uses %hs"), *NameOf(Event.Unit), Event.Id.c_str());
 			break;
 		case TMSim::EEventKind::Hit:
 			// A minus sign for damage and a plus for healing, which is the whole of
@@ -1378,6 +1406,12 @@ void ATMBattleDirector::Narrate(const TMSim::FTickReport& Report)
 				: Event.Id == "douse" ? FString::Printf(TEXT("    %s's burning is put out"), *Who)
 				: Event.Id == "thaw" ? FString::Printf(TEXT("    %s thaws"), *Who)
 				: Event.Id == "dry" ? FString::Printf(TEXT("    %s dries off"), *Who)
+				: Event.Id == "spread" ? FString::Printf(TEXT("    %s catches the plague"), *Who)
+				: Event.Id == "bomb" ? FString::Printf(TEXT("    The bomb on %s goes off!"), *Who)
+				: Event.Id == "echo" ? FString::Printf(TEXT("    %s's ability echoes"), *Who)
+				: Event.Id == "retribution" ? FString::Printf(TEXT("    Retribution stuns %s"), *Who)
+				: Event.Id == "ricochet" ? FString::Printf(TEXT("    it bounces from %s to %s"), *NameOf(Event.By), *Who)
+				: Event.Id == "execute" ? FString::Printf(TEXT("    %s's Verdict: half its gauge back"), *Who)
 				: FString::Printf(TEXT("    %s: %hs"), *Who, Event.Id.c_str());
 			break;
 		}
@@ -1468,6 +1502,25 @@ void ATMBattleDirector::Narrate(const TMSim::FTickReport& Report)
 				}
 			}
 			break;
+		// Ground zones (2026-10-04): told only where this screen may see them.
+		case TMSim::EEventKind::ZoneLaid:
+		case TMSim::EEventKind::ZoneEnded:
+		case TMSim::EEventKind::ZoneIgnited:
+		{
+			const TMSim::FUnit* Layer = Battle.FindUnit(Event.Unit);
+			if (!IsPointSeen(Event.Where) && !(Layer && ViewerTeam() >= 0 && Layer->Team == ViewerTeam()))
+			{
+				break;
+			}
+			const TMSim::FAbility* Laid = TMSim::FindAbility(Event.Id);
+			const FString Called = Laid ? FString(UTF8_TO_TCHAR(Laid->Name.c_str())) : FString(UTF8_TO_TCHAR(Event.Id.c_str()));
+			Line = Event.Kind == TMSim::EEventKind::ZoneLaid
+				? FString::Printf(TEXT("%s lays %s (%d turns)"), *NameOf(Event.Unit), *Called, Event.Amount)
+				: Event.Kind == TMSim::EEventKind::ZoneIgnited
+				? FString::Printf(TEXT("%s's %s catches fire"), *NameOf(Event.Unit), *Called)
+				: FString::Printf(TEXT("%s's %s fades"), *NameOf(Event.Unit), *Called);
+			break;
+		}
 		case TMSim::EEventKind::Hunting:
 			Line = FString::Printf(TEXT("%s hunts %s!"), *NameOf(Event.Unit), *NameOf(Event.By));
 			BossNews = Line;
@@ -1489,7 +1542,21 @@ void ATMBattleDirector::Narrate(const TMSim::FTickReport& Report)
 		case TMSim::EEventKind::Teleported:
 			// Shown at once where it went, not walked there (AdvanceMotion).
 			SnapUnits.Add(Event.Unit);
+			// The new spells' moves (2026-10-05) say how.
 			Line = Event.Id == "pet" ? FString::Printf(TEXT("%s calls up the %s"), *NameOf(Event.By), *NameOf(Event.Unit))
+				: Event.Id == "dash" ? FString::Printf(TEXT("%s dashes"), *NameOf(Event.Unit))
+				: Event.Id == "pull" ? FString::Printf(TEXT("    %s is dragged in"), *NameOf(Event.Unit))
+				: Event.Id == "hook" ? FString::Printf(TEXT("    %s is hooked in"), *NameOf(Event.Unit))
+				: Event.Id == "shove" ? FString::Printf(TEXT("    %s is shoved back"), *NameOf(Event.Unit))
+				: Event.Id == "rally" ? FString::Printf(TEXT("    %s answers the rally"), *NameOf(Event.Unit))
+				: Event.Id == "gate" ? FString::Printf(TEXT("%s steps through the gate"), *NameOf(Event.Unit))
+				: Event.Id == "recall" ? FString::Printf(TEXT("%s is recalled"), *NameOf(Event.Unit))
+				: Event.Id == "riptide" ? FString::Printf(TEXT("    %s trades places"), *NameOf(Event.Unit))
+				: Event.Id == "behind" ? FString::Printf(TEXT("%s steps behind its target"), *NameOf(Event.Unit))
+				: Event.Id == "vault" ? FString::Printf(TEXT("%s vaults over"), *NameOf(Event.Unit))
+				: Event.Id == "charge" ? FString::Printf(TEXT("%s charges"), *NameOf(Event.Unit))
+				: Event.Id == "leap" ? FString::Printf(TEXT("%s leaps"), *NameOf(Event.Unit))
+				: Event.Id == "shadowhop" ? FString::Printf(TEXT("%s slips into cover"), *NameOf(Event.Unit))
 				: FString::Printf(TEXT("%s blinks away"), *NameOf(Event.Unit));
 			break;
 		case TMSim::EEventKind::ShrineUsed:
@@ -1597,7 +1664,8 @@ void ATMBattleDirector::LogEvent(const TMSim::FEvent& Event, const FString& Plai
 	case TMSim::EEventKind::Resolved:
 		Entry.Kind = EKind::Action;
 		Entry.Group = ++LogGroup;
-		Entry.Verb = TEXT("uses");
+		// A warned blow (2026-10-06): drawn, then landing a turn later.
+		Entry.Verb = Event.Amount == 2 ? TEXT("draws") : Event.Amount == 1 ? TEXT("lands") : TEXT("uses");
 		Entry.What = AbilityName();
 		break;
 	case TMSim::EEventKind::CastStarted:
@@ -1895,9 +1963,32 @@ int32 ATMBattleDirector::ReachableCount(int32 UnitId) const
 	return 0;
 }
 
+void ATMBattleDirector::RetireOldVisuals()
+{
+	constexpr double KeepSeconds = 3.0;
+	const double Now = FPlatformTime::Seconds();
+	for (int32 i = RetiringVisuals.Num() - 1; i >= 0; --i)
+	{
+		if (!RetiringSince.IsValidIndex(i) || Now - RetiringSince[i] >= KeepSeconds)
+		{
+			if (USkeletalMeshComponent* Old = RetiringVisuals[i])
+			{
+				Old->DestroyComponent();
+			}
+			RetiringVisuals.RemoveAt(i);
+			if (RetiringSince.IsValidIndex(i))
+			{
+				RetiringSince.RemoveAt(i);
+			}
+		}
+	}
+}
+
 void ATMBattleDirector::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
+	RetireOldVisuals();
+	AdvanceClockWarning();
 
 	// An ultimate slows the world for a beat (UltimateBeat), a heavy blow holds
 	// it still for an instant (TMBattleDirectorFeel.cpp). Only the look of it:
@@ -1958,6 +2049,7 @@ void ATMBattleDirector::Tick(float DeltaSeconds)
 		{ TM_SLOW("Motion"); AdvanceMotion(DeltaSeconds); }
 		{ TM_SLOW("TurnRings"); AdvanceTurnRings(); }
 		{ TM_SLOW("Indicators"); AdvanceIndicators(); }
+		{ TM_SLOW("AuraFx"); AdvanceAuraFx(); }
 		{ TM_SLOW("Marks"); UpdateMarks(); }
 		{ TM_SLOW("Fog"); AdvanceFog(); }
 		{ TM_SLOW("CardPortraits"); AdvanceCardPortraits(); }
@@ -2733,7 +2825,7 @@ void ATMBattleDirector::OnKey(FKey Key)
 	// Fast-forward is read while held (WantsFastForward), not pressed.
 	else if (Is(ETMAction::FastForward)) {}
 	else if (Is(ETMAction::PlanTurn)) { PlanKey(); }
-	else if (Is(ETMAction::PlanUndo)) { UndoPlanStep(); }
+	else if (Is(ETMAction::PlanCancel)) { CancelQueueKey(); }
 	else if (Is(ETMAction::Move))
 	{
 		// battle.gd:966-972, _toggle_move.
@@ -2883,9 +2975,27 @@ void ATMBattleDirector::OnKeyUp(FKey Key)
 	if (Key == EKeys::RightMouseButton)
 	{
 		bRightHeld = false;
-		// A click rather than a drag: it drops an aim, as it always has.
+		// A click rather than a drag: it drops an aim, as it always has -- unless it is
+		// on the card of one of this player's units with something queued (its row on
+		// the squad strip, its queue tab, its turn square): then it cancels that queue
+		// ("Queued orders" B, 2026-10-06: "add right click card to cancel").
 		if (RightDragged < 6.0f && Screen == EScreen::Battle && !bMenuOpen && !bGuideOpen && !bOptionsOpen && !bDevToolsOpen)
 		{
+			APlayerController* Clicker = GetWorld() ? GetWorld()->GetFirstPlayerController() : nullptr;
+			const ATMBattleHud* Hud = Clicker ? Cast<ATMBattleHud>(Clicker->GetHUD()) : nullptr;
+			float CardX = 0.0f;
+			float CardY = 0.0f;
+			FTMHudButton Card;
+			if (Hud && CursorPosition(CardX, CardY) && Hud->ButtonAt(FVector2D(CardX, CardY), Card)
+				&& (Card.Action == ETMHudAction::PickUnit || Card.Action == ETMHudAction::QueueCancel) && Card.Value >= 0)
+			{
+				const TMSim::FUnit* Carded = Battle.FindUnit(Card.Value);
+				if (Carded && PlayerCanPlan(Carded) && !QueueSummary(*Carded).IsEmpty())
+				{
+					CancelQueue(Card.Value, true);
+					return;
+				}
+			}
 			CancelAim();
 		}
 	}
@@ -3282,51 +3392,67 @@ void ATMBattleDirector::PickUnderCursor()
 	// Units by where they appear on screen. The camera looks down at an angle, so
 	// a ray through a unit's chest meets the board well behind its feet; asking
 	// the screen is what makes clicking a unit land on that unit.
+	//
+	// v20 play test ("when units are close together it's hard to select
+	// targets"): each standing unit is measured by how far the pointer is from
+	// its whole body as drawn (feet to head), not from one point at its chest
+	// (which, with units half as big again since v19, sat at their knees); a
+	// pointer on two bodies goes to the one whose middle it is nearer; and while
+	// an ability is aimed, a unit it can't be used on counts as further off, so
+	// the one it can is chosen when they stand together.
 	int32 Best = -1;
-	double BestPixels = 36.0;
+	double BestPixels = 40.0;
 	// Whether the pointer is on the nearest unit's body itself, not only near it.
 	bool bOnBody = false;
+	const TMSim::FUnit* Aiming = AimMode == EAimMode::Ability ? SelectedUnit() : nullptr;
+	const TMSim::FAbility* AimedAbility = Aiming ? Aiming->Ability(AimSlot) : nullptr;
 	for (const TMSim::FUnit& Unit : Battle.Units)
 	{
 		if ((!Unit.IsAlive() && !Unit.IsKo()) || !IsSeen(Unit))
 		{
 			continue;
 		}
-		// A fallen unit is lying down, and only its plate is shown.
-		const float Up = Unit.IsAlive() ? 90.0f : 20.0f;
-		FVector2D OnScreen;
 		const FVector Drawn = ShownAt(Unit);
-		if (Player->ProjectWorldLocationToScreen(
-			GetActorTransform().TransformPosition(Drawn + FVector(0.0f, 0.0f, Up)), OnScreen))
+		double Pixels = 0.0;
+		bool bOnThisBody = false;
+		FVector2D Feet;
+		FVector2D Head;
+		if (Unit.IsAlive()
+			&& Player->ProjectWorldLocationToScreen(GetActorTransform().TransformPosition(Drawn), Feet)
+			&& Player->ProjectWorldLocationToScreen(GetActorTransform().TransformPosition(Drawn + FVector(0.0f, 0.0f, UnitHeadCm)), Head))
 		{
-			const double Pixels = FVector2D::Distance(OnScreen, Mouse);
-			if (Pixels < BestPixels)
+			// The body as the screen shows it: feet to head, about a quarter as
+			// wide as it is tall. Godot picks a unit by a ray meeting its body
+			// (battle.gd:741-753), and this is that body, drawn flat.
+			const FVector2D Along = Head - Feet;
+			const double Length = FMath::Max(1.0, static_cast<double>(Along.Size()));
+			const double T = FMath::Clamp(FVector2D::DotProduct(Mouse - Feet, Along) / (Length * Length), 0.0, 1.0);
+			const double Across = FVector2D::Distance(Mouse, Feet + Along * T);
+			bOnThisBody = Across <= Length * 0.25;
+			// Off the body: how far from it. On it: how far from its middle line,
+			// scaled down, so of two overlapping bodies the nearer middle wins.
+			Pixels = bOnThisBody ? Across * 0.5 : Across;
+		}
+		else
+		{
+			// A fallen unit is lying down, and only its plate is shown.
+			FVector2D OnScreen;
+			if (!Player->ProjectWorldLocationToScreen(GetActorTransform().TransformPosition(Drawn + FVector(0.0f, 0.0f, 20.0f)), OnScreen))
 			{
-				BestPixels = Pixels;
-				Best = Unit.Id;
-				// The body as the screen shows it: feet to head, about a quarter
-				// as wide as it is tall. Godot picks a unit by a ray meeting its
-				// body (battle.gd:741-753), and this is that body, drawn flat.
-				FVector2D Feet;
-				FVector2D Head;
-				bOnBody = false;
-				if (Unit.IsAlive()
-					&& Player->ProjectWorldLocationToScreen(GetActorTransform().TransformPosition(Drawn), Feet)
-					&& Player->ProjectWorldLocationToScreen(GetActorTransform().TransformPosition(Drawn + FVector(0.0f, 0.0f, UnitHeadCm)), Head))
-				{
-					const FVector2D Along = Head - Feet;
-					const double Length = Along.Size();
-					if (Length > 1.0)
-					{
-						const double T = FMath::Clamp(FVector2D::DotProduct(Mouse - Feet, Along) / (Length * Length), 0.0, 1.0);
-						bOnBody = FVector2D::Distance(Mouse, Feet + Along * T) <= Length * 0.25;
-					}
-				}
-				else if (!Unit.IsAlive())
-				{
-					bOnBody = Pixels <= 18.0;
-				}
+				continue;
 			}
+			Pixels = FVector2D::Distance(OnScreen, Mouse);
+			bOnThisBody = !Unit.IsAlive() && Pixels <= 18.0;
+		}
+		if (AimedAbility && !CanAimAt(*Aiming, *AimedAbility, Unit))
+		{
+			Pixels += 60.0;
+		}
+		if (Pixels < BestPixels)
+		{
+			BestPixels = Pixels;
+			Best = Unit.Id;
+			bOnBody = bOnThisBody;
 		}
 	}
 
@@ -3364,6 +3490,21 @@ void ATMBattleDirector::PickUnderCursor()
 	{
 		bHaveHover = true;
 		HoverPoint = Ground;
+		// Tile movement (v20 play test): a walk, or a unit being placed, aims at the
+		// tile's spot, wherever on the tile the pointer is.
+		HoverGround = Ground;
+		if (Battle.TilesOn() && AimMode != EAimMode::Ability)
+		{
+			HoverPoint = Battle.TileSpot(Ground);
+			// A unit on the tile is pointed at, wherever on its tile the pointer is.
+			if (const TMSim::FUnit* OnTile = Battle.UnitNear(HoverPoint, 0.5f))
+			{
+				if (IsSeen(*OnTile))
+				{
+					HoverUnitId = OnTile->Id;
+				}
+			}
+		}
 		// On the ground, a unit is pointed at only if it stands on that spot, as
 		// in Godot (battle.gd:756-758). Merely near it on screen would make a
 		// click that places a unit, or walks one, pick up the neighbour instead
@@ -3376,6 +3517,21 @@ void ATMBattleDirector::PickUnderCursor()
 			}
 		}
 		TetherAim();
+	}
+}
+
+bool ATMBattleDirector::CanAimAt(const TMSim::FUnit& User, const TMSim::FAbility& Ability, const TMSim::FUnit& Target) const
+{
+	switch (Ability.Target)
+	{
+	case TMSim::ETargetSide::Enemy:
+		return Target.IsAlive() && Target.Team != User.Team;
+	case TMSim::ETargetSide::Ally:
+		return Target.IsAlive() && Target.Team == User.Team;
+	case TMSim::ETargetSide::KoAlly:
+		return Target.IsKo() && Target.Team == User.Team;
+	default:
+		return true;
 	}
 }
 
@@ -3598,7 +3754,8 @@ void ATMBattleDirector::OnClick()
 			const TMSim::FNode Node = TMSim::FMap::NodeOf(HoverPoint);
 			const bool bReachable = std::any_of(Reachable.begin(), Reachable.end(),
 				[&Node](const std::pair<TMSim::FNode, double>& Entry) { return Entry.first == Node; });
-			if (bReachable && Node != TMSim::FMap::NodeOf(WalkStart(*Unit)))
+			if (bReachable && Node != TMSim::FMap::NodeOf(WalkStart(*Unit))
+				&& !(Battle.TilesOn() && Node == TMSim::FBattle::TileNode(WalkStart(*Unit))))
 			{
 				// Held: a waypoint on the way (2026-10-01). Planning: the plan's
 				// walk. Otherwise the walk, now, by any waypoints set.
@@ -3759,7 +3916,9 @@ bool ATMBattleDirector::ClosestSpotInRange(const TMSim::FUnit& Unit, int32 Slot,
 		{
 			continue;
 		}
-		if (TMSim::NeedsLineOfSight(*Ability) && !Battle.HasLineOfSight(Spot, Point))
+		// A zone that sees (2026-10-04) is thrown: it needs no line.
+		const bool bLobbed = Ability->LaysZone() && Ability->ZoneSight > 0.0f;
+		if (!bLobbed && TMSim::NeedsLineOfSight(*Ability) && !Battle.HasLineOfSight(Spot, Point))
 		{
 			continue;
 		}
@@ -3773,11 +3932,13 @@ bool ATMBattleDirector::ClosestSpotInRange(const TMSim::FUnit& Unit, int32 Slot,
 	return bFound;
 }
 
-bool ATMBattleDirector::WalkIntoRange(const TMSim::FUnit& Unit, const TMSim::FVec2& Point)
+bool ATMBattleDirector::WalkIntoRange(const TMSim::FUnit& Unit, const TMSim::FVec2& Point, int32 Follow)
 {
-	// battle.gd:838-857. The unit is on its way while time runs on, so the
-	// ability goes off at the spot the target was standing on: if it has moved
-	// by then, the blow lands on empty ground.
+	// battle.gd:838-857. The unit is on its way while time runs on. Godot aims
+	// at the spot the target was standing on, so if it has moved by then the
+	// blow lands on empty ground; here ("Attack Out of Range Mockups" A,
+	// 2026-10-06) a unit clicked on is followed, and aimed at where it stands
+	// when the walk ends (FirePendingAbility).
 	if (Unit.bMoved || Unit.IsCasting())
 	{
 		return false;
@@ -3803,7 +3964,7 @@ bool ATMBattleDirector::WalkIntoRange(const TMSim::FUnit& Unit, const TMSim::FVe
 	PendingAbility.Serial = Serial;
 	PendingAbility.Slot = Slot;
 	PendingAbility.Target = Point;
-	PendingAbility.Follow = -1;
+	PendingAbility.Follow = Follow;
 	PendingAbility.bAfterWalk = true;
 	AimMode = EAimMode::None;
 	AimSlot = -1;
@@ -3843,16 +4004,32 @@ void ATMBattleDirector::FirePendingAbility()
 	}
 	const FPendingAbility Order = PendingAbility;
 	PendingAbility = FPendingAbility();
-	// A plan aimed at a unit aims at where it stands now (TMBattleDirectorPlans.cpp).
+	// Aimed at a unit (a click on it, a plan's): at where it stands now.
 	TMSim::FVec2 Target = Order.Target;
-	if (Order.Follow >= 0)
+	const TMSim::FUnit* Followed = Order.Follow >= 0 ? FindIn(Battle, Order.Follow) : nullptr;
+	if (Followed)
 	{
-		if (const TMSim::FUnit* Followed = FindIn(Battle, Order.Follow))
-		{
-			Target = Followed->Pos;
-		}
+		Target = Followed->Pos;
 	}
-	OrderSelected(TMSim::FOrder::MakeUseAbility(Order.UnitId, Order.Serial, Order.Slot, Target, Order.Follow));
+	const TMSim::FOrder Use = TMSim::FOrder::MakeUseAbility(Order.UnitId, Order.Serial, Order.Slot, Target, Order.Follow);
+	// "Attack Out of Range Mockups" B (2026-10-06): checked on arrival. If the
+	// target has stepped out of reach (or died, or gone into the fog), no blow
+	// is thrown at empty ground: the order is dropped, the action is not spent,
+	// and the unit's turn goes on for the player to choose again.
+	const std::string Refused = Battle.Validate(Use);
+	if (!Refused.empty())
+	{
+		const TMSim::FAbility* Ability = Unit->Ability(Order.Slot);
+		FString Why = UTF8_TO_TCHAR(Refused.c_str());
+		Why.RemoveFromEnd(TEXT("."));
+		if (Refused == OutOfRange && Followed)
+		{
+			Why = FString::Printf(TEXT("%s moved out of reach"), *NameOf(Followed->Id));
+		}
+		Tell(FString::Printf(TEXT("%hs held: %s. Action kept."), Ability ? Ability->Name.c_str() : "Ability", *Why));
+		return;
+	}
+	OrderSelected(Use);
 	// Not the selected unit (a plan run while the player orders another): its
 	// turn is ended here, as OrderSelected does for the selected one.
 	const TMSim::FUnit* After = FindIn(Battle, Order.UnitId);
@@ -4043,13 +4220,15 @@ void ATMBattleDirector::PressHudButton(const FTMHudButton& Button)
 	case ETMHudAction::PlanGo:
 		PlanKey();
 		break;
-	case ETMHudAction::PlanUndo:
-		UndoPlanStep();
-		break;
-	case ETMHudAction::PlanClear:
-		if (Unit)
+	// A unit's whole queue, from its plan strip, its card on the squad strip or the x at its walk's end.
+	case ETMHudAction::QueueCancel:
+		if (Button.Value >= 0)
 		{
-			ClearPlan(Unit->Id);
+			CancelQueue(Button.Value, true);
+		}
+		else if (Unit)
+		{
+			CancelQueue(Unit->Id, true);
 		}
 		break;
 	// Go To's strip: walk and end (0) or walk and wait (1), and cancel.
@@ -4211,6 +4390,11 @@ void ATMBattleDirector::PressHudButton(const FTMHudButton& Button)
 		{
 			SaveSetupChoices();
 		}
+		// The host changed a setting on the lobby screen (v20): everyone told.
+		if (Screen == EScreen::Lobby && Net.IsValid() && Net->IsHost())
+		{
+			BroadcastLobby();
+		}
 		break;
 	}
 }
@@ -4245,6 +4429,7 @@ void ATMBattleDirector::SaveSetupChoices()
 	Number(TEXT("camp_respawn"), Setup.bCampRespawn ? 1 : 0);
 	Number(TEXT("boss_hunt"), Setup.bBossHunt ? 1 : 0);
 	Number(TEXT("boss_claim"), Setup.bBossClaim ? 1 : 0);
+	Number(TEXT("tile_move"), Setup.TileMove);
 	Out.Add(TEXT("map"), UTF8_TO_TCHAR(Setup.MapId.c_str()));
 	Out.Add(TEXT("theme"), Setup.ThemeId);
 	FTMSettings::Get().Save();
@@ -4302,6 +4487,7 @@ void ATMBattleDirector::RestoreSetupChoices()
 	Setup.bCampRespawn = Number(TEXT("camp_respawn"), 0) != 0.0;
 	Setup.bBossHunt = Number(TEXT("boss_hunt"), 0) != 0.0;
 	Setup.bBossClaim = Number(TEXT("boss_claim"), 0) != 0.0;
+	Setup.TileMove = FMath::Clamp(static_cast<int32>(Number(TEXT("tile_move"), 0)), 0, 2);
 	if (const FString* Map = In.Find(TEXT("map")))
 	{
 		const std::string Id = TCHAR_TO_UTF8(**Map);
@@ -4525,6 +4711,23 @@ void ATMBattleDirector::PressMenuButton(const FTMHudButton& Button)
 	case ETMHudAction::PickerChoose:
 	{
 		const std::vector<const TMSim::FJobDef*>& Jobs = TMSim::AllJobs();
+		// Random (v20): any class it could have, of the role shown.
+		if (Button.Value == -2 && PickerSlot >= 0)
+		{
+			const std::string Rolled = RandomClassFor(PickerSlot / 4, PickerSlot % 4, TSet<FString>(), PickerRole);
+			for (int32 j = 0; j < static_cast<int32>(Jobs.size()); ++j)
+			{
+				if (Jobs[j]->Id == Rolled)
+				{
+					FTMHudButton Chosen = Button;
+					Chosen.Value = j;
+					PressMenuButton(Chosen);
+					return;
+				}
+			}
+			Tell(TEXT("No class left to roll for that slot."));
+			break;
+		}
 		if (Screen == EScreen::Lobby && PickerSlot >= 0 && Button.Value >= 0 && Button.Value < static_cast<int32>(Jobs.size()))
 		{
 			LobbyPick(PickerSlot, Jobs[Button.Value]->Id);
@@ -4545,6 +4748,11 @@ void ATMBattleDirector::PressMenuButton(const FTMHudButton& Button)
 		PickerSlot = -1;
 		break;
 	case ETMHudAction::SetupItem:
+		// In the lobby, only the slots of a player's own units (and the host the computer's).
+		if (Screen == EScreen::Lobby && !LobbyMayPick(LocalPlayer, (Button.Value / 12) * 4 + (Button.Value % 12) / 3))
+		{
+			break;
+		}
 		if (!PicksOwnItems(Button.Value / 12))
 		{
 			ItemPickerSlot = Button.Value;
@@ -4712,6 +4920,10 @@ void ATMBattleDirector::PressMenuButton(const FTMHudButton& Button)
 		break;
 	case ETMHudAction::SetupFriendlyFire:
 		Setup.bFriendlyFire = !Setup.bFriendlyFire;
+		BuildBattle();
+		break;
+	case ETMHudAction::SetupTileMove:
+		Setup.TileMove = (Setup.TileMove + 1) % 3;
 		BuildBattle();
 		break;
 	case ETMHudAction::SetupUniqueClasses:
@@ -4952,6 +5164,15 @@ void ATMBattleDirector::PressMenuButton(const FTMHudButton& Button)
 		LeaveOnline();
 		OpenTitle();
 		break;
+	case ETMHudAction::OnlineJoinCode:
+		JoinByCode();
+		break;
+	case ETMHudAction::OnlineAdvanced:
+		bOnlineAdvanced = !bOnlineAdvanced;
+		break;
+	case ETMHudAction::LobbyCopyCode:
+		CopyOnlineCode();
+		break;
 
 	// The lobby and the draft (TMBattleDirectorLobby.cpp, TMBattleDirectorDraft.cpp).
 	case ETMHudAction::LobbySide:
@@ -4973,6 +5194,12 @@ void ATMBattleDirector::PressMenuButton(const FTMHudButton& Button)
 		LeaveOnline();
 		OpenTitle();
 		break;
+	case ETMHudAction::LobbyRandom:
+		if (Screen == EScreen::Lobby && !Setup.bDraft)
+		{
+			LobbyRandom();
+		}
+		break;
 	case ETMHudAction::LobbySlot:
 		if (Screen == EScreen::Lobby && !Setup.bDraft && LobbyMayPick(LocalPlayer, Button.Value))
 		{
@@ -4982,7 +5209,25 @@ void ATMBattleDirector::PressMenuButton(const FTMHudButton& Button)
 	case ETMHudAction::DraftChoose:
 	{
 		const std::vector<const TMSim::FJobDef*>& Jobs = TMSim::AllJobs();
-		if (Screen == EScreen::Draft && Button.Value >= 0 && Button.Value < static_cast<int32>(Jobs.size()))
+		if (Screen == EScreen::Draft && Button.Value == -2)
+		{
+			// Random (v20): any class still free, of the role shown.
+			TArray<FString> Free;
+			const char* Roles[4] = { "tank", "damage", "support", "special" };
+			for (const TMSim::FJobDef* Job : Jobs)
+			{
+				const FString Id = UTF8_TO_TCHAR(Job->Id.c_str());
+				if (!DraftUsed(Id) && (PickerRole < 0 || PickerRole > 3 || TMSim::JobHasRole(Job->Id, Roles[PickerRole])))
+				{
+					Free.Add(Id);
+				}
+			}
+			if (Free.Num() > 0)
+			{
+				DraftChoose(Free[FMath::RandRange(0, Free.Num() - 1)]);
+			}
+		}
+		else if (Screen == EScreen::Draft && Button.Value >= 0 && Button.Value < static_cast<int32>(Jobs.size()))
 		{
 			DraftChoose(UTF8_TO_TCHAR(Jobs[Button.Value]->Id.c_str()));
 		}
@@ -5450,7 +5695,7 @@ bool ATMBattleDirector::OnSetupScreen(int32 TuningIndex)
 	// and respawn joined them; they are kept between sessions with the setup).
 	return Key == "capture_seconds" || Key == "battle_seconds" || Key == "planning_seconds"
 		|| Key == "watchtower_count" || Key == "item_budget" || Key == "camps" || Key == "random_boss"
-		|| Key == "elements" || Key == "friendly_fire" || Key == "camp_respawn" || Key == "boss_hunt" || Key == "boss_claim";
+		|| Key == "elements" || Key == "friendly_fire" || Key == "camp_respawn" || Key == "boss_hunt" || Key == "boss_claim" || Key == "tile_move";
 }
 
 int32 ATMBattleDirector::ItemPointsSpent(int32 Team) const
@@ -5474,47 +5719,66 @@ bool ATMBattleDirector::PicksOwnItems(int32 Team) const
 	return Setup.Mode == TEXT("cpu") || (Setup.Mode == TEXT("ai") && Setup.PlayerTeam != Team);
 }
 
+FString ATMBattleDirector::ItemChoiceProblem(int32 SlotCode, const std::string& ItemId) const
+{
+	if (SlotCode < 0 || SlotCode >= 24)
+	{
+		return TEXT("No such item slot.");
+	}
+	if (ItemId.empty())
+	{
+		return FString();
+	}
+	const TMSim::FItemDef* Item = TMSim::FindItem(ItemId);
+	if (!Item)
+	{
+		return TEXT("No such item.");
+	}
+	const int32 Team = SlotCode / 12;
+	const int32 Unit = (SlotCode % 12) / 3;
+	const int32 Slot = SlotCode % 3;
+	if (Item->Cost <= 0)
+	{
+		return FString::Printf(TEXT("%hs can't be bought: it's only found, from the epic camp."), Item->Name.c_str());
+	}
+	for (int32 Other = 0; Other < 3; ++Other)
+	{
+		if (Other != Slot && Setup.Items[Team][Unit][Other] == Item->Id)
+		{
+			return FString::Printf(TEXT("That unit already carries %hs."), Item->Name.c_str());
+		}
+	}
+	const TMSim::FItemDef* Before = TMSim::FindItem(Setup.Items[Team][Unit][Slot]);
+	const int32 Left = Setup.ItemBudget - ItemPointsSpent(Team) + (Before ? Before->Cost : 0);
+	if (Item->Cost > Left)
+	{
+		return FString::Printf(TEXT("%hs costs %d points; this side has %d left."), Item->Name.c_str(), Item->Cost, Left);
+	}
+	return FString();
+}
+
 void ATMBattleDirector::ChooseItem(int32 SlotCode, int32 ItemIndex)
 {
 	if (SlotCode < 0 || SlotCode >= 24)
 	{
 		return;
 	}
-	const int32 Team = SlotCode / 12;
-	const int32 Unit = (SlotCode % 12) / 3;
-	const int32 Slot = SlotCode % 3;
-	std::string& Held = Setup.Items[Team][Unit][Slot];
 	const std::vector<const TMSim::FItemDef*>& All = TMSim::AllItems();
-	if (ItemIndex < 0 || ItemIndex >= static_cast<int32>(All.size()))
+	const std::string Id = ItemIndex >= 0 && ItemIndex < static_cast<int32>(All.size()) ? All[static_cast<size_t>(ItemIndex)]->Id : std::string();
+	const FString Problem = ItemChoiceProblem(SlotCode, Id);
+	if (!Problem.IsEmpty())
 	{
-		Held.clear();
-		ItemPickerSlot = -1;
-		BuildBattle();
+		Tell(Problem);
 		return;
 	}
-	const TMSim::FItemDef& Item = *All[static_cast<size_t>(ItemIndex)];
-	if (Item.Cost <= 0)
-	{
-		Tell(FString::Printf(TEXT("%hs can't be bought: it's only found, from the epic camp."), Item.Name.c_str()));
-		return;
-	}
-	for (int32 Other = 0; Other < 3; ++Other)
-	{
-		if (Other != Slot && Setup.Items[Team][Unit][Other] == Item.Id)
-		{
-			Tell(FString::Printf(TEXT("That unit already carries %hs."), Item.Name.c_str()));
-			return;
-		}
-	}
-	const TMSim::FItemDef* Before = TMSim::FindItem(Held);
-	const int32 Left = Setup.ItemBudget - ItemPointsSpent(Team) + (Before ? Before->Cost : 0);
-	if (Item.Cost > Left)
-	{
-		Tell(FString::Printf(TEXT("%hs costs %d points; this side has %d left."), Item.Name.c_str(), Item.Cost, Left));
-		return;
-	}
-	Held = Item.Id;
 	ItemPickerSlot = -1;
+	// Online, in the lobby: the host's to set, and everyone told (v20).
+	if (Screen == EScreen::Lobby)
+	{
+		LobbyItem(SlotCode, Id);
+		return;
+	}
+	Setup.Items[SlotCode / 12][(SlotCode % 12) / 3][SlotCode % 3] = Id;
 	BuildBattle();
 }
 

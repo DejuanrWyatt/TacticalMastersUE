@@ -14,7 +14,7 @@ namespace TMCast
 		constexpr const char* GMomentNames[] =
 		{
 			"castStart", "casting", "swing", "release", "projectile", "impact", "area",
-			"targetStatus", "allyStatus", "selfStatus", "tick", "expire", "summon",
+			"targetStatus", "allyStatus", "selfStatus", "tick", "expire", "summon", "zone",
 			"statusGain", "statusActive", "statusTick", "statusEnd", "reaction",
 		};
 		static_assert(sizeof(GMomentNames) / sizeof(GMomentNames[0]) == static_cast<size_t>(EMoment::Count), "a name per moment");
@@ -49,7 +49,7 @@ namespace TMCast
 			const int M = static_cast<int>(Moment);
 			switch (Table)
 			{
-			case ETable::Ability: return M <= static_cast<int>(EMoment::Summon);
+			case ETable::Ability: return M <= static_cast<int>(EMoment::Zone);
 			case ETable::Status: return M >= static_cast<int>(EMoment::StatusGain) && M <= static_cast<int>(EMoment::StatusEnd);
 			case ETable::Reaction: return Moment == EMoment::Reaction;
 			}
@@ -185,7 +185,7 @@ namespace TMCast
 				Problems.push_back(Where + ".effect: not an effect's object path, \"light\", \"shake\" or \"sound\"; left out");
 				return false;
 			}
-			Out.Anchor = Out.Moment == EMoment::Area ? EAnchor::Center : EAnchor::Body;
+			Out.Anchor = Out.Moment == EMoment::Area || Out.Moment == EMoment::Zone ? EAnchor::Center : EAnchor::Body;
 			Out.Duration = Out.Kind == EEffectKind::Light ? 0.5 : 0.0;
 			for (const std::pair<std::string, TMSim::FJson>& Member : Json.Object)
 			{
@@ -373,6 +373,7 @@ namespace TMCast
 		case EMoment::AllyStatus:
 		case EMoment::SelfStatus:
 		case EMoment::Summon:
+		case EMoment::Zone:
 		case EMoment::StatusActive:
 			return true;
 		default:
@@ -565,7 +566,7 @@ namespace TMCast
 			+ Quote(Event.Kind == EEffectKind::Light ? "light" : Event.Kind == EEffectKind::Shake ? "shake"
 				: Event.Kind == EEffectKind::Sound ? "sound" : Event.Effect);
 		if (Event.Kind == EEffectKind::Sound) { Out += ", \"sound\": " + Quote(Event.Sound); }
-		const EAnchor UsualAnchor = Event.Moment == EMoment::Area ? EAnchor::Center : EAnchor::Body;
+		const EAnchor UsualAnchor = Event.Moment == EMoment::Area || Event.Moment == EMoment::Zone ? EAnchor::Center : EAnchor::Body;
 		if (Event.Anchor != UsualAnchor) { Out += ", \"anchor\": " + Quote(AnchorName(Event.Anchor)); }
 		if (Event.bFollow) { Out += ", \"follow\": true"; }
 		if (Event.Offset.X != 0.0 || Event.Offset.Y != 0.0 || Event.Offset.Z != 0.0) { Out += ", \"offset\": " + Triple(Event.Offset); }

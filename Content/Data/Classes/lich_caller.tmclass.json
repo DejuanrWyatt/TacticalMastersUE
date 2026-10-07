@@ -85,33 +85,31 @@
       }
     },
     {
-      "id": "lich_caller_lich_pact",
-      "name": "Lich Pact",
-      "desc": "Bless every ally within 3 m of a point up to 6 m away; Crit +8 for 2 turns. (1 s)",
+      "id": "lich_caller_contagion",
+      "name": "Contagion",
+      "desc": "Infect an enemy 2-8 m away: a light hit, and Plague for 3 turns (5% of its health each of its turns). If it ends a turn within 2 m of its allies, they catch it with the turns it has left; it passes on twice at most.",
       "kind": "active",
-      "effect": "support",
+      "effect": "damage",
       "scale": "mag",
-      "target": "ally",
-      "shape": "circle",
-      "power": 0,
-      "min_range": 0,
-      "max_range": 6,
-      "aoe": 3,
+      "target": "enemy",
+      "shape": "unit",
+      "power": 20,
+      "min_range": 2,
+      "max_range": 8,
+      "aoe": 0,
       "cooldown": 3,
       "cast": 1,
-      "buffs": [
-        {
-          "stat": "crit",
-          "amount": 8,
-          "turns": 2
-        }
-      ],
+      "status": {
+        "id": "plague",
+        "turns": 3
+      },
       "fx": "haste",
       "vfx": {
         "system": "/Game/ParagonMorigesh/FX/Particles/Morigesh/Abilities/LifeDrain/FX/P_Morigesh_PhaseShift_Looping.P_Morigesh_PhaseShift_Looping",
         "at": "targets",
         "scale": 1
-      }
+      },
+      "anim": "bolt"
     },
     {
       "id": "lich_caller_lich_ascendant",
@@ -154,8 +152,8 @@
       "why": "Descriptions say what the abilities do (2026-10-02): Stun not sleep, Crit not the old Power, turns not seconds"
     },
     "rebalanced": {
-      "on": "2026-10-03",
-      "why": "Tuning pass 2026-10-03 (lab 15% in place of the Black Mage): HP 67->81, Speed 6->8, power +42%. Before that (2026-10-02): Balance audit 2026-10-02: rod reaches 1-7 m (power -15%); the summon casts in 1 s, every 3 turns, and calls up a computer-played pet for 3 turns; ultimate 1 s quicker"
+      "on": "2026-10-05",
+      "why": "Contagion in place of Lich Pact (unique and mobility spells, 2026-10-05). Before that (2026-10-03): Tuning pass 2026-10-03 (lab 15% in place of the Black Mage): HP 67->81, Speed 6->8, power +42%. Before that (2026-10-02): Balance audit 2026-10-02: rod reaches 1-7 m (power -15%); the summon casts in 1 s, every 3 turns, and calls up a computer-played pet for 3 turns; ultimate 1 s quicker"
     },
     "changedAt": "2026-10-03T03:45:00.000Z"
   }

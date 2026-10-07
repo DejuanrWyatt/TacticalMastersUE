@@ -45,9 +45,9 @@
       }
     },
     {
-      "id": "time_mage_slowga",
-      "name": "Slowga",
-      "desc": "Every enemy within 2.5 m of a point 2-8 m away is Slowed (Turn Gauge fills at half speed).",
+      "id": "time_mage_gravity_well",
+      "name": "Gravity Well",
+      "desc": "Collapse space at a point 2-8 m away: every enemy within 4.5 m of it is dragged up to 2 m toward it (not bosses) and Slowed for a turn.",
       "kind": "active",
       "effect": "support",
       "scale": "mag",
@@ -56,19 +56,21 @@
       "power": 0,
       "min_range": 2,
       "max_range": 8,
-      "aoe": 2.5,
-      "cooldown": 3,
-      "cast": 1.5,
+      "aoe": 4.5,
+      "cooldown": 4,
+      "cast": 1,
       "status": {
         "id": "slow",
-        "turns": 2
+        "turns": 1
       },
       "fx": "haste",
       "vfx": {
         "system": "/Game/ParagonPhase/FX/Particles/Abilities/Link/FX/P_PhaseLinkImpact.P_PhaseLinkImpact",
         "at": "targets",
         "scale": 1
-      }
+      },
+      "anim": "area",
+      "special": "gravity"
     },
     {
       "id": "time_mage_quicken",
@@ -126,8 +128,8 @@
       "why": "Descriptions say what the abilities do (2026-10-02): Stun not sleep, Crit not the old Power, turns not seconds"
     },
     "rebalanced": {
-      "on": "2026-10-03",
-      "why": "Tuning pass 2026-10-03 (lab 72% in place of the Archer): HP 58->51, Speed 16->14, power -24%. Before that (2026-10-03): Time Stop gives Stop, not Stun"
+      "on": "2026-10-05",
+      "why": "Gravity Well in place of Slowga (unique and mobility spells, 2026-10-05). Before that (2026-10-03): Tuning pass 2026-10-03 (lab 72% in place of the Archer): HP 58->51, Speed 16->14, power -24%. Before that (2026-10-03): Time Stop gives Stop, not Stun"
     }
   }
 }

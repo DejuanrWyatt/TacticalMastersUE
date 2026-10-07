@@ -44,27 +44,32 @@
       }
     },
     {
-      "id": "war_drummer_flame_anthem",
-      "name": "Flame Anthem",
-      "desc": "Every ally within 3 m of a point up to 6 m away gains 25% TG. (1.5 s)",
+      "id": "war_drummer_overcharge",
+      "name": "Overcharge",
+      "desc": "Drive an ally 1-6 m away: its Turn Gauge fills at once, but it is Slowed for 2 turns after.",
       "kind": "active",
       "effect": "support",
       "scale": "mag",
       "target": "ally",
-      "shape": "circle",
+      "shape": "unit",
       "power": 0,
-      "min_range": 0,
+      "min_range": 1,
       "max_range": 6,
-      "aoe": 3,
-      "cooldown": 3,
-      "cast": 1.5,
-      "tg": 25,
+      "aoe": 0,
+      "cooldown": 4,
+      "cast": 0,
+      "tg": 100,
+      "status": {
+        "id": "slow",
+        "turns": 2
+      },
       "fx": "haste",
       "vfx": {
         "system": "/Game/ParagonSevarog/FX/Particles/Abilities/SoulStackPassive/FX/P_SoulStageEmbersBurst.P_SoulStageEmbersBurst",
         "at": "targets",
         "scale": 1
-      }
+      },
+      "anim": "buff"
     },
     {
       "id": "war_drummer_flame_ballad",
@@ -121,6 +126,10 @@
     "reworded": {
       "on": "2026-10-02",
       "why": "Descriptions say what the abilities do (2026-10-02): Stun not sleep, Crit not the old Power, turns not seconds"
+    },
+    "rebalanced": {
+      "on": "2026-10-05",
+      "why": "Overcharge in place of Flame Anthem (unique and mobility spells, 2026-10-05)."
     }
   }
 }

@@ -71,28 +71,25 @@
       }
     },
     {
-      "id": "mountain_sentinel_stone_ward",
-      "name": "Stone Ward",
-      "desc": "Every ally within 4 m is shielded; AttDef +11 for 2 turns. Always on, for allies nearby.",
-      "kind": "aura",
-      "effect": "support",
-      "scale": "mag",
-      "target": "ally",
+      "id": "mountain_sentinel_stone_henge",
+      "name": "Stone Henge",
+      "desc": "Standing stones slam up around you: damage to enemies within 3 m, and they must come at you next turn.",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "att",
+      "target": "enemy",
       "shape": "self",
-      "power": 0,
+      "power": 26,
       "min_range": 0,
       "max_range": 0,
-      "aoe": 4,
-      "cooldown": 0,
+      "aoe": 3,
+      "cooldown": 3,
       "cast": 0,
-      "buffs": [
-        {
-          "stat": "attdef",
-          "amount": 11,
-          "turns": 2
-        }
-      ],
-      "fx": "guard"
+      "status": {
+        "id": "taunt",
+        "turns": 1
+      },
+      "fx": "earth_slash"
     },
     {
       "id": "mountain_sentinel_stone_bastion",
@@ -123,9 +120,27 @@
   ],
   "creator": {
     "rebalanced": {
-      "on": "2026-10-02",
-      "why": "Balance audit 2026-10-02: Speed 6 -> 8 (the slowest tanks were the two weakest)"
+      "on": "2026-10-06",
+      "why": "Cire's Spell Codex pick A9 Stone Henge in place of Stone Ward (feat-codex-picks.md). Before that (2026-10-02): Balance audit 2026-10-02: Speed 6 -> 8 (the slowest tanks were the two weakest)"
     },
-    "changedAt": "2026-10-03T03:45:00.000Z"
+    "changedAt": "2026-10-03T03:45:00.000Z",
+    "icons": {
+      "abilities": [
+        null,
+        null,
+        {
+          "backing": "circle",
+          "glyph": "temple",
+          "colour": "#a98a5f",
+          "style": "light",
+          "mark": "self",
+          "scale": 1,
+          "rotate": 0,
+          "badge": "earth",
+          "finish": "lit"
+        },
+        null
+      ]
+    }
   }
 }

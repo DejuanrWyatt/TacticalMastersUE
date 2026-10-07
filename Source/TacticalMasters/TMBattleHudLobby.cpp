@@ -1,8 +1,8 @@
 // The online lobby and the draft, as screens (Docs/design/feat-lobby.md).
 //
 // The lobby: Blue's and Red's columns, the players on each and the four units
-// they share, Join buttons to change side, and at the bottom the host's
-// settings and Start, or a joined player's Ready. The draft: the order along
+// they share with their items, Join buttons to change side, every battle
+// setting (the host's to change), and Start, or a joined player's Ready. The draft: the order along
 // the top, each side's bans and picks, and every class in a grid to ban or
 // pick from when it is this player's turn.
 
@@ -11,6 +11,8 @@
 #include "Engine/Canvas.h"
 #include "Engine/Engine.h"
 #include "Engine/Font.h"
+#include "HAL/PlatformTime.h"
+#include "Misc/ScopeExit.h"
 
 #include "TMBattleDirector.h"
 #include "TMBattleHudStyle.h"
@@ -47,34 +49,65 @@ void ATMBattleHud::DrawLobby(ATMBattleDirector& From)
 	UFont* Font = GEngine->GetMediumFont();
 	UFont* Big = GEngine->GetLargeFont();
 	const bool bHost = From.Net.IsValid() && From.Net->IsHost();
-	const float PW = FMath::Min(Canvas->ClipX - 40.0f * S, 1240.0f * S);
-	const float PH = FMath::Min(Canvas->ClipY - 40.0f * S, 820.0f * S);
+	// The whole lobby always fits (v20: it holds every setting now), shrunk to
+	// the window as the setup screen is.
+	const float WasS = S;
+	S = FMath::Min(S, FMath::Min((Canvas->ClipY - 16.0f) / 1040.0f, (Canvas->ClipX - 16.0f) / 1240.0f));
+	ON_SCOPE_EXIT
+	{
+		S = WasS;
+	};
+	const float PW = 1240.0f * S;
+	const float PH = 1040.0f * S;
 	const float PX = (Canvas->ClipX - PW) * 0.5f;
-	const float PY = (Canvas->ClipY - PH) * 0.5f;
+	const float PY = FMath::Max(8.0f * S, (Canvas->ClipY - PH) * 0.5f);
 	Panel(PX, PY, PW, PH, FLinearColor(0.05f, 0.06f, 0.1f, 0.95f), Gold, 1.5f);
-	Text(TEXT("Lobby"), PX + 30.0f * S, PY + 18.0f * S, Gold, Big, 0.9f * S);
-	const FString Rules = bHost ? From.LobbyRules() : From.LobbyRulesLine;
-	Text(FString::Printf(TEXT("%d of 4 players   ·   %s"), From.Players.Num(), *Rules), PX + 30.0f * S, PY + 66.0f * S, Dim, Font, 0.55f * S);
+	Text(TEXT("Lobby"), PX + 30.0f * S, PY + 16.0f * S, Gold, Big, 0.9f * S);
+	Text(FString::Printf(TEXT("%d of 4 players"), From.Players.Num()), PX + 30.0f * S, PY + 62.0f * S, Dim, Font, 0.55f * S);
+	// The join code, big, with Copy: what the host sends friends (Docs/design/feat-online-eos.md).
+	if (!From.OnlineCode.IsEmpty())
+	{
+		const float CopyW = 120.0f * S;
+		const float CopyH = 44.0f * S;
+		const float CopyX = PX + PW - 30.0f * S - CopyW;
+		const float CodeY = PY + 22.0f * S;
+		const bool bCopied = FPlatformTime::Seconds() - From.CodeCopiedAt < 2.0;
+		MenuButton(CopyX, CodeY, CopyW, CopyH, bCopied ? TEXT("Copied") : TEXT("Copy"), ETMHudAction::LobbyCopyCode, -1, false);
+		AddTip(CopyX, CodeY, CopyW, CopyH, TEXT("Puts the join code on the clipboard, to paste to your friends. They type it on Play Online to join."));
+		const FVector2D CodeSize = TextSize(From.OnlineCode, Big, 0.85f * S);
+		const float CodeX = CopyX - 18.0f * S - CodeSize.X;
+		Text(From.OnlineCode, CodeX, CodeY + (CopyH - CodeSize.Y) * 0.5f, Gold, Big, 0.85f * S);
+		const FString Label = TEXT("Join code");
+		const FVector2D LabelSize = TextSize(Label, Font, 0.55f * S);
+		Text(Label, CodeX - 14.0f * S - LabelSize.X, CodeY + (CopyH - LabelSize.Y) * 0.5f, Dim, Font, 0.55f * S);
+	}
 
-	// The two sides.
+	// The two sides: players, then the four units with their classes and items.
+	const bool bItems = From.Setup.ItemBudget > 0;
 	const float ColGap = 30.0f * S;
 	const float ColW = (PW - 60.0f * S - ColGap) * 0.5f;
-	const float ColTop = PY + 104.0f * S;
+	const float ColTop = PY + 96.0f * S;
 	const float ColH = 470.0f * S;
 	for (int32 Team = 0; Team < 2; ++Team)
 	{
 		const float CX = PX + 30.0f * S + Team * (ColW + ColGap);
 		Panel(CX, ColTop, ColW, ColH, TeamFill(Team) * FLinearColor(1, 1, 1, 0.35f), TeamColour(Team), 1.5f);
-		Text(SideName(Team), CX + 18.0f * S, ColTop + 12.0f * S, TeamColour(Team), Big, 0.7f * S);
+		Text(SideName(Team), CX + 18.0f * S, ColTop + 10.0f * S, TeamColour(Team), Big, 0.7f * S);
 		const bool bMine = From.Players.IsValidIndex(From.LocalPlayer) && From.Players[From.LocalPlayer].Team == Team;
 		if (!bMine)
 		{
-			MenuButton(CX + ColW - 150.0f * S, ColTop + 12.0f * S, 132.0f * S, 36.0f * S, FString::Printf(TEXT("Join %s"), SideName(Team)),
+			MenuButton(CX + ColW - 150.0f * S, ColTop + 10.0f * S, 132.0f * S, 36.0f * S, FString::Printf(TEXT("Join %s"), SideName(Team)),
 				ETMHudAction::LobbySide, Team);
+		}
+		else if (bItems)
+		{
+			const FString Points = FString::Printf(TEXT("Items %d / %d points"), From.ItemPointsSpent(Team), From.Setup.ItemBudget);
+			const FVector2D PointsSize = TextSize(Points, Font, 0.5f * S);
+			Text(Points, CX + ColW - 18.0f * S - PointsSize.X, ColTop + 18.0f * S, Dim, Font, 0.5f * S);
 		}
 
 		// Its players.
-		float Y = ColTop + 64.0f * S;
+		float Y = ColTop + 56.0f * S;
 		int32 OnSide = 0;
 		for (int32 i = 0; i < From.Players.Num(); ++i)
 		{
@@ -84,7 +117,7 @@ void ATMBattleHud::DrawLobby(ATMBattleDirector& From)
 				continue;
 			}
 			++OnSide;
-			Panel(CX + 14.0f * S, Y, ColW - 28.0f * S, 40.0f * S, FLinearColor(0.08f, 0.1f, 0.15f, 0.9f),
+			Panel(CX + 14.0f * S, Y, ColW - 28.0f * S, 36.0f * S, FLinearColor(0.08f, 0.1f, 0.15f, 0.9f),
 				i == From.LocalPlayer ? Gold : FLinearColor(0.35f, 0.4f, 0.5f, 0.7f), i == From.LocalPlayer ? 1.5f : 1.0f);
 			FString Name = Player.Name;
 			if (i == 0)
@@ -95,84 +128,118 @@ void ATMBattleHud::DrawLobby(ATMBattleDirector& From)
 			{
 				Name += TEXT("   - you");
 			}
-			Text(Name, CX + 28.0f * S, Y + 9.0f * S, TextColour, Font, 0.6f * S);
+			Text(Name, CX + 28.0f * S, Y + 7.0f * S, TextColour, Font, 0.58f * S);
 			const FString Ready = i == 0 ? FString() : Player.bReady ? FString(TEXT("Ready")) : FString(TEXT("Not ready"));
 			const FVector2D ReadySize = TextSize(Ready, Font, 0.55f * S);
-			Text(Ready, CX + ColW - 28.0f * S - ReadySize.X, Y + 10.0f * S, Player.bReady ? Gold : Dim, Font, 0.55f * S);
-			Y += 46.0f * S;
+			Text(Ready, CX + ColW - 28.0f * S - ReadySize.X, Y + 8.0f * S, Player.bReady ? Gold : Dim, Font, 0.55f * S);
+			Y += 40.0f * S;
 		}
 		if (OnSide == 0)
 		{
-			Text(TEXT("Nobody yet: the computer plays this side."), CX + 28.0f * S, Y + 9.0f * S, Dim, Font, 0.55f * S);
-			Y += 46.0f * S;
+			Text(TEXT("Nobody yet: the computer plays this side."), CX + 28.0f * S, Y + 8.0f * S, Dim, Font, 0.55f * S);
 		}
 
-		// Its four units: the class, and who orders it.
-		Y = ColTop + 64.0f * S + 4.0f * 46.0f * S + 10.0f * S;
-		Text(From.Setup.bDraft ? TEXT("Units (classes come from the draft)") : TEXT("Units (click yours to change its class)"),
+		// Its four units: the class, who orders it, and (with item points) its three items.
+		Y = ColTop + 56.0f * S + 4.0f * 40.0f * S + 8.0f * S;
+		Text(From.Setup.bDraft ? TEXT("Units (classes come from the draft)")
+			: bItems ? TEXT("Units (click yours: the class, or an item slot to buy)") : TEXT("Units (click yours to change its class)"),
 			CX + 18.0f * S, Y, Dim, Font, 0.5f * S);
-		Y += 24.0f * S;
+		Y += 26.0f * S;
+		const float Box = 38.0f * S;
+		const float ItemsW = bItems ? 3.0f * (Box + 6.0f * S) : 0.0f;
 		for (int32 Slot = 0; Slot < 4; ++Slot)
 		{
 			const int32 Code = Team * 4 + Slot;
 			const int32 Holder = From.SlotOwner(Team, Slot);
+			const bool bMay = From.LobbyMayPick(From.LocalPlayer, Code);
 			const FString Who = Holder < 0 ? FString(TEXT("computer")) : Holder == From.LocalPlayer ? FString(TEXT("you")) : From.Players[Holder].Name;
 			const FString Class = From.Setup.bDraft ? FString(TEXT("drafted")) : ClassName(From.Setup.Rosters[Team][Slot]);
 			const FString Label = FString::Printf(TEXT("%d.  %s"), Slot + 1, *Class);
 			const float RX = CX + 14.0f * S;
-			const float RW = ColW - 28.0f * S;
-			const float RH = 38.0f * S;
-			if (!From.Setup.bDraft && From.LobbyMayPick(From.LocalPlayer, Code))
+			const float RW = ColW - 28.0f * S - ItemsW;
+			const float RH = 44.0f * S;
+			if (!From.Setup.bDraft && bMay)
 			{
 				MenuButton(RX, Y, RW, RH, Label + TEXT("   ·   ") + Who, ETMHudAction::LobbySlot, Code, Holder == From.LocalPlayer);
 			}
 			else
 			{
 				Panel(RX, Y, RW, RH, FLinearColor(0.07f, 0.08f, 0.11f, 0.9f), FLinearColor(0.3f, 0.32f, 0.38f, 0.6f), 1.0f);
-				Text(Label, RX + 14.0f * S, Y + 8.0f * S, TextColour, Font, 0.58f * S);
+				Text(Label, RX + 14.0f * S, Y + 10.0f * S, TextColour, Font, 0.58f * S);
 				const FVector2D WhoSize = TextSize(Who, Font, 0.55f * S);
-				Text(Who, RX + RW - 14.0f * S - WhoSize.X, Y + 9.0f * S, Dim, Font, 0.55f * S);
+				Text(Who, RX + RW - 14.0f * S - WhoSize.X, Y + 11.0f * S, Dim, Font, 0.55f * S);
+			}
+			for (int32 Item = 0; Item < 3 && bItems; ++Item)
+			{
+				const float BX = RX + RW + 6.0f * S + Item * (Box + 6.0f * S);
+				const float BY = Y + (RH - Box) * 0.5f;
+				const TMSim::FItemDef* Carried = TMSim::FindItem(From.Setup.Items[Team][Slot][Item]);
+				ItemBadge(Carried, BX, BY, Box, Carried != nullptr);
+				if (bMay)
+				{
+					if (!Carried)
+					{
+						AddTip(BX, BY, Box, Box, TEXT("An empty item slot: click to buy an item with your side's points."));
+					}
+					AddButton(BX, BY, Box, Box, ETMHudAction::SetupItem, Team * 12 + Slot * 3 + Item);
+				}
 			}
 			Y += RH + 6.0f * S;
 		}
 	}
 
-	// The host's settings, which the others only see.
-	float Y = ColTop + ColH + 18.0f * S;
-	const float BH = 46.0f * S;
-	if (bHost)
+	// Every battle setting (v20 play test): the host's to change, the others' to read.
+	const TArray<ATMBattleDirector::FTMSettingRow> Rows = bHost ? From.LobbySettingRows() : From.LobbySettingsTold;
+	float Y = ColTop + ColH + 16.0f * S;
+	Text(bHost ? TEXT("Battle settings   (click to change)") : TEXT("Battle settings   (the host's)"), PX + 30.0f * S, Y, Gold, Font, 0.58f * S);
+	Y += 30.0f * S;
+	if (Rows.Num() == 0)
 	{
-		float BX = PX + 30.0f * S;
-		MenuButton(BX, Y, 200.0f * S, BH, TEXT("Battle settings"), ETMHudAction::LobbySettings, -1, false, TEXT("map, rules, items"));
-		BX += 210.0f * S;
-		MenuButton(BX, Y, 200.0f * S, BH, From.Setup.bDraft ? TEXT("Draft: on") : TEXT("Draft: off"), ETMHudAction::DraftToggle, -1,
-			From.Setup.bDraft, TEXT("bans and serpentine picks"));
-		BX += 210.0f * S;
-		if (From.Setup.bDraft)
+		Text(From.LobbyRulesLine, PX + 30.0f * S, Y, Dim, Font, 0.55f * S);
+	}
+	const int32 Across = 3;
+	const float CellGap = 14.0f * S;
+	const float CellW = (PW - 60.0f * S - (Across - 1) * CellGap) / Across;
+	const float LabelW = 124.0f * S;
+	const float RowH = 40.0f * S;
+	for (int32 Index = 0; Index < Rows.Num(); ++Index)
+	{
+		const ATMBattleDirector::FTMSettingRow& Row = Rows[Index];
+		const float X = PX + 30.0f * S + (Index % Across) * (CellW + CellGap);
+		const float RowY = Y + (Index / Across) * (RowH + 4.0f * S);
+		Text(Row.Label, X, RowY + 9.0f * S, Dim, Font, 0.52f * S);
+		if (bHost)
 		{
-			MenuButton(BX, Y, 200.0f * S, BH, From.Setup.DraftSeconds > 0 ? FString::Printf(TEXT("Pick timer: %d s"), From.Setup.DraftSeconds)
-				: FString(TEXT("Pick timer: off")), ETMHudAction::DraftTimer, -1, false, TEXT("seconds for each choice"));
+			MenuButton(X + LabelW, RowY, CellW - LabelW, RowH - 4.0f * S, Row.Value, static_cast<ETMHudAction>(Row.Action));
+			if (!Row.Tip.IsEmpty())
+			{
+				AddTip(X, RowY, CellW, RowH, Row.Tip);
+			}
+		}
+		else
+		{
+			Panel(X + LabelW, RowY, CellW - LabelW, RowH - 4.0f * S, FLinearColor(0.07f, 0.08f, 0.11f, 0.9f), FLinearColor(0.3f, 0.32f, 0.38f, 0.6f), 1.0f);
+			Text(Row.Value, X + LabelW + 12.0f * S, RowY + 8.0f * S, TextColour, Font, 0.54f * S);
 		}
 	}
-	else
-	{
-		Text(From.Setup.bDraft ? (From.Setup.DraftSeconds > 0 ? FString::Printf(TEXT("Draft on: %d s for each ban and pick."), From.Setup.DraftSeconds)
-			: FString(TEXT("Draft on, no pick timer."))) : FString(TEXT("No draft: each player chooses their own units' classes.")),
-			PX + 30.0f * S, Y + 12.0f * S, Dim, Font, 0.55f * S);
-	}
-	Y += BH + 14.0f * S;
+	Y += ((Rows.Num() + Across - 1) / Across) * (RowH + 4.0f * S) + 8.0f * S;
 	for (const FString& Line : { From.OnlineStatus, bHost ? From.OnlineAddresses : FString(), bHost ? From.OnlineRouter : FString() })
 	{
-		if (!Line.IsEmpty())
+		if (!Line.IsEmpty() && Y < PY + PH - 90.0f * S)
 		{
 			Text(Line, PX + 30.0f * S, Y, Line == From.OnlineStatus ? TextColour : Dim, Font, 0.5f * S);
 			Y += 22.0f * S;
 		}
 	}
 
-	// Leave, and Start or Ready.
+	// Leave, Random, and Start or Ready.
+	const float BH = 46.0f * S;
 	const float BY = PY + PH - 64.0f * S;
 	MenuButton(PX + 30.0f * S, BY, 160.0f * S, BH, TEXT("Leave  (Esc)"), ETMHudAction::LobbyLeave);
+	if (!From.Setup.bDraft)
+	{
+		MenuButton(PX + 200.0f * S, BY, 220.0f * S, BH, TEXT("Random classes"), ETMHudAction::LobbyRandom, -1, false, TEXT("for each of your units"));
+	}
 	const float BW = 240.0f * S;
 	if (bHost)
 	{
@@ -315,6 +382,12 @@ void ATMBattleHud::DrawDraft(ATMBattleDirector& From)
 	if (bMyTurn && bBan)
 	{
 		MenuButton(GX + GW - 140.0f * S, FY, 140.0f * S, 32.0f * S, TEXT("Skip this ban"), ETMHudAction::DraftChoose, -1);
+	}
+	if (bMyTurn)
+	{
+		// v20 play test: a class at random, of the role shown.
+		const float RX = GX + GW - (bBan ? 290.0f : 140.0f) * S;
+		MenuButton(RX, FY, 140.0f * S, 32.0f * S, bBan ? TEXT("Random ban") : TEXT("Random pick"), ETMHudAction::DraftChoose, -2);
 	}
 	const int32 Columns = FMath::Max(2, FMath::FloorToInt(GW / (190.0f * S)));
 	const float Gap = 6.0f * S;

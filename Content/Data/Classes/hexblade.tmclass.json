@@ -45,60 +45,49 @@
       }
     },
     {
-      "id": "hexblade_shadow_edge",
-      "name": "Shadow Edge",
-      "desc": "A spell-charged cut on an adjacent enemy; MagDef -6, AttDef -3 for 2 turns.",
+      "id": "hexblade_crimson_crystals",
+      "name": "Crimson Crystals",
+      "desc": "Blood crystals burst from the ground 2 m wide up to 6 m away: damage and Bleed for 2 turns.",
       "kind": "active",
       "effect": "damage",
+      "scale": "mag",
+      "target": "enemy",
+      "shape": "circle",
+      "power": 42,
+      "min_range": 0,
+      "max_range": 6,
+      "aoe": 2,
+      "cooldown": 2,
+      "cast": 0,
+      "status": {
+        "id": "bleed",
+        "turns": 2
+      },
+      "fx": "earth_slash"
+    },
+    {
+      "id": "hexblade_soul_link",
+      "name": "Soul Link",
+      "desc": "Bind an enemy 2-7 m away to the nearest of its allies within 5 m of it for 4 turns: half of whatever damage either takes, the other takes too, while they stay within 8 m of each other.",
+      "kind": "active",
+      "effect": "support",
       "scale": "mag",
       "target": "enemy",
       "shape": "unit",
-      "power": 38,
-      "min_range": 0,
-      "max_range": 1.8,
-      "aoe": 0,
-      "cooldown": 2,
-      "cast": 0,
-      "buffs": [
-        {
-          "stat": "magdef",
-          "amount": -6,
-          "turns": 2
-        },
-        {
-          "stat": "attdef",
-          "amount": -3,
-          "turns": 2
-        }
-      ],
-      "fx": "holy_blade",
-      "vfx": {
-        "system": "/Game/ParticleSystemVFXVol1/Systems/NS_SparkleBurst.NS_SparkleBurst",
-        "at": "targets",
-        "scale": 1
-      }
-    },
-    {
-      "id": "hexblade_shadow_lance",
-      "name": "Shadow Lance",
-      "desc": "A spear of magic through everyone in a line up to 7 m. (1 s)",
-      "kind": "active",
-      "effect": "damage",
-      "scale": "mag",
-      "target": "enemy",
-      "shape": "line",
-      "power": 26,
+      "power": 0,
       "min_range": 2,
       "max_range": 7,
-      "aoe": 0.7,
-      "cooldown": 0,
-      "cast": 1,
+      "aoe": 0,
+      "cooldown": 4,
+      "cast": 0.5,
       "fx": "pin_shot",
       "vfx": {
         "system": "/Game/ParticleSystemVFXVol1/Systems/NS_EnergyVortex.NS_EnergyVortex",
         "at": "point",
         "scale": 1
-      }
+      },
+      "anim": "bolt",
+      "special": "link"
     },
     {
       "id": "hexblade_shadow_maelstrom",
@@ -137,8 +126,26 @@
   ],
   "creator": {
     "rebalanced": {
-      "on": "2026-10-03",
-      "why": "Tuning pass 2026-10-03 (lab 69% in place of the Knight): Evasion 13->10"
+      "on": "2026-10-06",
+      "why": "Cire's Spell Codex pick A2 Crimson Crystals in place of Shadow Edge (feat-codex-picks.md). Before that (2026-10-05): Soul Link in place of Shadow Lance (unique and mobility spells, 2026-10-05). Before that (2026-10-03): Tuning pass 2026-10-03 (lab 69% in place of the Knight): Evasion 13->10"
+    },
+    "icons": {
+      "abilities": [
+        null,
+        {
+          "backing": "circle",
+          "glyph": "drop",
+          "colour": "#d83a4a",
+          "style": "light",
+          "mark": "circle",
+          "scale": 1,
+          "rotate": 0,
+          "badge": "none",
+          "finish": "lit"
+        },
+        null,
+        null
+      ]
     }
   }
 }

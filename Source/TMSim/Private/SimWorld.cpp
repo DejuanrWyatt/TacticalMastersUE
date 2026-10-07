@@ -183,7 +183,8 @@ namespace TMSim
 				return true;
 			}
 		}
-		return false;
+		// And a zone that sees (2026-10-04): a flare, a ward, a lantern.
+		return !Zones.empty() && ZoneSees(Team, Point);
 	}
 
 	bool FBattle::TowerSees(const FWatchtower& Tower, const FVec2& Point) const
@@ -315,7 +316,14 @@ namespace TMSim
 		}
 
 		// Team -1 means units are ignored, which is what makes it cacheable.
+		// The ground's own distances, walked node to node whatever the movement
+		// rule (v23 play test, 2026-10-05): with tile movement on, a tile-stepping
+		// field reaches only tiles' spots, so every other node read as unreachable
+		// and the watchtowers and camps (placed by this) found nowhere to stand.
+		const double Tiles = Tuning.TileMove;
+		Tuning.TileMove = 0.0;
 		RunDijkstra({ GoalNode }, Infinity, -1, Ground::Jump);
+		Tuning.TileMove = Tiles;
 		if (DistanceCache.size() >= 256)
 		{
 			DistanceCache.clear();
@@ -395,6 +403,34 @@ namespace TMSim
 			Mix(static_cast<uint64_t>(Rest.Tile));
 			Mix(static_cast<uint64_t>(Rest.UnitId + 1));
 			Mix(static_cast<uint64_t>(Rest.Turns));
+		}
+		// Ground zones (2026-10-04), only when there are any, so a battle without
+		// them sums as it always did.
+		for (const FZone& Zone : Zones)
+		{
+			Mix(0x5A);
+			Mix(static_cast<uint64_t>(Zone.Owner + 1));
+			Mix(static_cast<uint64_t>(Zone.Team + 1));
+			Mix(static_cast<uint64_t>(Zone.Slot + 1));
+			for (const char Letter : Zone.AbilityId)
+			{
+				Mix(static_cast<uint64_t>(static_cast<unsigned char>(Letter)));
+			}
+			MixFloat(Zone.From.X);
+			MixFloat(Zone.From.Y);
+			MixFloat(Zone.Target.X);
+			MixFloat(Zone.Target.Y);
+			Mix(static_cast<uint64_t>(Zone.Turns));
+			Mix(static_cast<uint64_t>(Zone.bIgnited ? 1 : 0));
+			for (const std::pair<int, int>& Touch : Zone.Touched)
+			{
+				Mix(static_cast<uint64_t>(Touch.first + 1));
+				Mix(static_cast<uint64_t>(Touch.second));
+			}
+			for (const int Once : Zone.Once)
+			{
+				Mix(static_cast<uint64_t>(Once + 1));
+			}
 		}
 		// The dice themselves. Two machines that have drawn a different number of
 		// times still agree about the board for a while, and then disagree about
@@ -814,25 +850,28 @@ namespace TMSim
 		{
 			return "That target is out of range.";
 		}
-		// Fog: a side cannot aim at ground none of it can see.
-		if (!CanSee(Unit->Team, Target))
-		{
-			return "You can't see that spot.";
-		}
 		const FAbility* Ability = Unit->Ability(Slot);
 		if (!Ability)
 		{
 			return "No such ability.";
 		}
-		if (NeedsLineOfSight(*Ability) && !HasLineOfSight(Unit->Pos, Target))
+		// A zone that sees (2026-10-04, a flare) is thrown to look where nobody can.
+		const bool bLobbed = Ability->LaysZone() && Ability->ZoneSight > 0.0f;
+		// Fog: a side cannot aim at ground none of it can see.
+		if (!bLobbed && !CanSee(Unit->Team, Target))
+		{
+			return "You can't see that spot.";
+		}
+		if (!bLobbed && NeedsLineOfSight(*Ability) && !HasLineOfSight(Unit->Pos, Target))
 		{
 			return "No line of sight.";
 		}
-		// A leap or a step behind needs somewhere to land (2026-10-03).
-		FVec2 Landing;
-		if ((Ability->Special == "leap" || Ability->Special == "behind") && !LandingFor(*Unit, *Ability, Target, Landing))
+		// A leap or a step behind needs somewhere to land (2026-10-03), and so do
+		// the new spells' moves (2026-10-05): a vault, a charge, a shadow hop, a dash.
+		const std::string Problem = SpecialProblem(*Unit, *Ability, Unit->Pos, Target);
+		if (!Problem.empty())
 		{
-			return Ability->Special == "behind" ? "There's no room behind that target." : "There's nowhere to land there.";
+			return Problem;
 		}
 
 		// Taunted: while whoever taunted it is within reach, an attack has to be

@@ -48,7 +48,7 @@ namespace
 			{ TEXT("auto_recenter"), TEXT("Camera follow: always / when idle / never"), { EKeys::V } },
 			{ TEXT("waypoint"), TEXT("Waypoint (hold while clicking a walk)"), { EKeys::LeftControl } },
 			{ TEXT("plan_turn"), TEXT("Plan a turn ahead / go"), { EKeys::G } },
-			{ TEXT("plan_undo"), TEXT("Undo the plan's last step"), { EKeys::BackSpace } },
+			{ TEXT("plan_cancel"), TEXT("Cancel the unit's queue (Shift: every unit's)"), { EKeys::BackSpace } },
 			{ TEXT("fast_forward"), TEXT("Fast-forward (hold, while none of yours is ready)"), { EKeys::X } },
 		};
 		return List;
@@ -153,6 +153,7 @@ void FTMSettings::ResetOptions()
 	CameraFollow = 1;
 	bLeadCamera = true;
 	bCameraHeldNote = true;
+	bThreatOdds = false;
 	for (bool& Quick : bQuickCast)
 	{
 		Quick = false;
@@ -221,6 +222,7 @@ void FTMSettings::Load()
 	bAutoRecenter = CameraFollow != 2;
 	Root->TryGetBoolField(TEXT("lead_camera"), bLeadCamera);
 	Root->TryGetBoolField(TEXT("camera_held_note"), bCameraHeldNote);
+	Root->TryGetBoolField(TEXT("threat_odds"), bThreatOdds);
 	Root->TryGetBoolField(TEXT("layout_grid"), bLayoutGrid);
 	for (int32 Slot = 0; Slot < 4; ++Slot)
 	{
@@ -347,6 +349,7 @@ void FTMSettings::Save() const
 	Root->SetNumberField(TEXT("camera_follow"), CameraFollow);
 	Root->SetBoolField(TEXT("lead_camera"), bLeadCamera);
 	Root->SetBoolField(TEXT("camera_held_note"), bCameraHeldNote);
+	Root->SetBoolField(TEXT("threat_odds"), bThreatOdds);
 	Root->SetBoolField(TEXT("layout_grid"), bLayoutGrid);
 	for (int32 Slot = 0; Slot < 4; ++Slot)
 	{

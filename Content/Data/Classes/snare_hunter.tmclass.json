@@ -49,29 +49,40 @@
       }
     },
     {
-      "id": "snare_hunter_hamstring",
-      "name": "Hamstring",
-      "desc": "An arrow at an enemy 2-8 m away that cripples it for 2 turns: it walks half as far.",
+      "id": "snare_hunter_tar_slick",
+      "name": "Tar Slick",
+      "desc": "Spill tar in a line 1.5 m wide from you to a point 1-6 m away, for 3 of your turns. An enemy that starts its turn on it, or stops on it, is Oiled and Slowed. Fire sets the slick alight: then it burns like Ember Field.",
       "kind": "active",
-      "effect": "damage",
+      "effect": "support",
       "scale": "att",
       "target": "enemy",
-      "shape": "unit",
-      "power": 38,
-      "min_range": 2,
-      "max_range": 8,
-      "aoe": 0,
-      "cooldown": 2,
-      "cast": 0,
+      "shape": "line",
+      "power": 0,
+      "min_range": 1,
+      "max_range": 6,
+      "aoe": 0.75,
+      "cooldown": 3,
+      "cast": 0.5,
       "status": {
-        "id": "crippled",
+        "id": "oiled",
         "turns": 2
       },
       "fx": "pin_shot",
       "vfx": {
         "system": "/Game/ParagonSparrow/FX/Particles/Sparrow/Abilities/Primary/FX/P_Sparrow_HitHero.P_Sparrow_HitHero",
-        "at": "targets",
+        "at": "point",
         "scale": 1
+      },
+      "anim": "shoot",
+      "special": "zone",
+      "element": "none",
+      "zone": {
+        "turns": 3,
+        "also": {
+          "id": "slow",
+          "turns": 1
+        },
+        "flammable": true
       }
     },
     {
@@ -154,15 +165,7 @@
           "scale": 1,
           "rotate": 0
         },
-        {
-          "backing": "circle",
-          "glyph": "arrow",
-          "colour": "#a98a5f",
-          "style": "light",
-          "mark": "unit",
-          "scale": 1,
-          "rotate": 0
-        },
+        null,
         {
           "backing": "none",
           "glyph": "eye",
@@ -196,8 +199,8 @@
       "against": "reference team, medium"
     },
     "rebalanced": {
-      "on": "2026-10-03",
-      "why": "Tuning pass 2026-10-03 (lab 18% in place of the Black Mage): HP 78->88, power +25%"
+      "on": "2026-10-04",
+      "why": "Ground zone Tar Slick in place of Hamstring (area denial, 2026-10-04). Before that (2026-10-03): Tuning pass 2026-10-03 (lab 18% in place of the Black Mage): HP 78->88, power +25%"
     }
   }
 }

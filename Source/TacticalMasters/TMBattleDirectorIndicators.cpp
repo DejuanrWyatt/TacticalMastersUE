@@ -9,6 +9,13 @@
 // units, cliff faces, rock and trees do not), so everything stands on top of it.
 // The picture is painted again only when what it shows changes.
 //
+// 2026-10-06 (v26 play test, "hard to see the movement ground indicators"): v26's
+// fade on steep faces also faded the marks off every grass blade, which stands
+// nearly upright, so in tall grass the walk area all but vanished. The fade now
+// works only near cliffs: a second picture, the cliff mask, is white within a
+// metre of every tall step (as TMBattleDirectorCliffs.cpp faces them with rock)
+// and the material fades by steepness only where it is white (the human's pick 2).
+//
 // It needs /Game/UI/M_GroundIndicator (Tools/make_indicator_material.py).
 // Without it the HUD draws the old outlines instead. Nothing here is read by
 // the rules; the shapes are drawn from the rules' own numbers (InShape).
@@ -16,6 +23,7 @@
 #include "TMBattleDirector.h"
 
 #include "Components/DecalComponent.h"
+#include "CanvasItem.h"
 #include "Engine/Canvas.h"
 #include "Engine/TextureRenderTarget2D.h"
 #include "GameFramework/PlayerController.h"
@@ -29,8 +37,15 @@
 // Named, not anonymous, so its names stay out of the files a unity build puts after it.
 namespace TMIndicatorPaint
 {
-	/** Picture pixels to a metre of board. */
+	/** Picture pixels to a metre of board, as everything here is measured. */
 	constexpr float Ppm = 24.0f;
+	/**
+	 * 2026-10-06 ("sharper lines ... too blurry at certain angles"): the picture is
+	 * made this many times finer than Ppm. Everything is still measured at 24 to a
+	 * metre and scaled up as it is drawn (FPainter::Flush), so every line, ring and
+	 * fill keeps its size on the ground, only drawn with three times the pixels.
+	 */
+	constexpr float Supersample = 3.0f;
 	const FLinearColor Teal(0.3f, 0.95f, 0.9f);
 	const FLinearColor Sprint(1.0f, 0.62f, 0.2f);
 	const FLinearColor Refused(1.0f, 0.32f, 0.28f);
@@ -44,8 +59,16 @@ namespace TMIndicatorPaint
 	/** Width of the walk's path line, in picture pixels; no glow round it either. */
 	constexpr float PathWidth = 1.25f;
 	/** Width of every aiming line -- a cone's edges, a lane, a charge, a ring where a
-	 *  blow lands -- in picture pixels: thin as the walk's, and no glow (2026-10-01). */
-	constexpr float AimWidth = 1.25f;
+	 *  blow lands -- in picture pixels: thin, and no glow (2026-10-01); a little firmer
+	 *  with its dark rim (2026-10-06, the human's pick C: "a 2 px edge, a dark rim"). */
+	constexpr float AimWidth = 1.75f;
+	/**
+	 * 2026-10-06 ("all outlines ... sharper", pick C): every edge -- a ring, a line, the
+	 * walk's outline -- gets a thin dark line each side of it, so it stops at a clear
+	 * edge on bright grass as well as on dark ground. In picture pixels, and how dark.
+	 */
+	constexpr float RimWidth = 0.9f;
+	constexpr float RimOpacity = 0.45f;
 	/** How much of a fill's own opacity is kept: nearly none (2026-10-03). */
 	constexpr float GroundFillOpacity = 0.3f;
 
@@ -54,6 +77,8 @@ namespace TMIndicatorPaint
 	{
 		UCanvas* Canvas = nullptr;
 		TArray<FCanvasUVTri> Tris;
+		/** The edges' dark rims: drawn first, under everything, so no edge is cut by another's rim. */
+		TArray<FCanvasUVTri> RimTris;
 
 		FVector2D P(const TMSim::FVec2& M) const { return FVector2D(M.X * Ppm, M.Y * Ppm); }
 		FVector2D P(double X, double Y) const { return FVector2D(X * Ppm, Y * Ppm); }
@@ -84,12 +109,35 @@ namespace TMIndicatorPaint
 				Tri(Pts[0], Pts[i], Pts[i + 1], Fill);
 			}
 		}
+		/** An edge (bright, thin) gets a dark rim; a fill (faint) or a broad band does not. */
+		static bool IsEdge(const FLinearColor& Colour, float Width)
+		{
+			return Colour.A >= 0.5f && Width <= 4.0f;
+		}
+		void RimQuad(const FVector2D& A, const FVector2D& B, const FVector2D& C, const FVector2D& D, float Strength)
+		{
+			FCanvasUVTri T;
+			T.V0_Color = T.V1_Color = T.V2_Color = FLinearColor(0.0f, 0.0f, 0.0f, RimOpacity * FMath::Min(1.0f, Strength));
+			T.V0_Pos = A; T.V1_Pos = B; T.V2_Pos = C;
+			RimTris.Add(T);
+			T.V0_Pos = A; T.V1_Pos = C; T.V2_Pos = D;
+			RimTris.Add(T);
+		}
 		void Flush()
 		{
-			if (Tris.Num() > 0)
+			if (Tris.Num() > 0 || RimTris.Num() > 0)
 			{
-				Canvas->K2_DrawTriangle(nullptr, Tris);
+				TArray<FCanvasUVTri> All = MoveTemp(RimTris);
+				All.Append(Tris);
+				for (FCanvasUVTri& T : All)
+				{
+					T.V0_Pos *= Supersample;
+					T.V1_Pos *= Supersample;
+					T.V2_Pos *= Supersample;
+				}
+				Canvas->K2_DrawTriangle(nullptr, All);
 				Tris.Reset();
+				RimTris.Reset();
 			}
 		}
 		/** An aiming line: once a glow, now a thin solid line, batched with the
@@ -110,6 +158,13 @@ namespace TMIndicatorPaint
 				return;
 			}
 			const FVector2D Across = FVector2D(-Along.Y, Along.X) / Length * (Width * 0.5);
+			if (IsEdge(Colour, Width))
+			{
+				// Its rim: wider by RimWidth each side, and a little longer, to close the joints.
+				const FVector2D Wide = Across * ((Width * 0.5 + RimWidth) / (Width * 0.5));
+				const FVector2D Reach = Along / Length * (RimWidth * 0.5);
+				RimQuad(A - Reach + Wide, B + Reach + Wide, B + Reach - Wide, A - Reach - Wide, Colour.A);
+			}
 			Tri(A + Across, B + Across, B - Across, Colour);
 			Tri(A + Across, B - Across, A - Across, Colour);
 		}
@@ -117,7 +172,7 @@ namespace TMIndicatorPaint
 		void Line(const FVector2D& A, const FVector2D& B, const FLinearColor& Colour, float Width)
 		{
 			Flush();
-			Canvas->K2_DrawLine(A, B, Width, FLinearColor(Colour.R, Colour.G, Colour.B, 1.0f));
+			Canvas->K2_DrawLine(A * Supersample, B * Supersample, Width * Supersample, FLinearColor(Colour.R, Colour.G, Colour.B, 1.0f));
 		}
 		void Arc(const FVector2D& Centre, float Radius, float From, float To, const FLinearColor& Colour, float Width = 3.0f)
 		{
@@ -144,12 +199,19 @@ namespace TMIndicatorPaint
 		void Band(const FVector2D& Centre, float Inner, float Outer, const FLinearColor& Colour)
 		{
 			const int32 Steps = 72;
+			const bool bRim = IsEdge(Colour, Outer - Inner);
+			const float RimIn = FMath::Max(0.0f, Inner - RimWidth);
+			const float RimOut = Outer + RimWidth;
 			for (int32 i = 0; i < Steps; ++i)
 			{
 				const float A0 = UE_TWO_PI * i / Steps;
 				const float A1 = UE_TWO_PI * (i + 1) / Steps;
 				const FVector2D D0(FMath::Cos(A0), FMath::Sin(A0));
 				const FVector2D D1(FMath::Cos(A1), FMath::Sin(A1));
+				if (bRim)
+				{
+					RimQuad(Centre + D0 * RimIn, Centre + D0 * RimOut, Centre + D1 * RimOut, Centre + D1 * RimIn, Colour.A);
+				}
 				Tri(Centre + D0 * Inner, Centre + D0 * Outer, Centre + D1 * Outer, Colour);
 				Tri(Centre + D0 * Inner, Centre + D1 * Outer, Centre + D1 * Inner, Colour);
 			}
@@ -160,6 +222,7 @@ namespace TMIndicatorPaint
 
 	/** The walk area last worked out (PaintMoveArea), what it was for, and its edge in metres. */
 	TArray<FCanvasUVTri> MoveAreaTris;
+	TArray<FCanvasUVTri> MoveAreaRims;
 	FString MoveAreaKey;
 	TArray<TPair<FVector2D, FVector2D>> MoveAreaEdges;
 
@@ -176,12 +239,13 @@ void ATMBattleDirector::BuildIndicators()
 	}
 	const TMSim::FVec2 Size = Battle.Map.SizeMeters();
 	// Never resized in place while the decal draws with it (FilmOfSize).
-	IndicatorFilm = FilmOfSize(IndicatorFilm, FMath::CeilToInt(Size.X * Ppm), FMath::CeilToInt(Size.Y * Ppm), false);
+	IndicatorFilm = FilmOfSize(IndicatorFilm, FMath::CeilToInt(Size.X * Ppm * Supersample), FMath::CeilToInt(Size.Y * Ppm * Supersample), false);
 	if (IndicatorDecal)
 	{
 		if (UMaterialInstanceDynamic* Mid = Cast<UMaterialInstanceDynamic>(IndicatorDecal->GetDecalMaterial()))
 		{
 			Mid->SetTextureParameterValue(TEXT("Paint"), IndicatorFilm);
+			PaintCliffMask(Mid);
 		}
 	}
 	if (!IndicatorDecal)
@@ -192,6 +256,7 @@ void ATMBattleDirector::BuildIndicators()
 		UMaterialInstanceDynamic* Mid = UMaterialInstanceDynamic::Create(Base, this);
 		Mid->SetTextureParameterValue(TEXT("Paint"), IndicatorFilm);
 		Mid->SetScalarParameterValue(TEXT("Glow"), 0.35f);
+		PaintCliffMask(Mid);
 		IndicatorDecal->SetDecalMaterial(Mid);
 		// Over the fog of war (TMBattleDirectorFog.cpp), so aims read in the dark.
 		IndicatorDecal->SortOrder = 1;
@@ -206,6 +271,7 @@ void ATMBattleDirector::BuildIndicators()
 	IndicatorDecal->MarkRenderStateDirty();
 	IndicatorSignature.Reset();
 	MoveAreaKey.Reset();
+	PlateKey.Reset();
 	bIndicatorDecal = true;
 	for (TObjectPtr<USkeletalMeshComponent>& Body : UnitVisuals)
 	{
@@ -214,6 +280,74 @@ void ATMBattleDirector::BuildIndicators()
 			Body->SetReceivesDecals(false);
 		}
 	}
+}
+
+void ATMBattleDirector::PaintCliffMask(UMaterialInstanceDynamic* Mid)
+{
+	// Eight pixels to a metre is plenty: it only says "near a cliff", and the
+	// decal's sampling softens its edge over a few centimetres.
+	constexpr float CliffMaskPpm = 8.0f;
+	/** Metres either side of a cliff's edge line where steep faces fade: the rock stands
+	 *  0.28 m out (CliffDepth) and the bank under it reaches a little further. */
+	constexpr float MaskReach = 0.9f;
+	/** As TMBattleDirectorCliffs.cpp: a step this tall or taller is faced with rock. */
+	constexpr int32 MaskCliffSteps = 2;
+	if (!Mid)
+	{
+		return;
+	}
+	const TMSim::FMap& Map = Battle.Map;
+	const TMSim::FVec2 Size = Map.SizeMeters();
+	CliffMaskFilm = FilmOfSize(CliffMaskFilm, FMath::CeilToInt(Size.X * CliffMaskPpm), FMath::CeilToInt(Size.Y * CliffMaskPpm), true);
+	UKismetRenderingLibrary::ClearRenderTarget2D(this, CliffMaskFilm, FLinearColor::Black);
+	Mid->SetTextureParameterValue(TEXT("Cliffs"), CliffMaskFilm);
+	if (Map.TilesX <= 0 || Map.TilesY <= 0 || Map.Covers.size() < static_cast<size_t>(Map.TilesX * Map.TilesY))
+	{
+		return;
+	}
+	UCanvas* Canvas = nullptr;
+	FVector2D CanvasSize;
+	FDrawToRenderTargetContext Context;
+	UKismetRenderingLibrary::BeginDrawCanvasToRenderTarget(this, CliffMaskFilm, Canvas, CanvasSize, Context);
+	if (!Canvas)
+	{
+		return;
+	}
+	// A tile's height as the ground draws it (as TMBattleDirectorCliffs.cpp): its steps; rock a step; water none.
+	auto Steps = [&Map](int32 X, int32 Y)
+	{
+		const int32 S = Map.TileLevel(X, Y);
+		return S > 0 ? S : (Map.Covers[Y * Map.TilesX + X] != 0 ? 1 : 0);
+	};
+	const float Tile = TMSim::Ground::TileSize;
+	auto Box = [&](float X0, float Y0, float X1, float Y1)
+	{
+		FCanvasTileItem Item(FVector2D(X0 * CliffMaskPpm, Y0 * CliffMaskPpm), FVector2D((X1 - X0) * CliffMaskPpm, (Y1 - Y0) * CliffMaskPpm), FLinearColor::White);
+		Item.BlendMode = SE_BLEND_Opaque;
+		Canvas->DrawItem(Item);
+	};
+	int32 Edges = 0;
+	for (int32 Y = 0; Y < Map.TilesY; ++Y)
+	{
+		for (int32 X = 0; X < Map.TilesX; ++X)
+		{
+			const int32 Here = Steps(X, Y);
+			if (X + 1 < Map.TilesX && FMath::Abs(Here - Steps(X + 1, Y)) >= MaskCliffSteps)
+			{
+				const float EdgeX = (X + 1) * Tile;
+				Box(EdgeX - MaskReach, Y * Tile - MaskReach, EdgeX + MaskReach, (Y + 1) * Tile + MaskReach);
+				++Edges;
+			}
+			if (Y + 1 < Map.TilesY && FMath::Abs(Here - Steps(X, Y + 1)) >= MaskCliffSteps)
+			{
+				const float EdgeY = (Y + 1) * Tile;
+				Box(X * Tile - MaskReach, EdgeY - MaskReach, (X + 1) * Tile + MaskReach, EdgeY + MaskReach);
+				++Edges;
+			}
+		}
+	}
+	UKismetRenderingLibrary::EndDrawCanvasToRenderTarget(this, Context);
+	UE_LOG(LogTemp, Log, TEXT("indicators: cliff mask, %d tall edges"), Edges);
 }
 
 void ATMBattleDirector::AdvanceIndicators()
@@ -242,6 +376,10 @@ void ATMBattleDirector::AdvanceIndicators()
 	Rings += CastSignature();
 	// Zones of control (2026-10-02).
 	Rings += ZoneSignature();
+	// Auras and buffs (v20 play test).
+	Rings += AuraSignature();
+	// Ground zones (2026-10-04).
+	Rings += GroundZoneSignature();
 	// And a ring at the edge of each hazard tile, so it reads as "this tile does
 	// something" before its look is made out: orange burns, cyan mends.
 	for (const int Each : Battle.Map.Hazards)
@@ -280,6 +418,8 @@ void ATMBattleDirector::AdvanceIndicators()
 	}
 	IndicatorSignature = Signature;
 	MoveEdgeMetres.Reset();
+	// Tile movement's plates come back with the walk area, if it is painted (PaintMoveArea).
+	HideMovePlates();
 
 	UKismetRenderingLibrary::ClearRenderTarget2D(this, IndicatorFilm, FLinearColor::Transparent);
 	if (!bShow && (!bBattle || (Rings.IsEmpty() && Planned.IsEmpty())))
@@ -304,10 +444,9 @@ void ATMBattleDirector::AdvanceIndicators()
 		};
 		auto GroundRing = [&](const TMSim::FVec2& Centre, float Radius, const FLinearColor& Colour)
 		{
-			// A faint fill and a soft rim, like the range of an ability.
+			// A faint fill and a sharp rim, like the range of an ability (2026-10-06: the soft band inside it gone).
 			Paint.Disc(Paint.P(Centre), Radius * Ppm, Alpha(Colour, 0.08f));
-			Paint.Band(Paint.P(Centre), Radius * Ppm - 5.0f, Radius * Ppm, Alpha(Colour, 0.3f));
-			Paint.Band(Paint.P(Centre), Radius * Ppm - 1.6f, Radius * Ppm, Alpha(Colour, 0.9f));
+			Paint.Band(Paint.P(Centre), Radius * Ppm - 2.0f, Radius * Ppm, Alpha(Colour, 0.9f));
 		};
 		if (TowerHovered >= 0 && TowerHovered < static_cast<int32>(Battle.Watchtowers.size()))
 		{
@@ -348,10 +487,11 @@ void ATMBattleDirector::AdvanceIndicators()
 				const FLinearColor Cue = Hazard < 0 ? FLinearColor(1.0f, 0.5f, 0.15f) : FLinearColor(0.35f, 0.95f, 1.0f);
 				const FVector2D Middle = Paint.P((TX + 0.5) * Step, (TY + 0.5) * Step);
 				const float Edge = Step * 0.45f * Ppm;
-				Paint.Band(Middle, Edge - 6.0f, Edge, Alpha(Cue, 0.16f));
-				Paint.Band(Middle, Edge - 1.6f, Edge, Alpha(Cue, 0.85f));
+				Paint.Band(Middle, Edge - 1.75f, Edge, Alpha(Cue, 0.85f));
 			}
 		}
+		PaintGroundZones(&Paint);
+		PaintAuras(&Paint);
 		PaintCasts(&Paint);
 		PaintZones(&Paint, bShow && AimMode == EAimMode::Move);
 	}
@@ -592,8 +732,13 @@ void ATMBattleDirector::PaintMoveArea(void* Painter, const TMSim::FUnit& Unit)
 	if (Key == MoveAreaKey)
 	{
 		Paint.Tris.Append(MoveAreaTris);
+		Paint.RimTris.Append(MoveAreaRims);
 		Paint.Flush();
 		MoveEdgeMetres = MoveAreaEdges;
+		if (Battle.TilesOn())
+		{
+			ShowMovePlates(Unit, Key);
+		}
 		return;
 	}
 	MoveAreaKey.Reset();
@@ -611,8 +756,48 @@ void ATMBattleDirector::PaintMoveArea(void* Painter, const TMSim::FUnit& Unit)
 	if (MaxX < 0)
 	{
 		MoveAreaTris.Reset();
+		MoveAreaRims.Reset();
 		MoveAreaEdges.Reset();
 		MoveAreaKey = Key;
+		return;
+	}
+	// Tile movement (v20 play test, "Tile-based movement" A and B): each tile it
+	// can walk to, as a square with a thin edge, Tactics style. Since 2026-10-06 the
+	// squares are plates on each tile's own top (ShowMovePlates), not painted here:
+	// painted from above they bent and hung down cliffs on raised ground. Their
+	// edges are still worked out, for MoveEdgeMetres.
+	if (Battle.TilesOn())
+	{
+		const float Tile = TMSim::Ground::TileSize;
+		const float Inset = 0.1f;
+		TArray<TPair<FVector2D, FVector2D>> Squares;
+		for (const std::pair<TMSim::FNode, double>& Entry : Reachable)
+		{
+			if (!(TMSim::FBattle::TileNode(TMSim::FMap::NodePos(Entry.first)) == Entry.first))
+			{
+				continue;  // where it stands, off its tile's spot
+			}
+			const float X0 = (Entry.first.X / TMSim::Ground::NodesPerTile) * Tile + Inset;
+			const float Y0 = (Entry.first.Y / TMSim::Ground::NodesPerTile) * Tile + Inset;
+			const float X1 = X0 + Tile - 2.0f * Inset;
+			const float Y1 = Y0 + Tile - 2.0f * Inset;
+			const FVector2D A = Paint.P(X0, Y0), B = Paint.P(X1, Y0), C = Paint.P(X1, Y1), D = Paint.P(X0, Y1);
+			for (const TPair<FVector2D, FVector2D>& Side : { TPair<FVector2D, FVector2D>(A, B), TPair<FVector2D, FVector2D>(B, C),
+				TPair<FVector2D, FVector2D>(C, D), TPair<FVector2D, FVector2D>(D, A) })
+			{
+				Squares.Add(Side);
+			}
+		}
+		MoveAreaTris = Paint.Tris;
+		MoveAreaRims = Paint.RimTris;
+		MoveAreaKey = Key;
+		Paint.Flush();
+		ShowMovePlates(Unit, Key);
+		for (const TPair<FVector2D, FVector2D>& Piece : Squares)
+		{
+			MoveEdgeMetres.Add({ Piece.Key / Ppm, Piece.Value / Ppm });
+		}
+		MoveAreaEdges = MoveEdgeMetres;
 		return;
 	}
 	// A spot another unit stands on is still inside the area around it, so a
@@ -696,6 +881,7 @@ void ATMBattleDirector::PaintMoveArea(void* Painter, const TMSim::FUnit& Unit)
 		Paint.Thin(Piece.Key, Piece.Value, MoveEdgeWidth, Alpha(Colour, 0.95f));
 	}
 	MoveAreaTris = Paint.Tris;
+	MoveAreaRims = Paint.RimTris;
 	MoveAreaKey = Key;
 	Paint.Flush();
 	for (const TPair<FVector2D, FVector2D>& Piece : Curve)
@@ -999,6 +1185,279 @@ FString ATMBattleDirector::ZoneSignature() const
 		Out += FString::Printf(TEXT("s%d"), static_cast<int32>(ZoneShadow.size()));
 	}
 	return Out;
+}
+
+int32 ATMBattleDirector::BoonsAndBanes(const TMSim::FUnit& Unit)
+{
+	int32 Out = 0;
+	for (const TMSim::FBuff& Buff : Unit.Buffs)
+	{
+		if (Buff.Turns > 0 && Buff.Amount != 0)
+		{
+			Out |= Buff.Amount > 0 ? 1 : 2;
+		}
+	}
+	for (const TMSim::FStatus& Status : Unit.Statuses)
+	{
+		if (const TMSim::FStatusDef* Def = TMSim::FindStatus(Status.Id))
+		{
+			// Hidden (Vanish) shows by the fading body, not a ring that gives it away.
+			if (!Def->bHidden)
+			{
+				Out |= Def->bHarmful ? 2 : 1;
+			}
+		}
+	}
+	return Out;
+}
+
+FString ATMBattleDirector::AuraSignature() const
+{
+	FString Out;
+	for (const TMSim::FUnit& Each : Battle.Units)
+	{
+		if (!Each.IsAlive() || Each.bOffBoard || !IsSeen(Each))
+		{
+			continue;
+		}
+		const int32 Marks = BoonsAndBanes(Each);
+		if (Marks != 0)
+		{
+			Out += FString::Printf(TEXT("a%d:%d:%.1f,%.1f;"), Each.Id, Marks, Each.Pos.X, Each.Pos.Y);
+		}
+	}
+	return Out;
+}
+
+void ATMBattleDirector::PaintAuras(void* Painter)
+{
+	using namespace TMIndicatorPaint;
+	FPainter& Paint = *static_cast<FPainter*>(Painter);
+	const FLinearColor Boon(0.62f, 1.0f, 0.45f);
+	const FLinearColor Bane(0.78f, 0.45f, 1.0f);
+	for (const TMSim::FUnit& Each : Battle.Units)
+	{
+		if (!Each.IsAlive() || Each.bOffBoard || !IsSeen(Each))
+		{
+			continue;
+		}
+		const FVector2D Middle = Paint.P(Each.Pos);
+		// Auras are effects round their owners now (AdvanceAuraFx, v21 play test),
+		// not their reach painted on the ground.
+		// Its boons and banes: a thin ring at its feet, and four arrows on it.
+		const int32 Marks = BoonsAndBanes(Each);
+		for (int32 Kind = 0; Kind < 2; ++Kind)
+		{
+			if ((Marks & (1 << Kind)) == 0)
+			{
+				continue;
+			}
+			const bool bBane = Kind == 1;
+			const FLinearColor Colour = bBane ? Bane : Boon;
+			// A bane's ring just inside a boon's, so a unit with both shows both.
+			const float Radius = (bBane ? 0.62f : 0.78f) * Ppm;
+			Paint.Band(Middle, Radius - 1.5f, Radius, Alpha(Colour, 0.9f));
+			for (int32 k = 0; k < 4; ++k)
+			{
+				const float Angle = UE_HALF_PI * k + UE_PI * 0.25f;
+				const FVector2D Out(FMath::Cos(Angle), FMath::Sin(Angle));
+				const FVector2D Side(-Out.Y, Out.X);
+				// The arrow's point: outward for a boon, inward for a bane.
+				const FVector2D Tip = Middle + Out * (bBane ? Radius - 5.0f : Radius + 5.0f);
+				const FVector2D Back = Middle + Out * (bBane ? Radius + 1.0f : Radius - 1.0f);
+				Paint.Thin(Back + Side * 4.0f, Tip, 1.5f, Alpha(Colour, 0.95f));
+				Paint.Thin(Back - Side * 4.0f, Tip, 1.5f, Alpha(Colour, 0.95f));
+			}
+		}
+	}
+}
+
+bool ATMBattleDirector::GroundZoneShown(const TMSim::FBattle::FZone& Zone) const
+{
+	const int32 Viewer = ViewerTeam();
+	// A recall mark (2026-10-05) is its own side's business.
+	const TMSim::FAbility* Laid = Battle.ZoneAbility(Zone);
+	if (Laid && Laid->Special == "recall" && Viewer >= 0 && Zone.Team != Viewer)
+	{
+		return false;
+	}
+	return Battle.ZoneLive(Zone) && (Viewer < 0 || Zone.Team == Viewer || IsPointSeen(Zone.Target));
+}
+
+FLinearColor ATMBattleDirector::GroundZoneColour(const TMSim::FAbility& Ability, bool bIgnited)
+{
+	// A warned blow (2026-10-06): red-orange, the colour of something about to land.
+	if (Ability.Special == "warned")
+	{
+		return FLinearColor(1.0f, 0.36f, 0.16f);
+	}
+	const std::string& Element = TMSim::ElementOf(Ability);
+	if (bIgnited || Element == "fire")
+	{
+		return FLinearColor(1.0f, 0.5f, 0.18f);
+	}
+	if (Ability.bZoneHide)
+	{
+		return FLinearColor(0.66f, 0.69f, 0.76f);
+	}
+	// 2026-10-05: gates violet, a recall mark pale gold, ice that speeds its side cyan.
+	if (Ability.bZonePortal)
+	{
+		return FLinearColor(0.72f, 0.5f, 1.0f);
+	}
+	if (Ability.Special == "recall")
+	{
+		return FLinearColor(1.0f, 0.88f, 0.6f);
+	}
+	if (Ability.Target == TMSim::ETargetSide::Ally)
+	{
+		return FLinearColor(0.55f, 0.95f, 1.0f);
+	}
+	if (Ability.ZoneSight > 0.0f)
+	{
+		return Ability.HasStatus() ? FLinearColor(1.0f, 0.97f, 0.78f) : FLinearColor(1.0f, 0.85f, 0.42f);
+	}
+	if (Element == "lightning")
+	{
+		return FLinearColor(0.62f, 0.74f, 1.0f);
+	}
+	if (Element == "ice")
+	{
+		return FLinearColor(0.8f, 0.96f, 1.0f);
+	}
+	if (Element == "water")
+	{
+		return FLinearColor(0.32f, 0.62f, 1.0f);
+	}
+	if (Ability.StatusId == "decay")
+	{
+		return FLinearColor(0.64f, 0.92f, 0.32f);
+	}
+	if (Ability.StatusId == "root")
+	{
+		return FLinearColor(0.56f, 0.82f, 0.34f);
+	}
+	if (Ability.StatusId == "silence")
+	{
+		return FLinearColor(0.78f, 0.56f, 1.0f);
+	}
+	if (Ability.StatusId == "oiled")
+	{
+		return FLinearColor(0.82f, 0.64f, 0.34f);
+	}
+	return FLinearColor(0.9f, 0.9f, 0.92f);
+}
+
+FString ATMBattleDirector::GroundZoneSignature() const
+{
+	FString Out;
+	for (const TMSim::FBattle::FZone& Zone : Battle.Zones)
+	{
+		if (GroundZoneShown(Zone))
+		{
+			Out += FString::Printf(TEXT("g%d:%hs:%d:%d:%.1f,%.1f;"), Zone.Owner, Zone.AbilityId.c_str(), Zone.Turns, Zone.bIgnited ? 1 : 0,
+				Zone.Target.X, Zone.Target.Y);
+		}
+	}
+	return Out;
+}
+
+void ATMBattleDirector::PaintGroundZones(void* Painter)
+{
+	// The "area denial" mockups (2026-10-04): the ground itself, tinted, so it
+	// reads as a place before it is read as a number.
+	using namespace TMIndicatorPaint;
+	FPainter& Paint = *static_cast<FPainter*>(Painter);
+	for (const TMSim::FBattle::FZone& Zone : Battle.Zones)
+	{
+		const TMSim::FAbility* Ability = Battle.ZoneAbility(Zone);
+		if (!Ability || !GroundZoneShown(Zone))
+		{
+			continue;
+		}
+		const FLinearColor Colour = GroundZoneColour(*Ability, Zone.bIgnited);
+		const bool bTar = !Zone.bIgnited && Ability->bZoneFlammable;
+		const bool bSees = Ability->ZoneSight > 0.0f;
+		const std::string Shape = TMSim::ShapeOf(*Ability);
+		// A pair of gates (2026-10-05): a mouth at each end, joined by a dotted thread.
+		if (Ability->bZonePortal)
+		{
+			const FVector2D Near = Paint.P(Zone.From);
+			const FVector2D Far = Paint.P(Zone.Target);
+			for (const FVector2D& Mouth : { Near, Far })
+			{
+				Paint.Disc(Mouth, 1.0f * Ppm, Alpha(Colour, 0.45f));
+				Paint.Band(Mouth, 1.0f * Ppm - 2.0f, 1.0f * Ppm, Alpha(Colour, 0.95f));
+			}
+			const FVector2D Along = Far - Near;
+			const float Length = static_cast<float>(Along.Size());
+			for (float Dot = 1.2f * Ppm; Dot < Length - 1.2f * Ppm; Dot += 0.5f * Ppm)
+			{
+				Paint.Disc(Near + Along / Length * Dot, 0.06f * Ppm, Alpha(Colour, 0.8f));
+			}
+			continue;
+		}
+		if (Shape == "line" || Shape == "vector")
+		{
+			const FVector2D From = Paint.P(Zone.From);
+			const FVector2D To = Paint.P(Zone.Target);
+			const FVector2D Toward = (To - From).GetSafeNormal();
+			const FVector2D Across(-Toward.Y, Toward.X);
+			const float Width = FMath::Max(Ability->Aoe, 0.6f) * Ppm;
+			// Tar is dark on the ground, with a rim in its colour.
+			const FLinearColor Fill = bTar ? FLinearColor(0.06f, 0.05f, 0.04f, 0.49f) : Alpha(Colour, 0.45f);
+			Paint.Poly({ From + Across * Width, To + Across * Width, To - Across * Width, From - Across * Width }, Fill);
+			Paint.Thin(From + Across * Width, To + Across * Width, 1.6f, Alpha(Colour, 0.9f));
+			Paint.Thin(From - Across * Width, To - Across * Width, 1.6f, Alpha(Colour, 0.9f));
+			// A warned blow (2026-10-06): hazard stripes across it, so it reads as
+			// "about to land here" and not as ground that lasts.
+			if (Ability->Special == "warned")
+			{
+				const float Length = static_cast<float>(FVector2D::Distance(From, To));
+				for (float Along = 0.35f * Ppm; Along < Length; Along += 0.7f * Ppm)
+				{
+					const FVector2D A = From + Toward * Along + Across * Width;
+					const FVector2D B = From + Toward * FMath::Min(Length, Along + 0.5f * Ppm) - Across * Width;
+					Paint.Thin(A, B, 2.2f, Alpha(Colour, 0.8f));
+				}
+			}
+			continue;
+		}
+		const float Radius = (bSees ? FMath::Max(Ability->ZoneSight, Ability->Aoe) : Ability->Aoe) * Ppm;
+		const FVector2D Middle = Paint.P(Zone.Target);
+		Paint.Disc(Middle, Radius, Alpha(Colour, bSees ? 0.25f : 0.45f));
+		if (bSees)
+		{
+			// Sight: a dashed rim, as the eye's reach rather than a place to keep out of.
+			const int32 Steps = FMath::Max(24, FMath::CeilToInt(UE_TWO_PI * Radius / 7.0f));
+			for (int32 k = 0; k < Steps; k += 2)
+			{
+				const float A0 = UE_TWO_PI * k / Steps;
+				const float A1 = UE_TWO_PI * (k + 1) / Steps;
+				Paint.Thin(Middle + FVector2D(FMath::Cos(A0), FMath::Sin(A0)) * Radius,
+					Middle + FVector2D(FMath::Cos(A1), FMath::Sin(A1)) * Radius, 1.8f, Alpha(Colour, 0.95f));
+			}
+		}
+		else if (Ability->Special == "warned")
+		{
+			// A warned blow over a circle: its rim, and hazard stripes across it.
+			Paint.Band(Middle, Radius - 2.4f, Radius, Alpha(Colour, 0.95f));
+			for (float Offset = -Radius + 0.35f * Ppm; Offset < Radius; Offset += 0.7f * Ppm)
+			{
+				const float Half = FMath::Sqrt(FMath::Max(0.0f, Radius * Radius - Offset * Offset));
+				Paint.Thin(Middle + FVector2D(Offset - Half * 0.5f, -Half), Middle + FVector2D(Offset + Half * 0.5f, Half), 2.2f, Alpha(Colour, 0.7f));
+			}
+		}
+		else
+		{
+			Paint.Band(Middle, Radius - 1.8f, Radius, Alpha(Colour, 0.92f));
+			// An inner ring for ground that does harm, so it reads as dangerous.
+			if (Zone.bIgnited || Ability->ZonePercent > 0.0f)
+			{
+				Paint.Band(Middle, Radius * 0.7f - 1.2f, Radius * 0.7f, Alpha(Colour, 0.55f));
+			}
+		}
+	}
 }
 
 void ATMBattleDirector::RefreshZoneShadow()

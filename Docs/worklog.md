@@ -42,9 +42,12 @@ How to write here:
   Then queued orders (Docs/design/feat-move-queue.md): plan a waiting unit's next turn, plan a turn and go in one
   (G), and waypoints (Ctrl+click). Then Go To, Civilization III style (feat-move-queue.md, "Go To"), and the new
   combat text and the health bar that shows over your own units in a fight (feat-combat-text.md).
-- 2026-10-04 21:40: all of this session's work to date (the list below and every Log entry since) is being
-  committed to git by `E:\Builds\agent-commit.bat`, at the human's word; result and hash in
-  `E:\Builds\agent-commit-status.txt`. Anything that script's after-status still lists was not this session's.
+- 2026-10-04: everything up to v20 committed in `76a56f6` (agent-commit.bat). Claimed since (changed, not built,
+  not committed): `Source/TMSim/` SimBattle.{h,cpp}; `Tests/` SimWatchtowerTest.cpp; `Source/TacticalMasters/`
+  TMBattleDirector.{h,cpp}, TMBattleDirector{Indicators,Lobby,Report}.cpp, TMBattleHud.{h,cpp},
+  TMBattleHud{Codex,Lobby,Panels,Report}.cpp, TMNet.h (protocol 22); Docs CHANGELOG, backlog, feat-battle-report,
+  feat-lobby, feat-objectives. Then also: `Source/TMSim/` SimMovement.cpp, SimTypes.{h,cpp}; `Tests/` SimPlayTest.cpp;
+  `Source/TacticalMasters/` TMBattleDirector{Blows,Online,Plans,Feel}.cpp.
 - Claimed before that commit: `Source/TacticalMasters/` TMNet.{h,cpp},
   TMBattleDirector.{h,cpp}, TMBattleDirector{Online,Lobby,Draft,Camps,Indicators,Fog,Loading,Showcase,Motion,Plans,Feel}.cpp (Plans and Feel are new), TMBattleHudFeel.cpp (new), TMBattleHud.{h,cpp},
   TMBattleHud{Lobby,Panels,Codex,Options}.cpp, TMBattleHudStyle.h, TMBattleDirectorBlows.cpp, TMBattleDirectorAbilityFx.cpp, TMDrawable.{h,cpp} (new), TMSettings.{h,cpp}; `Source/TMSim/` SimOrder.h, SimBattle.h, SimTypes.{h,cpp},
@@ -61,6 +64,206 @@ How to write here:
 
 ## Log
 
+- 2026-10-06 17:55 (lobby and items session) v26 play test, "Hard to see the movement ground indicators" (tall
+  grass): v26's steep-face fade (make_indicator_material.py) took the marks off upright grass blades. The human's
+  pick 2: the fade only near cliffs. A cliff mask (PaintCliffMask, TMBattleDirectorIndicators.cpp; CliffMaskFilm,
+  TMBattleDirector.h), white within 0.9 m of every step of 2+ levels as TMBattleDirectorCliffs.cpp faces them, is
+  the material's new "Cliffs" parameter (black by default, so the fog decal never fades). Check script
+  E:\Builds\agent-grass-check.bat. CHANGELOG "Next". Not built, not committed.
+
+- 2026-10-06 17:40 (lobby and items session) v26 packaged (BUILD READY, E:\Builds\TacticalMasters-2026-10-06-v26).
+  "commit to git": E:\Builds\agent-commit.bat rewritten for the human to run: v21 to v26 by path (Source, Tests,
+  Tools, Docs, Content/Data without eos-ids.json, the outline and indicator materials, the uproject, .gitignore,
+  Config/DefaultGame.ini). Hash in agent-commit-status.txt. Size: v25 is 25 GB, already Oodle-compressed;
+  textures are 22.6 GB of it, so a cook-time texture cap (2048 ~13 GB, 1024 ~5.5 GB) waits on the human's pick.
+
+- 2026-10-06 16:42 (lobby and items session) "package v26": E:\Builds\agent-v26.bat (as v25's, plus the ground
+  indicator material and a stop if Content\Data\Online\eos-ids.json is missing) for the human to run;
+  agent-release-build.bat now packages into E:\Builds\TacticalMasters-2026-10-06-v26. CHANGELOG's "Next" is now v26
+  (join codes, sharper lines, white-edged walk tiles, queue cancelling, the breathing selected outline). Protocol 27.
+  Not committed to git.
+
+- 2026-10-06 12:25 (lobby and items session) "Add right click card to cancel": a right click (not a drag) on a PickUnit
+  or QueueCancel button of this player's unit with a queue cancels it (TMBattleDirector.cpp, the right button's
+  release); otherwise it drops the aim as before. The squad strip's queue tab is a PickUnit button too
+  (TMBattleHudPanels.cpp); its tip and the codex controls row say so. CHANGELOG. Not built, not committed.
+
+- 2026-10-06 12:30 (lobby and items session) The human's picks: "Queued orders" B and C, the step-by-step undo removed
+  ("not many use cases"), and "Selected unit" A (the line breathes to white). ETMAction::PlanUndo -> PlanCancel
+  ("plan_cancel", Backspace; Shift+Backspace every unit's; X stays fast-forward); ETMHudAction PlanUndo/PlanClear ->
+  QueueCancel (Value: unit id). TMBattleDirectorPlans.cpp: UndoPlanStep gone; CancelQueue, CancelAllQueues,
+  CancelQueueKey, QueueSummary. TMBattleHudPanels.cpp: a queue tab with an x on each squad-strip row, an x at the end
+  of the selected (or pointed-at) unit's queue (DrawGoToMarks). TMBattleHud.cpp: plan strip Go + Cancel only; hints.
+  TMBattleHudCodex.cpp controls row. Outline: stencil 4 for the selected friend (TMBattleDirectorLooks.cpp, redrawn on
+  a new selection; "Pulse" set each frame, 1.2 s), Tools/make_outline_material.py (4 is ally-coloured, not marked;
+  lerps to near-white by Pulse). agent-eos-check.bat already remakes the outline. Not built, not committed.
+
+- 2026-10-06 09:45 (lobby and items session) Sharper lines, the human's pick of all four "Sharper lines" mockups (canvas
+  v14, row "Sharper lines": A outlines, B combat text, C indicators, D white-edged walk tiles). Tools/
+  make_outline_material.py (hard edge: any of the 16 taps is full; RimWidth/RimOpacity dark rim from 8 taps at
+  Thickness+RimWidth; Thickness 2.0; hover glow 0.12), Tools/make_indicator_material.py (opacity fades on faces
+  steeper than ~50 degrees, normal from DDX/DDY of world position); `Source/TacticalMasters/` TMBattleHud.cpp (Text
+  and OutlinedText on whole pixels), TMBattleHudPanels.cpp (floaters: edge 7% of height, no ember glow),
+  TMBattleDirectorIndicators.cpp (FPainter rims under every edge, AimWidth 1.75, soft bands removed),
+  TMBattleDirectorPlates.cpp + TMBattleDirector.h (white edges, PlateRims); Docs CHANGELOG; E:\Builds
+  agent-eos-check.bat now remakes both materials (with -stdout so their log lines show). Not built, not committed.
+
+- 2026-10-06 11:40 (lobby and items session) EOS join codes, built (not compiled on the PC yet). The human made the
+  Epic product, sent its ids and answered the scope's questions (direct IP under Advanced, six-letter codes, invite by
+  code only). Ids in `Content/Data/Online/eos-ids.json`, git-ignored (.gitignore). New `Source/TacticalMasters/`
+  TMEos.{h,cpp}; changed TMNet.{h,cpp}, TMBattleDirector.{h,cpp}, TMBattleDirectorOnline.cpp, TMBattleHud.{h,cpp},
+  TMBattleHudLobby.cpp, TacticalMasters.Build.cs, TacticalMasters.uproject (EOSShared plugin), .gitignore; Docs
+  CHANGELOG ("Next"), design/feat-online-eos.md (section 9); E:\Builds HOW TO PLAY ONLINE.txt, agent-eos-check.bat
+  and eos-test.ps1 (new: build, tests, two headless copies joining by code; not a release). TMEos and TMNet checked
+  here with g++ against the engine's own EOS SDK headers; the rest by reading. v25 finished packaging at 03:54
+  (BUILD READY). Not committed.
+
+- 2026-10-06 10:45 (lobby and items session) The human asked "scope out epic online services". Scope only, no code:
+  Docs/design/feat-online-eos.md (new). Plan: join codes through EOS Lobbies, P2P with relays, Device ID sign-in (no
+  Epic account), behind a transport seam in FTMNet so lobby, draft and battle code stay as they are; about 4-6 sessions.
+  Waiting on the human for the dev portal IDs (Product, Sandbox, Deployment, Client ID/Secret) and the open questions.
+
+- 2026-10-06 09:15 (lobby and items session) Codex picks (Docs/design/feat-codex-picks.md), the human's ask "start
+  adding this work ... use class editor to apply unique effects to each new skill". The v25 run was found stopped
+  (^C) in its camp tests (agent-v25-tests.txt), nothing packaged; rerun agent-v25.bat, which now carries this too
+  (protocol 27). Built A1-A9 and B8/B4/B9/B13; A10 left for the human (it needs a slot choice). Not built, not
+  committed. `Source/TMSim/` SimAbility.h, SimBattle.{h,cpp}, SimClassFile.cpp, SimResolve.cpp, SimSpells.cpp,
+  SimTargeting.cpp, SimZones.cpp; `Tests/` SimCodexTest.cpp (new), RunTests.bat; thirteen class files (with icon
+  designs in their creator notes) and thirteen icons (Content/Data/Icons/abilities); Content/Data/CastStudio/
+  AbilityLooks.json; `Source/TacticalMasters/` TMBattleDirector.{h,cpp}, TMBattleDirector{Blows,Cast,Indicators,
+  Motion}.cpp, TMBattleHudPanels.cpp, TMNet.h (27); Docs CHANGELOG, feat-codex-picks.md; E:\Builds agent-v25.bat,
+  agent-release-build.bat (comments). Class creator: data/caststudio.json rev 122 (backup in data/backups), app/
+  tmclass.mjs, FORMAT.md. Every rules test passes built with g++ here (SimCodexTest: 13 battles, every order legal,
+  replayed to the same checksum). **Restart the class creator** before saving in Cast Studio.
+- 2026-10-06 08:25 (lobby and items session) v25 asked for ("write v25"). Script: `E:\Builds\agent-v25.bat` (build,
+  outline material remade, tests, class lab, then agent-release-build.bat into
+  `E:\Builds\TacticalMasters-2026-10-06-v25`; status `E:\Builds\agent-v25-status.txt`). CHANGELOG's "Next" is now
+  "v25". Everything since v24 is in it; protocol 26 as v24. Still not committed.
+- 2026-10-06 08:05 (lobby and items session) v24 play-test crashes (UECC 5846..., 55FE..., 0248...; the human said 2,
+  there are 3 since the crash hunt): all the same site as v23/v24 -- RIP exe+0x8d48e00, RHISetShaderParameters ->
+  ValidateStaticUniformBuffer, rdi 0xdddd... (freed), reading 0xffffffffffffffff -- mid-battle, every one in a scene
+  capture's base pass ("SceneRender - BattleDirector", one draw: a turn-card/portrait capture of a body). The cooked
+  build has 83 UMaterialParameterCollection assets, many same-named (36 OrionGlobalGameplayCollection): the UE 5.8.1
+  D3D12 stale-binding bug Epic's forum threads describe, worked round by keeping collections loaded. TMDrawable:
+  KeepCollectionsLoaded (all via the asset registry at BeginPlay, rooted) and a pre-GC pass rooting any loaded since.
+  Not built, not committed. Files: TMDrawable.{h,cpp}.
+- 2026-10-06 07:45 (lobby and items session) Not built, not committed. The human's picks: "Attacking out of range"
+  A+B: WalkIntoRange/PlanWalkIntoRange take the aim's Follow (TMBattleDirectorFeel.cpp ClickAbility passes
+  Where.Follow), and FirePendingAbility asks Battle.Validate before ordering, dropping the order with a Tell
+  ("... held: X moved out of reach. Action kept.") instead of hitting the ground. "Less text on screen" B:
+  DrawBanners draws one slim line on the action bar's top edge (notice, Go To with small buttons, hover preview's
+  short words; Alt for the long), replacing the preview box, DrawGoToStrip's call (function kept, unused) and the
+  notice box; ActionBarLeft/Right new, PreviewRestKey/Since gone. Files: TMBattleDirector.{h,cpp},
+  TMBattleDirector{Feel,Plans}.cpp, TMBattleHud.{h,cpp}.
+- 2026-10-06 07:30 (lobby and items session) Not built, not committed:
+  (1) clock warning: AdvanceClockWarning (TMBattleDirectorSound.cpp, from Tick), event "clockWarning" -> sfx
+  "clock_warning" = Free_Sounds_Pack Sci-Fi_Interface_8-1 (sounds.json, and Tools/assign_sounds.py so a rerun keeps it).
+  (2) ground picture x3 finer: TMIndicatorPaint::Supersample, applied in FPainter::Flush/Line and the film size.
+  (3) overhead status chips: only the selected unit, or 1.5 s after a new status (ATMBattleHud::StatusSeen).
+  (4) Cast Studio "zone" moment (lasting; default anchor center): TMCast CastLooks.{h,cpp}, AdvanceCast plays it per
+  Battle.Zones entry while GroundZoneShown (CastZones), the creator's app/castlooks.mjs knows it; 28 zone events on the
+  12 zone abilities: ledger rev 121 (backup data/backups/caststudio-1791270000000-120.json), AbilityLooks.json
+  (3374 events; game reader check: no problems). Also mockups on the canvas: "Less text on screen" and
+  "Attacking out of range" (cause: PendingAbility.Target is the square, Follow -1).
+- 2026-10-06 06:30 (lobby and items session) Walk Squares mockups D, the human's pick, badges small: new
+  TMBattleDirectorPlates.cpp (ShowMovePlates/HideMovePlates: three instanced meshes -- shadow, fill, edges -- one plate per
+  reachable tile at its node level, tilted by its corners' levels); PaintMoveArea no longer paints tile squares on the
+  decal (edges still kept for MoveEdgeMetres) and shows the plates; AdvanceIndicators hides them on every repaint;
+  TMBattleHud.cpp DrawBoardAids draws the "+n" badges (scale 0.26) from PlateSteps. TMBattleDirector.h,
+  TMBattleDirectorIndicators.cpp, TMBattleHud.cpp. Not built, not committed.
+- 2026-10-06 06:05 (lobby and items session) Hit Preview Mockups B, the human's pick, smaller text: DrawBoardAids fills
+  AimOdds (top three by KO) instead of drawing OddsCard; DrawOverheads gives those units the full bar with the blow cut
+  out of it and a key row (scale 0.27 x overhead scale). OddsCard is unused now, kept. TMBattleHud.{h,cpp},
+  TMBattleHudPanels.cpp. Not built, not committed.
+- 2026-10-06 05:40 (lobby and items session) Outline "jittery and less defined" (v24): Tools/make_outline_material.py now
+  puts M_TeamOutline before TSR (after DOF) instead of after tonemapping, and the team outline is soft coverage from 16
+  taps (8 ways at Thickness and at half; Thickness 2.5) instead of a 4-tap hard test; colours x1.35 for the tonemapper.
+  Remade by running `Tools\MakeOutline.bat` (new; the human runs it, editor closed). Not run, not built, not committed.
+  Also "Hit preview on the health bar" mockups (5 boards) on the v20 Play Test Mockups canvas, for the human to pick.
+- 2026-10-06 00:30 (lobby and items session) The v24 crash hunt crashed at 18 s (gc every frame), the v17/v19/v23 stack
+  (freed uniform buffer, BasePass, 0xffffffffffffffff). Draw events named it: Sparrow's M_ArrowString3 and
+  M_Sparrow_Torso_Arms, Greystone's WhiteTiger legs -- the menu battle's bodies, dressed (DressUnits, frame 320) and
+  destroyed by ClearBattle as Start was clicked (frame 323), crash frame 329. ClearBattle now hides, stops and keeps
+  them (RetiringVisuals) and RetireOldVisuals (from Tick) destroys them 3 s later. TMBattleDirector.{h,cpp}. Not built,
+  not committed; to check: a build, then "Play crash hunt.bat" again.
+- 2026-10-05 22:50 (lobby and items session) v24 release asked for ("Start a v24"). Script: `E:\Builds\agent-v24.bat`
+  (build, every test, the class lab, then `agent-release-build.bat` with OUTDIR `E:\Builds\TacticalMasters-2026-10-05-v24`;
+  status in `E:\Builds\agent-v24-status.txt`). `agent-release-build.bat` and its status file had gone from E:\Builds
+  since the v23 packaging (which is why v23 never got its CHANGELOG.txt, online guide or play helpers): rewritten, and
+  the extras are now copied by agent-v24.bat after packaging. CHANGELOG's "Next" is now v24, protocol 26. Please
+  don't touch the E:\Builds scripts or build or cook while it runs.
+- 2026-10-05 17:45 (lobby and items session) Camps and watchtowers missing (v23 play test, tile_move 2): FBattle::DistanceFrom
+  ran RunDijkstra with tile stepping, so the field was finite only on tile spots and CampSpot / PlaceWatchtowers
+  rejected every tile centre. DistanceFrom now runs with TileMove 0 (SimWorld.cpp). Checked with the rules built with
+  g++ here, every map at camps 2, towers 2: tile_move 2 gave 0 towers and the boss alone, now the same as free walking
+  (2 towers, 9 camps; Crown Keep 5). Protocol 26 (TMNet.h). Not built in Unreal, not committed.
+- 2026-10-05 17:35 (lobby and items session) v23 play test, 2 crashes (16:45 and 17:12 UTC, both ~26.5 min after launch,
+  1600 s and 1593 s): the same stack as v17/v19, symbolised from the minidumps with the v23 PDB: render thread, BasePass
+  (breadcrumbs), RHISetShaderParameters -> ValidateStaticUniformBuffer / D3D12 SetSamplerTable reading freed memory
+  (0xffffffffffffffff, 0xdddd... in rdi). The four known shaderless materials were kept loaded (log), so it is something
+  else being drawn after it was freed; not named yet. `E:\Builds\play-helpers\Play crash hunt.bat` (draw events +
+  gc.CollectGarbageEveryFrame 1) written, and it and "Play with crash details.bat" copied into the v23 Windows folder
+  (the release script's copy steps had not run: no CHANGELOG.txt or helpers there). Also the tank ring hidden behind
+  units (DrawZoneShields, TMBattleHudPanels.cpp). Not built, not committed.
+- 2026-10-05 17:10 (lobby and items session) Cast cards shrink (v23 play test, too busy): `TMBattleHudPanels.cpp`
+  CastCard(..., bFull) eases from full to a small chip 0.8-2.0 s into the cast; the hovered unit's stays full.
+  `TMBattleHud.h` signature. Not built, not committed.
+- 2026-10-05 16:55 (lobby and items session) Ability cards (Ability Info Mockups D+A+E): `TMBattleHudPanels.cpp`
+  AbilityCard/AddAbilityTip/AltHeld (new "ability card" section), DrawTooltip(From) draws a card for a tip with
+  CardUnit/CardSlot, AbilityTile uses it; `TMBattleHud.cpp` DrawBanners docks the card while aiming, hover preview line
+  for abilities dropped, DrawTooltip(Found); `TMBattleHud.h` FTMHudTip CardUnit/CardSlot + declarations. Not built,
+  not committed. ExplainAbility now only feeds the Unit Guide.
+- 2026-10-05 16:40 (lobby and items session) Boss bar on hover only (v23 play test): `TMBattleHudPanels.cpp`
+  DrawBossBar shows the hovered boss (board, HUD link, or the bar itself) on top of the enemy panel, bottom right;
+  layout id now `boss_hover`; news line dropped (it is in the log). `TMBattleHud.h`: InspectTop/InspectRight,
+  BossBarUnitId/BossBarRect. Not built, not committed. CHANGELOG "Next".
+- 2026-10-05 13:30 (lobby and items session) v23 release asked for ("create v23 bat"). Script: `E:\Builds\agent-v23.bat`
+  (build, every test, the class lab, then `agent-release-build.bat` with OUTDIR `E:\Builds\TacticalMasters-2026-10-05-v23`;
+  status in `E:\Builds\agent-v23-status.txt`). The play helpers now come from `E:\Builds\play-helpers` (the v12 build
+  they were copied from is gone). CHANGELOG's v23 is dated, protocol 25. Please don't build or cook while it runs.
+- 2026-10-05 09:10 (lobby and items session) A look for every other ability in play, made in Cast Studio, not built,
+  not committed: Content/Data/CastStudio/AbilityLooks.json (469 looks added: 361 class, 78 monster and pet, 30 item
+  abilities; the 46 before unchanged; AbilityAnimation.json unchanged). Class creator (its own repo): data/caststudio.json
+  revision 120 (revision 119 kept in data/backups). Every one replaces today's look (strip all). Each has a signature
+  effect no other ability uses (one-to-one over the effect filming's catalogue, by the ability's element and kind),
+  supporting effects by element, a light, a jolt for heavy blows, and a cast and landing sound pair no other shares.
+  No code or class file changed. Read back with TMCast's ReadLooksFile: 515 looks, 3,346 events, no problems. The
+  release build's Tools\cook_list.py picks up the ~150 newly named effect folders (the package grows).
+  **Restart the class creator** before saving in Cast Studio.
+- 2026-10-05 08:00 (lobby and items session) Looks for the thirty new spells, made in the class creator's Cast Studio,
+  not built, not committed: Content/Data/CastStudio/AbilityLooks.json (30 looks added, the 16 before unchanged;
+  AbilityAnimation.json unchanged). Class creator (its own repo): data/caststudio.json revision 119. Each look
+  replaces today's look (strip all), so the effect a class file inherited from the ability it replaced no longer
+  plays; the class files are unchanged. No code changed. Read back with TMCast's ReadLooksFile here: 289 events, no
+  problems. **Restart the class creator** before saving in Cast Studio, or its open window saves over revision 119.
+- 2026-10-05 07:40 (lobby and items session) The unique and mobility spells, not built, not committed (CHANGELOG
+  v23, protocol 25): `Source/TMSim/` SimSpells.cpp (new; LandingFor moved here from SimResolve.cpp), SimAbility.h,
+  SimBattle.{h,cpp}, SimAI.{h,cpp}, SimCamps.cpp, SimClassFile.cpp, SimResolve.cpp, SimTypes.cpp, SimWorld.cpp,
+  SimZones.cpp; `Tests/` SimSpellTest.cpp (new), RunTests.bat (SimSpells.cpp in every build); thirty class files;
+  `Source/TacticalMasters/` TMBattleDirector.cpp, TMBattleDirector{Blows,Indicators,Motion,Report}.cpp,
+  TMBattleHudStyle.h, TMNet.h; Docs/design/feat-new-spells.md (new). Creator: app/tmclass.mjs, app/vocab.mjs, FORMAT.md.
+- 2026-10-05 05:10 (lobby and items session) Ground zones (area denial), not built, not committed (CHANGELOG v23,
+  protocol 24): `Source/TMSim/` SimZones.cpp (new), SimAbility.h, SimBattle.{h,cpp}, SimAI.{h,cpp}, SimCamps.cpp,
+  SimClassFile.cpp, SimMovement.cpp, SimResolve.cpp, SimTargeting.cpp, SimWorld.cpp; `Tests/` SimZoneTest.cpp (new),
+  SimStatusTest.cpp, RunTests.bat (SimZones.cpp in every build); twelve class files; `Source/TacticalMasters/`
+  TMBattleDirector.{h,cpp}, TMBattleDirector{Blows,Fog,Indicators,Tower}.cpp, TMBattleHud{,Codex,Panels}.cpp, TMNet.h;
+  Docs/design/feat-ground-zones.md (new). The class creator (`E:\TacticsClassCreator`): app/tmclass.mjs, FORMAT.md.
+- 2026-10-05 03:40 (lobby and items session) v21 built (19:24 local). Then the v21 play test, not built, not
+  committed (CHANGELOG v22, protocol 23): casts x4 and boss aggro (GameTuning, "boss_aggro" the 46th rule number),
+  units 1.125, FitPets, AdvanceAuraFx, the walk ghost, the odds option, the setup Start button. Rules tests pass.
+- 2026-10-04 23:55 (lobby and items session) Less text in fights (all 12 candidates) and tile movement as a setting
+  (free / tiles 4 ways / 8 ways; "tile_move", the 45th rule number; RunDijkstra steps tile to tile). Not built, not
+  committed. All rules tests pass with g++ (SimWatchtowerTest: 18 tile battles, 930 walks, replayed); game code
+  reviewed, the review's fixes made. WASD on hold.
+- 2026-10-04 22:50 (lobby and items session) The v20 play test findings, not built, not committed (CHANGELOG v21,
+  backlog "v20 play test"): auras and buffs on the ground; a turn ended at a watchtower captures it (SimBattle,
+  SimWatchtowerTest); easier picking of close units; the report revalued (feat-battle-report.md); the lobby holds
+  every setting, item buying and Random (feat-lobby.md 2a); protocol 22. All rules tests pass with g++; the game
+  code reviewed, not compiled. Text cuts, WASD and tile movement: mockups on "v20 Play Test Mockups", waiting on the human.
+- 2026-10-04 22:30 (lobby and items session) Committed `76a56f6`: everything up to v20 (211 files). The creator's
+  `data/` is ignored by its own .gitignore, so library.json stays out of git there. Left uncommitted, not this
+  session's: CLAUDE.md, Config/DefaultGame.ini (packaging rewrites it), TacticalMasters.uproject, `scripts/`,
+  SnippingSS/ and the asset packs under Content/.
 - 2026-10-04 21:40 (lobby and items session) v20 built and packaged from today's code
   (`E:\Builds\TacticalMasters-2026-10-04-v20`, 14:25 local; every rules and cast test passed). Then, at the human's
   word, the session's uncommitted work committed to git: `Source`, `Tests`, `Tools`, `Docs`, `Content/Data` (by path,

@@ -46,9 +46,9 @@
       }
     },
     {
-      "id": "paladin_aegis",
-      "name": "Aegis",
-      "desc": "Protect an ally up to 5 m away for 2 turns: physical hits on it do a third less.",
+      "id": "paladin_retribution",
+      "name": "Retribution",
+      "desc": "Ward an ally up to 5 m away for 2 turns: the first enemy to hurt it is Stunned.",
       "kind": "active",
       "effect": "support",
       "scale": "mag",
@@ -61,7 +61,7 @@
       "cooldown": 3,
       "cast": 0,
       "status": {
-        "id": "protect",
+        "id": "retribution",
         "turns": 2
       },
       "fx": "guard",
@@ -69,7 +69,8 @@
         "system": "/Game/FreeParticle_SoftTofu/Niagara/NS_Sparkling_Animate_2.NS_Sparkling_Animate_2",
         "at": "targets",
         "scale": 1
-      }
+      },
+      "anim": "buff"
     },
     {
       "id": "paladin_lay_on_hands",
@@ -118,8 +119,8 @@
   ],
   "creator": {
     "rebalanced": {
-      "on": "2026-10-03",
-      "why": "Aegis gives Protect"
+      "on": "2026-10-05",
+      "why": "Retribution in place of Aegis (unique and mobility spells, 2026-10-05). Before that (2026-10-03): Aegis gives Protect"
     }
   }
 }

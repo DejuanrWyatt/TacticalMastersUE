@@ -222,8 +222,12 @@ void ATMBattleDirector::ApplyOutlines()
 			continue;
 		}
 		// 3 is a unit under the pointer or in the aim: the outline material draws
-		// it thick, glowing red (Tools/make_outline_material.py).
-		const int32 Stencil = MarkedUnits.Contains(Battle.Units[i].Id) ? 3 : IsFriend(Battle.Units[i]) ? 1 : 2;
+		// it thick, glowing red (Tools/make_outline_material.py). 4 is the friend
+		// selected (2026-10-06, "Selected unit" A): its line breathes to white.
+		const TMSim::FUnit& Unit = Battle.Units[i];
+		const int32 Stencil = MarkedUnits.Contains(Unit.Id) ? 3
+			: (Unit.Id == SelectedId && IsFriend(Unit)) ? 4
+			: IsFriend(Unit) ? 1 : 2;
 		if (!Body->bRenderCustomDepth || Body->CustomDepthStencilValue != Stencil)
 		{
 			Body->SetRenderCustomDepth(true);
@@ -294,6 +298,18 @@ void ATMBattleDirector::UpdateMarks()
 				bEnemy ? FLinearColor(1.0f, 0.08f, 0.05f, 1.0f) : FLinearColor(0.15f, 0.55f, 1.0f, 1.0f));
 		}
 		ApplyOutlines();
+	}
+	// The selected unit's outline (stencil 4): a new selection redraws them.
+	if (OutlinedSelected != SelectedId)
+	{
+		OutlinedSelected = SelectedId;
+		ApplyOutlines();
+	}
+	// Its breath: 0 (team colour) to 1 (near-white) and back, every 1.2 s.
+	if (OutlineMid && GetWorld())
+	{
+		const float Phase = static_cast<float>(FMath::Fmod(GetWorld()->GetRealTimeSeconds(), 1.2) / 1.2);
+		OutlineMid->SetScalarParameterValue(TEXT("Pulse"), 0.5f - 0.5f * FMath::Cos(2.0f * PI * Phase));
 	}
 }
 

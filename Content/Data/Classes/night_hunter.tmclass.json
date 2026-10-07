@@ -44,60 +44,49 @@
       }
     },
     {
-      "id": "night_hunter_shadow_snipe",
-      "name": "Shadow Snipe",
-      "desc": "A shot that pierces everyone in a line up to 13 m. (1 s)",
+      "id": "night_hunter_night_spear",
+      "name": "Night Spear",
+      "desc": "A narrow spear of night down a 12 m line: damage and Silence for a turn to everyone on it.",
       "kind": "active",
       "effect": "damage",
       "scale": "att",
       "target": "enemy",
       "shape": "line",
-      "power": 38,
-      "min_range": 3,
-      "max_range": 13,
-      "aoe": 0.7,
-      "cooldown": 1,
-      "cast": 1,
-      "fx": "aimed_shot",
-      "vfx": {
-        "system": "/Game/ParagonMinions/FX/Particles/Minions/Shared/P_Minion_Melee_Impact.P_Minion_Melee_Impact",
-        "at": "targets",
-        "scale": 1
-      }
+      "power": 34,
+      "min_range": 0,
+      "max_range": 12,
+      "aoe": 0.6,
+      "cooldown": 2,
+      "cast": 0,
+      "status": {
+        "id": "silence",
+        "turns": 1
+      },
+      "fx": "aimed_shot"
     },
     {
-      "id": "night_hunter_shadow_barb",
-      "name": "Shadow Barb",
-      "desc": "A barbed arrow at an enemy 2-10 m away; MagDef -6, AttDef -3 for 2 turns.",
+      "id": "night_hunter_shadow_hop",
+      "name": "Shadow Hop",
+      "desc": "Vanish and come down in tall grass or your side's smoke up to 10 m away, hidden there.",
       "kind": "active",
-      "effect": "damage",
-      "scale": "att",
-      "target": "enemy",
-      "shape": "unit",
-      "power": 24,
+      "effect": "support",
+      "scale": "mag",
+      "target": "ally",
+      "shape": "point",
+      "power": 0,
       "min_range": 2,
       "max_range": 10,
       "aoe": 0,
-      "cooldown": 2,
+      "cooldown": 3,
       "cast": 0,
-      "buffs": [
-        {
-          "stat": "magdef",
-          "amount": -6,
-          "turns": 2
-        },
-        {
-          "stat": "attdef",
-          "amount": -3,
-          "turns": 2
-        }
-      ],
       "fx": "pin_shot",
       "vfx": {
         "system": "/Game/ParagonMinions/FX/Particles/Minions/Shared/P_Minion_Melee_Impact.P_Minion_Melee_Impact",
-        "at": "targets",
+        "at": "user",
         "scale": 1
-      }
+      },
+      "anim": "dash",
+      "special": "shadowhop"
     },
     {
       "id": "night_hunter_umbral_burst_volley",
@@ -133,5 +122,29 @@
         "scale": 1
       }
     }
-  ]
+  ],
+  "creator": {
+    "rebalanced": {
+      "on": "2026-10-06",
+      "why": "Cire's Spell Codex pick A4 Night Spear in place of Shadow Snipe (feat-codex-picks.md). Before that (2026-10-05): Shadow Hop in place of Shadow Barb (unique and mobility spells, 2026-10-05)."
+    },
+    "icons": {
+      "abilities": [
+        null,
+        {
+          "backing": "circle",
+          "glyph": "lance",
+          "colour": "#9a7ad6",
+          "style": "light",
+          "mark": "line",
+          "scale": 1,
+          "rotate": 0,
+          "badge": "shadow",
+          "finish": "lit"
+        },
+        null,
+        null
+      ]
+    }
+  }
 }

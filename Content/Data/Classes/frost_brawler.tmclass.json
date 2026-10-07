@@ -70,28 +70,26 @@
       }
     },
     {
-      "id": "frost_brawler_frost_stance",
-      "name": "Frost Stance",
-      "desc": "Take a fighting stance; MagDef +6 for 2 turns. Switched on and off.",
-      "kind": "toggle",
-      "effect": "support",
-      "scale": "mag",
-      "target": "ally",
+      "id": "frost_brawler_frost_pirouette",
+      "name": "Frost Pirouette",
+      "desc": "Spin in a ring of frost: damage and Slow to every enemy within 2.5 m.",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "att",
+      "target": "enemy",
       "shape": "self",
-      "power": 0,
+      "power": 30,
       "min_range": 0,
       "max_range": 0,
-      "aoe": 0,
-      "cooldown": 0,
+      "aoe": 2.5,
+      "cooldown": 2,
       "cast": 0,
-      "buffs": [
-        {
-          "stat": "magdef",
-          "amount": 6,
-          "turns": 2
-        }
-      ],
-      "fx": "focus"
+      "status": {
+        "id": "slow",
+        "turns": 1
+      },
+      "fx": "earth_slash",
+      "element": "ice"
     },
     {
       "id": "frost_brawler_frost_fury",
@@ -119,5 +117,29 @@
         "scale": 1
       }
     }
-  ]
+  ],
+  "creator": {
+    "rebalanced": {
+      "on": "2026-10-06",
+      "why": "Cire's Spell Codex pick A8 Frost Pirouette in place of Frost Stance (feat-codex-picks.md)"
+    },
+    "icons": {
+      "abilities": [
+        null,
+        null,
+        {
+          "backing": "circle",
+          "glyph": "tornado",
+          "colour": "#7fd4ef",
+          "style": "light",
+          "mark": "self",
+          "scale": 1,
+          "rotate": 0,
+          "badge": "ice",
+          "finish": "lit"
+        },
+        null
+      ]
+    }
+  }
 }

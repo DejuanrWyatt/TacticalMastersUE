@@ -14,6 +14,7 @@
 // Nothing here is read by the rules: they still know two sides of four units.
 
 #include "TMBattleDirector.h"
+#include "TMBattleHud.h"
 
 #include "HAL/PlatformProcess.h"
 #include "Misc/App.h"
@@ -249,12 +250,94 @@ void ATMBattleDirector::BroadcastLobby()
 	Message->SetBoolField(TEXT("draft"), Setup.bDraft);
 	Message->SetBoolField(TEXT("unique"), Setup.bUniqueClasses);
 	Message->SetNumberField(TEXT("draft_seconds"), Setup.DraftSeconds);
+	// v20: every setting as the lobby shows it, the item points, and what each unit carries.
+	TArray<TSharedPtr<FJsonValue>> Rows;
+	for (const FTMSettingRow& Row : LobbySettingRows())
+	{
+		TArray<TSharedPtr<FJsonValue>> Pair;
+		Pair.Add(MakeShared<FJsonValueString>(Row.Label));
+		Pair.Add(MakeShared<FJsonValueString>(Row.Value));
+		Rows.Add(MakeShared<FJsonValueArray>(Pair));
+	}
+	Message->SetArrayField(TEXT("settings"), Rows);
+	Message->SetNumberField(TEXT("item_budget"), Setup.ItemBudget);
+	TArray<TSharedPtr<FJsonValue>> Carried;
+	for (int32 Code = 0; Code < 24; ++Code)
+	{
+		Carried.Add(MakeShared<FJsonValueString>(UTF8_TO_TCHAR(Setup.Items[Code / 12][(Code % 12) / 3][Code % 3].c_str())));
+	}
+	Message->SetArrayField(TEXT("items"), Carried);
 	// Each player is told which of the list they are.
 	for (int32 i = 1; i < Players.Num(); ++i)
 	{
 		Message->SetNumberField(TEXT("you"), i);
 		Net->SendTo(Players[i].Peer, Message);
 	}
+}
+
+TArray<ATMBattleDirector::FTMSettingRow> ATMBattleDirector::LobbySettingRows() const
+{
+	// The setup screen's rules (TMBattleHud.cpp, DrawSetup), as rows the lobby
+	// lays out three abreast. The words are the setup screen's.
+	TArray<FTMSettingRow> Out;
+	auto Add = [&Out](const TCHAR* Label, const FString& Value, ETMHudAction Action, const TCHAR* Tip)
+	{
+		FTMSettingRow Row;
+		Row.Label = Label;
+		Row.Value = Value;
+		Row.Action = static_cast<int32>(Action);
+		Row.Tip = Tip;
+		Out.Add(Row);
+	};
+	auto Seconds = [](double Value)
+	{
+		return FMath::Fmod(Value, 60.0) == 0.0 ? FString::Printf(TEXT("%.0f minutes"), Value / 60.0) : FString::Printf(TEXT("%.0f seconds"), Value);
+	};
+	const TMSim::FMapDef& Map = TMSim::FindMap(Setup.MapId);
+	Add(TEXT("Map"), UTF8_TO_TCHAR(Map.Name.c_str()), ETMHudAction::SetupMap, TEXT("The battlefield. Click for the next."));
+	const FString Look = Setup.ThemeId.IsEmpty() ? FString(UTF8_TO_TCHAR(Map.Theme.c_str())) : Setup.ThemeId;
+	const FTMTheme* Theme = Themes.Find(Look);
+	Add(TEXT("Theme"), (Theme ? Theme->Name : Look) + (Setup.ThemeId.IsEmpty() ? TEXT(" (map's)") : TEXT("")), ETMHudAction::SetupTheme,
+		TEXT("How the battlefield looks. It changes nothing in the rules."));
+	Add(TEXT("Duplicates"), Setup.bUniqueClasses ? FString(TEXT("One of each class")) : FString(TEXT("Allowed")), ETMHudAction::SetupUniqueClasses,
+		TEXT("One of each class: no class appears twice in the battle, on either side."));
+	Add(TEXT("Victory"), Setup.CaptureSeconds > 0.0 ? FString::Printf(TEXT("Hold the middle %.0fs"), Setup.CaptureSeconds) : FString(TEXT("Last standing")),
+		ETMHudAction::SetupVictory, TEXT("Hold the middle: a side alone in the ring in the middle this long wins."));
+	Add(TEXT("Time"), Setup.BattleSeconds > 0.0 ? Seconds(Setup.BattleSeconds) : FString(TEXT("No limit")), ETMHudAction::SetupTime,
+		TEXT("When time runs out, the side with more of its health left wins."));
+	Add(TEXT("Planning"), Setup.PlanningSeconds > 0.0 ? FString::Printf(TEXT("%.0f seconds"), Setup.PlanningSeconds) : FString(TEXT("None")),
+		ETMHudAction::SetupPlanning, TEXT("Time before the fighting to place your units in your spawn area."));
+	Add(TEXT("Watchtowers"), Setup.Watchtowers > 0 ? FString::Printf(TEXT("%d"), Setup.Watchtowers) : FString(TEXT("None")), ETMHudAction::SetupTowers,
+		TEXT("Towers in mirrored pairs. A unit that ends its turn at one, with no enemy there, puts the turn into taking it."));
+	Add(TEXT("Item points"), Setup.ItemBudget > 0 ? FString::Printf(TEXT("%d per side"), Setup.ItemBudget) : FString(TEXT("No items")),
+		ETMHudAction::SetupItemBudget, TEXT("Points each side spends on items before the battle: common 1, uncommon 2, rare 3. Click a unit's item slot above to buy."));
+	static const TCHAR* CampWords[] = { TEXT("Off"), TEXT("Light"), TEXT("Standard"), TEXT("Wild") };
+	Add(TEXT("Camps"), CampWords[FMath::Clamp(Setup.CampLevel, 0, 3)], ETMHudAction::SetupCamps,
+		TEXT("Monster camps in mirrored pairs, waking over time; Standard and Wild have the map's boss."));
+	Add(TEXT("Respawns"), Setup.bCampRespawn ? FString(TEXT("Camps come back")) : FString(TEXT("Off")), ETMHudAction::SetupCampRespawn,
+		TEXT("On, a cleared camp wakes again a while later."));
+	const TMSim::FJobDef* Boss = TMSim::FindJob(Map.Boss);
+	Add(TEXT("Boss"), Setup.bRandomBoss ? FString(TEXT("Random")) : FString::Printf(TEXT("%hs"), Boss ? Boss->Name.c_str() : "none"), ETMHudAction::SetupBoss,
+		TEXT("The map's own boss, or any, chosen by the battle's seed."));
+	Add(TEXT("Elements"), Setup.bElements ? FString(TEXT("Reactions on")) : FString(TEXT("Off")), ETMHudAction::SetupElements,
+		TEXT("Water leaves Wet, ice Chills; lightning stuns the Wet, ice freezes them, fire burns the Oiled."));
+	Add(TEXT("Friendly fire"), Setup.bFriendlyFire ? FString(TEXT("On")) : FString(TEXT("Off")), ETMHudAction::SetupFriendlyFire,
+		TEXT("On: area blows aimed at the enemy also hurt your own units standing in them."));
+	Add(TEXT("Bosses hunt"), Setup.bBossHunt ? FString(TEXT("On")) : FString(TEXT("Off")), ETMHudAction::SetupBossHunt,
+		TEXT("On: a boss goes after whoever has hurt it most."));
+	Add(TEXT("Claim boss"), Setup.bBossClaim ? FString(TEXT("On")) : FString(TEXT("Off")), ETMHudAction::SetupBossClaim,
+		TEXT("On: the side that lands the last blow on the boss gets the Boss's Boon."));
+	static const TCHAR* WalkWords[] = { TEXT("Free walking"), TEXT("Tiles, 4 ways"), TEXT("Tiles, 8 ways") };
+	Add(TEXT("Movement"), WalkWords[FMath::Clamp(Setup.TileMove, 0, 2)], ETMHudAction::SetupTileMove,
+		TEXT("Free: any spot within Move metres. Tiles: from tile to tile, 2 m a step, four ways or eight (a diagonal 3 m)."));
+	Add(TEXT("Draft"), Setup.bDraft ? FString(TEXT("On")) : FString(TEXT("Off")), ETMHudAction::DraftToggle,
+		TEXT("Bans and serpentine picks: a class banned or taken is gone for everyone."));
+	if (Setup.bDraft)
+	{
+		Add(TEXT("Pick timer"), Setup.DraftSeconds > 0 ? FString::Printf(TEXT("%d s"), Setup.DraftSeconds) : FString(TEXT("Off")), ETMHudAction::DraftTimer,
+			TEXT("Seconds for each ban and pick."));
+	}
+	return Out;
 }
 
 FString ATMBattleDirector::LobbyRules() const
@@ -301,6 +384,10 @@ FString ATMBattleDirector::LobbyRules() const
 	if (Setup.bFriendlyFire)
 	{
 		Parts.Add(TEXT("friendly fire"));
+	}
+	if (Setup.TileMove > 0)
+	{
+		Parts.Add(Setup.TileMove == 1 ? TEXT("tiles, 4 ways") : TEXT("tiles, 8 ways"));
 	}
 	return FString::Join(Parts, TEXT(" · "));
 }
@@ -498,6 +585,71 @@ void ATMBattleDirector::LobbyApplyPick(int32 Player, int32 SlotCode, const std::
 	BroadcastLobby();
 }
 
+void ATMBattleDirector::LobbyItem(int32 SlotCode, const std::string& ItemId)
+{
+	if (Net.IsValid() && Net->IsHost())
+	{
+		LobbyApplyItem(0, SlotCode, ItemId);
+		return;
+	}
+	SendOnline(TEXT("item"), [SlotCode, &ItemId](FJsonObject& Message)
+	{
+		Message.SetNumberField(TEXT("slot"), SlotCode);
+		Message.SetStringField(TEXT("item"), UTF8_TO_TCHAR(ItemId.c_str()));
+	});
+}
+
+void ATMBattleDirector::LobbyApplyItem(int32 Player, int32 SlotCode, const std::string& ItemId)
+{
+	// A unit's items are its player's to buy (the host buys the computer's), from its side's points.
+	if (SlotCode < 0 || SlotCode >= 24 || !LobbyMayPick(Player, (SlotCode / 12) * TMLobby::Slots + (SlotCode % 12) / 3)
+		|| !ItemChoiceProblem(SlotCode, ItemId).IsEmpty())
+	{
+		return;
+	}
+	Setup.Items[SlotCode / 12][(SlotCode % 12) / 3][SlotCode % 3] = ItemId;
+	BuildBattle();
+	BroadcastLobby();
+}
+
+std::string ATMBattleDirector::RandomClassFor(int32 Team, int32 Slot, const TSet<FString>& AlsoAvoid, int32 RoleIndex) const
+{
+	const char* Roles[4] = { "tank", "damage", "support", "special" };
+	TArray<const TMSim::FJobDef*> Fits;
+	for (const TMSim::FJobDef* Job : TMSim::AllJobs())
+	{
+		if (Job->Id == Setup.Rosters[FMath::Clamp(Team, 0, 1)][FMath::Clamp(Slot, 0, 3)]
+			|| AlsoAvoid.Contains(UTF8_TO_TCHAR(Job->Id.c_str()))
+			|| (Setup.bUniqueClasses && ClassTaken(Job->Id, Team, Slot))
+			|| (RoleIndex >= 0 && RoleIndex < 4 && !TMSim::JobHasRole(Job->Id, Roles[RoleIndex])))
+		{
+			continue;
+		}
+		Fits.Add(Job);
+	}
+	return Fits.Num() > 0 ? Fits[FMath::RandRange(0, Fits.Num() - 1)]->Id : std::string();
+}
+
+void ATMBattleDirector::LobbyRandom()
+{
+	// Each of this player's own slots, a different class each, asked of the host in turn.
+	TSet<FString> Rolled;
+	for (int32 Code = 0; Code < 2 * TMLobby::Slots; ++Code)
+	{
+		const int32 Holder = SlotOwner(Code / TMLobby::Slots, Code % TMLobby::Slots);
+		if (Holder != LocalPlayer)
+		{
+			continue;
+		}
+		const std::string Job = RandomClassFor(Code / TMLobby::Slots, Code % TMLobby::Slots, Rolled, -1);
+		if (!Job.empty())
+		{
+			Rolled.Add(UTF8_TO_TCHAR(Job.c_str()));
+			LobbyPick(Code, Job);
+		}
+	}
+}
+
 // ---------------------------------------------------------------- the messages
 
 bool ATMBattleDirector::OnLobbyMessage(const FString& Kind, const FJsonObject& Message, int32 From)
@@ -508,7 +660,7 @@ bool ATMBattleDirector::OnLobbyMessage(const FString& Kind, const FJsonObject& M
 		const int32 Player = PlayerOfPeer(From);
 		if (Player < 0 || Screen != EScreen::Lobby)
 		{
-			return Kind == TEXT("side") || Kind == TEXT("ready") || Kind == TEXT("pick");
+			return Kind == TEXT("side") || Kind == TEXT("ready") || Kind == TEXT("pick") || Kind == TEXT("item");
 		}
 		if (Kind == TEXT("side"))
 		{
@@ -539,6 +691,15 @@ bool ATMBattleDirector::OnLobbyMessage(const FString& Kind, const FJsonObject& M
 			Message.TryGetNumberField(TEXT("slot"), Slot);
 			Message.TryGetStringField(TEXT("class"), Job);
 			LobbyApplyPick(Player, Slot, TCHAR_TO_UTF8(*Job));
+			return true;
+		}
+		if (Kind == TEXT("item"))
+		{
+			int32 Slot = -1;
+			FString Item;
+			Message.TryGetNumberField(TEXT("slot"), Slot);
+			Message.TryGetStringField(TEXT("item"), Item);
+			LobbyApplyItem(Player, Slot, TCHAR_TO_UTF8(*Item));
 			return true;
 		}
 		return false;
@@ -617,6 +778,37 @@ void ATMBattleDirector::ApplyLobby(const FJsonObject& Message)
 	Message.TryGetBoolField(TEXT("draft"), Setup.bDraft);
 	Message.TryGetBoolField(TEXT("unique"), Setup.bUniqueClasses);
 	Message.TryGetNumberField(TEXT("draft_seconds"), Setup.DraftSeconds);
+	// v20: the host's settings to show, the item points and what each unit carries.
+	LobbySettingsTold.Reset();
+	const TArray<TSharedPtr<FJsonValue>>* Rows = nullptr;
+	if (Message.TryGetArrayField(TEXT("settings"), Rows))
+	{
+		for (const TSharedPtr<FJsonValue>& Value : *Rows)
+		{
+			const TArray<TSharedPtr<FJsonValue>>* Pair = nullptr;
+			if (Value->TryGetArray(Pair) && Pair->Num() == 2)
+			{
+				FTMSettingRow Row;
+				Row.Label = (*Pair)[0]->AsString();
+				Row.Value = (*Pair)[1]->AsString();
+				LobbySettingsTold.Add(Row);
+			}
+		}
+	}
+	int32 Budget = Setup.ItemBudget;
+	if (Message.TryGetNumberField(TEXT("item_budget"), Budget))
+	{
+		Setup.ItemBudget = FMath::Clamp(Budget, 0, 20);
+	}
+	const TArray<TSharedPtr<FJsonValue>>* Carried = nullptr;
+	if (Message.TryGetArrayField(TEXT("items"), Carried) && Carried->Num() == 24)
+	{
+		for (int32 Code = 0; Code < 24; ++Code)
+		{
+			const std::string Id = TCHAR_TO_UTF8(*(*Carried)[Code]->AsString());
+			Setup.Items[Code / 12][(Code % 12) / 3][Code % 3] = TMSim::FindItem(Id) ? Id : std::string();
+		}
+	}
 	OnlineStatus.Reset();
 	Setup.Mode = TEXT("online");
 	if (Screen != EScreen::Lobby)

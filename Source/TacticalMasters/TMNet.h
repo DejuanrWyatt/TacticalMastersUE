@@ -12,6 +12,13 @@
 // TCP is reliable and ordered by itself, so the router port a host opens is TCP,
 // not UDP. Everything is non-blocking and polled once a frame from the
 // director's Tick, so nothing here ever holds the game up waiting on the network.
+//
+// A player can also come through Epic Online Services (TMEos.h,
+// Docs/design/feat-online-eos.md): the host offers a six-letter join code as
+// well as its port, and a friend who types the code is connected through
+// Epic's servers, relayed if the routers won't let the two PCs meet. Such a
+// peer carries the same byte stream, cut into EOS packets, so the framing,
+// Send/SendTo/Kick and everything after are the same for both kinds of peer.
 
 #pragma once
 
@@ -24,7 +31,7 @@ class FTMNet
 {
 public:
 	/** Bumped whenever the rules or the messages change: two builds that differ can't play each other. */
-	static constexpr int32 ProtocolVersion = 21;  // 2: watchtowers (the capture order, three rule numbers); 3: items (loadouts, the item budget); 4: neutral camps (take and drop orders, seven ability slots); 5: the second set of statuses (element reactions); 6: walking onto items picks them up; 7: towers see their whole radius, nothing blocking; 8: the lobby (up to four players, sides chosen) and the draft; 9: friendly fire; 10: the team stash (items picked up go to the side, equipped from it, taking one off is a turn); 11: camp respawns a setup option, off by default; 12: walks by waypoints (the move order carries them); 13: Armor/Resist as a share, one Evasion that dodges or grazes; 14: zone of control (a 40th rule number), the Knight and Archer rebalanced; 15: camp noise, clean kills, boss wind-ups broken by stagger, the boss's hunt and claim (two rule numbers); 16: a walk can say which way to face on arrival (the move order's "f"); 17: movement skills (leap, behind), an ability's self status, the Ninja, Berserker and eight more classes reworked, summoners' pets and the 2026-10-02 class balance; 18: the 2026-10-03 class tuning pass (35 class files); 19: casters' signatures and hexers' status curses (eleven new abilities); 20: the held buffs and nerfs (seven class files); 21: the v19 play test (springs rest, tall grass, three rule numbers, map files with "grass")
+	static constexpr int32 ProtocolVersion = 27;  // 2: watchtowers (the capture order, three rule numbers); 3: items (loadouts, the item budget); 4: neutral camps (take and drop orders, seven ability slots); 5: the second set of statuses (element reactions); 6: walking onto items picks them up; 7: towers see their whole radius, nothing blocking; 8: the lobby (up to four players, sides chosen) and the draft; 9: friendly fire; 10: the team stash (items picked up go to the side, equipped from it, taking one off is a turn); 11: camp respawns a setup option, off by default; 12: walks by waypoints (the move order carries them); 13: Armor/Resist as a share, one Evasion that dodges or grazes; 14: zone of control (a 40th rule number), the Knight and Archer rebalanced; 15: camp noise, clean kills, boss wind-ups broken by stagger, the boss's hunt and claim (two rule numbers); 16: a walk can say which way to face on arrival (the move order's "f"); 17: movement skills (leap, behind), an ability's self status, the Ninja, Berserker and eight more classes reworked, summoners' pets and the 2026-10-02 class balance; 18: the 2026-10-03 class tuning pass (35 class files); 19: casters' signatures and hexers' status curses (eleven new abilities); 20: the held buffs and nerfs (seven class files); 21: the v19 play test (springs rest, tall grass, three rule numbers, map files with "grass"); 22: the v20 play test (a turn ended at a watchtower captures it; the lobby carries every setting and each unit's items, and the "item" message); 23: the v21 play test (casts four times as long, bosses' reach, a 46th rule number); 24: ground zones (twelve area denial abilities in twelve class files, three event kinds); 25: the unique and mobility spells (thirty abilities in thirty class files, eight statuses); 26: the ground's distances walked node to node with tile movement on (towers and camps placed again); 27: four codex picks with rules of their own (warned, ricochet, execute, crowd) and thirteen class files
 	static constexpr int32 DefaultPort = 7777;
 	/** Players a host takes besides itself: four in all. */
 	static constexpr int32 MaxPeers = 3;
@@ -37,6 +44,12 @@ public:
 	FString Host(int32 Port);
 	/** Starts connecting to a host. Returns "" or what went wrong (the connection itself is reported later). */
 	FString Join(const FString& Address, int32 Port);
+	/** Hosting (with or without a port): also offers the game by a join code, once Epic's sign-in is ready. */
+	void OfferCode();
+	/** Starts joining the game with this join code (TMEos.h). Returns "" or what went wrong (the rest comes later, as for Join). */
+	FString JoinCode(const FString& Code);
+	/** The join code: the one this host offers, once made, or the one this player joined with. */
+	FString Code() const;
 	/** Drops every connection and stops listening. */
 	void Close();
 
@@ -75,6 +88,8 @@ public:
 	TArray<TPair<int32, FString>> Departed;
 	/** Joining: set once when the host goes, or the join fails; says why. */
 	FString Lost;
+	/** The join code's progress, for the screen: made, looking, found, or why there is none. Set when it changes. */
+	FString CodeNews;
 
 	/** Hosting: whether new players are let in (the lobby) or turned away (a battle). */
 	bool bAccepting = true;
@@ -87,10 +102,23 @@ private:
 	float ConnectingFor = 0.0f;
 	int32 NextPeerId = 1;
 
+	/** Through a join code: the host wants one made, or this player is joining with one. */
+	bool bWantCode = false;
+	bool bJoiningByCode = false;
+	/** The join code being looked for (joining), until Epic's sign-in is ready to look. */
+	FString WantedCode;
+	/** The lobby's state last frame, to tell the screen when it changes. */
+	uint8 LastLobby = 0;
+	/** Hosting: the sign-in's failure was told once. */
+	bool bCodeRefusalTold = false;
+
 	struct FPeer
 	{
 		int32 Id = 0;
+		/** A TCP peer's connection; null for a peer through Epic. */
 		FSocket* Socket = nullptr;
+		/** A peer through Epic: its Product User ID. */
+		FString EosUser;
 		bool bConnected = false;
 		TArray<uint8> Outgoing;
 		TArray<uint8> Incoming;
@@ -101,18 +129,28 @@ private:
 	struct FTurnedAway
 	{
 		FSocket* Socket = nullptr;
+		FString EosUser;
 		TArray<uint8> Outgoing;
 		float Age = 0.0f;
 	};
 	TArray<FTurnedAway> TurnedAway;
 
 	FPeer* FindPeer(int32 PeerId);
+	int32 FindEosPeer(const FString& User) const;
 	static void Frame(const TSharedRef<FJsonObject>& Message, TArray<uint8>& Into);
 	/** Sends what it can; false if the connection is gone. */
 	static bool Flush(FSocket* Socket, TArray<uint8>& Bytes);
+	/** The same for a peer through Epic: the bytes cut into packets. */
+	static bool FlushEos(const FString& User, TArray<uint8>& Bytes);
 	/** Reads what has come; false if the connection is gone or sent nonsense (Why says which). */
 	bool ReadPeer(FPeer& Peer, FString& Why);
+	/** Whole messages out of what has come; false if it is nonsense. */
+	bool TakeMessages(FPeer& Peer, FString& Why);
 	void DropPeer(int32 Index, const FString& Why);
-	void TurnAway(FSocket* Socket, TArray<uint8>&& Pending, const FString& Reason);
+	void TurnAway(FSocket* Socket, const FString& EosUser, TArray<uint8>&& Pending, const FString& Reason);
+	/** Hosting: a player through Epic has connected; let in, or turned away. Returns its index, or -1. */
+	int32 AddEosPeer(const FString& User);
+	/** The join code's lobby and connections, once a frame. */
+	void PollCode(float DeltaSeconds);
 	static void Destroy(FSocket*& Socket);
 };

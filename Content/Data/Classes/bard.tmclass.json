@@ -45,27 +45,31 @@
       }
     },
     {
-      "id": "bard_song_of_haste",
-      "name": "Song of Haste",
-      "desc": "Every ally within 3 m of a point up to 6 m away gains 25% TG (1.5 s).",
+      "id": "bard_echo",
+      "name": "Echo",
+      "desc": "Echo an ally up to 6 m away for 2 turns: the next damage or healing ability it uses goes off a second time, at half power.",
       "kind": "active",
       "effect": "support",
       "scale": "mag",
       "target": "ally",
-      "shape": "circle",
+      "shape": "unit",
       "power": 0,
       "min_range": 0,
       "max_range": 6,
-      "aoe": 3,
+      "aoe": 0,
       "cooldown": 3,
-      "cast": 1.5,
-      "tg": 25,
+      "cast": 0,
+      "status": {
+        "id": "echo",
+        "turns": 2
+      },
       "fx": "haste",
       "vfx": {
         "system": "/Game/ParagonSevarog/FX/Particles/Abilities/SoulStackPassive/FX/P_SoulStageEmbersBurst.P_SoulStageEmbersBurst",
         "at": "targets",
         "scale": 1
-      }
+      },
+      "anim": "buff"
     },
     {
       "id": "bard_lullaby",
@@ -124,6 +128,10 @@
     "reworded": {
       "on": "2026-10-02",
       "why": "Descriptions say what the abilities do (2026-10-02): Stun not sleep, Crit not the old Power, turns not seconds"
+    },
+    "rebalanced": {
+      "on": "2026-10-05",
+      "why": "Echo in place of Song of Haste (unique and mobility spells, 2026-10-05)."
     }
   }
 }

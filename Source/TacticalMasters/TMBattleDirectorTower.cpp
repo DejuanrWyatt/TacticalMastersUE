@@ -235,7 +235,8 @@ bool ATMBattleDirector::SeenWithoutKindling(int32 Team, const TMSim::FVec2& Poin
 			return true;
 		}
 	}
-	return false;
+	// And a ground zone that sees (2026-10-04): a flare, a ward, a lantern.
+	return !Battle.Zones.empty() && Battle.ZoneSees(Team, Point);
 }
 
 bool ATMBattleDirector::KindlingReaches(int32 Team, const TMSim::FVec2& Point) const

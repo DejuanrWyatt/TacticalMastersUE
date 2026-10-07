@@ -20,3 +20,7 @@ Content/Paragon*/
 Content/Characters/Mannequins/
 Content/Characters/Paragon/
 !Content/Characters/Paragon/.gitkeep
+
+# The Epic Online Services product's ids (Docs/design/feat-online-eos.md): they
+# ship inside every build, but there is no reason to publish them with the code.
+Content/Data/Online/eos-ids.json

@@ -113,6 +113,22 @@ namespace TMSim
 		}
 	}
 
+	FNode FBattle::TileNode(const FVec2& Point)
+	{
+		// The nodes are half a metre apart, four to a 2 m tile; the second of each
+		// row and column, so a tile's spot is a quarter metre off its middle.
+		constexpr int PerTile = Ground::NodesPerTile;
+		const FNode Node = FMap::NodeOf(Point);
+		const int TX = Node.X >= 0 ? Node.X / PerTile : (Node.X - PerTile + 1) / PerTile;
+		const int TY = Node.Y >= 0 ? Node.Y / PerTile : (Node.Y - PerTile + 1) / PerTile;
+		return FNode{ TX * PerTile + 1, TY * PerTile + 1 };
+	}
+
+	FVec2 FBattle::TileSpot(const FVec2& Point) const
+	{
+		return TilesOn() ? FMap::NodePos(TileNode(Point)) : FMap::Snap(Point);
+	}
+
 	void FBattle::RunDijkstra(const std::vector<FNode>& Starts, double MaxCost, int Team, int Jump)
 	{
 		const int Count = Map.NavX * Map.NavY;
@@ -166,6 +182,32 @@ namespace TMSim
 		HeapCost.clear();
 		HeapNode.clear();
 
+		// Tile movement (FTuning::TileMove): steps of a whole tile, from tile spot to
+		// tile spot; a unit standing off its tile's spot settles onto it for nothing.
+		const bool bTiles = Tuning.TileMove >= 0.5;
+		const int Ways = bTiles && Tuning.TileMove < 1.5 ? 4 : 8;
+		const int Stride = bTiles ? Ground::NodesPerTile : 1;
+		// A unit off its tile's spot (it spawned, leapt or was knocked there)
+		// settles onto its own tile's spot for nothing, or, when that spot is
+		// water, a wall, an enemy's or more than a jump away, onto a spot of a
+		// tile beside it for one tile's walk.
+		auto Settle = [&](int Si, const FNode& Onto, double At)
+		{
+			if (Onto.X < 0 || Onto.Y < 0 || Onto.X >= Map.NavX || Onto.Y >= Map.NavY)
+			{
+				return false;
+			}
+			const int Oi = Onto.Y * Map.NavX + Onto.X;
+			if (Map.NavLevels[Oi] <= 0 || Blocked[Oi] != 0 || std::abs(Map.NavLevels[Oi] - Map.NavLevels[Si]) > Jump
+				|| At > MaxCost + 0.001 || Cost[Oi] <= At)
+			{
+				return false;
+			}
+			Cost[Oi] = At;
+			Parent[Oi] = Si;
+			HeapPush(At, Oi);
+			return true;
+		};
 		for (const FNode& S : Starts)
 		{
 			if (S.X >= 0 && S.Y >= 0 && S.X < Map.NavX && S.Y < Map.NavY)
@@ -173,6 +215,14 @@ namespace TMSim
 				const int Si = S.Y * Map.NavX + S.X;
 				Cost[Si] = 0.0;
 				HeapPush(0.0, Si);
+				const FNode Own = TileNode(FMap::NodePos(S));
+				if (bTiles && !(Own == S) && !Settle(Si, Own, 0.0))
+				{
+					for (int k = 0; k < 4; ++k)
+					{
+						Settle(Si, FNode{ Own.X + DirX[k] * Stride, Own.Y + DirY[k] * Stride }, Ground::TileSize);
+					}
+				}
 			}
 		}
 
@@ -195,6 +245,68 @@ namespace TMSim
 			const int X = i % Map.NavX;
 			const int Y = i / Map.NavX;
 			const int Level = Map.NavLevels[i];
+
+			if (bTiles)
+			{
+				// Only from a tile's spot, to the next tiles' spots.
+				if (!(TileNode(FMap::NodePos(FNode{ X, Y })) == FNode{ X, Y }))
+				{
+					continue;
+				}
+				for (int k = 0; k < Ways; ++k)
+				{
+					const int Mx = X + DirX[k] * Stride;
+					const int My = Y + DirY[k] * Stride;
+					if (Mx < 0 || My < 0 || Mx >= Map.NavX || My >= Map.NavY)
+					{
+						continue;
+					}
+					// Every node on the way must be walkable ground, free of enemies,
+					// and each step within a jump of the last: no leaping a wall or a
+					// river in one tile. A diagonal also needs both tiles beside it.
+					bool bClear = true;
+					int Was = Level;
+					for (int s = 1; s <= Stride && bClear; ++s)
+					{
+						const int N = (Y + DirY[k] * s) * Map.NavX + (X + DirX[k] * s);
+						const int NLevel = Map.NavLevels[N];
+						bClear = NLevel > 0 && Blocked[N] == 0 && std::abs(NLevel - Was) <= Jump;
+						// No walking through a tank's zone to a tile beyond it: a walk ends
+						// in a zone, so only a step that ends in one may enter it.
+						if (bClear && bZones && s < Stride && Zoned[N] == 1)
+						{
+							const int End = My * Map.NavX + Mx;
+							bClear = Zoned[End] == 1;
+						}
+						Was = NLevel;
+					}
+					if (bClear && DirX[k] != 0 && DirY[k] != 0)
+					{
+						const int A = Y * Map.NavX + Mx;
+						const int B = My * Map.NavX + X;
+						bClear = Map.NavLevels[A] > 0 && Map.NavLevels[B] > 0 && Blocked[A] == 0 && Blocked[B] == 0
+							&& std::abs(Map.NavLevels[A] - Level) <= Jump && std::abs(Map.NavLevels[B] - Level) <= Jump;
+					}
+					if (!bClear)
+					{
+						continue;
+					}
+					const int M = My * Map.NavX + Mx;
+					double Next = C + (DirX[k] != 0 && DirY[k] != 0 ? Ground::TileSize * 1.5 : Ground::TileSize);
+					if (bEngaging && Engaged[i] == 1 && Engaged[M] == 0)
+					{
+						Next += EngageCost;
+					}
+					if (Next > MaxCost + 0.001 || Next >= Cost[M])
+					{
+						continue;
+					}
+					Cost[M] = Next;
+					Parent[M] = i;
+					HeapPush(Next, M);
+				}
+				continue;
+			}
 
 			for (int k = 0; k < 8; ++k)
 			{
@@ -756,6 +868,11 @@ namespace TMSim
 		if (!Unit->Statuses.empty() && Unit->HasStatus("suppressed"))
 		{
 			SuppressedMoved(*Unit, Report);
+		}
+		// Ground zones (2026-10-04): stopping in one is stepping into it.
+		if (!Zones.empty() && Unit->IsAlive())
+		{
+			ZonesAfterWalk(*Unit, Report);
 		}
 		return true;
 	}

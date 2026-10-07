@@ -2,6 +2,11 @@
 
 #include "TMDrawable.h"
 
+#include "AssetRegistry/AssetRegistryModule.h"
+#include "AssetRegistry/IAssetRegistry.h"
+#include "Materials/MaterialParameterCollection.h"
+#include "Modules/ModuleManager.h"
+
 #include "Components/SkeletalMeshComponent.h"
 #include "Engine/StaticMesh.h"
 #include "Engine/World.h"
@@ -34,6 +39,34 @@ namespace TMDrawable
 
 		/** Whether KeepBrokenLoaded runs before each garbage collection yet. */
 		bool bWatching = false;
+
+		/** Roots one collection, once; true if it was not kept before. */
+		bool Keep(UMaterialParameterCollection* Collection)
+		{
+			if (!IsValid(Collection) || Collection->IsRooted() || Collection->IsUnreachable()
+				|| Collection->HasAnyFlags(RF_ClassDefaultObject | RF_NeedLoad | RF_NeedPostLoad | RF_BeginDestroyed))
+			{
+				return false;
+			}
+			Collection->AddToRoot();
+			return true;
+		}
+
+		/** Pre-GC: any collection read in since, kept too. */
+		void KeepLoadedCollections()
+		{
+			if (!FPlatformProperties::RequiresCookedData() || !IsInGameThread())
+			{
+				return;
+			}
+			for (TObjectIterator<UMaterialParameterCollection> It; It; ++It)
+			{
+				if (Keep(*It))
+				{
+					UE_LOG(LogTemp, Log, TEXT("material parameter collection kept loaded for good: %s"), *It->GetPathName());
+				}
+			}
+		}
 	}
 
 	bool MaterialUsable(const UMaterialInterface* Material, const UWorld* World)
@@ -168,6 +201,31 @@ namespace TMDrawable
 		}
 	}
 
+	void KeepCollectionsLoaded()
+	{
+		if (!FPlatformProperties::RequiresCookedData() || !IsInGameThread())
+		{
+			return;
+		}
+		// Every one the build has, read in now, so none is ever read in and let
+		// go again during a battle.
+		IAssetRegistry& Registry = FModuleManager::LoadModuleChecked<FAssetRegistryModule>("AssetRegistry").Get();
+		TArray<FAssetData> Found;
+		Registry.GetAssetsByClass(UMaterialParameterCollection::StaticClass()->GetClassPathName(), Found);
+		int32 Kept = 0;
+		for (const FAssetData& Asset : Found)
+		{
+			if (UMaterialParameterCollection* Collection = Cast<UMaterialParameterCollection>(Asset.GetAsset()))
+			{
+				Keep(Collection);
+				++Kept;
+			}
+		}
+		// And any the registry did not list.
+		KeepLoadedCollections();
+		UE_LOG(LogTemp, Log, TEXT("material parameter collections kept loaded for good: %d of %d listed"), Kept, Found.Num());
+	}
+
 	void WatchBrokenMaterials()
 	{
 		if (bWatching)
@@ -176,7 +234,9 @@ namespace TMDrawable
 		}
 		bWatching = true;
 		FCoreUObjectDelegates::GetPreGarbageCollectDelegate().AddStatic(&KeepBrokenLoaded);
+		FCoreUObjectDelegates::GetPreGarbageCollectDelegate().AddStatic(&KeepLoadedCollections);
 		KeepBrokenLoaded();
+		KeepCollectionsLoaded();
 	}
 
 	void MendBody(USkeletalMeshComponent* Body)

@@ -44,25 +44,37 @@
       }
     },
     {
-      "id": "lumimancer_radiance",
-      "name": "Radiance",
-      "desc": "Every enemy within 2 m of a point 2-8 m away. (2 s)",
+      "id": "lumimancer_lantern_glow",
+      "name": "Lantern Glow",
+      "desc": "Hang a lantern over a point 2-8 m away for 2 of your turns. Your side sees within 2.5 m of it and finds units hiding there; an enemy that starts its turn there, or stops there, is Blinded (a quarter of its blows miss).",
       "kind": "active",
-      "effect": "damage",
+      "effect": "support",
       "scale": "mag",
       "target": "enemy",
       "shape": "circle",
-      "power": 37.8,
+      "power": 0,
       "min_range": 2,
       "max_range": 8,
-      "aoe": 2,
-      "cooldown": 2,
-      "cast": 2,
+      "aoe": 2.5,
+      "cooldown": 3,
+      "cast": 0.5,
+      "status": {
+        "id": "blind",
+        "turns": 1
+      },
       "fx": "holy_blade",
       "vfx": {
         "system": "/Game/ParagonSerath/FX/Particles/Abilities/Chastise/FX/P_WingBlastFallen.P_WingBlastFallen",
         "at": "point",
         "scale": 1
+      },
+      "anim": "area",
+      "special": "zone",
+      "element": "none",
+      "zone": {
+        "turns": 2,
+        "sight": 2.5,
+        "reveal": true
       }
     },
     {
@@ -113,8 +125,8 @@
   ],
   "creator": {
     "rebalanced": {
-      "on": "2026-10-03",
-      "why": "Prism Ward (Reflect on an ally) in place of Holy Staff"
+      "on": "2026-10-04",
+      "why": "Ground zone Lantern Glow in place of Radiance (area denial, 2026-10-04). Before that (2026-10-03): Prism Ward (Reflect on an ally) in place of Holy Staff"
     },
     "changedAt": "2026-10-03T03:45:00.000Z"
   }

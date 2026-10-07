@@ -70,28 +70,26 @@
       }
     },
     {
-      "id": "stone_brawler_stance",
-      "name": "Stance",
-      "desc": "Take a fighting stance",
-      "kind": "toggle",
-      "effect": "support",
-      "scale": "mag",
-      "target": "ally",
+      "id": "stone_brawler_echo_slam",
+      "name": "Echo Slam",
+      "desc": "Slam the ground: damage to enemies within 3 m, 20% more for each one caught beyond the first, and a short Stun.",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "att",
+      "target": "enemy",
       "shape": "self",
-      "power": 0,
+      "power": 30,
       "min_range": 0,
       "max_range": 0,
-      "aoe": 0,
-      "cooldown": 0,
+      "aoe": 3,
+      "cooldown": 3,
       "cast": 0,
-      "buffs": [
-        {
-          "stat": "attdef",
-          "amount": 4,
-          "turns": 2
-        }
-      ],
-      "fx": "focus"
+      "status": {
+        "id": "stun",
+        "turns": 1
+      },
+      "fx": "earth_slash",
+      "special": "crowd"
     },
     {
       "id": "stone_brawler_fury",
@@ -152,8 +150,26 @@
     "description": "Fast melee fighter",
     "measured": -26,
     "rebalanced": {
-      "on": "2026-10-04",
-      "why": "Held buffs 2026-10-04 (lab 18%): HP 100->120, Jab 32->45, Uppercut 44->62, Fury 49->69; now 49%"
+      "on": "2026-10-06",
+      "why": "Cire's Spell Codex pick B13 Echo Slam (crowd) in place of Stance (feat-codex-picks.md). Before that (2026-10-04): Held buffs 2026-10-04 (lab 18%): HP 100->120, Jab 32->45, Uppercut 44->62, Fury 49->69; now 49%"
+    },
+    "icons": {
+      "abilities": [
+        null,
+        null,
+        {
+          "backing": "circle",
+          "glyph": "burst",
+          "colour": "#d9a35a",
+          "style": "light",
+          "mark": "self",
+          "scale": 1,
+          "rotate": 0,
+          "badge": "earth",
+          "finish": "lit"
+        },
+        null
+      ]
     }
   }
 }

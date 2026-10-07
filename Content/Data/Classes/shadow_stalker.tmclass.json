@@ -78,29 +78,32 @@
       }
     },
     {
-      "id": "shadow_stalker_shadow_veil",
-      "name": "Shadow Veil",
-      "desc": "Slow every enemy within 2 m of a point 1-5 m away; Slows for 2 turns.",
+      "id": "shadow_stalker_smoke_veil",
+      "name": "Smoke Veil",
+      "desc": "Throw smoke over a point up to 5 m away (your own feet too) for 2 of your turns. Your side's units in it are hidden from the other side as in tall grass, until they strike, are hurt, or an enemy comes within 3 m.",
       "kind": "active",
       "effect": "support",
       "scale": "mag",
-      "target": "enemy",
+      "target": "ally",
       "shape": "circle",
       "power": 0,
-      "min_range": 1,
+      "min_range": 0,
       "max_range": 5,
       "aoe": 2,
       "cooldown": 3,
       "cast": 0,
-      "status": {
-        "id": "slow",
-        "turns": 2
-      },
       "fx": "haste",
       "vfx": {
         "system": "/Game/ParticleSystemVFXVol1/Systems/NS_EnergyVortex.NS_EnergyVortex",
-        "at": "targets",
+        "at": "point",
         "scale": 1
+      },
+      "anim": "area",
+      "special": "zone",
+      "element": "none",
+      "zone": {
+        "turns": 2,
+        "hide": true
       }
     },
     {
@@ -137,5 +140,11 @@
         "scale": 1
       }
     }
-  ]
+  ],
+  "creator": {
+    "rebalanced": {
+      "on": "2026-10-04",
+      "why": "Ground zone Smoke Veil in place of Shadow Veil (area denial, 2026-10-04)."
+    }
+  }
 }

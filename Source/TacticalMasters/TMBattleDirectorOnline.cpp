@@ -8,12 +8,14 @@
 // moves time. So both machines apply exactly the same orders in exactly the
 // same order, and since the rules are deterministic the two battles are the
 // same battle -- which the host's checksums, every five seconds of battle,
-// keep proving. The connection itself is FTMNet's (TMNet.cpp).
+// keep proving. The connection itself is FTMNet's (TMNet.cpp), by address or
+// by a join code through Epic Online Services (TMEos.cpp).
 
 #include "TMBattleDirector.h"
 
 #include "Framework/Application/SlateApplication.h"
 #include "HAL/FileManager.h"
+#include "HAL/PlatformApplicationMisc.h"
 #include "Misc/App.h"
 #include "Misc/FileHelper.h"
 #include "Misc/Paths.h"
@@ -23,6 +25,7 @@
 #include "SimClassFile.h"
 #include "SimMap.h"
 #include "SimOrderText.h"
+#include "TMEos.h"
 #include "TMSettings.h"
 #include "TMTextInput.h"
 #include "TMViewportClient.h"
@@ -103,6 +106,8 @@ void ATMBattleDirector::OpenOnline()
 	Screen = EScreen::Online;
 	bMenuOpen = false;
 	bPaused = false;
+	// Epic's sign-in, in the background, so a code can be made or looked up (once; again after a failure).
+	FTMEos::Get().Start(LocalName());
 }
 
 void ATMBattleDirector::HostOnline()
@@ -110,13 +115,31 @@ void ATMBattleDirector::HostOnline()
 	const int32 Port = FMath::Clamp(FCString::Atoi(*JoinPort), 1, 65535);
 	Net = MakeUnique<FTMNet>();
 	const FString Refused = Net->Host(Port);
-	if (!Refused.IsEmpty())
+	// A join code too, when Epic's sign-in was started (the online screen starts it; the online test's -tmhost doesn't).
+	const FTMEos::EState Eos = FTMEos::Get().GetState();
+	const bool bCode = Eos == FTMEos::EState::SigningIn || Eos == FTMEos::EState::Ready || Eos == FTMEos::EState::Failed;
+	if (!Refused.IsEmpty() && !bCode)
 	{
 		OnlineStatus = Refused;
 		Net.Reset();
 		return;
 	}
-	OnlineStatus = FString::Printf(TEXT("Hosting on port %d. Waiting for players..."), Port);
+	if (bCode)
+	{
+		Net->OfferCode();
+	}
+	OnlineCode.Reset();
+	if (!Refused.IsEmpty())
+	{
+		// The port is taken, but a join code still works.
+		OnlineStatus = TEXT("Hosting. Making a join code...");
+		OnlineAddresses = Refused + TEXT(" Joining by address won't work, but the join code will.");
+		OnlineRouter.Reset();
+		UE_LOG(LogTemp, Log, TEXT("ONLINE: hosting by join code only (%s)"), *Refused);
+		StartLobby();
+		return;
+	}
+	OnlineStatus = bCode ? FString(TEXT("Hosting. Making a join code...")) : FString::Printf(TEXT("Hosting on port %d. Waiting for players..."), Port);
 	// The addresses a player on the same network would type (main_menu.gd:204-210).
 	TArray<FString> Near;
 	TArray<TSharedPtr<FInternetAddr>> Mine;
@@ -170,10 +193,39 @@ void ATMBattleDirector::JoinOnline()
 	UE_LOG(LogTemp, Log, TEXT("ONLINE: joining %s:%d"), *Address, Port);
 }
 
+void ATMBattleDirector::JoinByCode()
+{
+	OnlineAddresses.Reset();
+	OnlineRouter.Reset();
+	OnlineCode.Reset();
+	Net = MakeUnique<FTMNet>();
+	const FString Refused = Net->JoinCode(JoinCodeText);
+	if (!Refused.IsEmpty())
+	{
+		OnlineStatus = Refused;
+		Net.Reset();
+		return;
+	}
+	OnlineCode = Net->Code();
+	OnlineStatus = FTMEos::Get().IsReady() ? FString::Printf(TEXT("Looking for the game %s..."), *OnlineCode)
+		: FString(TEXT("Signing in to Epic's online services, then looking for the game..."));
+	UE_LOG(LogTemp, Log, TEXT("ONLINE: joining by the code %s"), *OnlineCode);
+}
+
+void ATMBattleDirector::CopyOnlineCode()
+{
+	if (!OnlineCode.IsEmpty())
+	{
+		FPlatformApplicationMisc::ClipboardCopy(*OnlineCode);
+		CodeCopiedAt = FPlatformTime::Seconds();
+	}
+}
+
 void ATMBattleDirector::LeaveOnline()
 {
 	Upnp.Reset();
 	Net.Reset();
+	OnlineCode.Reset();
 	const bool bWasOnline = Setup.Mode == TEXT("online");
 	bOnline = false;
 	bOnlineHost = false;
@@ -221,8 +273,9 @@ void ATMBattleDirector::StartTyping(ETypeField Field)
 	{
 		return;
 	}
-	FString* Into = Field == ETypeField::Address ? &JoinAddress : Field == ETypeField::Port ? &JoinPort : &ChatLine;
-	const int32 Longest = Field == ETypeField::Chat ? MaxChat : Field == ETypeField::Port ? 5 : 200;
+	FString* Into = Field == ETypeField::Address ? &JoinAddress : Field == ETypeField::Port ? &JoinPort
+		: Field == ETypeField::Code ? &JoinCodeText : &ChatLine;
+	const int32 Longest = Field == ETypeField::Chat ? MaxChat : Field == ETypeField::Port ? 5 : Field == ETypeField::Code ? 9 : 200;
 	Typing = Field;
 	TextInput->Begin(Into, Longest, [this](bool bSubmit) { TypedDone(bSubmit); });
 }
@@ -247,6 +300,14 @@ void ATMBattleDirector::TypedDone(bool bSubmit)
 	else if (Was == ETypeField::Address && bSubmit)
 	{
 		JoinOnline();
+	}
+	else if (Was == ETypeField::Code)
+	{
+		JoinCodeText = JoinCodeText.ToUpper();
+		if (bSubmit)
+		{
+			JoinByCode();
+		}
 	}
 }
 
@@ -306,6 +367,18 @@ void ATMBattleDirector::AdvanceOnline(float DeltaSeconds)
 		return;
 	}
 	Net->Poll(DeltaSeconds);
+	if (!Net->CodeNews.IsEmpty())
+	{
+		// The join code's progress: made (hosting), looking and found (joining), or why there is none.
+		OnlineStatus = Net->CodeNews;
+		Net->CodeNews.Reset();
+		const FString Code = Net->Code();
+		if (!Code.IsEmpty())
+		{
+			OnlineCode = Code;
+		}
+		UE_LOG(LogTemp, Log, TEXT("ONLINE: %s"), *OnlineStatus);
+	}
 	if (Net->bJustConnected)
 	{
 		// net.gd:168-170: say hello with this build's version, and a name.
@@ -658,6 +731,8 @@ void ATMBattleDirector::StartOnlineAsHost()
 		// The boss's hunt and claim (protocol 15).
 		Message.SetBoolField(TEXT("boss_hunt"), Setup.bBossHunt);
 		Message.SetBoolField(TEXT("boss_claim"), Setup.bBossClaim);
+		// Tile movement (protocol 22).
+		Message.SetNumberField(TEXT("tile_move"), Setup.TileMove);
 		Message.SetStringField(TEXT("camp_files"), FString::Printf(TEXT("%08x-%08x"), FolderPrint(TEXT("Monsters")), FolderPrint(TEXT("Items"))));
 		TArray<TSharedPtr<FJsonValue>> Carried;
 		for (int32 Team = 0; Team < 2; ++Team)
@@ -831,6 +906,8 @@ FString ATMBattleDirector::StartOnlineFrom(const FJsonObject& Start)
 	Next.bBossHunt = Start.TryGetBoolField(TEXT("boss_hunt"), bBossHunt) && bBossHunt;
 	bool bBossClaim = false;
 	Next.bBossClaim = Start.TryGetBoolField(TEXT("boss_claim"), bBossClaim) && bBossClaim;
+	int32 TileMove = 0;
+	Next.TileMove = Start.TryGetNumberField(TEXT("tile_move"), TileMove) ? FMath::Clamp(TileMove, 0, 2) : 0;
 	if (Next.CampLevel > 0)
 	{
 		FString Theirs;

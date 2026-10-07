@@ -24,6 +24,31 @@ TMBattleDirectorReport.cpp), so a replay tallies the same numbers. Per unit of t
 
 ## Points
 
+Revalued after the v20 play test (2026-10-04: "more accurately depict the value of each unit";
+`ATMBattleDirector::ValueParts`). The last blow used to take 12 and everyone else 5, so whoever stole a kill was
+the MVP; a tank was paid for being hit rather than for what it stopped; a shield was worth nothing to its caster.
+
+| | Points |
+|---|---|
+| Damage to the other side | 1 per 10 |
+| Damage to monsters | 0.4 per 10 |
+| Takedown (an enemy unit falls) | 15 shared by the other side's units by what they did to it in the minute before (damage, and a turn of control as 15% of its health in damage); 3 more for the last blow |
+| Damage taken | 0.2 per 10 |
+| Mitigated | 0.5 per 10 |
+| Taken for an ally (Guard) | 0.5 per 10, on top of the above |
+| Healing; shields on allies (what they soaked) | 1 per 10 |
+| Knocked out | -8 |
+| Monster, boss | 4, 15 |
+| Buff, debuff | 2 each |
+| Turn of control | 4 |
+| Revive | 12 |
+| Tower | 8 |
+
+Knock-outs and assists are still counted and shown; they no longer carry points of their own. A unit's page lists
+where its points came from. The weights below are the first version's, kept for the record.
+
+### The first version (2026-10-02)
+
 1 per 10 damage, 0.4 per 10 taken, 0.3 per 10 mitigated, 1 per 10 healing; 12 a knock-out, 5 an assist,
 -10 knocked out; 4 a monster, 15 a boss; 2 a buff, 2 a debuff, 3 a turn of control, 10 a revive, 8 a tower.
 Kept to the tenth. The MVP has the most; a tie goes to fewer falls, then more damage. Grades: S the MVP, A within

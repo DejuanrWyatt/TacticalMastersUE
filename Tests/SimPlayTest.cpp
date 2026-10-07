@@ -487,7 +487,7 @@ int main()
 		// budget, the camps' two, element reactions and friendly fire after them
 		// (not Godot's), so every older rule keeps its index; the boss's hunt and
 		// claim last (2026-10-02).
-		if (TuningKeys().size() != 44 || Speed < 0 || KoSeconds < 0
+		if (TuningKeys().size() != 46 || Speed < 0 || KoSeconds < 0
 			|| std::string(TuningKeys()[27].Key) != "battle_seconds"
 			|| std::string(TuningKeys()[28].Key) != "watchtower_count"
 			|| std::string(TuningKeys()[32].Key) != "camps"
@@ -499,9 +499,25 @@ int main()
 			|| std::string(TuningKeys()[40].Key) != "boss_hunt"
 			|| std::string(TuningKeys()[41].Key) != "boss_claim"
 			|| std::string(TuningKeys()[42].Key) != "spring_percent"
-			|| std::string(TuningKeys()[43].Key) != "spring_rest_turns")
+			|| std::string(TuningKeys()[43].Key) != "spring_rest_turns"
+			|| std::string(TuningKeys()[44].Key) != "tile_move"
+			|| std::string(TuningKeys()[45].Key) != "boss_aggro")
 		{
 			Fail("the tuning table should have Godot's 28 rule numbers, then the watchtowers' three, the item budget, the camps' two, elements and friendly fire");
+		}
+		// Bosses' reach (v21 play test): a boss's only, 1 by default, 1.5 in the game.
+		{
+			FBattle Reach;
+			FMonsterInfo Boss;
+			Boss.Tier = 3;
+			FMonsterInfo Wolf;
+			Wolf.Tier = 1;
+			const bool bDefault = Reach.AggroScale(Boss) == 1.0;
+			Reach.Tuning = GameTuning();
+			if (!bDefault || Reach.AggroScale(Boss) != 1.5 || Reach.AggroScale(Wolf) != 1.0 || Reach.Tuning.CastTimeMultiplier != 4.0)
+			{
+				Fail("a boss's notice and chase range should be 1x by default, 1.5x in the game, and never another monster's");
+			}
 		}
 		const FOrder Tune = FOrder::MakeTune({ { Speed, 1.5 }, { KoSeconds, 999.0 } });
 		if (!Tuned.Validate(Tune).empty())

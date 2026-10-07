@@ -44,30 +44,28 @@
       }
     },
     {
-      "id": "sky_lancer_take_wing",
-      "name": "Take Wing",
-      "desc": "Takes to the air for 3 turns: climbs any height, and blows at arm's length cannot reach it.",
+      "id": "sky_lancer_grapple",
+      "name": "Grapple",
+      "desc": "Fire a line at an ally 2-8 m away and land beside it, whatever stands between.",
       "kind": "active",
       "effect": "support",
       "scale": "mag",
       "target": "ally",
-      "shape": "self",
+      "shape": "unit",
       "power": 0,
-      "min_range": 0,
-      "max_range": 0,
+      "min_range": 2,
+      "max_range": 8,
       "aoe": 0,
-      "cooldown": 4,
+      "cooldown": 3,
       "cast": 0,
-      "status": {
-        "id": "fly",
-        "turns": 3
-      },
       "fx": "haste",
       "vfx": {
         "system": "/Game/FreeParticle_SoftTofu/Niagara/NS_Sparkling_Star.NS_Sparkling_Star",
         "at": "user",
         "scale": 1
-      }
+      },
+      "anim": "dash",
+      "special": "leap"
     },
     {
       "id": "sky_lancer_diving_charge",
@@ -149,15 +147,7 @@
           "scale": 1,
           "rotate": 0
         },
-        {
-          "backing": "circle",
-          "glyph": "swirl",
-          "colour": "#9fe0c0",
-          "style": "light",
-          "mark": "none",
-          "scale": 1,
-          "rotate": 0
-        },
+        null,
         {
           "backing": "circle",
           "glyph": "arrow",
@@ -191,8 +181,8 @@
       "against": "reference team, medium"
     },
     "rebalanced": {
-      "on": "2026-10-03",
-      "why": "Tuning pass 2026-10-03 (lab 14% in place of the Black Mage): HP 70->87, power +48%"
+      "on": "2026-10-05",
+      "why": "Grapple in place of Take Wing (unique and mobility spells, 2026-10-05). Before that (2026-10-03): Tuning pass 2026-10-03 (lab 14% in place of the Black Mage): HP 70->87, power +48%"
     }
   }
 }

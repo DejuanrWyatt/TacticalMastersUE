@@ -168,6 +168,65 @@ UObject* ATMBattleDirector::LoadLookFx(const FString& Key)
 	return Known->Get();
 }
 
+void ATMBattleDirector::AdvanceAuraFx()
+{
+	// Each unit with an aura wears its look's aura effect at its feet, a little
+	// wider than the unit, kept playing (a one-shot effect is started again as it
+	// ends), and put out while the unit is down, gone or out of sight.
+	TSet<int32> Wanted;
+	const bool bBattle = Screen == EScreen::Battle;
+	for (int32 i = 0; bBattle && i < static_cast<int32>(Battle.Units.size()) && i < UnitVisuals.Num(); ++i)
+	{
+		const TMSim::FUnit& Unit = Battle.Units[static_cast<size_t>(i)];
+		const TMSim::FAbility* Aura = nullptr;
+		for (int32 Slot = 0; Slot < TMSim::ClassSlots && !Aura; ++Slot)
+		{
+			const TMSim::FAbility* Ability = Unit.Ability(Slot);
+			Aura = Ability && Ability->Kind == "aura" ? Ability : nullptr;
+		}
+		if (!Aura || !UnitVisuals[i] || !Unit.IsAlive() || Unit.bOffBoard || !IsSeen(Unit))
+		{
+			continue;
+		}
+		const TMCast::FLegacyFlavour& Set = TMCast::LegacyFlavour(LookOf(*Aura).Flavour);
+		const TMCast::FLegacyFx& Fx = Set.Aura.IsSet() ? Set.Aura : Set.Cast;
+		if (!Fx.IsSet())
+		{
+			continue;
+		}
+		Wanted.Add(Unit.Id);
+		FTMAuraFx& Held = AuraFx.FindOrAdd(Unit.Id);
+		const FString Path = UTF8_TO_TCHAR(Fx.Path);
+		UFXSystemComponent* Playing = Held.Playing.Get();
+		if (!Playing || Held.Path != Path || Playing->GetAttachParent() != UnitVisuals[i])
+		{
+			if (Playing)
+			{
+				Playing->DestroyComponent();
+			}
+			Playing = PlayFx(Fx, FVector::ZeroVector, 180.0f * UnitSize, UnitVisuals[i]);
+			Held.Playing = Playing;
+			Held.Path = Path;
+		}
+		else if (!Playing->IsActive())
+		{
+			Playing->Activate(true);
+		}
+	}
+	// The rest put out.
+	for (auto It = AuraFx.CreateIterator(); It; ++It)
+	{
+		if (!Wanted.Contains(It.Key()))
+		{
+			if (UFXSystemComponent* Playing = It.Value().Playing.Get())
+			{
+				Playing->DestroyComponent();
+			}
+			It.RemoveCurrent();
+		}
+	}
+}
+
 UFXSystemComponent* ATMBattleDirector::PlayFx(const TMCast::FLegacyFx& Fx, const FVector& Local, float WantCm, USceneComponent* AttachTo)
 {
 	if (!Fx.IsSet())

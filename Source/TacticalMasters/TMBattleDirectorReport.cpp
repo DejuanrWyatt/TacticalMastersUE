@@ -13,20 +13,35 @@
 
 namespace TMReport
 {
-	/** Points per thing done (the human's weights, 2026-10-02). */
+	// Points per thing done. The human's weights (2026-10-02), revalued after the
+	// v20 play test (2026-10-04, "more accurately depict the value of each unit"):
+	// - a takedown is 15 points shared by everyone who hurt or held the fallen unit
+	//   in the minute before, by their share (a turn of control counts as 15% of
+	//   its health in damage), and 3 more for the last blow; it used to be 12 to the
+	//   last blow and 5 to anyone else, so whoever stole the kill was the MVP;
+	// - damage to monsters is worth 0.4 a 10 against the other side's 1 a 10;
+	// - simply being hit is worth little (0.2 a 10, was 0.4); what armour, dodges,
+	//   wards and shields stopped is worth more (0.5 a 10, was 0.3), and damage
+	//   taken in an ally's place (Guard) another 0.5 a 10: a tank's work;
+	// - shields put on allies count as healing, for what they soaked;
+	// - a turn of control 4 (was 3), a revive 12 (was 10), knocked out -8 (was -10).
 	constexpr double PerDamage = 0.1;
-	constexpr double PerTaken = 0.04;
-	constexpr double PerMitigated = 0.03;
+	constexpr double PerMonsterDamage = 0.04;
+	constexpr double PerTaken = 0.02;
+	constexpr double PerMitigated = 0.05;
+	constexpr double PerGuarded = 0.05;
 	constexpr double PerHealing = 0.1;
-	constexpr double PerKill = 12.0;
-	constexpr double PerAssist = 5.0;
-	constexpr double PerDeath = -10.0;
+	constexpr double PerShielding = 0.1;
+	constexpr double TakedownPool = 15.0;
+	constexpr double LastBlow = 3.0;
+	constexpr double ControlAsHealth = 0.15;
+	constexpr double PerDeath = -8.0;
 	constexpr double PerMonster = 4.0;
 	constexpr double PerBoss = 15.0;
 	constexpr double PerBuff = 2.0;
 	constexpr double PerDebuff = 2.0;
-	constexpr double PerControl = 3.0;
-	constexpr double PerRevive = 10.0;
+	constexpr double PerControl = 4.0;
+	constexpr double PerRevive = 12.0;
 	constexpr double PerTower = 8.0;
 	/** An assist is help in the minute before the fall. */
 	constexpr int32 AssistTicks = 60 * TMSim::Pace::TicksPerSecond;
@@ -37,12 +52,42 @@ namespace TMReport
 	}
 }
 
-double ATMBattleDirector::ScoreOf(const FTMUnitTally& T)
+TArray<ATMBattleDirector::FTMValuePart> ATMBattleDirector::ValueParts(const FTMUnitTally& T)
 {
 	using namespace TMReport;
-	return T.Damage * PerDamage + T.Taken * PerTaken + T.Mitigated * PerMitigated + T.Healing * PerHealing
-		+ T.Kills * PerKill + T.Assists * PerAssist + T.Deaths * PerDeath + T.Monsters * PerMonster + T.Bosses * PerBoss
-		+ T.Buffs * PerBuff + T.Debuffs * PerDebuff + T.Control * PerControl + T.Revives * PerRevive + T.Towers * PerTower;
+	const int32 OnSides = FMath::Max(0, T.Damage - T.MonsterDamage);
+	return {
+		{ TEXT("Damage"), OnSides * PerDamage },
+		{ TEXT("Monster damage"), T.MonsterDamage * PerMonsterDamage },
+		{ TEXT("Takedowns"), T.Takedowns },
+		{ TEXT("Damage taken"), T.Taken * PerTaken },
+		{ TEXT("Mitigated"), T.Mitigated * PerMitigated },
+		{ TEXT("Guarding"), T.Guarded * PerGuarded },
+		{ TEXT("Healing"), T.Healing * PerHealing },
+		{ TEXT("Shielding"), T.Shielding * PerShielding },
+		{ TEXT("Knocked out"), T.Deaths * PerDeath },
+		{ TEXT("Monsters"), T.Monsters * PerMonster },
+		{ TEXT("Boss"), T.Bosses * PerBoss },
+		{ TEXT("Buffs"), T.Buffs * PerBuff },
+		{ TEXT("Debuffs"), T.Debuffs * PerDebuff },
+		{ TEXT("Control"), T.Control * PerControl },
+		{ TEXT("Revives"), T.Revives * PerRevive },
+		{ TEXT("Towers"), T.Towers * PerTower } };
+}
+
+FString ATMBattleDirector::ValueRules()
+{
+	return TEXT("Points: 1 per 10 damage to the other side, 0.4 per 10 to monsters; each enemy that falls is worth 15, shared by everyone who hurt or held it in the minute before (a turn of control counts as 15% of its health), and 3 more for the last blow; 0.2 per 10 taken, 0.5 per 10 mitigated, 0.5 per 10 taken for an ally (Guard); 1 per 10 healed or soaked by your shields on allies; -8 knocked out; 4 a monster, 15 a boss; 2 a buff or debuff, 4 a turn of control, 12 a revive, 8 a tower.");
+}
+
+double ATMBattleDirector::ScoreOf(const FTMUnitTally& T)
+{
+	double Sum = 0.0;
+	for (const FTMValuePart& Part : ValueParts(T))
+	{
+		Sum += Part.Points;
+	}
+	return Sum;
 }
 
 int32 ATMBattleDirector::MvpId() const
@@ -79,6 +124,7 @@ void ATMBattleDirector::ResetTallies()
 	}
 	TallyHp.Reset();
 	LastHurtBy.Reset();
+	RecentHurt.Reset();
 	HelpedAgainst.Reset();
 	StatusFrom.Reset();
 	PendingSoak.Reset();
@@ -127,8 +173,19 @@ void ATMBattleDirector::TallyEvents(const TMSim::FTickReport& Report)
 			CastAbility = TMSim::FindAbility(Event.Id);
 			break;
 		case TMSim::EEventKind::Absorbed:
+		{
 			PendingSoak.FindOrAdd(Event.Unit) += Event.Amount;
+			// A shield put on an ally: what it soaked is its caster's, like healing.
+			const int32* From = StatusFrom.Find(FString::Printf(TEXT("%d:%hs"), Event.Unit, Event.Id.c_str()));
+			if (From && *From != Event.Unit && TeamOf(*From) == TeamOf(Event.Unit))
+			{
+				if (FTMUnitTally* T = TallyOf(*From))
+				{
+					T->Shielding += Event.Amount;
+				}
+			}
 			break;
+		}
 		case TMSim::EEventKind::Grazed:
 			PendingGraze.Add(Event.Unit);
 			break;
@@ -210,6 +267,19 @@ void ATMBattleDirector::TallyEvents(const TMSim::FTickReport& Report)
 					}
 					break;
 				}
+				// The new spells (2026-10-05): a tether's drain and a spirit swap's gain are health taken in.
+				if (Event.Id == "drain" || Event.Id == "spirit_up")
+				{
+					if (int32* Hp = TallyHp.Find(Event.Unit))
+					{
+						*Hp = FMath::Min(Struck->MaxHp(), *Hp + Event.Amount);
+					}
+					if (FTMUnitTally* T = TallyOf(Event.Unit))
+					{
+						T->HealingReceived += Event.Amount;
+					}
+					break;
+				}
 				if (Event.Id == "mend" || Event.Id == "ground")
 				{
 					// Nobody's healing to give, but the unit took it in. "ground" is
@@ -274,6 +344,7 @@ void ATMBattleDirector::TallyEvents(const TMSim::FTickReport& Report)
 				if (ByTeam != Struck->Team)
 				{
 					T->Damage += Amount;
+					T->MonsterDamage += Struck->bMonster ? Amount : 0;
 					T->Biggest = FMath::Max(T->Biggest, Amount);
 					const FString Name = Ability ? FString(UTF8_TO_TCHAR(Ability->Name.c_str())) : FString(UTF8_TO_TCHAR(Event.Id.c_str())).Left(1).ToUpper() + FString(UTF8_TO_TCHAR(Event.Id.c_str())).Mid(1);
 					T->ByAbility.FindOrAdd(Name) += Amount;
@@ -283,6 +354,7 @@ void ATMBattleDirector::TallyEvents(const TMSim::FTickReport& Report)
 			{
 				LastHurtBy.Add(Event.Unit, By);
 				Helped(Event.Unit, By);
+				RecentHurt.FindOrAdd(Event.Unit).Add({ By, Now, Amount, 0 });
 			}
 			break;
 		}
@@ -307,7 +379,9 @@ void ATMBattleDirector::TallyEvents(const TMSim::FTickReport& Report)
 				if (IsControl(Def))
 				{
 					// Turns of it, as the ability gave it.
-					T->Control += CastAbility && CastAbility->HasStatus() && CastAbility->StatusId == Event.Id ? FMath::Max(1, CastAbility->StatusTurns) : 1;
+					const int32 Turns = CastAbility && CastAbility->HasStatus() && CastAbility->StatusId == Event.Id ? FMath::Max(1, CastAbility->StatusTurns) : 1;
+					T->Control += Turns;
+					RecentHurt.FindOrAdd(Event.Unit).Add({ By, Now, 0, Turns });
 				}
 			}
 			break;
@@ -334,6 +408,7 @@ void ATMBattleDirector::TallyEvents(const TMSim::FTickReport& Report)
 						++T->Monsters;
 					}
 				}
+				RecentHurt.Remove(Event.Unit);
 				break;
 			}
 			if (FTMUnitTally* T = TallyOf(Event.Unit))
@@ -345,8 +420,40 @@ void ATMBattleDirector::TallyEvents(const TMSim::FTickReport& Report)
 				if (TeamOf(Killer) != Fallen->Team)
 				{
 					++T->Kills;
+					T->Takedowns += LastBlow;
 				}
 			}
+			// The takedown's points, shared by the other side's units by what they did
+			// to it in the last minute: damage, and turns of control as a share of its health.
+			{
+				TMap<int32, double> Shares;
+				double Whole = 0.0;
+				if (const TArray<FTMHurt>* Hurts = RecentHurt.Find(Event.Unit))
+				{
+					for (const FTMHurt& Hurt : *Hurts)
+					{
+						if (Now - Hurt.Tick <= AssistTicks && TeamOf(Hurt.By) != Fallen->Team && Tallies.Contains(Hurt.By))
+						{
+							const double Weight = Hurt.Amount + Hurt.ControlTurns * ControlAsHealth * Fallen->MaxHp();
+							Shares.FindOrAdd(Hurt.By) += Weight;
+							Whole += Weight;
+						}
+					}
+				}
+				if (Whole <= 0.0 && Killer >= 0 && TeamOf(Killer) != Fallen->Team && Tallies.Contains(Killer))
+				{
+					Shares.Add(Killer, 1.0);
+					Whole = 1.0;
+				}
+				for (const TPair<int32, double>& Share : Shares)
+				{
+					if (FTMUnitTally* T = TallyOf(Share.Key))
+					{
+						T->Takedowns += TakedownPool * Share.Value / Whole;
+					}
+				}
+			}
+			RecentHurt.Remove(Event.Unit);
 			// Everyone on the other side who hurt, debuffed or held it in the last minute.
 			if (const TMap<int32, int32>* Helpers = HelpedAgainst.Find(Event.Unit))
 			{

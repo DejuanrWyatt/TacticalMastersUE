@@ -202,6 +202,19 @@ namespace TMSim
 		 * turns (anyone's, once that unit has fallen). 0, Godot's: it never does.
 		 */
 		double SpringRestTurns = 0.0;
+		/**
+		 * Tile movement (v20 play test, 2026-10-04, "Tile-based movement" A and B):
+		 * 0, free walking on the half-metre grid, as always; 1, from tile to tile
+		 * (2 m) four ways, each step 2 m of Move; 2, eight ways, a diagonal step 3 m
+		 * (one and a half tiles). A walk ends on a tile's spot (FBattle::TileSpot).
+		 */
+		double TileMove = 0.0;
+		/**
+		 * A boss's reach (v21 play test, 2026-10-04: "increase boss aggro radius"):
+		 * how far off it notices someone, and how far it chases, times this. 1, as
+		 * its monster file says; the game plays at 1.5 (GameTuning).
+		 */
+		double BossAggro = 1.0;
 
 		/** Multiplier on every ability's cast time. */
 		double CastTimeMultiplier = 1.0;

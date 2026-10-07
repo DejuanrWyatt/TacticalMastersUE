@@ -46,30 +46,30 @@
       }
     },
     {
-      "id": "chrono_sage_quicken",
-      "name": "Quicken",
-      "desc": "An ally up to 6 m away strides for 2 turns (walks half again as far) and its Turn Gauge jumps 25%.",
+      "id": "chrono_sage_recall",
+      "name": "Recall",
+      "desc": "Mark where you stand for 3 turns. Use it again while the mark lasts and you are back there at once.",
       "kind": "active",
       "effect": "support",
       "scale": "mag",
       "target": "ally",
-      "shape": "unit",
+      "shape": "self",
       "power": 0,
       "min_range": 0,
-      "max_range": 6,
-      "aoe": 0,
-      "cooldown": 2,
+      "max_range": 0,
+      "aoe": 0.8,
+      "cooldown": 0,
       "cast": 0,
-      "tg": 15,
-      "status": {
-        "id": "stride",
-        "turns": 2
-      },
       "fx": "haste",
       "vfx": {
         "system": "/Game/FreeParticle_SoftTofu/Niagara/NS_Sparkling_Glow.NS_Sparkling_Glow",
-        "at": "targets",
+        "at": "user",
         "scale": 1
+      },
+      "anim": "buff",
+      "special": "recall",
+      "zone": {
+        "turns": 3
       }
     },
     {
@@ -151,15 +151,7 @@
           "scale": 1,
           "rotate": 0
         },
-        {
-          "backing": "circle",
-          "glyph": "buff",
-          "colour": "#f2d24b",
-          "style": "light",
-          "mark": "none",
-          "scale": 1,
-          "rotate": 0
-        },
+        null,
         {
           "backing": "circle",
           "glyph": "hourglass",
@@ -191,6 +183,10 @@
         74
       ],
       "against": "reference team, medium"
+    },
+    "rebalanced": {
+      "on": "2026-10-05",
+      "why": "Recall in place of Quicken (unique and mobility spells, 2026-10-05)."
     }
   }
 }

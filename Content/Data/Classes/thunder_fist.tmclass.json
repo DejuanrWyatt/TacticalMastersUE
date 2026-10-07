@@ -70,28 +70,27 @@
       }
     },
     {
-      "id": "thunder_fist_thunder_stance",
-      "name": "Thunder Stance",
-      "desc": "Take a fighting stance; Speed +2 for 2 turns. Switched on and off.",
-      "kind": "toggle",
-      "effect": "support",
-      "scale": "mag",
-      "target": "ally",
-      "shape": "self",
-      "power": 0,
+      "id": "thunder_fist_storm_slash",
+      "name": "Storm Slash",
+      "desc": "A crackling slash in a 3 m cone: damage, and those hit are Silenced for a turn.",
+      "kind": "active",
+      "effect": "damage",
+      "scale": "att",
+      "target": "enemy",
+      "shape": "cone",
+      "power": 34,
       "min_range": 0,
-      "max_range": 0,
+      "max_range": 3,
       "aoe": 0,
-      "cooldown": 0,
+      "angle": 90,
+      "cooldown": 3,
       "cast": 0,
-      "buffs": [
-        {
-          "stat": "speed",
-          "amount": 2,
-          "turns": 2
-        }
-      ],
-      "fx": "focus"
+      "status": {
+        "id": "silence",
+        "turns": 1
+      },
+      "fx": "wave_fist",
+      "element": "lightning"
     },
     {
       "id": "thunder_fist_thunder_fury",
@@ -122,8 +121,26 @@
   ],
   "creator": {
     "rebalanced": {
-      "on": "2026-10-04",
-      "why": "Held buffs 2026-10-04 (lab 23% on fresh seeds, standard teams): HP 75->92, Thunder Jab 32->45, Thunder Uppercut 44->62, Thunder Fury 49->69; now 49%"
+      "on": "2026-10-06",
+      "why": "Cire's Spell Codex pick A3 Storm Slash in place of Thunder Stance (feat-codex-picks.md). Before that (2026-10-04): Held buffs 2026-10-04 (lab 23% on fresh seeds, standard teams): HP 75->92, Thunder Jab 32->45, Thunder Uppercut 44->62, Thunder Fury 49->69; now 49%"
+    },
+    "icons": {
+      "abilities": [
+        null,
+        null,
+        {
+          "backing": "circle",
+          "glyph": "slash",
+          "colour": "#f2d24b",
+          "style": "light",
+          "mark": "cone",
+          "scale": 1,
+          "rotate": 0,
+          "badge": "lightning",
+          "finish": "lit"
+        },
+        null
+      ]
     }
   }
 }

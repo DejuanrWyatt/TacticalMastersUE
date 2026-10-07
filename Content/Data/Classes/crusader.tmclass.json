@@ -67,26 +67,28 @@
       }
     },
     {
-      "id": "crusader_holy_lance",
-      "name": "Holy Lance",
-      "desc": "A spear of magic through everyone in a line up to 7 m. (1 s)",
+      "id": "crusader_charge",
+      "name": "Charge",
+      "desc": "Charge an enemy 2-8 m away and strike it, 10% harder for every 2 m of the run.",
       "kind": "active",
       "effect": "damage",
-      "scale": "mag",
+      "scale": "att",
       "target": "enemy",
-      "shape": "line",
-      "power": 26,
+      "shape": "unit",
+      "power": 30,
       "min_range": 2,
-      "max_range": 7,
-      "aoe": 0.7,
-      "cooldown": 0,
-      "cast": 1,
+      "max_range": 8,
+      "aoe": 0,
+      "cooldown": 3,
+      "cast": 0,
       "fx": "holy_blade",
       "vfx": {
         "system": "/Game/ParagonGreystone/FX/Particles/Greystone/Abilities/LeapAOE/FX/P_LeapSmash_Location.P_LeapSmash_Location",
         "at": "point",
         "scale": 1
-      }
+      },
+      "anim": "dash",
+      "special": "charge"
     },
     {
       "id": "crusader_holy_maelstrom",
@@ -110,5 +112,11 @@
         "scale": 1
       }
     }
-  ]
+  ],
+  "creator": {
+    "rebalanced": {
+      "on": "2026-10-05",
+      "why": "Charge in place of Holy Lance (unique and mobility spells, 2026-10-05)."
+    }
+  }
 }

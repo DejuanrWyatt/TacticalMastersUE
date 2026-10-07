@@ -46,6 +46,7 @@ bool* ATMBattleHud::FeelOption(int32 Which)
 	case 4: return &Settings.bEdgePan;
 	case 5: return &Settings.bLeadCamera;
 	case 6: return &Settings.bCameraHeldNote;
+	case 7: return &Settings.bThreatOdds;
 	default: return nullptr;
 	}
 }
@@ -169,6 +170,8 @@ void ATMBattleHud::DrawOptions(ATMBattleDirector& From)
 			TEXT("A walk whose end is near the edge of the screen, or off it, brings the camera halfway along.") },
 		{ TEXT("Say \"Camera held\" when the camera waits for you"),
 			TEXT("When the camera wanted to follow but you were busy, a small note says so; it follows once you are done, if that is soon.") },
+		{ TEXT("Enemy odds on the board"),
+			TEXT("Pointing at an enemy: a box over your unit most at risk with its best attack, the damage, your chance to evade and to be knocked out. The card at the top right shows every unit either way.") },
 	};
 	for (int32 Row = 0; Row < static_cast<int32>(UE_ARRAY_COUNT(FeelRows)); ++Row)
 	{

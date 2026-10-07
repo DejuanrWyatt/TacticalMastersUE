@@ -102,6 +102,17 @@ namespace TMSim
 		// 2026-10-02 ("Camps and Bosses Mockups" C, D): a boss's prey (By is the boss), and the boon of a claimed boss.
 		{ "hunted",     "Hunted",        "HNT",  0.0f,  1.0f, 1.0f, 1.0f, 0 , false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, 0,  false, false, true,  0 },
 		{ "boon",       "Boss's Boon",   "BON",  0.0f,  1.0f, 1.0f, 1.0f, 0 , false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, 10, false, false, false, 0 },
+		// 2026-10-05, the unique spells (Docs/design/feat-new-spells.md); what each does beyond its row is in
+		// SimSpells.cpp and where it acts. By: the plague's first caster, the linked unit's partner, the bomb's
+		// planter, the tether's caster, the marker. A plague's Amount is how many times it has passed on.
+		{ "plague",     "Plague",        "PLG",  -0.05f, 1.0f, 1.0f, 1.0f, 0 , true , false, false, false, false, false, false, false, false, false, false, false, false, false, false, 0,  false, false, true , 0 },
+		{ "linked",     "Soul Link",     "LNK",  0.0f, 1.0f, 1.0f, 1.0f, 0 , true , false, false, false, false, false, false, false, false, false, false, false, false, false, false, 0,  false, false, true , 0 },
+		{ "bomb",       "Time Bomb",     "BMB",  0.0f, 1.0f, 1.0f, 1.0f, 0 , true , false, false, false, false, false, false, false, false, false, false, false, false, false, false, 0,  false, false, true , 0 },
+		{ "tethered",   "Tethered",      "TTH",  0.0f, 1.0f, 1.0f, 1.0f, 0 , true , false, false, false, false, false, false, false, false, false, false, false, false, false, false, 0,  false, false, true , 0 },
+		{ "echo",       "Echo",          "ECH",  0.0f, 1.0f, 1.0f, 1.0f, 0 , false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, 0,  false, false, false, 0 },
+		{ "retribution","Retribution",   "RTB",  0.0f, 1.0f, 1.0f, 1.0f, 0 , false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, 0,  false, false, false, 0 },
+		{ "undying",    "Undying",       "UND",  0.0f, 1.0f, 1.0f, 1.0f, 0 , false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, 0,  false, false, false, 0 },
+		{ "deathmark",  "Death Mark",    "DMK",  0.0f, 1.0f, 1.0f, 1.0f, 0 , true , false, false, false, false, false, false, false, false, false, false, false, false, false, false, 0,  false, false, true , 0 },
 	};
 
 	const FStatusDef* AllStatuses(int& OutCount)
@@ -150,7 +161,7 @@ namespace TMSim
 			{ "ult_per_turn", "Ultimate per turn", "Ultimate meter gained each time a unit becomes READY.", 0.0, 50.0, 1.0, &FTuning::UltPerTurn },
 			{ "move_multiplier", "Move multiplier", "Multiplier on every unit's Move distance.", 0.25, 3.0, 0.05, &FTuning::MoveMultiplier },
 			{ "sight_multiplier", "Sight multiplier", "Multiplier on every unit's Sight radius.", 0.25, 3.0, 0.05, &FTuning::SightMultiplier },
-			{ "cast_time_multiplier", "Cast time multiplier", "Multiplier on every ability's cast time.", 0.0, 3.0, 0.05, &FTuning::CastTimeMultiplier },
+			{ "cast_time_multiplier", "Cast time multiplier", "Multiplier on every ability's cast time (the game plays at 4 since the v21 play test).", 0.0, 8.0, 0.05, &FTuning::CastTimeMultiplier },
 			{ "crit_multiplier", "Critical hit multiplier", "What a critical hit multiplies damage by.", 1.0, 3.0, 0.05, &FTuning::CritMultiplier },
 			{ "evade_multiplier", "Evasion multiplier", "Multiplier on every unit's A-Eva and M-Eva.", 0.0, 3.0, 0.05, &FTuning::EvadeMultiplier },
 			{ "crit_chance_multiplier", "Crit chance multiplier", "Multiplier on every unit's Crit chance.", 0.0, 3.0, 0.05, &FTuning::CritChanceMultiplier },
@@ -185,6 +196,10 @@ namespace TMSim
 			// 2026-10-04 (v19 play test): the springs (wells) have their own numbers.
 			{ "spring_percent", "Spring healing (% max HP)", "Health a healing spring (well) mends when a unit's turn comes round on it.", 0.0, 40.0, 1.0, &FTuning::SpringPercent },
 			{ "spring_rest_turns", "Spring rest (turns)", "0 = never. Once a spring has mended a unit, it runs dry for this many of that unit's turns before it mends anyone again.", 0.0, 10.0, 1.0, &FTuning::SpringRestTurns },
+			// 2026-10-04 (v20 play test): walking tile to tile, a setup option.
+			{ "tile_move", "Tile movement", "0 = free walking. 1 = tile to tile, four ways (2 m a step). 2 = tile to tile, eight ways (a diagonal 3 m).", 0.0, 2.0, 1.0, &FTuning::TileMove },
+			// 2026-10-04 (v21 play test): bosses notice and chase from further off.
+			{ "boss_aggro", "Boss aggro range (x)", "How far off a boss notices a unit, and how far it chases, times its monster file's own numbers.", 0.5, 4.0, 0.1, &FTuning::BossAggro },
 		};
 		return Keys;
 	}
@@ -196,6 +211,11 @@ namespace TMSim
 		Tuning.ZoneOfControl = 1.0;
 		// A well is used, then rests (v19 play test, 2026-10-04).
 		Tuning.SpringRestTurns = 3.0;
+		// Bosses notice and chase from further off (v21 play test, 2026-10-04).
+		Tuning.BossAggro = 1.5;
+		// Every cast four times as long (v21 play test, 2026-10-04: "increase cast
+		// time of all skills by x4 by default"), so casts can be seen and answered.
+		Tuning.CastTimeMultiplier = 4.0;
 		return Tuning;
 	}
 }

@@ -19,6 +19,7 @@
 #include "TMDrawable.h"
 
 #include "Components/SkeletalMeshComponent.h"
+#include "Engine/SkeletalMesh.h"
 #include "Dom/JsonObject.h"
 #include "Misc/FileHelper.h"
 #include "Misc/Paths.h"
@@ -191,6 +192,47 @@ bool ATMBattleDirector::LoadBodiesInBackground()
 	return BodyLoad.IsValid();
 }
 
+void ATMBattleDirector::FitPets()
+{
+	// A summon about half as tall as its summoner (v21 play test), whatever its
+	// body: the meshes' own heights, times how big each is drawn.
+	auto Height = [](const USkeletalMeshComponent* Visual)
+	{
+		const USkeletalMesh* Mesh = Visual ? Visual->GetSkeletalMeshAsset() : nullptr;
+		return Mesh ? static_cast<float>(Mesh->GetBounds().BoxExtent.Z) * 2.0f * static_cast<float>(Visual->GetRelativeScale3D().Z) : 0.0f;
+	};
+	for (int32 i = 0; i < UnitVisuals.Num() && i < static_cast<int32>(Battle.Units.size()); ++i)
+	{
+		const TMSim::FUnit& Pet = Battle.Units[static_cast<size_t>(i)];
+		if (Pet.PetOf < 0 || !UnitVisuals[i])
+		{
+			continue;
+		}
+		int32 Summoner = -1;
+		for (int32 k = 0; k < static_cast<int32>(Battle.Units.size()); ++k)
+		{
+			Summoner = Battle.Units[static_cast<size_t>(k)].Id == Pet.PetOf ? k : Summoner;
+		}
+		if (!UnitVisuals.IsValidIndex(Summoner) || !UnitVisuals[Summoner])
+		{
+			continue;
+		}
+		// From the body's own size, so fitting it again never shrinks it twice.
+		const FTMBody* Body = BodyFor(Pet);
+		if (Body)
+		{
+			UnitVisuals[i]->SetRelativeScale3D(FVector(Body->Scale * UnitSize));
+		}
+		const float Mine = Height(UnitVisuals[i]);
+		const float Theirs = Height(UnitVisuals[Summoner]);
+		if (Mine > 1.0f && Theirs > 1.0f)
+		{
+			const float Fit = FMath::Clamp(0.5f * Theirs / Mine, 0.15f, 2.0f);
+			UnitVisuals[i]->SetRelativeScale3D(UnitVisuals[i]->GetRelativeScale3D() * Fit);
+		}
+	}
+}
+
 void ATMBattleDirector::DressUnits()
 {
 	// All read by now, so wearing them is only finding them.
@@ -202,6 +244,7 @@ void ATMBattleDirector::DressUnits()
 			WearBody(UnitVisuals[i], *Body);
 		}
 	}
+	FitPets();
 	ResetMotion();
 	RefreshVisuals();
 }

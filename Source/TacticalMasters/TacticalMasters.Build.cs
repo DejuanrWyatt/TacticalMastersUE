@@ -30,5 +30,13 @@ public class TacticalMasters : ModuleRules
 		{
 			"Sockets", "Networking", "HTTP", "Slate", "SlateCore", "ApplicationCore"
 		});
+
+		// Online play by a join code (Docs/design/feat-online-eos.md): Epic Online
+		// Services, through the SDK that ships with the engine. EOSShared starts the
+		// SDK; EOSSDK is the SDK's headers and library (and stages its DLL).
+		if (Target.Platform == UnrealTargetPlatform.Win64)
+		{
+			PrivateDependencyModuleNames.AddRange(new string[] { "EOSShared", "EOSSDK" });
+		}
 	}
 }

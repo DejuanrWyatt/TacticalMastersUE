@@ -1265,10 +1265,31 @@ namespace TMSim
 			const FMonsterInfo* Info = Unit.MonsterInfo();
 			bHidden = Info && Info->Has(MonsterTrait::Ambush);
 		}
-		// In tall grass and not given away since its turn began (2026-10-04).
-		if (!bHidden && !Unit.bSpotted && !Map.Grass.empty() && Map.InGrass(Unit.Pos))
+		// In tall grass and not given away since its turn began (2026-10-04); or in
+		// its own side's smoke (a ground zone) -- unless this side has ground that
+		// shows what hides there (a flare, a lantern).
+		if (!bHidden && !Unit.bSpotted)
 		{
-			bHidden = true;
+			bool bCover = !Map.Grass.empty() && Map.InGrass(Unit.Pos);
+			bool bRevealed = false;
+			for (const FZone& Zone : Zones)
+			{
+				const FAbility* Laid = ZoneAbility(Zone);
+				if (!Laid || !ZoneLive(Zone))
+				{
+					continue;
+				}
+				if (Laid->bZoneHide && Zone.Team == Unit.Team && !Unit.Flies() && ZoneCovers(Zone, Unit.Pos))
+				{
+					bCover = true;
+				}
+				if (Laid->bZoneReveal && Zone.Team == Team
+					&& Zone.Target.DistanceTo(Unit.Pos) <= std::max(Laid->ZoneSight, Laid->Aoe))
+				{
+					bRevealed = true;
+				}
+			}
+			bHidden = bCover && !bRevealed;
 		}
 		if (!bHidden)
 		{
@@ -1333,8 +1354,8 @@ namespace TMSim
 			return false;
 		}
 		const FVec2 Anchor = LeashAnchor(Monster);
-		const double Leash = Info->Temperament == ETemperament::GuardUnit ? Camp::WardLeash + Info->Leash
-			: Info->Temperament == ETemperament::GuardPlace ? static_cast<double>(Info->Ring) + 2.0 : Info->Leash;
+		const double Leash = (Info->Temperament == ETemperament::GuardUnit ? Camp::WardLeash + Info->Leash
+			: Info->Temperament == ETemperament::GuardPlace ? static_cast<double>(Info->Ring) + 2.0 : Info->Leash) * AggroScale(*Info);
 		for (const FUnit& Other : Units)
 		{
 			if (IsQuarry(Other) && static_cast<double>(Other.Pos.DistanceTo(Anchor)) <= Leash + 2.0
@@ -1355,6 +1376,8 @@ namespace TMSim
 			return false;
 		}
 		const bool bCalmable = Info->Temperament == ETemperament::Docile || Info->Temperament == ETemperament::Provoked;
+		// A boss notices from further off (FTuning::BossAggro).
+		const double Reach = AggroScale(*Info);
 		for (const FUnit& Other : Units)
 		{
 			if (!IsQuarry(Other) || (bCalmable && GearHas(Other, &FItemDef::bCalmsMonsters)))
@@ -1368,13 +1391,13 @@ namespace TMSim
 			{
 			case ETemperament::Territorial:
 			case ETemperament::GuardPlace:
-				bSets = FromHome <= Info->Ring;
+				bSets = FromHome <= Info->Ring * Reach;
 				break;
 			case ETemperament::Aggressive:
-				bSets = FromMe <= Info->Ring && HasLineOfSight(Monster.Pos, Other.Pos);
+				bSets = FromMe <= Info->Ring * Reach && HasLineOfSight(Monster.Pos, Other.Pos);
 				break;
 			case ETemperament::Patrol:
-				bSets = FromMe <= SightOf(Monster) && HasLineOfSight(Monster.Pos, Other.Pos);
+				bSets = FromMe <= SightOf(Monster) * Reach && HasLineOfSight(Monster.Pos, Other.Pos);
 				break;
 			case ETemperament::GuardUnit:
 				if (Monster.Camp >= 0 && Monster.Camp < static_cast<int>(Camps.size()))
@@ -1745,6 +1768,8 @@ namespace TMSim
 		{
 			return;
 		}
+		// The unique and mobility spells (2026-10-05, SimSpells.cpp).
+		ApplySpellSpecial(User, Ability, Target, *Struck, Report);
 		if (Ability.Special == "swap" && Struck->Id != User.Id)
 		{
 			std::swap(User.Pos, Struck->Pos);

@@ -286,5 +286,9 @@ The human's choices, which replace the watchtower parts of sections 3-5 where th
   what the tower sees; the order as text; 15 computer-vs-computer battles, every order legal, towers taken,
   each replayed to the same checksum). `SimPlayTest`: five more checksum probes. Every Godot parity test
   passes unchanged.
+- **Ending a turn there captures (v20 play test, 2026-10-04):** a side's unit (not a monster or pet, not
+  stunned) that ends its turn within reach of a tower its side doesn't hold, on ground it could step to, with no
+  enemy at the tower, puts that turn into it (`FBattle::AutoCapture`, from `EndTurn`), whatever else it did.
+  The Capture order still spends the whole turn and counts once. Protocol 22.
 - **Room:** Highlands (12x12) has room for 2; the 30+ maps take all 8; Crown Keep 6; Frostwall Town's middle
   is its fountain, so an odd count there loses the middle tower.

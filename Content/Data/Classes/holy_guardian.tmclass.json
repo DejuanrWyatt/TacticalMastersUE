@@ -45,26 +45,31 @@
       }
     },
     {
-      "id": "holy_guardian_bash",
-      "name": "Bash",
-      "desc": "Shield-bash an adjacent enemy",
+      "id": "holy_guardian_undying",
+      "name": "Undying",
+      "desc": "An ally up to 5 m away can't fall below 1 health until its next turn begins.",
       "kind": "active",
-      "effect": "damage",
-      "scale": "att",
-      "target": "enemy",
+      "effect": "support",
+      "scale": "mag",
+      "target": "ally",
       "shape": "unit",
-      "power": 31,
+      "power": 0,
       "min_range": 0,
-      "max_range": 1.8,
+      "max_range": 5,
       "aoe": 0,
-      "cooldown": 2,
+      "cooldown": 4,
       "cast": 0,
+      "status": {
+        "id": "undying",
+        "turns": 1
+      },
       "fx": "shield_bash",
       "vfx": {
         "system": "/Game/ParagonGreystone/FX/Particles/Greystone/Abilities/ClearAPath/FX/P_Greystone_ClearAPath_Impact.P_Greystone_ClearAPath_Impact",
         "at": "targets",
         "scale": 1
-      }
+      },
+      "anim": "buff"
     },
     {
       "id": "holy_guardian_ward",
@@ -148,6 +153,10 @@
       }
     ],
     "description": "Tank who shields allies",
-    "measured": -48
+    "measured": -48,
+    "rebalanced": {
+      "on": "2026-10-05",
+      "why": "Undying in place of Bash (unique and mobility spells, 2026-10-05)."
+    }
   }
 }

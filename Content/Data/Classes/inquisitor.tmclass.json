@@ -92,26 +92,46 @@
       }
     },
     {
-      "id": "inquisitor_holy_execution",
-      "name": "Holy Execution",
-      "desc": "ULTIMATE: A killing blow on an adjacent enemy.",
+      "id": "inquisitor_verdict",
+      "name": "Verdict",
+      "desc": "Damage plus a quarter of the health the target is missing; a kill gives back half your gauge.",
       "kind": "active",
       "effect": "damage",
       "scale": "att",
       "target": "enemy",
       "shape": "unit",
-      "power": 75.4,
+      "power": 45,
       "min_range": 0,
       "max_range": 1.8,
       "aoe": 0,
       "cooldown": 0,
       "cast": 0,
       "fx": "brave_slash",
-      "vfx": {
-        "system": "/Game/ParagonMinions/FX/Particles/Minions/Shared/P_Minion_Melee_Impact.P_Minion_Melee_Impact",
-        "at": "targets",
-        "scale": 1
-      }
+      "special": "execute"
     }
-  ]
+  ],
+  "creator": {
+    "rebalanced": {
+      "on": "2026-10-06",
+      "why": "Cire's Spell Codex pick B9 Verdict (execute) in place of Holy Execution (feat-codex-picks.md)"
+    },
+    "icons": {
+      "abilities": [
+        null,
+        null,
+        null,
+        {
+          "backing": "hex",
+          "glyph": "execute",
+          "colour": "#e05a5a",
+          "style": "light",
+          "mark": "unit",
+          "scale": 1,
+          "rotate": 0,
+          "badge": "none",
+          "finish": "lit"
+        }
+      ]
+    }
+  }
 }

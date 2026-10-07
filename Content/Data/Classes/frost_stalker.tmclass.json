@@ -70,29 +70,35 @@
       }
     },
     {
-      "id": "frost_stalker_frost_veil",
-      "name": "Frost Veil",
-      "desc": "Slow every enemy within 2 m of a point 1-5 m away; Slows for 2 turns.",
+      "id": "frost_stalker_ice_slide",
+      "name": "Ice Slide",
+      "desc": "Lay a strip of ice 1.5 m wide from you to a point 1-6 m away for 2 of your turns. An ally that starts its turn on it, or stops on it, walks half again as far.",
       "kind": "active",
       "effect": "support",
       "scale": "mag",
-      "target": "enemy",
-      "shape": "circle",
+      "target": "ally",
+      "shape": "line",
       "power": 0,
       "min_range": 1,
-      "max_range": 5,
-      "aoe": 2,
+      "max_range": 6,
+      "aoe": 0.75,
       "cooldown": 3,
       "cast": 0,
       "status": {
-        "id": "slow",
-        "turns": 2
+        "id": "stride",
+        "turns": 1
       },
       "fx": "haste",
       "vfx": {
         "system": "/Game/ParticleSystemVFXVol1/Systems/NS_EnergyVortex.NS_EnergyVortex",
         "at": "targets",
         "scale": 1
+      },
+      "anim": "area",
+      "special": "zone",
+      "element": "none",
+      "zone": {
+        "turns": 2
       }
     },
     {
@@ -121,5 +127,11 @@
         "scale": 1
       }
     }
-  ]
+  ],
+  "creator": {
+    "rebalanced": {
+      "on": "2026-10-05",
+      "why": "Ice Slide in place of Frost Veil (unique and mobility spells, 2026-10-05)."
+    }
+  }
 }

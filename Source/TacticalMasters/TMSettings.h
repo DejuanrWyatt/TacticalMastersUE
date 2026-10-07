@@ -51,8 +51,8 @@ enum class ETMAction : uint8
 	Waypoint,
 	/** Plan the selected unit's turn ahead; again carries the plan out (or puts it by). */
 	PlanTurn,
-	/** Takes back the plan's last step: a waypoint, its ability, then its walk. */
-	PlanUndo,
+	/** Cancels the selected unit's whole queue -- plan, Go To, waypoints -- in one press; with Shift, every unit's (2026-10-06). */
+	PlanCancel,
 	/** Held: the battle runs three times as fast while none of this machine's units is ready (2026-10-03). */
 	FastForward,
 	Count
@@ -100,6 +100,8 @@ public:
 	bool bLeadCamera = true;
 	/** A small "Camera held" note while the camera waits for you to finish (Options). */
 	bool bCameraHeldNote = true;
+	/** Pointing at an enemy: its odds against your unit most at risk, in a box on the board (Options; off by default, v21 play test). */
+	bool bThreatOdds = false;
 
 	/**
 	 * Quick Cast, per ability key (2026-10-03): the key held aims the ability,

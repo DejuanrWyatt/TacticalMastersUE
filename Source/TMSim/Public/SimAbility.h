@@ -117,6 +117,25 @@ namespace TMSim
 		 * the user on the free spot behind the unit aimed at, as near as can be
 		 * to straight behind it -- the Ninja's Shadow Step. With nowhere to land
 		 * the ability can't be used (FBattle::LandingFor).
+		 *
+		 * "zone" (2026-10-04, area denial) lays ground that lasts: see ZoneTurns.
+		 *
+		 * The unique and mobility spells (2026-10-05, Docs/design/feat-new-spells.md),
+		 * in SimSpells.cpp: "link" (Soul Link), "gravity" (pulls those it reaches
+		 * toward the aim), "transfer" (an ally's ills onto the nearest enemy),
+		 * "pact" (health for an ally's cooldowns), "chain" (a heal that leaps),
+		 * "spiritswap" (trade health shares), "reckoning" (harder the more hurt),
+		 * "dash", "disengage", "vault", "charge", "shadowhop", "recall" (move the
+		 * user), "rally", "hook", "shove", "riptide" (move another).
+		 *
+		 * From Cire's Spell Codex (2026-10-06, Docs/design/feat-codex-picks.md), in
+		 * SimSpells.cpp and where noted: "warned" (drawn on the ground now, it lands
+		 * at the start of the caster's next turn on whoever is there then:
+		 * SimZones.cpp), "ricochet" (the blow bounces on to 2 more enemies within
+		 * 5 m, a fifth weaker each time, each taking its status), "execute" (a
+		 * quarter of the target's missing health on top; a kill gives back half the
+		 * caster's gauge), "crowd" (a fifth harder for each enemy caught beyond the
+		 * first).
 		 */
 		std::string Special;
 		/**
@@ -134,7 +153,34 @@ namespace TMSim
 		 */
 		std::string Element;
 
+		/**
+		 * Ground zones (2026-10-04, "area denial" mockups; Docs/design/feat-ground-zones.md).
+		 * An ability with "special": "zone" touches nobody as it goes off: it lays
+		 * its shape on the ground, where it was aimed, for ZoneTurns of the caster's
+		 * turns. A unit of the side it is for (Target) that starts its turn in it, or
+		 * ends a walk in it, is touched, at most once a turn: ZonePercent of its max
+		 * HP lost (as burning ground takes), the ability's element, its status and
+		 * ZoneStatus2. Flying units are above it. ZoneSight > 0: its side sees that
+		 * far round the aim point, and it may be thrown where nobody sees.
+		 * bZoneOnce: the statuses only the first time each unit is touched.
+		 * bZoneReveal: its side spots units hiding in grass or smoke in it.
+		 * bZoneHide: its own side hides in it as in tall grass (Target ally).
+		 * bZoneFlammable: fire turns it into burning ground (FBattle::ZonesMeetElement).
+		 */
+		int ZoneTurns = 0;
+		float ZonePercent = 0.0f;
+		float ZoneSight = 0.0f;
+		std::string ZoneStatus2;
+		int ZoneStatus2Turns = 0;
+		bool bZoneOnce = false;
+		bool bZoneReveal = false;
+		bool bZoneHide = false;
+		bool bZoneFlammable = false;
+		/** A pair of gates (2026-10-05, Rift Gate): its side's units that end a walk at one come out of the other. */
+		bool bZonePortal = false;
+
 		bool HasStatus() const { return !StatusId.empty(); }
+		bool LaysZone() const { return ZoneTurns > 0; }
 	};
 
 	/**

@@ -554,9 +554,74 @@ int main(int ArgCount, char** Args)
 			Fail("a unit that has acted should not capture");
 		}
 
+		// The v20 play test: ending a turn at a tower puts the turn into it, with no
+		// Capture; not while an enemy stands at it; and a Capture counts once.
+		{
+			FBattle Auto;
+			Auto.Tuning.WatchtowerCount = 2;
+			Auto.Tuning.WatchtowerTurns = 2;
+			Deal(Auto, *Big, 5);
+			FUnit* Stayer = NextReady(Auto, 0);
+			StandAt(Auto, *Stayer, Auto.Watchtowers[0]);
+			FTickReport Ended;
+			Auto.Apply(FOrder::MakeEndTurn(Stayer->Id, Stayer->Serial), Ended);
+			if (Auto.Watchtowers[0].Capturer != 0 || Auto.Watchtowers[0].Progress != 1 || Ended.WhoWas(EEventKind::Capturing).size() != 1)
+			{
+				Fail("ending a turn at a tower should put the turn into it");
+			}
+			// An enemy at the tower: the next blue turn there counts for nothing.
+			FUnit* Red = nullptr;
+			for (FUnit& Unit : Auto.Units)
+			{
+				Red = (!Red && Unit.Team == 1) ? &Unit : Red;
+			}
+			Red->Pos = FMap::Snap(FVec2(Auto.Watchtowers[0].Pos.X + 1.0f, Auto.Watchtowers[0].Pos.Y + 1.0f));
+			FUnit* Again = nullptr;
+			for (int Tries = 0; Tries < 30 && !Again; ++Tries)
+			{
+				FUnit* Next = NextReady(Auto, 0);
+				if (Next && Next->Id == Stayer->Id)
+				{
+					Again = Next;
+				}
+				else if (Next)
+				{
+					FTickReport Skip;
+					Auto.Apply(FOrder::MakeEndTurn(Next->Id, Next->Serial), Skip);
+				}
+			}
+			if (Again)
+			{
+				FTickReport Contested;
+				Auto.Apply(FOrder::MakeEndTurn(Again->Id, Again->Serial), Contested);
+				if (Auto.Watchtowers[0].Progress != 1 || !Contested.WhoWas(EEventKind::Capturing).empty())
+				{
+					Fail("a contested tower should take nothing from a turn ended at it");
+				}
+			}
+			else
+			{
+				Fail("the unit at the tower should come round again");
+			}
+
+			FBattle Once;
+			Once.Tuning.WatchtowerCount = 2;
+			Once.Tuning.WatchtowerTurns = 3;
+			Deal(Once, *Big, 5);
+			FUnit* Taker = NextReady(Once, 0);
+			StandAt(Once, *Taker, Once.Watchtowers[0]);
+			FTickReport Captured;
+			Once.Apply(FOrder::MakeCapture(Taker->Id, Taker->Serial, 0), Captured);
+			if (Once.Watchtowers[0].Progress != 1 || Captured.WhoWas(EEventKind::Capturing).size() != 1)
+			{
+				Fail("a Capture order should count its turn once, not again as the turn ends");
+			}
+		}
+
 		if (Failures == Before)
 		{
 			std::printf("taking a tower costs the turns the rule number says (2, then 3), each a whole turn; refused when too far, contested, already held, already acted or for another turn\n");
+			std::printf("ending a turn at a tower counts as a turn of capturing it, unless an enemy stands at it; a Capture counts once\n");
 			std::printf("a held tower shows its side more of the board, only what the tower itself sees\n");
 		}
 	}
@@ -670,6 +735,136 @@ int main(int ArgCount, char** Args)
 		{
 			std::printf("the computer played %d battles with towers: every order legal, %d towers taken, each battle replayed to the same checksum\n",
 				Played, Taken);
+		}
+	}
+
+	// Tile movement (v20 play test, FTuning::TileMove): four ways and eight. Every
+	// spot a walk can end on is a tile's spot, a step is 2 m (a diagonal 3 m, eight
+	// ways only), and the computer plays whole battles with it, every order legal,
+	// every walk ending on a tile's spot, replayed to the same checksum.
+	{
+		const int Before = Failures;
+		int Played = 0;
+		int Walks = 0;
+		for (int Mode = 1; Mode <= 2; ++Mode)
+		{
+			for (const FMapDef& Map : Maps)
+			{
+				const uint64_t Seed = 7;
+				FBattle Battle;
+				Battle.Tuning.TileMove = Mode;
+				Battle.Tuning.EngageCost = 0.0;
+				Deal(Battle, Map, Seed);
+				FUnit* First = NextReady(Battle, 0);
+				if (!First)
+				{
+					Fail(Map.Id + ": nobody came ready");
+					continue;
+				}
+				const FNode Start = FMap::NodeOf(First->Pos);
+				const FNode Home = FBattle::TileNode(First->Pos);
+				bool bDiagonal = false;
+				for (const auto& Pair : Battle.ReachableNodes(*First))
+				{
+					if (Pair.first == Start)
+					{
+						continue;
+					}
+					if (!(FBattle::TileNode(FMap::NodePos(Pair.first)) == Pair.first))
+					{
+						Fail(Map.Id + ": tile movement reached a spot that is not a tile's");
+						break;
+					}
+					const double Steps = Pair.second / Ground::TileSize;
+					if (Mode == 1 && std::fabs(Steps - std::round(Steps)) > 1e-6)
+					{
+						Fail(Map.Id + ": four-way tile steps should cost whole tiles");
+						break;
+					}
+					if (Pair.first.X != Home.X && Pair.first.Y != Home.Y && std::abs(Pair.first.X - Home.X) == 4
+						&& std::abs(Pair.first.Y - Home.Y) == 4)
+					{
+						bDiagonal = true;
+						const double Expected = Mode == 1 ? 2.0 * Ground::TileSize : 1.5 * Ground::TileSize;
+						if (std::fabs(Pair.second - Expected) > 0.01 && Pair.second < Expected)
+						{
+							Fail(Map.Id + ": a diagonal tile step cost less than it should");
+						}
+					}
+				}
+				(void)bDiagonal;
+
+				FBattle Game;
+				Game.Tuning.TileMove = Mode;
+				Deal(Game, Map, Seed);
+				FAIPlayer Computers[2] = { FAIPlayer("hard"), FAIPlayer("hard") };
+				Computers[0].Rng.Seed(Seed);
+				Computers[1].Rng.Seed(Seed + 1);
+				std::vector<std::pair<int, FOrder>> Orders;
+				int Refusals = 0;
+				while (Game.TickCount < 3000 && Game.Winner < 0)
+				{
+					const FUnit* Unit = WaitingOn(Game);
+					if (!Unit)
+					{
+						FTickReport Report;
+						Game.Advance(1, Report);
+						continue;
+					}
+					FOrder Order = Computers[Unit->Team].NextCommand(Game, *Unit);
+					if (!Game.Validate(Order).empty())
+					{
+						++Refusals;
+						Order = FOrder::MakeEndTurn(Unit->Id, Unit->Serial);
+					}
+					Orders.emplace_back(Game.TickCount, Order);
+					FTickReport Report;
+					Game.Apply(Order, Report);
+					if (Order.Type == EOrderType::Move)
+					{
+						++Walks;
+						const FUnit* Walked = Game.FindUnit(Order.UnitId);
+						if (Walked && !(FMap::NodeOf(Walked->Pos) == FBattle::TileNode(Walked->Pos)) && !(Order.To == Walked->WalkFrom))
+						{
+							Fail(Map.Id + ": a walk with tile movement ended off a tile's spot");
+						}
+					}
+				}
+				++Played;
+				if (Refusals > 0)
+				{
+					Fail(Map.Id + ": with tile movement the computer gave " + std::to_string(Refusals) + " orders the rules refused");
+				}
+				FBattle Replay;
+				Replay.Tuning.TileMove = Mode;
+				Deal(Replay, Map, Seed);
+				size_t Next = 0;
+				while (Next < Orders.size() || (Replay.TickCount < Game.TickCount && Replay.Winner < 0))
+				{
+					if (Next < Orders.size() && Orders[Next].first == Replay.TickCount)
+					{
+						FTickReport Report;
+						Replay.Apply(Orders[Next].second, Report);
+						++Next;
+						continue;
+					}
+					if (Replay.Winner >= 0)
+					{
+						break;
+					}
+					FTickReport Report;
+					Replay.Advance(1, Report);
+				}
+				if (Replay.Checksum() != Game.Checksum())
+				{
+					Fail(Map.Id + ": a battle with tile movement did not replay to the same checksum");
+				}
+			}
+		}
+		if (Failures == Before)
+		{
+			std::printf("tile movement, four ways and eight: walks end on tiles' spots, a step costs a tile (a diagonal one and a half); %d battles, %d walks, every order legal, each replayed to the same checksum\n",
+				Played, Walks);
 		}
 	}
 

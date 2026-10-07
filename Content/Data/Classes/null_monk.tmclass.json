@@ -44,29 +44,39 @@
       }
     },
     {
-      "id": "null_monk_hush",
-      "name": "Hush",
-      "desc": "Silences an enemy 1-6 m away for 2 turns: no abilities but its plain attack.",
+      "id": "null_monk_hush_circle",
+      "name": "Hush Circle",
+      "desc": "Draw a circle of silence within 2 m of a point 1-6 m away for 2 of your turns. An enemy that starts its turn there, or stops there, is Silenced (its plain attack only) and Shredded (its defences cut).",
       "kind": "active",
       "effect": "support",
       "scale": "mag",
       "target": "enemy",
-      "shape": "unit",
+      "shape": "circle",
       "power": 0,
       "min_range": 1,
       "max_range": 6,
-      "aoe": 0,
+      "aoe": 2,
       "cooldown": 4,
-      "cast": 0,
+      "cast": 0.5,
       "status": {
         "id": "silence",
-        "turns": 2
+        "turns": 1
       },
       "fx": "chakra",
       "vfx": {
         "system": "/Game/ParticleSystemVFXVol1/Systems/NS_SparkleBurst.NS_SparkleBurst",
-        "at": "targets",
+        "at": "point",
         "scale": 1
+      },
+      "anim": "area",
+      "special": "zone",
+      "element": "none",
+      "zone": {
+        "turns": 2,
+        "also": {
+          "id": "shred",
+          "turns": 1
+        }
       }
     },
     {
@@ -147,15 +157,7 @@
           "scale": 1,
           "rotate": 0
         },
-        {
-          "backing": "circle",
-          "glyph": "note",
-          "colour": "#b98adf",
-          "style": "light",
-          "mark": "none",
-          "scale": 1,
-          "rotate": 20
-        },
+        null,
         {
           "backing": "circle",
           "glyph": "sun",
@@ -187,6 +189,10 @@
         98
       ],
       "against": "reference team, medium"
+    },
+    "rebalanced": {
+      "on": "2026-10-04",
+      "why": "Ground zone Hush Circle in place of Hush (area denial, 2026-10-04)."
     }
   }
 }

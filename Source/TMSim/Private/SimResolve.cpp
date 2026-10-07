@@ -77,6 +77,11 @@ namespace TMSim
 			Target.bPhoenixUsed = true;
 			Target.Hp = 1;
 		}
+		// Undying (2026-10-05): nothing takes the last of it while it lasts.
+		if (Target.Hp == 0 && !Target.Statuses.empty() && Target.HasStatus("undying"))
+		{
+			Target.Hp = 1;
+		}
 
 		std::vector<FStatus> Kept;
 		Kept.reserve(Target.Statuses.size());
@@ -262,6 +267,30 @@ namespace TMSim
 		Target.Clock = 0;
 		Target.bMoved = false;
 		Target.bActed = false;
+		// Death Mark (2026-10-05): the marker's side is paid gauge for the fall.
+		for (const FStatus& Status : Target.Statuses)
+		{
+			const FUnit* Marker = Status.Id == "deathmark" ? FindUnit(Status.By) : nullptr;
+			if (!Marker)
+			{
+				continue;
+			}
+			const int Side = Marker->Team;
+			for (FUnit& Ally : Units)
+			{
+				if (Ally.IsAlive() && !Ally.bOffBoard && Ally.Team == Side && !Ally.bReady)
+				{
+					Ally.Tg = std::min(Pace::TgMax, Ally.Tg + Pace::TgMax * 30 / 100);
+					FEvent Event;
+					Event.Kind = EEventKind::GaugeChanged;
+					Event.Unit = Ally.Id;
+					Event.Amount = 30;
+					Event.Where = Ally.Pos;
+					Report.Events.push_back(Event);
+				}
+			}
+			break;
+		}
 		// Reraise: it stands again a few seconds later, so it lies there until then.
 		const bool bReraise = !bNoRaise && Target.HasStatus("reraise");
 		Target.Statuses.clear();
@@ -391,7 +420,8 @@ namespace TMSim
 			User.Channeling.Target = Target;
 			User.Channeling.Turns = std::max(1, Ability->Channel);
 			ResolveAbility(User, Slot, Target, Report);
-			if (User.IsAlive())
+			// Not if something already took the turn (2026-10-05: Retribution's stun).
+			if (User.IsAlive() && User.bReady)
 			{
 				EndTurnFor(User, false, Report);
 			}
@@ -443,7 +473,8 @@ namespace TMSim
 		// A movement skill (2026-10-03) moves the user first: the blow lands from
 		// where it comes down (Leap Smash) or from behind its target (Shadow
 		// Step), so a step behind strikes the back. It faces where it aimed.
-		if (Ability->Special == "leap" || Ability->Special == "behind")
+		const FVec2 Before = User.Pos;
+		if (Ability->Special == "leap" || Ability->Special == "behind" || Ability->Special == "vault" || Ability->Special == "charge")
 		{
 			FVec2 Landing;
 			if (LandingFor(User, *Ability, Target, Landing))
@@ -462,11 +493,18 @@ namespace TMSim
 				Report.Events.push_back(Moved);
 			}
 		}
+		// The new spells' own moves (2026-10-05): dash, disengage, shadow hop, recall.
+		if (Ability->Special == "dash" || Ability->Special == "disengage" || Ability->Special == "shadowhop" || Ability->Special == "recall")
+		{
+			MoveForSpell(User, Slot, *Ability, Target, Report);
+		}
 
 		// Worked out before anything else moves or changes, because a "vector"
 		// ability carries the caster along its own line and the damage is owed
 		// from where the swing started, not from where it finished.
-		const std::vector<FHit> Hits = Preview(User, Slot, User.Pos, Target);
+		// A charge is owed from where the run began (2026-10-05); a warned blow
+		// landing (2026-10-06), from where its caster stood when it was drawn.
+		const std::vector<FHit> Hits = Preview(User, Slot, bWarnedStrike ? WarnedFrom : Ability->Special == "charge" ? Before : User.Pos, Target);
 
 		if (ShapeOf(*Ability) == "vector" && Map.NodeWalkable(FMap::NodeOf(Target)))
 		{
@@ -490,13 +528,24 @@ namespace TMSim
 				[](const FStatus& Status) { return Status.Id == "veil"; }), User.Statuses.end());
 		}
 
+		// A warned ability (2026-10-06, Cire's Spell Codex): used, it is only drawn
+		// on the ground, and lands at the start of the caster's next turn on
+		// whoever is in it then (SimZones.cpp). Amount says which half this is for
+		// whoever shows it: 2 drawn, 1 landing, 0 any other ability.
+		const bool bWarnedLaid = Ability->Special == "warned" && !bWarnedStrike;
 		FEvent Cast;
 		Cast.Kind = EEventKind::Resolved;
 		Cast.Unit = User.Id;
 		Cast.Slot = Slot;
 		Cast.Where = Target;
 		Cast.Id = Ability->Id;
+		Cast.Amount = bWarnedStrike ? 1 : bWarnedLaid ? 2 : 0;
 		Report.Events.push_back(Cast);
+		if (bWarnedLaid)
+		{
+			LayZone(User, Slot, *Ability, Target, Report, 1);
+			return;
+		}
 
 		// A loud blow near a waiting camp wakes it sooner (2026-10-02, A): an area
 		// blow is loud, and fire louder.
@@ -507,6 +556,20 @@ namespace TMSim
 			const int Loud = (bArea ? 1 : 0) + (ElementOf(*Ability) == "fire" ? 1 : 0);
 			MakeNoise(Shape == "self" ? User.Pos : Target, User, Loud, Report);
 		}
+
+		// Ground zones (2026-10-04): fire catches tar, water puts fire out; and a
+		// zone ability touches nobody as it goes off, it lays its ground.
+		if (!Zones.empty())
+		{
+			ZonesMeetElement(User, *Ability, Target, Report);
+		}
+		if (Ability->LaysZone() && Ability->Special == "zone")
+		{
+			LayZone(User, Slot, *Ability, Target, Report);
+			return;
+		}
+		// What the new spells do once everything is hit (SimSpells.cpp).
+		FSpellAfter After;
 
 		for (const FHit& Hit : Hits)
 		{
@@ -595,6 +658,24 @@ namespace TMSim
 			{
 				Amount = TakeFromShield(*Struck, Amount, Report);
 				Amount = Hurt(*Struck, Amount);
+				// Soul Link and Retribution (2026-10-05): settled once everything is hit.
+				if (Amount > 0 && !Struck->Statuses.empty())
+				{
+					for (const FStatus& Status : Struck->Statuses)
+					{
+						const FUnit* Partner = Status.Id == "linked" ? FindUnit(Status.By) : nullptr;
+						if (Partner && Partner->IsAlive() && Partner->Id != Struck->Id && Amount / 2 > 0
+							&& static_cast<double>(Partner->Pos.DistanceTo(Struck->Pos)) <= 8.0)
+						{
+							After.Shared.push_back(std::make_pair(Partner->Id, Amount / 2));
+						}
+					}
+					if (Struck->Team != User.Team && Struck->HasStatus("retribution"))
+					{
+						RemoveStatus(*Struck, "retribution");
+						After.bRetribution = true;
+					}
+				}
 				if (Struck->bMonster && Amount > 0)
 				{
 					BossHurtBy(*Struck, User, Amount);
@@ -672,6 +753,7 @@ namespace TMSim
 					break;
 				}
 				Struck->Hp += Amount;
+				After.Healed.push_back(Struck->Id);
 				break;
 			case EEffect::Revive:
 				Struck->Hp = Amount;
@@ -694,12 +776,26 @@ namespace TMSim
 			Landed.Where = Struck->Pos;
 			Landed.Id = Ability->Id;
 			Report.Events.push_back(Landed);
+			After.Struck.push_back(Struck->Id);
 
 			if (!Struck->IsAlive())
 			{
 				if (!Struck->IsKo() && !Struck->bOffBoard)
 				{
 					KnockOut(*Struck, Report);
+					// Verdict (2026-10-06): a kill gives back half of the gauge it spent.
+					if (Ability->Special == "execute" && User.IsAlive() && Struck->Id != User.Id)
+					{
+						User.Ult = std::min(Pace::UltMax, User.Ult + Pace::UltMax / 2);
+						FEvent Refund;
+						Refund.Kind = EEventKind::Reaction;
+						Refund.Unit = User.Id;
+						Refund.By = Struck->Id;
+						Refund.Amount = Pace::UltMax / 2;
+						Refund.Where = User.Pos;
+						Refund.Id = "execute";
+						Report.Events.push_back(Refund);
+					}
 					if (User.HasItems())
 					{
 						User.KillTgPercent += GearSum(User, &FItemDef::KillTgPercent);
@@ -745,8 +841,8 @@ namespace TMSim
 			{
 				const FStatusDef* Def = FindStatus(Ability->StatusId);
 				// A Shield is worth the ability's own power, and a Taunt has to
-				// remember who is owed the attention.
-				const int Soak = (Def && Def->bAbsorbs) ? std::max(1, RoundToInt(Ability->Power)) : 0;
+				// remember who is owed the attention. A Time Bomb holds its blast.
+				const int Soak = (Def && (Def->bAbsorbs || Ability->StatusId == "bomb")) ? std::max(1, RoundToInt(Ability->Power)) : 0;
 				const int By = (Def && (Def->bTaunt || Def->bSourced)) ? User.Id : -1;
 				AddStatus(*Struck, Ability->StatusId, Ability->StatusTurns, Soak, By);
 
@@ -809,71 +905,29 @@ namespace TMSim
 			CallPet(User, *Ability, Target, Report);
 		}
 
+		AfterSpell(User, Slot, *Ability, Target, After, Report);
+
 		CheckWinner();
 		if (Winner != -1)
 		{
 			Report.Say(EEventKind::Won, Winner);
+			return;
 		}
-	}
-}
-
-namespace TMSim
-{
-	bool FBattle::LandingFor(const FUnit& User, const FAbility& Ability, const FVec2& Target, FVec2& OutSpot) const
-	{
-		// Leap: as near the aim point as can be, within 1.5 m of it (or the
-		// ability's area, if wider). Behind: round the unit aimed at, as near as
-		// can be to the spot a metre behind it, not on top of it.
-		FVec2 Centre = FMap::Snap(Target);
-		FVec2 Want = Centre;
-		float Reach = std::max(1.5f, Ability.Aoe);
-		float Closest = 0.0f;
-		if (Ability.Special == "behind")
+		// Echo (2026-10-05): the ally's next damage or healing goes off again, at half power.
+		if (EchoScale == 1.0 && User.IsAlive() && !User.Statuses.empty() && User.HasStatus("echo") && Ability->Kind == "active"
+			&& Ability->Special.empty() && Ability->StatusId != "echo"
+			&& (Ability->Effect == EEffect::Damage || Ability->Effect == EEffect::Heal))
 		{
-			const FUnit* Victim = UnitNear(Target, Ground::HitRadius);
-			if (!Victim || Victim->Id == User.Id)
-			{
-				return false;
-			}
-			Centre = Victim->Pos;
-			Want = Victim->Pos - Victim->Facing * 1.0f;
-			Reach = 1.6f;
-			Closest = 0.6f;
+			RemoveStatus(User, "echo");
+			FEvent Echoed;
+			Echoed.Kind = EEventKind::Reaction;
+			Echoed.Unit = User.Id;
+			Echoed.Where = User.Pos;
+			Echoed.Id = "echo";
+			Report.Events.push_back(Echoed);
+			EchoScale = 0.5;
+			ResolveAbility(User, Slot, Target, Report);
+			EchoScale = 1.0;
 		}
-		else if (Ability.Special != "leap")
-		{
-			return false;
-		}
-		const FNode Middle = FMap::NodeOf(Centre);
-		bool bFound = false;
-		float Best = 0.0f;
-		// Rows then columns, nearest-first by distance, the first of equals kept:
-		// the same spot on every machine.
-		for (int DY = -4; DY <= 4; ++DY)
-		{
-			for (int DX = -4; DX <= 4; ++DX)
-			{
-				const FNode Node{ Middle.X + DX, Middle.Y + DY };
-				const FVec2 Spot = FMap::NodePos(Node);
-				const float FromCentre = Spot.DistanceTo(Centre);
-				if (FromCentre > Reach + 0.001f || FromCentre < Closest || !InBounds(Spot) || !Map.NodeWalkable(Node))
-				{
-					continue;
-				}
-				const FUnit* Other = UnitNear(Spot, Ground::UnitSpacing);
-				if (Other && Other->Id != User.Id)
-				{
-					continue;
-				}
-				const float Score = Spot.DistanceTo(Want);
-				if (!bFound || Score < Best)
-				{
-					bFound = true;
-					Best = Score;
-					OutSpot = Spot;
-				}
-			}
-		}
-		return bFound;
 	}
 }

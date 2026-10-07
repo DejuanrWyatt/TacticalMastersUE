@@ -44,33 +44,25 @@
       }
     },
     {
-      "id": "dust_hexer_stone_curse",
-      "name": "Stone Curse",
-      "desc": "Weaken an enemy 2-8 m away for 2 turns; Move -2. (1 s)",
+      "id": "dust_hexer_blight_sigil",
+      "name": "Blight Sigil",
+      "desc": "A blight sigil 2.5 m wide up to 8 m away: damage, and those caught heal half as much for 3 turns.",
       "kind": "active",
-      "effect": "support",
+      "effect": "damage",
       "scale": "mag",
       "target": "enemy",
-      "shape": "unit",
-      "power": 0,
-      "min_range": 2,
+      "shape": "circle",
+      "power": 40,
+      "min_range": 0,
       "max_range": 8,
-      "aoe": 0,
+      "aoe": 2.5,
       "cooldown": 3,
-      "cast": 1,
-      "buffs": [
-        {
-          "stat": "move",
-          "amount": -2,
-          "turns": 2
-        }
-      ],
-      "fx": "pin_shot",
-      "vfx": {
-        "system": "/Game/ParagonMorigesh/FX/Particles/Morigesh/Abilities/StabDoll/FX/P_Morigesh_StabDoll_IMPACT.P_Morigesh_StabDoll_IMPACT",
-        "at": "targets",
-        "scale": 1
-      }
+      "cast": 0,
+      "status": {
+        "id": "wounded",
+        "turns": 3
+      },
+      "fx": "earth_slash"
     },
     {
       "id": "dust_hexer_stone_slumber",
@@ -129,6 +121,28 @@
     "reworded": {
       "on": "2026-10-02",
       "why": "Descriptions say what the abilities do (2026-10-02): Stun not sleep, Crit not the old Power, turns not seconds"
+    },
+    "rebalanced": {
+      "on": "2026-10-06",
+      "why": "Cire's Spell Codex pick A1 Blight Sigil in place of Stone Curse (feat-codex-picks.md)"
+    },
+    "icons": {
+      "abilities": [
+        null,
+        {
+          "backing": "circle",
+          "glyph": "sigil",
+          "colour": "#8fd14f",
+          "style": "light",
+          "mark": "circle",
+          "scale": 1,
+          "rotate": 0,
+          "badge": "none",
+          "finish": "lit"
+        },
+        null,
+        null
+      ]
     }
   }
 }

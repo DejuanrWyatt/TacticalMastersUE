@@ -27,6 +27,18 @@ four units. Who orders which unit is the director's business.
    Pick timer buttons set the draft. Everyone else sees the rules in one line.
 7. Start (host) needs at least two players and every joined player ready. With the draft on, it starts the draft.
 
+## 2a. Settings, items and Random (v20 play test, 2026-10-04)
+- Every battle setting is on the lobby screen, three to a row: map, theme, duplicates, victory, time, planning,
+  watchtowers, item points, camps, respawns, boss, elements, friendly fire, bosses hunt, claim the boss, draft,
+  pick timer. The host clicks to change one and everyone is told; the others see the values. (The setup screen
+  is still where the host starts.)
+- Items: beside each unit its three item slots. A unit's own player buys its items from the side's points (the
+  host buys the computer's), with the setup screen's item picker; the player asks the host (`item`: slot code
+  team * 12 + unit * 3 + slot, item id, "" to empty), the host checks owner, points and the rest and tells
+  everyone. The `lobby` message carries `settings` (label, value pairs), `item_budget` and `items` (24 ids).
+- Random: the class picker's Random (of the role shown); Random classes in the lobby, a different class for each
+  of the player's own units; Random pick / Random ban in the draft. Each is an ordinary pick, checked as one.
+
 ## 3. The draft
 Order (`TMDraftOrder::Steps`), 14 steps:
 
@@ -54,7 +66,7 @@ Order (`TMDraftOrder::Steps`), 14 steps:
 - After a battle the host takes everyone back to the lobby (R or the button); players who left are dropped.
 
 ## 5. Protocol
-`FTMNet::ProtocolVersion` 8. New messages: `lobby` (host -> each, with "you"), `side`, `ready`, `pick`
+`FTMNet::ProtocolVersion` 8 (22 since the v20 play test: settings, items and `item` above). New messages: `lobby` (host -> each, with "you"), `side`, `ready`, `pick`
 (player -> host), `left` (host -> all), `draft` (host -> all), `draft_choose` (player -> host).
 `start` gains `players`, `owners` and per-player `you`; `team` is gone. `rematch` is gone.
 Transport: a star of TCP connections (TMNet.cpp), the host taking up to three.

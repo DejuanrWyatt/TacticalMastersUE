@@ -10,6 +10,11 @@
 			"LoadingPhase": "PreDefault"
 		},
 		{
+			"Name": "TMCast",
+			"Type": "Runtime",
+			"LoadingPhase": "PreDefault"
+		},
+		{
 			"Name": "TacticalMasters",
 			"Type": "Runtime",
 			"LoadingPhase": "Default",
@@ -20,6 +25,7 @@
 		{ "Name": "RemoteControl", "Enabled": true },
 		{ "Name": "PythonScriptPlugin", "Enabled": true },
 		{ "Name": "Niagara", "Enabled": true },
-		{ "Name": "ProceduralMeshComponent", "Enabled": true }
+		{ "Name": "ProceduralMeshComponent", "Enabled": true },
+		{ "Name": "EOSShared", "Enabled": true }
 	]
 }

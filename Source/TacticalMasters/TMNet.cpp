@@ -1,5 +1,7 @@
 #include "TMNet.h"
 
+#include "TMEos.h"
+
 #include "Common/TcpSocketBuilder.h"
 #include "IPAddress.h"
 #include "Serialization/JsonReader.h"
@@ -12,6 +14,11 @@ namespace TMNetPrivate
 {
 	/** How long a join may take to connect before it is given up (Godot's ENet waits about as long). */
 	constexpr float ConnectSeconds = 10.0f;
+	/** Through Epic, finding a way between two routers (and a relay if there is none) takes longer. */
+	constexpr float CodeConnectSeconds = 25.0f;
+	/** How long a refusal has to go out before the connection is closed: longer through Epic, which queues it. */
+	constexpr float RefusalSeconds = 0.5f;
+	constexpr float EosRefusalSeconds = 1.5f;
 	const TCHAR* const Garbled = TEXT("The other game sent something it shouldn't have, so the connection was closed.");
 }
 
@@ -43,6 +50,18 @@ void FTMNet::Close()
 		Destroy(Away.Socket);
 	}
 	TurnedAway.Reset();
+	if (bWantCode || bJoiningByCode)
+	{
+		// Every connection on the code's socket, then the lobby (closed for everyone, hosting).
+		FTMEos::Get().DisconnectAll();
+		FTMEos::Get().LeaveLobby();
+	}
+	bWantCode = false;
+	bJoiningByCode = false;
+	WantedCode.Reset();
+	LastLobby = 0;
+	bCodeRefusalTold = false;
+	CodeNews.Reset();
 	bHosting = false;
 	Received.Reset();
 	Arrived.Reset();
@@ -65,6 +84,10 @@ bool FTMNet::IsConnected() const
 
 bool FTMNet::IsConnecting() const
 {
+	if (bJoiningByCode && Peers.Num() == 0)
+	{
+		return Lost.IsEmpty();  // still finding or joining the game
+	}
 	return !bHosting && Peers.Num() > 0 && !Peers[0].bConnected;
 }
 
@@ -123,6 +146,55 @@ FString FTMNet::Join(const FString& Address, int32 Port)
 	return FString();
 }
 
+void FTMNet::OfferCode()
+{
+	// Hosting even if the port couldn't be opened: the code is enough.
+	bHosting = true;
+	bWantCode = true;
+	bCodeRefusalTold = false;
+}
+
+FString FTMNet::JoinCode(const FString& Typed)
+{
+	Close();
+	const FString Clean = FTMEos::CleanCode(Typed);
+	if (Clean.IsEmpty())
+	{
+		return TEXT("A join code is six letters and digits (never 0, O, 1, I or L), as the host's lobby shows it.");
+	}
+	const FTMEos::EState State = FTMEos::Get().GetState();
+	if (State == FTMEos::EState::Unavailable || State == FTMEos::EState::Failed || State == FTMEos::EState::Off)
+	{
+		return FTMEos::Get().StatusLine();
+	}
+	bJoiningByCode = true;
+	WantedCode = Clean;
+	ConnectingFor = 0.0f;
+	return FString();
+}
+
+FString FTMNet::Code() const
+{
+	const FTMEos& Eos = FTMEos::Get();
+	if ((bWantCode && Eos.LobbyState() == FTMEos::ELobby::Hosting) || (bJoiningByCode && !Eos.LobbyCode().IsEmpty()))
+	{
+		return Eos.LobbyCode();
+	}
+	return bJoiningByCode ? WantedCode : FString();
+}
+
+int32 FTMNet::FindEosPeer(const FString& User) const
+{
+	for (int32 i = 0; i < Peers.Num(); ++i)
+	{
+		if (!Peers[i].EosUser.IsEmpty() && Peers[i].EosUser == User)
+		{
+			return i;
+		}
+	}
+	return INDEX_NONE;
+}
+
 FTMNet::FPeer* FTMNet::FindPeer(int32 PeerId)
 {
 	for (FPeer& Peer : Peers)
@@ -154,10 +226,11 @@ void FTMNet::SendTo(int32 PeerId, const TSharedRef<FJsonObject>& Message)
 	}
 }
 
-void FTMNet::TurnAway(FSocket* Socket, TArray<uint8>&& Pending, const FString& Reason)
+void FTMNet::TurnAway(FSocket* Socket, const FString& EosUser, TArray<uint8>&& Pending, const FString& Reason)
 {
 	FTurnedAway Away;
 	Away.Socket = Socket;
+	Away.EosUser = EosUser;
 	Away.Outgoing = MoveTemp(Pending);
 	TSharedRef<FJsonObject> Refusal = MakeShared<FJsonObject>();
 	Refusal->SetStringField(TEXT("t"), TEXT("refuse"));
@@ -172,7 +245,7 @@ void FTMNet::Kick(int32 PeerId, const FString& Reason)
 	{
 		if (Peers[i].Id == PeerId)
 		{
-			TurnAway(Peers[i].Socket, MoveTemp(Peers[i].Outgoing), Reason);
+			TurnAway(Peers[i].Socket, Peers[i].EosUser, MoveTemp(Peers[i].Outgoing), Reason);
 			Peers.RemoveAt(i);
 			return;
 		}
@@ -213,6 +286,27 @@ bool FTMNet::Flush(FSocket* Socket, TArray<uint8>& Bytes)
 	return true;
 }
 
+bool FTMNet::FlushEos(const FString& User, TArray<uint8>& Bytes)
+{
+	// Packets of at most EOS's size, as many as its queue takes; the rest next frame.
+	int32 Sent = 0;
+	bool bFailed = false;
+	while (Sent < Bytes.Num())
+	{
+		const int32 Size = FMath::Min(FTMEos::MaxPacket, Bytes.Num() - Sent);
+		if (!FTMEos::Get().Send(User, Bytes.GetData() + Sent, Size, bFailed))
+		{
+			break;
+		}
+		Sent += Size;
+	}
+	if (Sent > 0)
+	{
+		Bytes.RemoveAt(0, Sent, EAllowShrinking::No);
+	}
+	return !bFailed;
+}
+
 void FTMNet::DropPeer(int32 Index, const FString& Why)
 {
 	if (!Peers.IsValidIndex(Index))
@@ -221,6 +315,10 @@ void FTMNet::DropPeer(int32 Index, const FString& Why)
 	}
 	const int32 Id = Peers[Index].Id;
 	Destroy(Peers[Index].Socket);
+	if (!Peers[Index].EosUser.IsEmpty())
+	{
+		FTMEos::Get().Disconnect(Peers[Index].EosUser);
+	}
 	Peers.RemoveAt(Index);
 	if (bHosting)
 	{
@@ -234,6 +332,11 @@ void FTMNet::DropPeer(int32 Index, const FString& Why)
 
 bool FTMNet::ReadPeer(FPeer& Peer, FString& Why)
 {
+	if (!Peer.Socket)
+	{
+		// Through Epic: PollCode has put its packets into Incoming already.
+		return TakeMessages(Peer, Why);
+	}
 	uint8 Buffer[16384];
 	for (;;)
 	{
@@ -251,6 +354,11 @@ bool FTMNet::ReadPeer(FPeer& Peer, FString& Why)
 		}
 		Peer.Incoming.Append(Buffer, Read);
 	}
+	return TakeMessages(Peer, Why);
+}
+
+bool FTMNet::TakeMessages(FPeer& Peer, FString& Why)
+{
 	// Whole messages out of what has arrived.
 	while (Peer.Incoming.Num() >= 4)
 	{
@@ -294,7 +402,7 @@ void FTMNet::Poll(float DeltaSeconds)
 		if (!bAccepting || Peers.Num() >= MaxPeers)
 		{
 			// A battle on, or four already: say so, then let them go.
-			TurnAway(Incoming, TArray<uint8>(), bAccepting ? FString(TEXT("That game is full: four players already.")) : BusyReason);
+			TurnAway(Incoming, FString(), TArray<uint8>(), bAccepting ? FString(TEXT("That game is full: four players already.")) : BusyReason);
 			continue;
 		}
 		FPeer Peer;
@@ -304,14 +412,22 @@ void FTMNet::Poll(float DeltaSeconds)
 		Peers.Add(MoveTemp(Peer));
 		Arrived.Add(Peers.Last().Id);
 	}
+	// Players through a join code: the lobby, arrivals, packets, connections closed.
+	PollCode(DeltaSeconds);
 	for (int32 i = TurnedAway.Num() - 1; i >= 0; --i)
 	{
 		FTurnedAway& Away = TurnedAway[i];
 		Away.Age += DeltaSeconds;
-		// Half a second for the refusal to arrive, as net.gd:185 gives it.
-		if (!Flush(Away.Socket, Away.Outgoing) || Away.Age > 0.5f)
+		// Half a second for the refusal to arrive, as net.gd:185 gives it (more through Epic, which queues it).
+		const bool bEos = !Away.EosUser.IsEmpty();
+		const bool bGoing = bEos ? FlushEos(Away.EosUser, Away.Outgoing) : Flush(Away.Socket, Away.Outgoing);
+		if (!bGoing || Away.Age > (bEos ? TMNetPrivate::EosRefusalSeconds : TMNetPrivate::RefusalSeconds))
 		{
 			Destroy(Away.Socket);
+			if (bEos)
+			{
+				FTMEos::Get().Disconnect(Away.EosUser);
+			}
 			TurnedAway.RemoveAt(i);
 		}
 	}
@@ -319,6 +435,16 @@ void FTMNet::Poll(float DeltaSeconds)
 	for (int32 i = Peers.Num() - 1; i >= 0; --i)
 	{
 		FPeer& Peer = Peers[i];
+		if (!Peer.bConnected && !Peer.EosUser.IsEmpty())
+		{
+			// Joining by a code: PollCode marks the host connected once Epic says so.
+			ConnectingFor += DeltaSeconds;
+			if (ConnectingFor > TMNetPrivate::CodeConnectSeconds)
+			{
+				DropPeer(i, TEXT("Couldn't reach the host, even through Epic's relays. Check both PCs are online, then try again."));
+			}
+			continue;
+		}
 		if (!Peer.bConnected)
 		{
 			// Joining: the connection to the host is still being made.
@@ -340,7 +466,7 @@ void FTMNet::Poll(float DeltaSeconds)
 			}
 		}
 		FString Why;
-		if (!Flush(Peer.Socket, Peer.Outgoing))
+		if (!(Peer.Socket ? Flush(Peer.Socket, Peer.Outgoing) : FlushEos(Peer.EosUser, Peer.Outgoing)))
 		{
 			DropPeer(i, bHosting ? TEXT("A player disconnected.") : TEXT("The host disconnected."));
 			continue;
@@ -348,6 +474,194 @@ void FTMNet::Poll(float DeltaSeconds)
 		if (!ReadPeer(Peer, Why))
 		{
 			DropPeer(i, Why);
+		}
+	}
+}
+
+int32 FTMNet::AddEosPeer(const FString& User)
+{
+	for (const FTurnedAway& Away : TurnedAway)
+	{
+		if (Away.EosUser == User)
+		{
+			return INDEX_NONE;  // already being told no
+		}
+	}
+	if (!bAccepting || Peers.Num() >= MaxPeers)
+	{
+		TurnAway(nullptr, User, TArray<uint8>(), bAccepting ? FString(TEXT("That game is full: four players already.")) : BusyReason);
+		return INDEX_NONE;
+	}
+	FPeer Peer;
+	Peer.Id = NextPeerId++;
+	Peer.EosUser = User;
+	Peer.bConnected = true;
+	Peers.Add(MoveTemp(Peer));
+	Arrived.Add(Peers.Last().Id);
+	return Peers.Num() - 1;
+}
+
+void FTMNet::PollCode(float DeltaSeconds)
+{
+	if (!bWantCode && !bJoiningByCode)
+	{
+		return;
+	}
+	FTMEos& Eos = FTMEos::Get();
+	using ELobby = FTMEos::ELobby;
+	const FTMEos::EState State = Eos.GetState();
+
+	// Start the lobby once the sign-in is ready (it may still be signing in when Host or Join is pressed).
+	if (Eos.LobbyState() == ELobby::None && Lost.IsEmpty())
+	{
+		if (State == FTMEos::EState::Ready)
+		{
+			if (bWantCode)
+			{
+				Eos.HostLobby(MaxPeers + 1, ProtocolVersion);
+			}
+			else if (Peers.Num() == 0)
+			{
+				Eos.JoinLobby(WantedCode, ProtocolVersion);
+			}
+		}
+		else if (State != FTMEos::EState::SigningIn)
+		{
+			if (bWantCode && !bCodeRefusalTold)
+			{
+				bCodeRefusalTold = true;
+				CodeNews = TEXT("No join code: ") + Eos.StatusLine();
+			}
+			else if (bJoiningByCode)
+			{
+				Lost = Eos.StatusLine();
+				bJoiningByCode = false;
+				return;
+			}
+		}
+	}
+
+	// What the screen says as the lobby goes along.
+	const ELobby Now = Eos.LobbyState();
+	if (static_cast<uint8>(Now) != LastLobby)
+	{
+		LastLobby = static_cast<uint8>(Now);
+		switch (Now)
+		{
+		case ELobby::Creating:
+			CodeNews = TEXT("Making a join code...");
+			break;
+		case ELobby::Hosting:
+			CodeNews = FString::Printf(TEXT("Your join code is %s: send it to your friends."), *Eos.LobbyCode());
+			break;
+		case ELobby::Searching:
+			CodeNews = FString::Printf(TEXT("Looking for the game %s..."), *Eos.LobbyCode());
+			break;
+		case ELobby::Joining:
+			CodeNews = TEXT("Found it. Joining...");
+			break;
+		case ELobby::Joined:
+			CodeNews = TEXT("Connecting to the host (through Epic's relays if need be)...");
+			break;
+		case ELobby::Failed:
+			if (bJoiningByCode)
+			{
+				Lost = Eos.LobbyError();
+				bJoiningByCode = false;
+				Eos.LeaveLobby();
+				return;
+			}
+			CodeNews = TEXT("No join code: ") + Eos.LobbyError() + TEXT(" Players can still join by address.");
+			break;
+		default:
+			break;
+		}
+	}
+
+	if (bJoiningByCode && Now == ELobby::Joined && Peers.Num() == 0 && Lost.IsEmpty())
+	{
+		// In the host's lobby: now the connection to it.
+		FPeer HostPeer;
+		HostPeer.Id = 0;
+		HostPeer.EosUser = Eos.LobbyHost();
+		Peers.Add(MoveTemp(HostPeer));
+		ConnectingFor = 0.0f;
+		Eos.Connect(Eos.LobbyHost());
+	}
+
+	// Connections made.
+	for (const FString& User : Eos.Established)
+	{
+		const int32 Index = FindEosPeer(User);
+		if (Index != INDEX_NONE)
+		{
+			if (!Peers[Index].bConnected)
+			{
+				Peers[Index].bConnected = true;
+				bJustConnected = true;
+			}
+		}
+		else if (bHosting && bWantCode)
+		{
+			AddEosPeer(User);
+		}
+	}
+	Eos.Established.Reset();
+
+	// Packets: each peer's share of the stream, in order (a host's player may be heard before Epic says it connected).
+	FString From;
+	TArray<uint8> Bytes;
+	for (int32 Budget = 8192; Budget > 0 && Eos.Receive(From, Bytes); --Budget)
+	{
+		int32 Index = FindEosPeer(From);
+		if (Index == INDEX_NONE && bHosting && bWantCode)
+		{
+			Index = AddEosPeer(From);
+		}
+		if (Index != INDEX_NONE)
+		{
+			FPeer& Peer = Peers[Index];
+			if (!Peer.bConnected)
+			{
+				Peer.bConnected = true;
+				bJustConnected = true;
+			}
+			Peer.Incoming.Append(Bytes);
+		}
+	}
+
+	// Connections closed, and players who left the lobby.
+	for (const TPair<FString, FString>& Gone : Eos.Closed)
+	{
+		const int32 Index = FindEosPeer(Gone.Key);
+		if (Index != INDEX_NONE)
+		{
+			DropPeer(Index, bHosting ? FString::Printf(TEXT("A player disconnected (%s)."), *Gone.Value)
+				: (Peers[Index].bConnected ? FString::Printf(TEXT("The host disconnected (%s)."), *Gone.Value)
+					: TEXT("Couldn't connect to the host: ") + Gone.Value + TEXT(".")));
+		}
+	}
+	Eos.Closed.Reset();
+	for (const FString& User : Eos.LeftLobby)
+	{
+		const int32 Index = FindEosPeer(User);
+		if (Index != INDEX_NONE)
+		{
+			DropPeer(Index, TEXT("A player left."));
+		}
+	}
+	Eos.LeftLobby.Reset();
+	if (Eos.bLobbyClosed && bJoiningByCode)
+	{
+		Eos.bLobbyClosed = false;
+		const int32 Index = Peers.Num() > 0 ? 0 : INDEX_NONE;
+		if (Index != INDEX_NONE)
+		{
+			DropPeer(Index, TEXT("The host closed the game."));
+		}
+		else if (Lost.IsEmpty())
+		{
+			Lost = TEXT("The host closed the game.");
 		}
 	}
 }

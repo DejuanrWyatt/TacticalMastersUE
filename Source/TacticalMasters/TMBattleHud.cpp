@@ -8,6 +8,7 @@
 #include "GameFramework/PlayerController.h"
 
 #include "TMBattleDirector.h"
+#include "TMEos.h"
 #include "TMSettings.h"
 #include "TMBattleHudStyle.h"
 #include "SimAbility.h"
@@ -178,24 +179,33 @@ void ATMBattleHud::Panel(float X, float Y, float W, float H, const FLinearColor&
 
 void ATMBattleHud::Text(const FString& What, float X, float Y, const FLinearColor& Colour, UFont* Font, float Scale, bool bShadow)
 {
+	// On whole pixels (2026-10-06, "sharper"): a word drawn between two pixels is smeared over both.
+	const float PX = FMath::RoundToFloat(X);
+	const float PY = FMath::RoundToFloat(Y);
 	if (bShadow)
 	{
-		DrawText(What, Shadow, X + 1.0f, Y + 1.0f, Font, Scale * FontBoost);
+		DrawText(What, Shadow, PX + 1.0f, PY + 1.0f, Font, Scale * FontBoost);
 	}
-	DrawText(What, Colour, X, Y, Font, Scale * FontBoost);
+	DrawText(What, Colour, PX, PY, Font, Scale * FontBoost);
 }
 
 void ATMBattleHud::OutlinedText(const FString& What, float X, float Y, const FLinearColor& Colour, UFont* Font, float Scale, float Edge)
 {
 	// Eight dark copies round it, then the text: an outline that holds on snow and on night alike.
+	// 2026-10-06 ("all outlines ... sharper, also combat text"): the text and every
+	// copy on whole pixels, a whole number of pixels apart, so the edge is a hard
+	// dark line instead of a blur round the letters.
 	const FLinearColor Ink(0.02f, 0.02f, 0.04f, Colour.A);
-	const float E = FMath::Max(1.0f, Edge);
+	const float PX = FMath::RoundToFloat(X);
+	const float PY = FMath::RoundToFloat(Y);
+	const float E = FMath::Max(1.0f, FMath::RoundToFloat(Edge));
+	const float D = FMath::Max(1.0f, FMath::RoundToFloat(Edge * 0.7f));
+	const float Ways[8][2] = { { E, 0.0f }, { -E, 0.0f }, { 0.0f, E }, { 0.0f, -E }, { D, D }, { -D, D }, { D, -D }, { -D, -D } };
 	for (int32 k = 0; k < 8; ++k)
 	{
-		const float A = k * PI / 4.0f;
-		DrawText(What, Ink, X + FMath::Cos(A) * E, Y + FMath::Sin(A) * E, Font, Scale * FontBoost);
+		DrawText(What, Ink, PX + Ways[k][0], PY + Ways[k][1], Font, Scale * FontBoost);
 	}
-	DrawText(What, Colour, X, Y, Font, Scale * FontBoost);
+	DrawText(What, Colour, PX, PY, Font, Scale * FontBoost);
 }
 
 FVector2D ATMBattleHud::TextSize(const FString& What, UFont* Font, float Scale)
@@ -328,6 +338,13 @@ void ATMBattleHud::DrawHUD()
 				Tips.Reset();
 				DrawClassPicker(*Found);
 			}
+			else if (Found->ItemPickerSlot >= 0)
+			{
+				// v20: each player buys their own units' items in the lobby.
+				Buttons.Reset();
+				Tips.Reset();
+				DrawItemPicker(*Found);
+			}
 		}
 		else if (Found->Screen == ATMBattleDirector::EScreen::Draft)
 		{
@@ -362,7 +379,7 @@ void ATMBattleHud::DrawHUD()
 		}
 		DrawOverlays(*Found);
 		DrawLoading(*Found);
-		DrawTooltip();
+		DrawTooltip(Found);
 		return;
 	}
 
@@ -422,7 +439,36 @@ void ATMBattleHud::DrawHUD()
 	}
 	DrawOverlays(*Found);
 	DrawLoading(*Found);
-	DrawTooltip();
+	DrawTooltip(Found);
+}
+
+int32 ATMBattleHud::NextOwnUnit(ATMBattleDirector& From, float* Seconds) const
+{
+	// Only while none of yours is ready, in a battle being played, not while planning.
+	if (!From.bPlayerInput || From.SelectedUnit() || From.Battle.Winner != -1 || From.Battle.IsPlanning())
+	{
+		return -1;
+	}
+	const TMSim::FUnit* Next = nullptr;
+	int32 Soonest = 0;
+	for (const TMSim::FUnit& Candidate : From.Battle.Units)
+	{
+		if (!Candidate.IsAlive() || (From.bOnline ? From.UnitOwner(Candidate) != From.LocalPlayer : From.ComputerPlays(Candidate.Team)))
+		{
+			continue;
+		}
+		const int32 Ticks = From.Battle.TicksToReady(Candidate);
+		if (!Next || Ticks < Soonest)
+		{
+			Next = &Candidate;
+			Soonest = Ticks;
+		}
+	}
+	if (Seconds)
+	{
+		*Seconds = Soonest / static_cast<float>(TMSim::Pace::TicksPerSecond);
+	}
+	return Next ? Next->Id : -1;
 }
 
 void ATMBattleHud::DrawLoading(ATMBattleDirector& From)
@@ -445,6 +491,32 @@ void ATMBattleHud::DrawLoading(ATMBattleDirector& From)
 
 void ATMBattleHud::DrawBoardAids(ATMBattleDirector& From)
 {
+	AimOdds.Reset();
+	AimOddsExtra.Reset();
+	// Tile movement's plates (TMBattleDirectorPlates.cpp, 2026-10-06): a small badge on
+	// each tile above or below the unit's own ground, saying how many levels.
+	if (From.bPlatesShown && PlayerOwner && From.Screen == ATMBattleDirector::EScreen::Battle)
+	{
+		UFont* BadgeFont = GEngine->GetMediumFont();
+		const FTransform& Board = From.GetActorTransform();
+		const float BadgeScale = 0.26f * S;
+		for (const TPair<FVector, int32>& Step : From.PlateSteps)
+		{
+			FVector2D Spot;
+			if (!PlayerOwner->ProjectWorldLocationToScreen(Board.TransformPosition(Step.Key), Spot))
+			{
+				continue;
+			}
+			const FString Said = FString::Printf(TEXT("%+d"), Step.Value);
+			const FVector2D Said2 = TextSize(Said, BadgeFont, BadgeScale);
+			const float BW = Said2.X + 6.0f * S;
+			const float BH = Said2.Y + 1.0f * S;
+			// Up a brighter edge than down.
+			const FLinearColor Rim(0.3f, 0.95f, 0.9f, Step.Value > 0 ? 0.95f : 0.5f);
+			Panel(Spot.X - BW * 0.5f, Spot.Y - BH * 0.5f, BW, BH, FLinearColor(0.02f, 0.04f, 0.06f, 0.82f), Rim, 1.0f);
+			Text(Said, Spot.X - Said2.X * 0.5f, Spot.Y - Said2.Y * 0.5f, FLinearColor::White, BadgeFont, BadgeScale, false);
+		}
+	}
 	// While planning: where the unit being placed may go (battle.gd:381-384).
 	if (From.Battle.IsPlanning())
 	{
@@ -493,7 +565,6 @@ void ATMBattleHud::DrawBoardAids(ATMBattleDirector& From)
 	// is shown only for the one under the pointer, as thin white lines painted on
 	// the ground (TMBattleDirectorIndicators.cpp); flat here only without that.
 	{
-		UFont* TowerFont = GEngine->GetMediumFont();
 		const int32 Needed = From.Battle.CaptureTurnsNeeded();
 		const int32 Hovered = From.bIndicatorDecal ? -1 : From.HoveredTower();
 		int32 TowerIndex = -1;
@@ -510,11 +581,17 @@ void ATMBattleHud::DrawBoardAids(ATMBattleDirector& From)
 				FVector2D At;
 				if (ToScreen(From, Tower.Pos, 9.6f * From.TileSize, At))
 				{
-					const FString Line = FString::Printf(TEXT("%s %d/%d"), Tower.Capturer == 0 ? TEXT("Blue") : TEXT("Red"),
-						Tower.Progress, Needed);
-					const FVector2D Size = TextSize(Line, TowerFont, 0.6f * S);
-					Panel(At.X - Size.X * 0.5f - 6.0f * S, At.Y - 3.0f * S, Size.X + 12.0f * S, Size.Y + 6.0f * S, FLinearColor(0.0f, 0.0f, 0.0f, 0.6f));
-					Text(Line, At.X - Size.X * 0.5f, At.Y, TeamColour(Tower.Capturer), TowerFont, 0.6f * S);
+					// A pip for each turn it takes, filled for those put in, in the
+					// capturing side's colour (v20 play test: pips, not words).
+					const float Pip = 10.0f * S;
+					const float Gap = 5.0f * S;
+					const float Wide = Needed * Pip + (Needed - 1) * Gap;
+					const FLinearColor Side = TeamColour(Tower.Capturer);
+					for (int32 k = 0; k < Needed; ++k)
+					{
+						const float PX = At.X - Wide * 0.5f + k * (Pip + Gap);
+						Panel(PX, At.Y, Pip, Pip, k < Tower.Progress ? Side : FLinearColor(0.0f, 0.0f, 0.0f, 0.55f), Side, 1.5f * S);
+					}
 				}
 			}
 		}
@@ -709,16 +786,26 @@ void ATMBattleHud::DrawBoardAids(ATMBattleDirector& From)
 			}
 		}
 		Cards.StableSort([](const FCardFor& A, const FCardFor& B) { return A.Odds.Ko > B.Odds.Ko; });
-		const FString Extra = Ability->HasStatus()
-			? FString::Printf(TEXT("+%hs unless dodged"), Ability->StatusId.c_str()) : FString();
+		// "Hit Preview Mockups" B (2026-10-06): no card. The blow is cut out of each
+		// unit's own overhead bar, with one small row of the outcomes under it
+		// (DrawOverheads, AimOdds).
+		AimOddsExtra = Ability->HasStatus()
+			? FString::Printf(TEXT("+%hs"), Ability->StatusId.c_str()) : FString();
 		for (int32 i = 0; i < Cards.Num() && i < 3; ++i)
 		{
-			FVector2D At;
-			if (ToScreen(From, Cards[i].Target->Pos, 225.0f, At))
-			{
-				OddsCard(*Cards[i].Target, Cards[i].Odds, From.IsFriend(*Cards[i].Target), Extra, At.X, At.Y);
-				Carded.Add(Cards[i].Target->Id);
-			}
+			const TMSim::FOdds& Odds = Cards[i].Odds;
+			FTMAimOdds& Shown = AimOdds.Add(Cards[i].Target->Id);
+			Shown.Hit = static_cast<float>(Odds.Hit);
+			Shown.Crit = static_cast<float>(Odds.Crit);
+			Shown.Graze = static_cast<float>(Odds.Graze);
+			Shown.Dodge = static_cast<float>(Odds.Dodge);
+			Shown.Ko = static_cast<float>(Odds.Ko);
+			Shown.HitAmount = Odds.HitAmount;
+			Shown.CritAmount = Odds.CritAmount;
+			Shown.GrazeAmount = Odds.GrazeAmount;
+			Shown.Evade = Odds.Evade;
+			Shown.CritChance = Odds.CritChance;
+			Carded.Add(Cards[i].Target->Id);
 		}
 	}
 	for (const TMSim::FHit& Hit : Hits)
@@ -791,6 +878,8 @@ void ATMBattleHud::DrawActionBar(ATMBattleDirector& From)
 	// Sprint and End Turn (hud.gd:866-909, 1429-1474).
 	const TMSim::FUnit* Unit = From.SelectedUnit();
 	ActionBarTop = Canvas->ClipY - 16.0f * S;
+	ActionBarLeft = 0.0f;
+	ActionBarRight = 0.0f;
 	if (!From.bPlayerInput || !Unit || !Unit->IsAlive())
 	{
 		return;
@@ -820,6 +909,8 @@ void ATMBattleHud::DrawActionBar(ATMBattleDirector& From)
 	float X = (Canvas->ClipX - Total) * 0.5f + Nudge(TEXT("action_bar")).X;
 	const float Y = Canvas->ClipY - Tile - 22.0f * S + Nudge(TEXT("action_bar")).Y;
 	ActionBarTop = Y - 8.0f * S;
+	ActionBarLeft = X - 26.0f * S;
+	ActionBarRight = X + Total + 14.0f * S;
 	Movable(TEXT("action_bar"), TEXT("Action bar"), X, Y, Total, Tile);
 
 	// The long dark strip everything sits on.
@@ -964,7 +1055,7 @@ void ATMBattleHud::DrawActionBar(ATMBattleDirector& From)
 		WordTile(EGlyph::Capture, TEXT("CAPTURE"), FString::Printf(TEXT("%d turn%s"), From.Battle.CaptureTurnsNeeded(),
 			From.Battle.CaptureTurnsNeeded() == 1 ? TEXT("") : TEXT("s")), bCan, false, ETMHudAction::Capture);
 		AddTip(TileX, Y + Tile - Small, Small, Small, bCan
-			? FString(TEXT("Spend this unit's whole turn taking the watchtower it stands next to."))
+			? FString(TEXT("Spend this unit's whole turn taking the watchtower it stands next to. Ending its turn here does the same, after a walk or an ability too."))
 			: WhyNot);
 	}
 	WordTile(EGlyph::End, TEXT("END"), FTMSettings::Get().KeyName(ETMAction::EndTurn), bControllable, false, ETMHudAction::EndTurn);
@@ -1044,6 +1135,9 @@ void ATMBattleHud::DrawBanners(ATMBattleDirector& From)
 
 	// The hover preview, just above the action bar: what a click here would do.
 	FString Preview;
+	// v20 play test, less text: a short line at once, the full words once the
+	// pointer has rested on the same thing for 0.4 s.
+	FString Short;
 	FLinearColor PreviewColour = TextColour;
 	const TMSim::FUnit* Unit = From.SelectedUnit();
 	FVector2D Mouse(-1.0f, -1.0f);
@@ -1059,23 +1153,8 @@ void ATMBattleHud::DrawBanners(ATMBattleDirector& From)
 	FTMHudButton Over;
 	if (Unit && ButtonAt(Mouse, Over) && Over.Action == ETMHudAction::Ability)
 	{
-		// The mouse is over an ability: say what it is, whether or not it can be used.
-		if (const TMSim::FAbility* Ability = Unit->Ability(Over.Value))
-		{
-			const std::string Blocked = From.Battle.AbilityBlockedReason(*Unit, Over.Value);
-			const FString Reach = Ability->MaxRange == 0.0f
-				? FString(TEXT("self"))
-				: FString::Printf(TEXT("range %.1f-%.1f m"), Ability->MinRange, Ability->MaxRange);
-			const FString CastText = Ability->Cast == 0.0f
-				? FString(TEXT("instant"))
-				: FString::Printf(TEXT("cast %.1fs"), From.Battle.CastTicks(*Ability) / Tps);
-			Preview = FString::Printf(TEXT("%hs%s   %hs  %s  %s%s  cooldown %d"),
-				Ability->Name.c_str(),
-				Blocked.empty() ? TEXT("") : *FString::Printf(TEXT(" (%hs)"), Blocked.c_str()),
-				TMSim::ShapeOf(*Ability).c_str(), *Reach, *CastText,
-				Ability->Aoe > 0.0f ? *FString::Printf(TEXT("  radius %.1f m"), Ability->Aoe) : TEXT(""),
-				Ability->Cooldown);
-		}
+		// The mouse is over an ability: its card says what it is (AbilityCard,
+		// 2026-10-05), so no line here.
 	}
 	else if (From.PlayerCanCommand(Unit) && From.AimMode == ATMBattleDirector::EAimMode::Move && From.bHaveHover)
 	{
@@ -1092,7 +1171,10 @@ void ATMBattleHud::DrawBanners(ATMBattleDirector& From)
 					Entry.second, From.Battle.MoveOf(*Unit, From.bSprinting),
 					Ways > 0 ? *FString::Printf(TEXT(" by %d waypoint%s"), Ways, Ways == 1 ? TEXT("") : TEXT("s")) : TEXT(""),
 					*Keys.KeyName(ETMAction::Waypoint),
-					Ways > 0 ? *FString::Printf(TEXT("   %s: undo one"), *Keys.KeyName(ETMAction::PlanUndo)) : TEXT(""));
+					Ways > 0 ? *FString::Printf(TEXT("   %s: clear them"), *Keys.KeyName(ETMAction::PlanCancel)) : TEXT(""));
+				Short = FString::Printf(TEXT("%s %.1f / %.1f m%s"), From.IsPlanningSelected() ? TEXT("Plan") : TEXT("Walk"),
+					Entry.second, From.Battle.MoveOf(*Unit, From.bSprinting),
+					Ways > 0 ? *FString::Printf(TEXT(", %d waypoint%s"), Ways, Ways == 1 ? TEXT("") : TEXT("s")) : TEXT(""));
 				break;
 			}
 		}
@@ -1102,6 +1184,7 @@ void ATMBattleHud::DrawBanners(ATMBattleDirector& From)
 			const int32 Turns = static_cast<int32>(From.GoToHoverStops.size());
 			Preview = FString::Printf(TEXT("Go To: %d turn%s, %.1f m. Click to set: each turn it walks, then ends its turn."),
 				Turns, Turns == 1 ? TEXT("") : TEXT("s"), From.GoToHoverMetres);
+			Short = FString::Printf(TEXT("Go To: %d turn%s"), Turns, Turns == 1 ? TEXT("") : TEXT("s"));
 			PreviewColour = FLinearColor(0.55f, 0.75f, 1.0f);
 		}
 	}
@@ -1123,8 +1206,9 @@ void ATMBattleHud::DrawBanners(ATMBattleDirector& From)
 				const TMSim::FUnit* Target = From.Battle.FindUnit(Where.Follow);
 				Preview = bPlanned
 					? FString::Printf(TEXT("%hs: out of range. Click to plan a walk of %.1f m, then it."), Aimed->Name.c_str(), Walk)
-					: FString::Printf(TEXT("%hs: out of range. Click to walk %.1f m and use it where %s is standing now."),
-						Aimed->Name.c_str(), Walk, Target ? *JobName(*Target) : TEXT("the target"));
+					: FString::Printf(TEXT("%hs: out of range. Click to walk %.1f m, then use it on %s wherever it is by then."),
+						Aimed->Name.c_str(), Walk, Target ? *JobName(*Target) : TEXT("that spot"));
+				Short = FString::Printf(TEXT("%hs: walk %.1f m first"), Aimed->Name.c_str(), Walk);
 				PreviewColour = FLinearColor(1.0f, 0.9f, 0.35f);
 			}
 			else if (From.bAbilityHoverGoTo)
@@ -1133,11 +1217,13 @@ void ATMBattleHud::DrawBanners(ATMBattleDirector& From)
 				const int32 Turns = static_cast<int32>(From.GoToHoverStops.size());
 				Preview = FString::Printf(TEXT("OUT OF RANGE: %hs. Click to go into range (%d turn%s, %.0f m), then use it there. It stops if it sees an enemy."),
 					Aimed->Name.c_str(), Turns, Turns == 1 ? TEXT("") : TEXT("s"), From.GoToHoverMetres);
+				Short = FString::Printf(TEXT("Out of range: %d turn%s away"), Turns, Turns == 1 ? TEXT("") : TEXT("s"));
 				PreviewColour = FLinearColor(1.0f, 0.62f, 0.3f);
 			}
 			else
 			{
 				Preview = FString::Printf(TEXT("OUT OF RANGE: %hs, and there is no way into range of that."), Aimed->Name.c_str());
+				Short = FString::Printf(TEXT("%hs: out of range, no way in"), Aimed->Name.c_str());
 				PreviewColour = Urgent;
 			}
 		}
@@ -1152,71 +1238,148 @@ void ATMBattleHud::DrawBanners(ATMBattleDirector& From)
 			const int32 Hits = static_cast<int32>(From.Battle.Preview(*Unit, From.AimSlot, Unit->Pos, Where.Point).size());
 			Preview = FString::Printf(TEXT("%hs: click to %s. Reaches %d%s."), Ability ? Ability->Name.c_str() : "",
 				bPlanned ? TEXT("plan it") : TEXT("use"), Hits, bPlanned ? TEXT(" as things stand now") : TEXT(""));
+			Short = FString::Printf(TEXT("%hs  ·  reaches %d"), Ability ? Ability->Name.c_str() : "", Hits);
 			PreviewColour = FLinearColor(0.55f, 1.0f, 0.6f);
 		}
 	}
-	float Above = ActionBarTop - 8.0f * S;
-	if (!Preview.IsEmpty())
+	// "Text Mockups" B (2026-10-06): one slim line of small text along the top
+	// edge of the action bar, in place of the three boxes that stood over the
+	// board -- the newest notice first, then a Go To with its buttons, then
+	// what a click on the pointer's spot would do. Short words; Alt for the
+	// whole sentence.
+	if (!Short.IsEmpty() && !AltHeld())
 	{
-		const float Scale = 0.68f * S;
-		const FVector2D Size = TextSize(Preview, Font, Scale);
-		Above -= Size.Y + 8.0f * S;
-		Panel(CentreX - Size.X * 0.5f - 10.0f * S, Above - 4.0f * S, Size.X + 20.0f * S, Size.Y + 8.0f * S, PanelFill);
-		Text(Preview, CentreX - Size.X * 0.5f, Above, PreviewColour, Font, Scale);
+		Preview = Short;
+	}
+	float Above = ActionBarTop - 8.0f * S;
+	{
+		struct FBit
+		{
+			FString Label;
+			FLinearColor Ink;
+			ETMHudAction Action = ETMHudAction::None;
+			int32 Value = -1;
+			bool bLit = false;
+			bool bKey = false;
+		};
+		TArray<FBit> Bits;
+		const FLinearColor Bar(1.0f, 1.0f, 1.0f, 0.25f);
+		auto Divide = [&]()
+		{
+			if (Bits.Num() > 0)
+			{
+				Bits.Add({ TEXT("|"), Bar });
+			}
+		};
+		// Why the last thing did not work (or what just happened), fading out.
+		if (From.NoticeLeft > 0.0f && !From.Notice.IsEmpty())
+		{
+			const float Fade = FMath::Clamp(From.NoticeLeft / 0.5f, 0.0f, 1.0f);
+			Bits.Add({ From.Notice, FLinearColor(Gold.R, Gold.G, Gold.B, Fade) });
+		}
+		// A Go To (2026-10-01): where it stands, how each turn on the road ends, its buttons.
+		const ATMBattleDirector::FTMGoTo* Order = Unit && From.PlayerCanCommand(Unit) ? From.GoToOf(Unit->Id) : nullptr;
+		if (Order)
+		{
+			const FTMSettings& Keys = FTMSettings::Get();
+			const int32 Turns = static_cast<int32>(Order->Stops.size());
+			const TMSim::FAbility* Carried = Order->HasAbility() ? Unit->Ability(Order->Slot) : nullptr;
+			const FLinearColor Ink = Order->bStopped ? FLinearColor(1.0f, 0.68f, 0.62f) : FLinearColor(0.81f, 0.88f, 1.0f);
+			Divide();
+			Bits.Add({ Order->bStopped ? FString::Printf(TEXT("Stopped: %s"), *Order->Why)
+				: Carried ? FString::Printf(TEXT("Into range for %hs: %d turn%s"), Carried->Name.c_str(), Turns, Turns == 1 ? TEXT("") : TEXT("s"))
+				: FString::Printf(TEXT("Go To: %d turn%s"), Turns, Turns == 1 ? TEXT("") : TEXT("s")), Ink });
+			if (Order->bStopped)
+			{
+				Bits.Add({ TEXT("Keep going"), Gold, ETMHudAction::PlanGo, -1, true });
+				Bits.Add({ Keys.KeyName(ETMAction::PlanTurn), TextColour, ETMHudAction::None, -1, false, true });
+			}
+			Bits.Add({ TEXT("End"), TextColour, ETMHudAction::GoToMode, 0, !Order->bWaitForMe });
+			Bits.Add({ TEXT("Wait for me"), TextColour, ETMHudAction::GoToMode, 1, Order->bWaitForMe });
+			Bits.Add({ TEXT("Cancel"), TextColour, ETMHudAction::GoToCancel });
+			Bits.Add({ Keys.KeyName(ETMAction::PlanCancel), TextColour, ETMHudAction::None, -1, false, true });
+		}
+		if (!Preview.IsEmpty())
+		{
+			Divide();
+			Bits.Add({ Preview, PreviewColour });
+		}
+		if (Bits.Num() > 0)
+		{
+			const float Scale = 0.5f * S;
+			const float KeyScale = 0.42f * S;
+			const float Gap = 6.0f * S;
+			const float H = TextSize(TEXT("Ag"), Font, Scale).Y + 8.0f * S;
+			auto Width = [&](const FBit& Bit)
+			{
+				return Bit.bKey ? TextSize(Bit.Label, Font, KeyScale).X + 8.0f * S
+					: TextSize(Bit.Label, Font, Scale).X + (Bit.Action != ETMHudAction::None ? 14.0f * S : 0.0f);
+			};
+			float W = -Gap;
+			for (const FBit& Bit : Bits)
+			{
+				W += Width(Bit) + Gap;
+			}
+			const bool bOnBar = ActionBarRight > ActionBarLeft;
+			const float Middle = bOnBar ? (ActionBarLeft + ActionBarRight) * 0.5f : CentreX;
+			const float LineW = FMath::Max(bOnBar ? ActionBarRight - ActionBarLeft : 0.0f, W + 24.0f * S);
+			// Its foot on the strip's top edge.
+			const float Y0 = ActionBarTop - 2.0f * S - H;
+			DrawRect(FLinearColor(0.024f, 0.03f, 0.047f, 0.9f), Middle - LineW * 0.5f, Y0, LineW, H);
+			DrawRect(FLinearColor(1.0f, 1.0f, 1.0f, 0.15f), Middle - LineW * 0.5f, Y0, LineW, FMath::Max(1.0f, S));
+			const FVector2D Mouse2 = MousePoint();
+			float X = Middle - W * 0.5f;
+			for (const FBit& Bit : Bits)
+			{
+				const float BW = Width(Bit);
+				if (Bit.bKey)
+				{
+					// Drawn as a key, as the mockup's keycaps.
+					const FVector2D Size = TextSize(Bit.Label, Font, KeyScale);
+					Panel(X, Y0 + 4.0f * S, BW, H - 8.0f * S, FLinearColor(1.0f, 1.0f, 1.0f, 0.08f), FLinearColor(1.0f, 1.0f, 1.0f, 0.45f), 1.0f);
+					Text(Bit.Label, X + (BW - Size.X) * 0.5f, Y0 + (H - Size.Y) * 0.5f, FLinearColor::White, Font, KeyScale);
+				}
+				else if (Bit.Action != ETMHudAction::None)
+				{
+					const FVector2D Size = TextSize(Bit.Label, Font, Scale);
+					const bool bOver = FBox2D(FVector2D(X, Y0 + 2.0f * S), FVector2D(X + BW, Y0 + H - 2.0f * S)).IsInside(Mouse2);
+					Panel(X, Y0 + 2.0f * S, BW, H - 4.0f * S,
+						bOver ? FLinearColor(0.2f, 0.25f, 0.36f, 0.96f) : FLinearColor(0.12f, 0.15f, 0.22f, 0.9f),
+						Bit.bLit ? Gold : FLinearColor(0.4f, 0.45f, 0.55f, 0.8f), 1.0f);
+					Text(Bit.Label, X + (BW - Size.X) * 0.5f, Y0 + (H - Size.Y) * 0.5f, Bit.bLit ? Gold : Bit.Ink, Font, Scale);
+					AddButton(X, Y0 + 2.0f * S, BW, H - 4.0f * S, Bit.Action, Bit.Value);
+				}
+				else
+				{
+					Text(Bit.Label, X, Y0 + (H - TextSize(Bit.Label, Font, Scale).Y) * 0.5f, Bit.Ink, Font, Scale);
+				}
+				X += BW + Gap;
+			}
+			Above = Y0 - 6.0f * S;
+		}
+	}
+
+	// Aiming an ability ("Ability Info Mockups" E, 2026-10-05): its card docked
+	// above the action bar, not following the pointer; Alt for the whole of it.
+	if (Unit && From.PlayerCanCommand(Unit) && From.AimMode == ATMBattleDirector::EAimMode::Ability && Unit->Ability(From.AimSlot))
+	{
+		const bool bDetail = AltHeld();
+		const FString Note = TEXT("AIMING");
+		const FVector2D Size = AbilityCard(From, *Unit, From.AimSlot, 0.0f, 0.0f, bDetail, 0.0f, Note);
+		Above -= Size.Y + 6.0f * S;
+		AbilityCard(From, *Unit, From.AimSlot, CentreX - Size.X * 0.5f, Above, bDetail, Size.Y, Note);
 		Above -= 8.0f * S;
 	}
 
-	// Queued orders (2026-10-01): the plan being made, as steps, with its buttons.
-	if (Unit && From.GoToOf(Unit->Id) && From.PlayerCanCommand(Unit))
-	{
-		// A Go To (2026-10-01): its turns, how each ends, and its buttons.
-		Above = DrawGoToStrip(From, *Unit, Above);
-	}
-	else if (Unit && From.IsPlanningSelected())
+	// Queued orders (2026-10-01): the plan being made, as steps, with its
+	// buttons. A Go To's are on the slim line above.
+	if (Unit && !(From.GoToOf(Unit->Id) && From.PlayerCanCommand(Unit)) && From.IsPlanningSelected())
 	{
 		Above = DrawPlanStrip(From, *Unit, Above);
 	}
 
-	// Why the last thing did not work, for a few seconds.
-	if (From.NoticeLeft > 0.0f && !From.Notice.IsEmpty())
-	{
-		const float Scale = 0.72f * S;
-		const FVector2D Size = TextSize(From.Notice, Font, Scale);
-		Above -= Size.Y + 8.0f * S;
-		Panel(CentreX - Size.X * 0.5f - 10.0f * S, Above - 4.0f * S, Size.X + 20.0f * S, Size.Y + 8.0f * S, PanelFill);
-		Text(From.Notice, CentreX - Size.X * 0.5f, Above, Gold, Font, Scale);
-	}
-
-	// Nobody of ours is ready: say who is next, and when. Not while planning,
-	// when no time passes and the banner says what to do.
-	if (From.bPlayerInput && !Unit && From.Battle.Winner == -1 && !From.Battle.IsPlanning())
-	{
-		const TMSim::FUnit* Next = nullptr;
-		int32 Soonest = 0;
-		for (const TMSim::FUnit& Candidate : From.Battle.Units)
-		{
-			if (!Candidate.IsAlive() || (From.bOnline ? From.UnitOwner(Candidate) != From.LocalPlayer : From.ComputerPlays(Candidate.Team)))
-			{
-				continue;
-			}
-			const int32 Ticks = From.Battle.TicksToReady(Candidate);
-			if (!Next || Ticks < Soonest)
-			{
-				Next = &Candidate;
-				Soonest = Ticks;
-			}
-		}
-		if (Next)
-		{
-			const FString Line = FString::Printf(TEXT("Waiting: %s %d is up in %.1fs   Click one of yours to plan its turn"),
-				*JobName(*Next), Next->Id, Soonest / Tps);
-			const float Scale = 0.72f * S;
-			const FVector2D Size = TextSize(Line, Font, Scale);
-			const float Y = Canvas->ClipY - Size.Y - 30.0f * S;
-			Panel(CentreX - Size.X * 0.5f - 10.0f * S, Y - 4.0f * S, Size.X + 20.0f * S, Size.Y + 8.0f * S, PanelFill);
-			Text(Line, CentreX - Size.X * 0.5f, Y, Dim, Font, Scale);
-		}
-	}
+	// Nobody of ours is ready: the banner that said who is next is gone (v20 play
+	// test, less text); that unit's turn chip glows instead (NextOwnUnit).
 
 	if (From.bPaused)
 	{
@@ -1397,7 +1560,7 @@ float ATMBattleHud::DrawGoToStrip(ATMBattleDirector& From, const TMSim::FUnit& U
 	const FString EndLabel = TEXT("Walk and end");
 	const FString WaitLabel = TEXT("Walk, wait for me");
 	const FString GoLabel = FString::Printf(TEXT("Keep going (%s)"), *Keys.KeyName(ETMAction::PlanTurn));
-	const FString CancelLabel = FString::Printf(TEXT("Cancel (%s)"), *Keys.KeyName(ETMAction::PlanUndo));
+	const FString CancelLabel = FString::Printf(TEXT("Cancel (%s)"), *Keys.KeyName(ETMAction::PlanCancel));
 	auto Width = [&](const FString& Label) { return TextSize(Label, Font, Scale).X + 24.0f * S; };
 	float W = TextSize(Lead, Font, Scale).X + Gap + Width(EndLabel) + Gap + Width(WaitLabel) + Gap + Width(CancelLabel);
 	if (Order->bStopped)
@@ -1431,8 +1594,9 @@ float ATMBattleHud::DrawGoToStrip(ATMBattleDirector& From, const TMSim::FUnit& U
 float ATMBattleHud::DrawPlanStrip(ATMBattleDirector& From, const TMSim::FUnit& Unit, float Above)
 {
 	// The plan as the steps it will take -- walk, ability, end of turn -- and
-	// its buttons: Go inside a turn, Done for a unit still waiting, Undo, Clear
-	// (Docs/design/feat-move-queue.md, B).
+	// its buttons: Go inside a turn, Done for a unit still waiting, and Cancel,
+	// which clears the whole plan (Docs/design/feat-move-queue.md, B; the
+	// step-by-step Undo went on 2026-10-06).
 	UFont* Font = GEngine->GetMediumFont();
 	const FTMSettings& Keys = FTMSettings::Get();
 	const ATMBattleDirector::FTMPlan* Plan = From.PlanOf(Unit.Id);
@@ -1463,8 +1627,7 @@ float ATMBattleHud::DrawPlanStrip(ATMBattleDirector& From, const TMSim::FUnit& U
 	const FString Empty = TEXT("Nothing yet: click where it walks, or pick an ability");
 	const bool bGo = Unit.bReady && Plan && !Plan->IsEmpty();
 	const FString GoLabel = FString::Printf(TEXT("%s (%s)"), bGo ? TEXT("Go") : TEXT("Done"), *Keys.KeyName(ETMAction::PlanTurn));
-	const FString UndoLabel = FString::Printf(TEXT("Undo (%s)"), *Keys.KeyName(ETMAction::PlanUndo));
-	const FString ClearLabel = TEXT("Clear");
+	const FString ClearLabel = FString::Printf(TEXT("Cancel (%s)"), *Keys.KeyName(ETMAction::PlanCancel));
 	auto Width = [&](const FString& Label) { return TextSize(Label, Font, Scale).X + 24.0f * S; };
 	const float Arrow = 18.0f * S;
 	float W = Width(Lead) + Gap;
@@ -1476,7 +1639,7 @@ float ATMBattleHud::DrawPlanStrip(ATMBattleDirector& From, const TMSim::FUnit& U
 	{
 		W += Width(Chip.Label) + Arrow;
 	}
-	W += Width(GoLabel) + Gap + Width(UndoLabel) + Gap + Width(ClearLabel);
+	W += Width(GoLabel) + Gap + Width(ClearLabel);
 	const float PadX = 12.0f * S;
 	const float H = ChipH + 16.0f * S;
 	const float X0 = Canvas->ClipX * 0.5f - (W + 2.0f * PadX) * 0.5f;
@@ -1509,9 +1672,7 @@ float ATMBattleHud::DrawPlanStrip(ATMBattleDirector& From, const TMSim::FUnit& U
 	}
 	MenuButton(X, Y, Width(GoLabel), ChipH, GoLabel, ETMHudAction::PlanGo, -1, true);
 	X += Width(GoLabel) + Gap;
-	MenuButton(X, Y, Width(UndoLabel), ChipH, UndoLabel, ETMHudAction::PlanUndo);
-	X += Width(UndoLabel) + Gap;
-	MenuButton(X, Y, Width(ClearLabel), ChipH, ClearLabel, ETMHudAction::PlanClear);
+	MenuButton(X, Y, Width(ClearLabel), ChipH, ClearLabel, ETMHudAction::QueueCancel, Unit.Id);
 	return Y0 - 8.0f * S;
 }
 
@@ -1597,7 +1758,7 @@ void ATMBattleHud::DrawSetup(ATMBattleDirector& From)
 	// The whole screen always fits, whatever the UI scale: shrunk to the
 	// window if it would run off it, so Start is never out of reach.
 	const float WasS = S;
-	S = FMath::Min(S, FMath::Min((Canvas->ClipY - 16.0f) / 980.0f, (Canvas->ClipX - 16.0f) / 1180.0f));
+	S = FMath::Min(S, FMath::Min((Canvas->ClipY - 16.0f) / 1010.0f, (Canvas->ClipX - 16.0f) / 1180.0f));
 	ON_SCOPE_EXIT
 	{
 		S = WasS;
@@ -1609,7 +1770,7 @@ void ATMBattleHud::DrawSetup(ATMBattleDirector& From)
 	const float PW = 1180.0f * S;
 	// Tall enough for the right column's ten rules with Back and Start below
 	// them, not over the last (2026-10-01: Start covered Friendly fire).
-	const float PH = 980.0f * S;
+	const float PH = 1010.0f * S;
 	const float PX = (Canvas->ClipX - PW) * 0.5f;
 	const float PY = FMath::Max(8.0f * S, (Canvas->ClipY - PH) * 0.5f);
 	Panel(PX, PY, PW, PH, FLinearColor(0.05f, 0.06f, 0.1f, 0.94f), FLinearColor(0.4f, 0.45f, 0.55f, 0.8f), 1.5f);
@@ -1730,6 +1891,11 @@ void ATMBattleHud::DrawSetup(ATMBattleDirector& From)
 			ETMHudAction::SetupUniqueClasses, -1);
 		AddTip(RowX, Y - 46.0f * S, LabelW + ValueW, 38.0f * S,
 			TEXT("Off: no class appears twice in the battle, on either side. A class already on a slot is greyed in the class picker, and turning this on gives any second copy another class of its role. Online, the host's setting holds for everyone."));
+		// Tile movement (v20 play test, "Tile-based movement" A and B).
+		static const TCHAR* WalkWords[] = { TEXT("Free walking"), TEXT("Tiles, 4 ways"), TEXT("Tiles, 8 ways") };
+		Row(TEXT("Movement"), WalkWords[FMath::Clamp(Setup.TileMove, 0, 2)], ETMHudAction::SetupTileMove, -1);
+		AddTip(RowX, Y - 46.0f * S, LabelW + ValueW, 38.0f * S,
+			TEXT("Free walking: any spot within the unit's Move, in metres. Tiles: units walk from tile to tile, 2 m of Move a step, up, down, left or right (4 ways) or diagonally too, a diagonal costing 3 m (8 ways). Ranges and areas are unchanged."));
 	}
 
 	// How the battle can be won, on the right under red's team.
@@ -1766,7 +1932,7 @@ void ATMBattleHud::DrawSetup(ATMBattleDirector& From)
 		AddTip(RowX, Y - 46.0f * S, LabelW + ValueW, 38.0f * S,
 			TEXT("Points each side spends on items before the battle: common items cost 1, uncommon 2, rare 3. Epic items can't be bought. Each unit carries up to three. Click a unit's empty slot to choose; the computer picks its own."));
 		AddTip(RowX, TowerRowY, LabelW + ValueW, 38.0f * S,
-			FString::Printf(TEXT("Towers placed somewhere new each battle, in mirrored pairs so neither side has a nearer one (an odd one stands in the middle; a small map may have room for fewer). Stand next to one and press Capture: it takes that unit's whole turn, and %d such turns take the tower (Developer Tools: Watchtower capture). A side that holds a tower sees %.0f m around it."),
+			FString::Printf(TEXT("Towers placed somewhere new each battle, in mirrored pairs so neither side has a nearer one (an odd one stands in the middle; a small map may have room for fewer). A unit that ends its turn next to one, with no enemy there, puts that turn into it (or press Capture to spend the whole turn on it), and %d such turns take the tower (Developer Tools: Watchtower capture). A side that holds a tower sees %.0f m around it."),
 				FMath::Max(1, TMSim::RoundToInt(From.Battle.Tuning.WatchtowerTurns)), From.Battle.Tuning.WatchtowerSight));
 		static const TCHAR* CampWords[] = { TEXT("Off"), TEXT("Light"), TEXT("Standard"), TEXT("Wild") };
 		Row(TEXT("Neutral camps"), CampWords[FMath::Clamp(Setup.CampLevel, 0, 3)], ETMHudAction::SetupCamps, -1);
@@ -1807,27 +1973,30 @@ void ATMBattleHud::DrawSetup(ATMBattleDirector& From)
 	const float BH = 52.0f * S;
 	const float BY = PY + PH - BH - 24.0f * S;
 	MenuButton(PX + 30.0f * S, BY, 160.0f * S, BH, TEXT("Back  (Esc)"), ETMHudAction::SetupBack);
+	// Beside Back, under the left column, where nothing else is (v21 play test:
+	// at the right it sat over the last rules).
+	const float StartX = PX + 200.0f * S;
 	if (!bHosting)
 	{
-		MenuButton(PX + PW - BW - 30.0f * S, BY, BW, BH, TEXT("Start Battle"), ETMHudAction::SetupStart, -1, true);
+		MenuButton(StartX, BY, BW, BH, TEXT("Start Battle"), ETMHudAction::SetupStart, -1, true);
 		return;
 	}
 	// Hosting: the lobby is open, and this screen changed its rules.
 	if (From.Net.IsValid() && From.Net->IsHost())
 	{
-		MenuButton(PX + PW - BW - 30.0f * S, BY, BW, BH, TEXT("Back to lobby"), ETMHudAction::SetupStart, -1, true);
+		MenuButton(StartX, BY, BW, BH, TEXT("Back to lobby"), ETMHudAction::SetupStart, -1, true);
 	}
 	else if (From.IsWaitingOnline())
 	{
-		Panel(PX + PW - BW - 30.0f * S, BY, BW, BH, FLinearColor(0.1f, 0.12f, 0.18f, 0.95f), Gold, 1.0f);
+		Panel(StartX, BY, BW, BH, FLinearColor(0.1f, 0.12f, 0.18f, 0.95f), Gold, 1.0f);
 		const FString Waiting = TEXT("Waiting for an opponent...");
 		const FVector2D WaitSize = TextSize(Waiting, Font, 0.55f * S);
-		Text(Waiting, PX + PW - BW - 30.0f * S + (BW - WaitSize.X) * 0.5f, BY + (BH - WaitSize.Y) * 0.5f, Gold, Font, 0.55f * S);
+		Text(Waiting, StartX + (BW - WaitSize.X) * 0.5f, BY + (BH - WaitSize.Y) * 0.5f, Gold, Font, 0.55f * S);
 	}
 	else
 	{
-		MenuButton(PX + PW - BW - 30.0f * S, BY, BW, BH, TEXT("Host Game"), ETMHudAction::SetupStart, -1, true,
-			FString::Printf(TEXT("on port %s"), *From.JoinPort));
+		MenuButton(StartX, BY, BW, BH, TEXT("Host Game"), ETMHudAction::SetupStart, -1, true,
+			FString::Printf(TEXT("a join code, and port %s"), *From.JoinPort));
 	}
 	float StatusY = BY - 76.0f * S;
 	for (const FString& Line : { From.OnlineStatus, From.OnlineAddresses, From.OnlineRouter })
@@ -1855,73 +2024,93 @@ void ATMBattleHud::TextField(float X, float Y, float W, float H, const FString& 
 
 void ATMBattleHud::DrawOnline(ATMBattleDirector& From)
 {
-	// main_menu.gd:79-230: an address and a port, Host or Join, and what is happening.
+	// Host, or join with a friend's join code (Docs/design/feat-online-eos.md);
+	// joining by address (main_menu.gd:79-230) under Advanced.
 	DrawRect(FLinearColor(0.02f, 0.03f, 0.06f, 0.6f), 0.0f, 0.0f, Canvas->ClipX, Canvas->ClipY);
 	UFont* Font = GEngine->GetMediumFont();
 	UFont* Big = GEngine->GetLargeFont();
 	const float PW = 940.0f * S;
-	const float PH = 560.0f * S;
+	const float PH = 640.0f * S;
 	const float PX = (Canvas->ClipX - PW) * 0.5f;
 	const float PY = (Canvas->ClipY - PH) * 0.5f;
 	Panel(PX, PY, PW, PH, FLinearColor(0.05f, 0.06f, 0.1f, 0.95f), Gold, 1.5f);
 	Text(TEXT("Play Online"), PX + 30.0f * S, PY + 20.0f * S, Gold, Big, 0.9f * S);
-	Text(TEXT("The host chooses the battle and plays Blue; the other player joins with the host's address."),
+	Text(TEXT("Host a game and send your friends its join code, or type a friend's code to join theirs."),
 		PX + 30.0f * S, PY + 70.0f * S, Dim, Font, 0.55f * S);
+	const FTMEos& Eos = FTMEos::Get();
+	const bool bEosTrouble = Eos.GetState() == FTMEos::EState::Failed || Eos.GetState() == FTMEos::EState::Unavailable;
+	Text(Eos.StatusLine(), PX + 30.0f * S, PY + 98.0f * S, bEosTrouble ? FLinearColor(1.0f, 0.62f, 0.4f) : Dim, Font, 0.5f * S);
 
 	using EField = ATMBattleDirector::ETypeField;
-	float Y = PY + 120.0f * S;
-	const float FieldH = 48.0f * S;
-	const float AddressW = PW - 60.0f * S - 190.0f * S;
-	Text(TEXT("Host address"), PX + 30.0f * S, Y, Dim, Font, 0.55f * S);
-	Text(TEXT("Port"), PX + 30.0f * S + AddressW + 30.0f * S, Y, Dim, Font, 0.55f * S);
-	Y += 26.0f * S;
-	TextField(PX + 30.0f * S, Y, AddressW, FieldH, From.JoinAddress, TEXT("click and type the host's address"),
-		From.Typing == EField::Address, static_cast<int32>(EField::Address));
-	TextField(PX + 30.0f * S + AddressW + 30.0f * S, Y, 160.0f * S, FieldH, From.JoinPort, TEXT("7777"),
-		From.Typing == EField::Port, static_cast<int32>(EField::Port));
-	Y += FieldH + 24.0f * S;
-
-	const float BW = (PW - 60.0f * S - 20.0f * S) * 0.5f;
-	const float BH = 56.0f * S;
+	const float ColW = (PW - 60.0f * S - 30.0f * S) * 0.5f;
+	const float LeftX = PX + 30.0f * S;
+	const float RightX = LeftX + ColW + 30.0f * S;
+	float Y = PY + 136.0f * S;
+	const float BH = 52.0f * S;
 	const bool bBusy = From.IsWaitingOnline();
 	if (bBusy)
 	{
-		Panel(PX + 30.0f * S, Y, PW - 60.0f * S, BH, FLinearColor(0.1f, 0.12f, 0.18f, 0.95f), Gold, 1.0f);
+		Panel(LeftX, Y + 26.0f * S, PW - 60.0f * S, BH, FLinearColor(0.1f, 0.12f, 0.18f, 0.95f), Gold, 1.0f);
 		const FString Busy = TEXT("Connecting... (Back to give up)");
 		const FVector2D BusySize = TextSize(Busy, Font, 0.62f * S);
-		Text(Busy, PX + (PW - BusySize.X) * 0.5f, Y + (BH - BusySize.Y) * 0.5f, Gold, Font, 0.62f * S);
+		Text(Busy, PX + (PW - BusySize.X) * 0.5f, Y + 26.0f * S + (BH - BusySize.Y) * 0.5f, Gold, Font, 0.62f * S);
 	}
 	else
 	{
-		MenuButton(PX + 30.0f * S, Y, BW, BH, TEXT("Host Game"), ETMHudAction::OnlineHost, -1, true, TEXT("choose the battle, then wait for a player"));
-		MenuButton(PX + 30.0f * S + BW + 20.0f * S, Y, BW, BH, TEXT("Join Game"), ETMHudAction::OnlineJoin, -1, true, TEXT("connect to the address above"));
+		Text(TEXT("Host"), LeftX, Y, Dim, Font, 0.55f * S);
+		MenuButton(LeftX, Y + 26.0f * S, ColW, BH, TEXT("Host Game"), ETMHudAction::OnlineHost, -1, true, TEXT("choose the battle, then send the code"));
+		Text(TEXT("Join a friend's game"), RightX, Y, Dim, Font, 0.55f * S);
+		const float JoinW = 120.0f * S;
+		TextField(RightX, Y + 26.0f * S, ColW - JoinW - 12.0f * S, BH, From.JoinCodeText, TEXT("join code"),
+			From.Typing == EField::Code, static_cast<int32>(EField::Code));
+		MenuButton(RightX + ColW - JoinW, Y + 26.0f * S, JoinW, BH, TEXT("Join"), ETMHudAction::OnlineJoinCode, -1, true);
 	}
-	Y += BH + 30.0f * S;
+	Y += 26.0f * S + BH + 18.0f * S;
 
-	for (const FString& Line : { From.OnlineStatus, From.OnlineAddresses, From.OnlineRouter })
+	// What is happening; the addresses and the router only matter for joining by address.
+	for (const FString& Line : { From.OnlineStatus, From.bOnlineAdvanced ? From.OnlineAddresses : FString(), From.bOnlineAdvanced ? From.OnlineRouter : FString() })
 	{
 		if (!Line.IsEmpty())
 		{
-			Text(Line, PX + 30.0f * S, Y, Line == From.OnlineStatus ? TextColour : Dim, Font, 0.55f * S);
+			Text(Line, LeftX, Y, Line == From.OnlineStatus ? TextColour : Dim, Font, 0.55f * S);
 			Y += 26.0f * S;
 		}
 	}
+	Y = FMath::Max(Y, PY + 300.0f * S) + 8.0f * S;
 
-	const float HelpY = PY + PH - 150.0f * S;
-	const TCHAR* Help[] =
+	MenuButton(LeftX, Y, 300.0f * S, 36.0f * S, From.bOnlineAdvanced ? TEXT("Advanced: direct IP  (hide)") : TEXT("Advanced: direct IP  (show)"),
+		ETMHudAction::OnlineAdvanced, -1, false);
+	Y += 48.0f * S;
+	if (From.bOnlineAdvanced)
 	{
-		TEXT("On the same network, join with the address the host's screen shows."),
-		TEXT("Over the internet the host needs TCP port 7777 open: the game asks the router itself, and says if it can't."),
-		TEXT("If it can't, forward the port on the router by hand, or both players join a VPN such as Tailscale."),
-		TEXT("Both players need the same build of the game, and the same class files."),
-	};
-	float LineY = HelpY;
-	for (const TCHAR* Line : Help)
-	{
-		Text(Line, PX + 30.0f * S, LineY, Dim, Font, 0.5f * S);
-		LineY += 22.0f * S;
+		const float FieldH = 44.0f * S;
+		const float AddressW = PW - 60.0f * S - 190.0f * S;
+		Text(TEXT("Host address"), LeftX, Y, Dim, Font, 0.55f * S);
+		Text(TEXT("Port"), LeftX + AddressW + 30.0f * S, Y, Dim, Font, 0.55f * S);
+		Y += 26.0f * S;
+		TextField(LeftX, Y, AddressW, FieldH, From.JoinAddress, TEXT("click and type the host's address"),
+			From.Typing == EField::Address, static_cast<int32>(EField::Address));
+		TextField(LeftX + AddressW + 30.0f * S, Y, 160.0f * S, FieldH, From.JoinPort, TEXT("7777"),
+			From.Typing == EField::Port, static_cast<int32>(EField::Port));
+		Y += FieldH + 10.0f * S;
+		if (!bBusy)
+		{
+			MenuButton(LeftX, Y, 260.0f * S, 40.0f * S, TEXT("Join by address"), ETMHudAction::OnlineJoin, -1, false, TEXT("connect to the address above"));
+		}
+		Y += 50.0f * S;
+		const TCHAR* Help[] =
+		{
+			TEXT("A host always takes players by address too: on the same network, use an address its lobby shows."),
+			TEXT("Over the internet that needs TCP port 7777 open on the host's router (the game asks the router itself)."),
+			TEXT("The join code needs none of that. Both players need the same build of the game either way."),
+		};
+		for (const TCHAR* Line : Help)
+		{
+			Text(Line, LeftX, Y, Dim, Font, 0.5f * S);
+			Y += 22.0f * S;
+		}
 	}
-	MenuButton(PX + 30.0f * S, PY + PH - 60.0f * S, 160.0f * S, 44.0f * S, TEXT("Back  (Esc)"), ETMHudAction::OnlineBack);
+	MenuButton(LeftX, PY + PH - 60.0f * S, 160.0f * S, 44.0f * S, TEXT("Back  (Esc)"), ETMHudAction::OnlineBack);
 }
 
 void ATMBattleHud::DrawBattleMenu(ATMBattleDirector& From)
@@ -1958,4 +2147,4 @@ void ATMBattleHud::DrawBattleMenu(ATMBattleDirector& From)
 	MenuButton(X, Y, W, H, TEXT("Change setup"), ETMHudAction::MenuSetup);
 	Y += H + Gap;
 	MenuButton(X, Y, W, H, TEXT("Main menu"), ETMHudAction::MenuTitle);
-}
+}

@@ -716,6 +716,11 @@ void ATMBattleDirector::AnimateEvents(const TMSim::FTickReport& Report)
 			// Its motion (TMSim::MotionOf): the class file's, or one worked out
 			// from the ability. A switch flipped, or an aura, is no motion.
 			const TMSim::FAbility* Ability = TMSim::FindAbility(Event.Id);
+			// A warned blow landing (2026-10-06): the swing was when it was drawn.
+			if (Event.Amount == 1 && Ability && Ability->Special == "warned")
+			{
+				continue;
+			}
 			const FString Named = Ability ? FString(UTF8_TO_TCHAR(TMSim::MotionOf(*Ability, Event.Slot).c_str())) : FString(TEXT("none"));
 			const bool bCharged = Motion.bWasCasting;
 			Motion.bWasCasting = false;
@@ -780,13 +785,19 @@ void ATMBattleDirector::AnimateEvents(const TMSim::FTickReport& Report)
 			// behind) -- not walked there by the way a walk would go.
 			const bool bMovedBy = Ability && !(Unit.Pos == Motion.SimPos);
 			uint8 Flight = 0;
-			if (bMovedBy && Ability->Special == "leap")
+			if (bMovedBy && (Ability->Special == "leap" || Ability->Special == "vault"))
 			{
 				Flight = 1;
 			}
-			else if (bMovedBy && Ability->Special == "behind")
+			else if (bMovedBy && (Ability->Special == "behind" || Ability->Special == "shadowhop" || Ability->Special == "recall"))
 			{
 				Flight = 3;
+			}
+			else if (bMovedBy && (Ability->Special == "dash" || Ability->Special == "charge" || Ability->Special == "disengage"
+				|| Ability->Special == "riptide"))
+			{
+				// The new spells' moves (2026-10-05): a rush along the ground.
+				Flight = 2;
 			}
 			else if (bMovedBy && TMSim::ShapeOf(*Ability) == "vector")
 			{

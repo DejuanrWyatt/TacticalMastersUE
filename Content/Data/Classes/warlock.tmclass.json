@@ -70,30 +70,31 @@
       }
     },
     {
-      "id": "warlock_shadow_slumber",
-      "name": "Shadow Slumber",
-      "desc": "Lull an enemy 2-7 m away into a stupor; Stuns for 1 turn. (2 s)",
+      "id": "warlock_life_tether",
+      "name": "Life Tether",
+      "desc": "Tie yourself to an enemy 1-6 m away for 3 turns: as each of its turns begins it loses 5% of its health and you gain it. The tether snaps if you fall or stand more than 8 m apart.",
       "kind": "active",
       "effect": "support",
       "scale": "mag",
       "target": "enemy",
       "shape": "unit",
       "power": 0,
-      "min_range": 2,
-      "max_range": 7,
+      "min_range": 1,
+      "max_range": 6,
       "aoe": 0,
       "cooldown": 3,
-      "cast": 2,
+      "cast": 0.5,
       "status": {
-        "id": "stun",
-        "turns": 1
+        "id": "tethered",
+        "turns": 3
       },
       "fx": "haste",
       "vfx": {
         "system": "/Game/ParagonGideon/FX/Particles/Gideon/Abilities/Meteor/FX/P_Gideon_MeteorBigImpact.P_Gideon_MeteorBigImpact",
         "at": "targets",
         "scale": 1
-      }
+      },
+      "anim": "bolt"
     },
     {
       "id": "warlock_shadow_doom",
@@ -154,8 +155,8 @@
       ]
     },
     "rebalanced": {
-      "on": "2026-10-04",
-      "why": "Status curse in place of Shadow Curse (never used): a light hit that leaves Decay for 2 turns (healing on it hurts instead)"
+      "on": "2026-10-05",
+      "why": "Life Tether in place of Shadow Slumber (unique and mobility spells, 2026-10-05). Before that (2026-10-04): Status curse in place of Shadow Curse (never used): a light hit that leaves Decay for 2 turns (healing on it hurts instead)"
     }
   }
 }

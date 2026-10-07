@@ -86,6 +86,7 @@ namespace TMCast
 		Tick,          // a status it gave hurting or healing a turn
 		Expire,        // a status it gave ending, a pet it called leaving, a channel's end
 		Summon,        // on a pet it called, while the pet stays               (lasting)
+		Zone,          // on the ground it laid (a ground zone), while it lasts  (lasting; 2026-10-06)
 		// A status's, whoever gave it.
 		StatusGain,
 		StatusActive,  //                                                       (lasting)

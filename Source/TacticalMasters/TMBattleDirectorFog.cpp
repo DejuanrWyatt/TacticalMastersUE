@@ -275,6 +275,15 @@ void ATMBattleDirector::AdvanceFog()
 		{
 			Signature += FString::Printf(TEXT("|t%d"), Tower.Owner);
 		}
+		// Ground zones that see for this side (2026-10-04).
+		for (const TMSim::FBattle::FZone& Zone : Battle.Zones)
+		{
+			const TMSim::FAbility* Laid = Battle.ZoneAbility(Zone);
+			if (Zone.Team == Viewer && Laid && Laid->ZoneSight > 0.0f)
+			{
+				Signature += FString::Printf(TEXT("|z%d:%hs:%.1f,%.1f"), Zone.Owner, Zone.AbilityId.c_str(), Zone.Target.X, Zone.Target.Y);
+			}
+		}
 	}
 	// A tower just taken spreads its sight over TowerKindleSeconds, with its fire
 	// (2026-10-02): sixteen steps, each redrawing only the spread on top of what

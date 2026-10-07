@@ -340,8 +340,22 @@ namespace TMSim
 		{
 			Percent = std::min<double>(Items::DamagePercentCap, Percent + Extra);
 		}
-		const double Power = (bItems || Extra != 0) && (bHeal || Ability.Effect == EEffect::Damage)
+		double Power = (bItems || Extra != 0) && (bHeal || Ability.Effect == EEffect::Damage)
 			? (Ability.Power + Flat) * (1.0 + Percent / 100.0) : Ability.Power;
+		// The new spells (2026-10-05): an echo at half power; Reckoning harder the
+		// more of the user's health is gone; a Charge harder for every metre run.
+		if (EchoScale != 1.0 && (bHeal || Ability.Effect == EEffect::Damage))
+		{
+			Power *= EchoScale;
+		}
+		if (Ability.Special == "reckoning" && User.MaxHp() > 0)
+		{
+			Power *= 1.0 + std::max(0.0, 1.0 - static_cast<double>(User.Hp) / User.MaxHp());
+		}
+		else if (Ability.Special == "charge")
+		{
+			Power *= 1.0 + 0.05 * std::max(0.0, static_cast<double>(From.DistanceTo(TargetPos)) - 1.5);
+		}
 
 		switch (Ability.Effect)
 		{
@@ -374,13 +388,24 @@ namespace TMSim
 			// Defense model 1 (2026-10-01): a share off, never a slice, so a small
 			// hit counts and no pile of defense makes a unit immune. Defense below
 			// nothing (a debuff larger than it) counts as none.
+			int Dealt = 0;
 			if (NewDefense())
 			{
 				const double Scale = std::max(1.0, Tuning.DefenseScale);
-				return std::max(Combat::MinimumDamage,
+				Dealt = std::max(Combat::MinimumDamage,
 					RoundToInt(Raw * Tuning.DamageMultiplier * Scale / (Scale + std::max(0, Defence))));
 			}
-			return std::max(Combat::MinimumDamage, RoundToInt((Raw - Defence) * Tuning.DamageMultiplier));
+			else
+			{
+				Dealt = std::max(Combat::MinimumDamage, RoundToInt((Raw - Defence) * Tuning.DamageMultiplier));
+			}
+			// Verdict (2026-10-06, Cire's Spell Codex): a quarter of what the target
+			// is missing on top, past its defence.
+			if (Ability.Special == "execute")
+			{
+				Dealt += RoundToInt(std::max(0, Target.MaxHp() - Target.Hp) * ExecuteShare);
+			}
+			return Dealt;
 		}
 		case EEffect::Heal:
 		{
@@ -579,12 +604,56 @@ namespace TMSim
 		// the end overrides the waking, so a Sleep that damage woke comes back if
 		// it had turns left (game_state.gd:1237-1277, 1339-1350). Kept bug-for-bug.
 		const std::vector<FStatus> Current = Unit.Statuses;
+		// Time Bomb (2026-10-05): it goes off once the statuses have had their say.
+		int BombAmount = 0;
+		int BombBy = -1;
+		bool bBomb = false;
 		for (FStatus Status : Current)
 		{
 			const FStatusDef* Def = FindStatus(Status.Id);
 			if (!Def)
 			{
 				continue;
+			}
+			// Life Tether (2026-10-05): a share of its health to the caster, while
+			// the caster stands and is near enough; otherwise it snaps.
+			if (Status.Id == "tethered")
+			{
+				FUnit* Caster = FindUnit(Status.By);
+				if (!Caster || !Caster->IsAlive() || static_cast<double>(Caster->Pos.DistanceTo(Unit.Pos)) > 8.0)
+				{
+					continue;
+				}
+				const int Taken = Hurt(Unit, std::max(1, RoundToInt(Unit.MaxHp() * 0.05)));
+				if (Taken > 0)
+				{
+					FEvent Event;
+					Event.Kind = EEventKind::Hit;
+					Event.Unit = Unit.Id;
+					Event.By = Caster->Id;
+					Event.Amount = Taken;
+					Event.Where = Unit.Pos;
+					Event.Id = "tethered";
+					Report.Events.push_back(Event);
+					const int Healed = Caster->HasStatus("decay") ? 0 : std::min(Caster->HealReceived(Taken), Caster->MaxHp() - Caster->Hp);
+					if (Healed > 0)
+					{
+						Caster->Hp += Healed;
+						FEvent Drain;
+						Drain.Kind = EEventKind::Hit;
+						Drain.Unit = Caster->Id;
+						Drain.Amount = Healed;
+						Drain.Where = Caster->Pos;
+						Drain.Id = "drain";
+						Report.Events.push_back(Drain);
+					}
+					if (!Unit.IsAlive())
+					{
+						KnockOut(Unit, Report);
+						CheckWinner();
+						return;
+					}
+				}
 			}
 			if (Def->PerTurn != 0.0f && Unit.IsAlive())
 			{
@@ -657,6 +726,12 @@ namespace TMSim
 			{
 				Kept.push_back(Status);
 			}
+			else if (Status.Id == "bomb")
+			{
+				bBomb = true;
+				BombAmount = Status.Amount;
+				BombBy = Status.By;
+			}
 			else if (Def->bDoom && Unit.IsAlive())
 			{
 				// The count has run out, and that is that however much health is
@@ -674,6 +749,10 @@ namespace TMSim
 		if (Unit.CharmedFrom < 0 && Unit.HasStatus("charmed"))
 		{
 			RemoveStatus(Unit, "charmed");
+		}
+		if (bBomb && Unit.IsAlive())
+		{
+			Detonate(Unit, BombAmount, BombBy, Report);
 		}
 	}
 
@@ -843,6 +922,12 @@ namespace TMSim
 		{
 			return;
 		}
+		// Ground zones (2026-10-04): they count down, and touch whoever starts here.
+		const bool bZoneLost = !Zones.empty() && ZonesAtTurnStart(Unit, Report);
+		if (!Unit.IsAlive())
+		{
+			return;
+		}
 		UndamagedRegen(Unit, Report);
 		// Seen or not as its turn begins (Nightcloak), and a shrine underfoot.
 		if (Unit.HasItems())
@@ -894,7 +979,7 @@ namespace TMSim
 			{
 				Unit.Channeling = FChannel();
 			}
-			if (Unit.IsAlive())
+			if (Unit.IsAlive() && Unit.bReady)
 			{
 				EndTurnFor(Unit, false, Report);
 			}
@@ -904,7 +989,7 @@ namespace TMSim
 		// A status that takes its orders away: the turn it just earned is lost, and
 		// the status has counted down for it. Stun is not one of these -- that
 		// interrupts the turn a unit is already in.
-		if (!BlockedBy.empty())
+		if (!BlockedBy.empty() || bZoneLost)
 		{
 			EndTurn(Unit, true, Report);
 			return;
@@ -1104,6 +1189,50 @@ namespace TMSim
 
 	void FBattle::ApplyCapture(FUnit& Unit, int Tower, FTickReport& Report)
 	{
+		CaptureProgress(Unit, Tower, Report);
+
+		// It costs the turn: the action, and the end of it. A unit that walked
+		// there first has used the whole turn, and keeps the gauge of one that did.
+		// The end of the turn would count the tower again (AutoCapture): not twice.
+		Unit.bActed = true;
+		bCaptureOrder = true;
+		EndTurn(Unit, false, Report);
+		bCaptureOrder = false;
+	}
+
+	void FBattle::AutoCapture(FUnit& Unit, FTickReport& Report)
+	{
+		// Only a side's own units (not a monster, not a pet), alive, at a tower
+		// its side doesn't hold, on ground it could step to from the tower's, with
+		// no enemy at it: what ValidateCapture asks, less the turn's action.
+		if (bCaptureOrder || Watchtowers.empty() || !Unit.IsAlive() || Unit.IsStunned() || Unit.bMonster || Unit.PetOf >= 0
+			|| (Unit.Team != 0 && Unit.Team != 1))
+		{
+			return;
+		}
+		const int Tower = TowerNear(Unit.Pos);
+		if (Tower < 0)
+		{
+			return;
+		}
+		const FWatchtower& Held = Watchtowers[static_cast<size_t>(Tower)];
+		if (Held.Owner == Unit.Team || std::abs(LevelAt(Unit.Pos) - LevelAt(Held.Pos)) > Ground::Jump)
+		{
+			return;
+		}
+		for (const FUnit& Other : Units)
+		{
+			if (Other.IsAlive() && Other.Team != Unit.Team
+				&& static_cast<double>(Other.Pos.DistanceTo(Held.Pos)) <= Watchtower::Reach)
+			{
+				return;
+			}
+		}
+		CaptureProgress(Unit, Tower, Report);
+	}
+
+	void FBattle::CaptureProgress(FUnit& Unit, int Tower, FTickReport& Report)
+	{
 		FWatchtower& Held = Watchtowers[static_cast<size_t>(Tower)];
 		// Progress belongs to one side at a time: the other side starting on a
 		// tower wipes out whatever the first had put in.
@@ -1137,11 +1266,6 @@ namespace TMSim
 			Taken.Where = Held.Pos;
 			Report.Events.push_back(Taken);
 		}
-
-		// It costs the turn: the action, and the end of it. A unit that walked
-		// there first has used the whole turn, and keeps the gauge of one that did.
-		Unit.bActed = true;
-		EndTurn(Unit, false, Report);
 	}
 
 	void FBattle::FinishOnTime(FTickReport& Report)
@@ -1228,6 +1352,14 @@ namespace TMSim
 
 	void FBattle::EndTurn(FUnit& Unit, bool bTimedOut, FTickReport& Report)
 	{
+		// Standing at a watchtower as the turn ends puts the turn into it (v20 play test).
+		AutoCapture(Unit, Report);
+		// Contagion (2026-10-05): a carrier ending its turn among its allies passes it on.
+		if (!Unit.Statuses.empty() && Unit.HasStatus("plague"))
+		{
+			SpreadPlague(Unit, Report);
+		}
+
 		// A turn lost to the countdown stops a channel; giving the turn up on
 		// purpose does not, because carrying on is the whole point of one.
 		if (bTimedOut && Unit.IsChanneling())

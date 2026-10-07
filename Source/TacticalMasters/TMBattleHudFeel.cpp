@@ -76,23 +76,8 @@ void ATMBattleHud::DrawFeel(ATMBattleDirector& From)
 		const FLinearColor Ghost = TeamColour(Unit->Team) * FLinearColor(1.0f, 1.0f, 1.0f, 0.55f);
 		const float Radius = 0.32f * From.TileSize;
 		const FVector Feet = OnBoard(End, 4.0f);
-		const float Tall = 175.0f;
+		// Only a circle at its feet and the arrows (v21 play test: no body outline over it).
 		GroundRing(Feet, Radius, Ghost, 2.5f * S);
-		GroundRing(Feet + FVector(0.0f, 0.0f, Tall * 0.55f), Radius * 0.85f, Ghost * FLinearColor(1.0f, 1.0f, 1.0f, 0.6f), 1.5f * S);
-		GroundRing(Feet + FVector(0.0f, 0.0f, Tall), Radius * 0.45f, Ghost, 2.0f * S);
-		// The body's sides, as the camera sees them: from each side of the feet to the head.
-		const FRotator Looking = PlayerOwner->PlayerCameraManager ? PlayerOwner->PlayerCameraManager->GetCameraRotation() : FRotator::ZeroRotator;
-		const FVector Across = Board.InverseTransformVectorNoScale(FRotationMatrix(Looking).GetScaledAxis(EAxis::Y)) * Radius;
-		for (const float Way : { -1.0f, 1.0f })
-		{
-			FVector2D Low;
-			FVector2D High;
-			if (PlayerOwner->ProjectWorldLocationToScreen(Board.TransformPosition(Feet + Across * Way), Low)
-				&& PlayerOwner->ProjectWorldLocationToScreen(Board.TransformPosition(Feet + Across * Way * 0.45f + FVector(0.0f, 0.0f, Tall)), High))
-			{
-				DrawLine(Low.X, Low.Y, High.X, High.Y, Ghost * FLinearColor(1.0f, 1.0f, 1.0f, 0.7f), 2.0f * S);
-			}
-		}
 		// The way it would face: the last step of the walk, or -- pressed and
 		// dragged (2026-10-03, facing on arrival) -- the way chosen, in gold and
 		// bigger, with the eight it can choose from marked round it.
@@ -146,7 +131,7 @@ void ATMBattleHud::DrawFeel(ATMBattleDirector& From)
 		}
 		// Pressed, not dragged yet: a word on what dragging does.
 		FVector2D Label;
-		if (bPressed && !bChosen && OnScreen(Feet + FVector(0.0f, 0.0f, Tall + 30.0f), Label))
+		if (bPressed && !bChosen && OnScreen(Feet + FVector(0.0f, 0.0f, 205.0f), Label))
 		{
 			const FString Words = TEXT("drag to face");
 			const FVector2D Size = TextSize(Words, Font, 0.42f * S);

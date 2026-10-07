@@ -45,30 +45,28 @@
       }
     },
     {
-      "id": "war_marshal_shield_slam",
-      "name": "Shield Slam",
-      "desc": "Slams an enemy at arm's length to the ground: next turn it may walk or act, not both.",
+      "id": "war_marshal_rally_call",
+      "name": "Rally Call",
+      "desc": "Call an ally 2-8 m away to your side: it lands beside you at once.",
       "kind": "active",
-      "effect": "damage",
-      "scale": "att",
-      "target": "enemy",
+      "effect": "support",
+      "scale": "mag",
+      "target": "ally",
       "shape": "unit",
-      "power": 26,
-      "min_range": 0,
-      "max_range": 1.8,
+      "power": 0,
+      "min_range": 2,
+      "max_range": 8,
       "aoe": 0,
-      "cooldown": 2,
+      "cooldown": 3,
       "cast": 0,
-      "status": {
-        "id": "knockdown",
-        "turns": 1
-      },
       "fx": "shield_bash",
       "vfx": {
         "system": "/Game/ParagonSteel/FX/Particles/Steel/Abilities/Bash/FX/P_ShieldBashImpact.P_ShieldBashImpact",
         "at": "targets",
         "scale": 1
-      }
+      },
+      "anim": "buff",
+      "special": "rally"
     },
     {
       "id": "war_marshal_battle_standard",
@@ -170,15 +168,7 @@
           "scale": 1,
           "rotate": 0
         },
-        {
-          "backing": "circle",
-          "glyph": "hammer",
-          "colour": "#c9ced9",
-          "style": "light",
-          "mark": "none",
-          "scale": 1,
-          "rotate": 0
-        },
+        null,
         {
           "backing": "square",
           "glyph": "crown",
@@ -210,6 +200,10 @@
         58
       ],
       "against": "reference team, medium"
+    },
+    "rebalanced": {
+      "on": "2026-10-05",
+      "why": "Rally Call in place of Shield Slam (unique and mobility spells, 2026-10-05)."
     }
   }
 }

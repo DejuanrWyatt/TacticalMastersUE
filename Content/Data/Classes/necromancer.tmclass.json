@@ -44,41 +44,36 @@
       }
     },
     {
-      "id": "necromancer_umbral_burst",
-      "name": "Umbral Burst",
-      "desc": "Every enemy within 2 m of a point 2-8 m away; MagDef -6, AttDef -3 and Decay for 2 turns: healing hurts them. (2 s)",
+      "id": "necromancer_caustic_pool",
+      "name": "Caustic Pool",
+      "desc": "Pour rot on the ground within 1.5 m of a point 2-8 m away for 4 of your turns. An enemy that starts its turn there, or stops there, loses 4% of its health and Decays: healing hurts it.",
       "kind": "active",
-      "effect": "damage",
+      "effect": "support",
       "scale": "mag",
       "target": "enemy",
       "shape": "circle",
-      "power": 36,
+      "power": 0,
       "min_range": 2,
       "max_range": 8,
-      "aoe": 2,
-      "cooldown": 2,
-      "cast": 2,
+      "aoe": 1.5,
+      "cooldown": 3,
+      "cast": 1,
       "status": {
         "id": "decay",
-        "turns": 2
+        "turns": 1
       },
-      "buffs": [
-        {
-          "stat": "magdef",
-          "amount": -6,
-          "turns": 2
-        },
-        {
-          "stat": "attdef",
-          "amount": -3,
-          "turns": 2
-        }
-      ],
       "fx": "pin_shot",
       "vfx": {
         "system": "/Game/ParagonMorigesh/FX/Particles/Morigesh/Skins/NorthernMystic/P_Morigesh_NorthernMystic_SkillshotAOE_Projectile.P_Morigesh_NorthernMystic_SkillshotAOE_Projectile",
         "at": "point",
         "scale": 1
+      },
+      "anim": "area",
+      "special": "zone",
+      "element": "none",
+      "zone": {
+        "turns": 4,
+        "percent": 4
       }
     },
     {
@@ -147,7 +142,7 @@
   "creator": {
     "rebalanced": {
       "on": "2026-10-04",
-      "why": "Signature in place of Shadow Staff (never used): a hit that leaves the enemy Wounded (healing halved) for 2 turns. Before that (2026-10-03): Umbral Burst leaves Decay"
+      "why": "Ground zone Caustic Pool in place of Umbral Burst (area denial, 2026-10-04). Before that (2026-10-04): Signature in place of Shadow Staff (never used): a hit that leaves the enemy Wounded (healing halved) for 2 turns. Before that (2026-10-03): Umbral Burst leaves Decay"
     },
     "changedAt": "2026-10-03T03:45:00.000Z",
     "icons": {

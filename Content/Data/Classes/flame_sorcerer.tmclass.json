@@ -44,29 +44,36 @@
       }
     },
     {
-      "id": "flame_sorcerer_burst",
-      "name": "Burst",
-      "desc": "Every enemy within 2 m of a point 2-8 m away",
+      "id": "flame_sorcerer_ember_field",
+      "name": "Ember Field",
+      "desc": "Set the ground alight round a point 2-8 m away, 2.5 m across each way, for 3 of your turns. An enemy that starts its turn there, or stops there, loses 6% of its health and Burns; an Oiled one catches fire. Water puts it out.",
       "kind": "active",
-      "effect": "damage",
+      "effect": "support",
       "scale": "mag",
       "target": "enemy",
       "shape": "circle",
-      "power": 36,
+      "power": 0,
       "min_range": 2,
       "max_range": 8,
-      "aoe": 2,
-      "cooldown": 2,
-      "cast": 2,
+      "aoe": 2.5,
+      "cooldown": 3,
+      "cast": 1,
       "status": {
         "id": "burn",
-        "turns": 2
+        "turns": 1
       },
       "fx": "fire",
       "vfx": {
         "system": "/Game/ParagonIggyScorch/FX/Particles/IggyScorch/Abilities/Turret/FX/P_IggyScorch_Turret_Explosion.P_IggyScorch_Turret_Explosion",
         "at": "point",
         "scale": 1
+      },
+      "anim": "area",
+      "special": "zone",
+      "element": "fire",
+      "zone": {
+        "turns": 3,
+        "percent": 6
       }
     },
     {
@@ -157,7 +164,7 @@
     "measured": -66,
     "rebalanced": {
       "on": "2026-10-04",
-      "why": "Signature in place of Staff (never used): Oils an enemy for 2 turns with a light hit, so Burst and Cataclysm burn it twice as long. Before that (2026-10-02): Balance audit 2026-10-02: the staff strikes from 1-5 m (power -15%) instead of only at arm's length, which the computer never used"
+      "why": "Ground zone Ember Field in place of Burst (area denial, 2026-10-04). Before that (2026-10-04): Signature in place of Staff (never used): Oils an enemy for 2 turns with a light hit, so Burst and Cataclysm burn it twice as long. Before that (2026-10-02): Balance audit 2026-10-02: the staff strikes from 1-5 m (power -15%) instead of only at arm's length, which the computer never used"
     },
     "changedAt": "2026-10-03T03:45:00.000Z",
     "icons": {

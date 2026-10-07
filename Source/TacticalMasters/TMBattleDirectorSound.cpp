@@ -272,3 +272,27 @@ void ATMBattleDirector::SoundStep(int32 Index, float DeltaSeconds)
 		}
 	}
 }
+
+void ATMBattleDirector::AdvanceClockWarning()
+{
+	// 2026-10-06: "a warning sound when a currently selected unit's turn is running
+	// out, starting on 3 seconds left" -- one beep as each of the last three
+	// seconds begins, louder on the last.
+	const TMSim::FUnit* Unit = SelectedUnit();
+	if (Screen != EScreen::Battle || bPaused || Battle.Winner != -1 || !Unit || !Unit->bReady || !PlayerCanCommand(Unit))
+	{
+		ClockWarnSecond = -1;
+		return;
+	}
+	if (Unit->Id != ClockWarnUnit)
+	{
+		ClockWarnUnit = Unit->Id;
+		ClockWarnSecond = -1;
+	}
+	const int32 Left = FMath::CeilToInt(static_cast<float>(Unit->Clock) / TMSim::Pace::TicksPerSecond);
+	if (Left >= 1 && Left <= 3 && Left != ClockWarnSecond)
+	{
+		ClockWarnSecond = Left;
+		PlayEventSound(TEXT("clockWarning"), nullptr, Left == 1 ? 1.0f : 0.7f);
+	}
+}

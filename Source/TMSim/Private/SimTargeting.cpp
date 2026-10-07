@@ -234,8 +234,22 @@ namespace TMSim
 			FHit Hit;
 			Hit.UnitId = Target_.Id;
 			Hit.Where = Pos;
-			Hit.Amount = CalcAmount(Unit, *Ability, From, Target_, Pos,
-				LevelAt(From), LevelAt(Pos));
+			if (Ability->LaysZone())
+			{
+				// Ground (2026-10-04): what it will take from whoever starts a turn in
+				// it, which is nothing for anything off the ground.
+				if (Target_.Flies())
+				{
+					continue;
+				}
+				Hit.Amount = Ability->ZonePercent > 0.0f
+					? std::max(1, RoundToInt(Target_.MaxHp() * Ability->ZonePercent * 0.01)) : 0;
+			}
+			else
+			{
+				Hit.Amount = CalcAmount(Unit, *Ability, From, Target_, Pos,
+					LevelAt(From), LevelAt(Pos));
+			}
 			Hit.Distance = Pos.DistanceTo(Target);
 			Hit.Flank = Ability->Effect == EEffect::Damage
 				? FlankBonus(Target_, Pos, From) : 1.0;
@@ -258,6 +272,27 @@ namespace TMSim
 			const FHit Kept = *Closest;
 			Out.clear();
 			Out.push_back(Kept);
+		}
+		// Echo Slam (2026-10-06, Cire's Spell Codex): a fifth harder for each enemy
+		// caught beyond the first.
+		if (Ability->Special == "crowd" && Ability->Effect == EEffect::Damage && Out.size() > 1)
+		{
+			int Caught = 0;
+			for (const FHit& Hit : Out)
+			{
+				for (const FUnit& Struck : Units)
+				{
+					Caught += Struck.Id == Hit.UnitId && Struck.Team != Unit.Team ? 1 : 0;
+				}
+			}
+			if (Caught > 1)
+			{
+				const double Scale = 1.0 + CrowdShare * (Caught - 1);
+				for (FHit& Hit : Out)
+				{
+					Hit.Amount = RoundToInt(Hit.Amount * Scale);
+				}
+			}
 		}
 		return Out;
 	}

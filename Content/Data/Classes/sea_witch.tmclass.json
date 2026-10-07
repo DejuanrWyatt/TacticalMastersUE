@@ -44,20 +44,20 @@
       }
     },
     {
-      "id": "sea_witch_drown_curse",
-      "name": "Drown Curse",
-      "desc": "Curse an enemy 2-8 m away with the sea: a light hit, and Wet for 2 turns, so lightning shocks it and ice takes hold.",
+      "id": "sea_witch_tide_pool",
+      "name": "Tide Pool",
+      "desc": "Flood the ground within 2 m of a point 2-8 m away for 3 of your turns. An enemy that starts its turn there, or stops there, is Wet: lightning shocks it, ice freezes it. It also puts out burning ground it reaches.",
       "kind": "active",
-      "effect": "damage",
+      "effect": "support",
       "scale": "mag",
       "target": "enemy",
-      "shape": "unit",
-      "power": 10,
+      "shape": "circle",
+      "power": 0,
       "min_range": 2,
       "max_range": 8,
-      "aoe": 0,
+      "aoe": 2,
       "cooldown": 3,
-      "cast": 0,
+      "cast": 1,
       "status": {
         "id": "wet",
         "turns": 2
@@ -65,8 +65,14 @@
       "fx": "pin_shot",
       "vfx": {
         "system": "/Game/ParagonDekker/FX/Particles/Abilities/Line/FX/P_DekkerLineGroundDamage_Water.P_DekkerLineGroundDamage_Water",
-        "at": "targets",
+        "at": "point",
         "scale": 0.5
+      },
+      "anim": "area",
+      "special": "zone",
+      "element": "water",
+      "zone": {
+        "turns": 3
       }
     },
     {
@@ -129,22 +135,12 @@
     },
     "rebalanced": {
       "on": "2026-10-04",
-      "why": "Held nerfs 2026-10-04 (lab 64%): Tide Doom 46->39; now 61-65%. Before that (2026-10-04): Status curse in place of Tide Curse (never used): a light hit that leaves the enemy Wet for 2 turns, for lightning and ice to finish. Before that (2026-10-03): Tuning pass 2026-10-03 (lab 74% in place of the Archer): Tide Doom slow 2->1 turns"
+      "why": "Ground zone Tide Pool in place of Drown Curse (area denial, 2026-10-04). Before that (2026-10-04): Held nerfs 2026-10-04 (lab 64%): Tide Doom 46->39; now 61-65%. Before that (2026-10-04): Status curse in place of Tide Curse (never used): a light hit that leaves the enemy Wet for 2 turns, for lightning and ice to finish. Before that (2026-10-03): Tuning pass 2026-10-03 (lab 74% in place of the Archer): Tide Doom slow 2->1 turns"
     },
     "icons": {
       "abilities": [
         null,
-        {
-          "backing": "circle",
-          "glyph": "drop",
-          "colour": "#4f8fe0",
-          "style": "light",
-          "mark": "unit",
-          "scale": 1,
-          "rotate": 0,
-          "badge": "none",
-          "finish": "lit"
-        },
+        null,
         null,
         null
       ]

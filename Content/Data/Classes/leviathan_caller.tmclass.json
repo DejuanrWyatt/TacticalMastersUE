@@ -77,33 +77,28 @@
       }
     },
     {
-      "id": "leviathan_caller_leviathan_pact",
-      "name": "Leviathan Pact",
-      "desc": "Bless every ally within 3 m of a point up to 6 m away; MagDef +5 for 2 turns. (1 s)",
+      "id": "leviathan_caller_riptide",
+      "name": "Riptide",
+      "desc": "A wave along a line up to 7 m: a light hit on everyone in it, and you trade places with the furthest enemy it struck (not bosses).",
       "kind": "active",
-      "effect": "support",
+      "effect": "damage",
       "scale": "mag",
-      "target": "ally",
-      "shape": "circle",
-      "power": 0,
-      "min_range": 0,
-      "max_range": 6,
-      "aoe": 3,
+      "target": "enemy",
+      "shape": "line",
+      "power": 22,
+      "min_range": 2,
+      "max_range": 7,
+      "aoe": 0.7,
       "cooldown": 3,
-      "cast": 1,
-      "buffs": [
-        {
-          "stat": "magdef",
-          "amount": 5,
-          "turns": 2
-        }
-      ],
+      "cast": 0,
       "fx": "haste",
       "vfx": {
         "system": "/Game/ParagonKhaimera/FX/ParticleSystems/Abilities/WarriorSustain/FX/P_Passive_Activate.P_Passive_Activate",
         "at": "targets",
         "scale": 1
-      }
+      },
+      "anim": "area",
+      "special": "riptide"
     },
     {
       "id": "leviathan_caller_leviathan_ascendant",
@@ -134,8 +129,8 @@
   ],
   "creator": {
     "rebalanced": {
-      "on": "2026-10-02",
-      "why": "Balance audit 2026-10-02: rod reaches 1-7 m (power -15%); the summon casts in 1 s, every 3 turns, and calls up a computer-played pet for 3 turns; ultimate 1 s quicker"
+      "on": "2026-10-05",
+      "why": "Riptide in place of Leviathan Pact (unique and mobility spells, 2026-10-05). Before that (2026-10-02): Balance audit 2026-10-02: rod reaches 1-7 m (power -15%); the summon casts in 1 s, every 3 turns, and calls up a computer-played pet for 3 turns; ultimate 1 s quicker"
     },
     "changedAt": "2026-10-03T03:45:00.000Z"
   }

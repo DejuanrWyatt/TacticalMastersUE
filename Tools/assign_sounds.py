@@ -40,7 +40,7 @@ MOTIONS = {
 # Weapons keep their clash of steel. "magic" is plain arcane: the motion's own.
 ELEMENTS = {"fire", "ice", "water", "earth", "nature", "holy", "shadow", "lightning", "wind"}
 SPELLS = {"bolt", "area", "channel"}
-EVENTS = {"cast": "charge", "knockout": "knock_out", "ready": "ready", "turnLost": "turn_lost",
+EVENTS = {"cast": "charge", "knockout": "knock_out", "ready": "ready", "turnLost": "turn_lost", "clockWarning": "clock_warning",
           "victory": "victory", "defeat": "defeat", "step": "step", "click": "click", "select": "select", "battleStart": "horn",
           "step_meadow": "step_meadow", "step_winter": "step_winter", "step_volcanic": "step_volcanic",
           "step_ruined_keep": "step_ruined_keep"}
@@ -114,6 +114,8 @@ SFX_PACKS = {
     "knock_out": ["Free_Sounds_Pack/**/Hit_Generic_5-*", "Free_Sounds_Pack/**/Rock_Large_Debris_*"],
     "ready": ["Free_Sounds_Pack/**/Magical_Interface_5-*"],
     "turn_lost": ["Free_Sounds_Pack/**/Interface_3-*"],
+    # 2026-10-06: a beep each of the last three seconds of your unit's turn.
+    "clock_warning": ["Free_Sounds_Pack/**/Sci-Fi_Interface_8-*"],
     "victory": ["Free_Sounds_Pack/**/Special_Collectible_26-*"],
     "defeat": [MAGIC + "SW_MagicFade_FadeOut1_*"],
     "click": ["Free_Sounds_Pack/**/Interface_1-*"],

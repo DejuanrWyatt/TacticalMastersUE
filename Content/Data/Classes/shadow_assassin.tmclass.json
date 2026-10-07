@@ -78,30 +78,31 @@
       }
     },
     {
-      "id": "shadow_assassin_veil",
-      "name": "Veil",
-      "desc": "Slow every enemy within 2 m of a point 1-5 m away",
+      "id": "shadow_assassin_death_mark",
+      "name": "Death Mark",
+      "desc": "Mark an enemy 2-8 m away for 3 turns: if it falls while marked, every unit on your side gets 30% Turn Gauge.",
       "kind": "active",
       "effect": "support",
       "scale": "mag",
       "target": "enemy",
-      "shape": "circle",
+      "shape": "unit",
       "power": 0,
-      "min_range": 1,
-      "max_range": 5,
-      "aoe": 2,
+      "min_range": 2,
+      "max_range": 8,
+      "aoe": 0,
       "cooldown": 3,
       "cast": 0,
       "status": {
-        "id": "slow",
-        "turns": 2
+        "id": "deathmark",
+        "turns": 3
       },
       "fx": "haste",
       "vfx": {
         "system": "/Game/PotaVFX_Smoke/VFX/System/SmokeBurst/NS_MagicSmokeBurstAir.NS_MagicSmokeBurstAir",
         "at": "targets",
         "scale": 1
-      }
+      },
+      "anim": "shoot"
     },
     {
       "id": "shadow_assassin_execution",
@@ -168,6 +169,10 @@
       }
     ],
     "description": "Quick melee killer",
-    "measured": 34
+    "measured": 34,
+    "rebalanced": {
+      "on": "2026-10-05",
+      "why": "Death Mark in place of Veil (unique and mobility spells, 2026-10-05)."
+    }
   }
 }

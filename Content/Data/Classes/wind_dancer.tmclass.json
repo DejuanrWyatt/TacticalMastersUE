@@ -63,30 +63,28 @@
       "anim": "dash"
     },
     {
-      "id": "wind_dancer_gale_veil",
-      "name": "Gale Veil",
-      "desc": "Slow every enemy within 2 m of a point 1-5 m away; Slows for 2 turns.",
+      "id": "wind_dancer_dash",
+      "name": "Dash",
+      "desc": "Dash up to 6 m (3 tiles) straight toward a point, on top of your walk: through allies, stopping short of enemies, rock and cliffs. Zones of control don't hold it.",
       "kind": "active",
       "effect": "support",
       "scale": "mag",
       "target": "enemy",
-      "shape": "circle",
+      "shape": "point",
       "power": 0,
       "min_range": 1,
-      "max_range": 5,
-      "aoe": 2,
-      "cooldown": 3,
+      "max_range": 6,
+      "aoe": 0,
+      "cooldown": 2,
       "cast": 0,
-      "status": {
-        "id": "slow",
-        "turns": 2
-      },
       "fx": "haste",
       "vfx": {
         "system": "/Game/ParticleSystemVFXVol1/Systems/NS_EnergyVortex.NS_EnergyVortex",
         "at": "targets",
         "scale": 1
-      }
+      },
+      "anim": "dash",
+      "special": "dash"
     },
     {
       "id": "wind_dancer_gale_execution",
@@ -114,8 +112,8 @@
   ],
   "creator": {
     "rebalanced": {
-      "on": "2026-10-03",
-      "why": "Gale Rush (a dash-strike that carries her) in place of Gale Kunai"
+      "on": "2026-10-05",
+      "why": "Dash in place of Gale Veil (unique and mobility spells, 2026-10-05). Before that (2026-10-03): Gale Rush (a dash-strike that carries her) in place of Gale Kunai"
     }
   }
 }

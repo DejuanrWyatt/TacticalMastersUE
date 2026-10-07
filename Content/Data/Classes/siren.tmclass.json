@@ -71,28 +71,23 @@
       "anim": "area"
     },
     {
-      "id": "siren_tide_ballad",
-      "name": "Tide Ballad",
-      "desc": "Every ally within 4 m is inspired; MagDef +5 for 2 turns. Always on, for allies nearby.",
-      "kind": "aura",
+      "id": "siren_lure",
+      "name": "Lure",
+      "desc": "Trade places with an enemy 2-6 m away: drop its healer into your line, or step out of a trap.",
+      "kind": "active",
       "effect": "support",
       "scale": "mag",
-      "target": "ally",
-      "shape": "self",
+      "target": "enemy",
+      "shape": "unit",
       "power": 0,
-      "min_range": 0,
-      "max_range": 0,
-      "aoe": 4,
-      "cooldown": 0,
-      "cast": 0,
-      "buffs": [
-        {
-          "stat": "magdef",
-          "amount": 5,
-          "turns": 2
-        }
-      ],
-      "fx": "haste"
+      "min_range": 2,
+      "max_range": 6,
+      "aoe": 0,
+      "cooldown": 4,
+      "cast": 0.5,
+      "fx": "haste",
+      "anim": "bolt",
+      "special": "swap"
     },
     {
       "id": "siren_tide_finale",
@@ -123,8 +118,8 @@
   ],
   "creator": {
     "rebalanced": {
-      "on": "2026-10-03",
-      "why": "Tuning pass 2026-10-03 (lab 70% in place of the White Mage): HP 74->70, power -11%. Before that (2026-10-03): Siren Song charms, in place of Tide Anthem"
+      "on": "2026-10-05",
+      "why": "Lure in place of Tide Ballad (unique and mobility spells, 2026-10-05). Before that (2026-10-03): Tuning pass 2026-10-03 (lab 70% in place of the White Mage): HP 74->70, power -11%. Before that (2026-10-03): Siren Song charms, in place of Tide Anthem"
     }
   }
 }

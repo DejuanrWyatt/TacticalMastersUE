@@ -31,8 +31,14 @@ namespace TMSim
 		const char* const ClassKeys[] = { "format", "version", "id", "name", "color", "look", "icon", "roles", "stats", "abilities", "creator", "monster" };
 		const char* const AbilityKeys[] = { "id", "name", "desc", "kind", "effect", "scale", "target", "shape", "power", "min_range",
 			"max_range", "aoe", "angle", "channel", "cooldown", "cast", "tg", "status", "self_status", "buffs", "fx", "vfx", "anim", "special",
-			"element", "pet" };
-		const char* const Specials[] = { "blink", "swap", "tame", "summon", "rewind", "pet", "leap", "behind" };
+			"element", "pet", "zone" };
+		const char* const Specials[] = { "blink", "swap", "tame", "summon", "rewind", "pet", "leap", "behind", "zone",
+			// 2026-10-05, the unique and mobility spells (SimSpells.cpp).
+			"link", "gravity", "transfer", "pact", "chain", "spiritswap", "reckoning", "dash", "disengage", "vault", "charge",
+			"shadowhop", "recall", "rally", "hook", "shove", "riptide",
+			// 2026-10-06, picks from Cire's Spell Codex (Docs/design/feat-codex-picks.md).
+			"warned", "ricochet", "execute", "crowd" };
+		const char* const ZoneKeys[] = { "turns", "percent", "sight", "also", "once", "reveal", "hide", "flammable", "portal" };
 		const char* const Elements[] = { "fire", "ice", "lightning", "water", "none" };
 		const char* const MonsterKeys[] = { "tier", "temperament", "traits", "ring", "leash", "phases" };
 		const char* const Tiers[] = { "easy", "medium", "hard", "epic" };
@@ -197,6 +203,92 @@ namespace TMSim
 			else if (Out.Special == "pet")
 			{
 				Problems.Say(Where, "\"special\": \"pet\" needs a \"pet\"");
+			}
+			// Ground that lasts (2026-10-04, Docs/design/feat-ground-zones.md).
+			if (const FJson* Zone = Json.Find("zone"))
+			{
+				if (!Zone->IsObject())
+				{
+					Problems.Say(Where, "\"zone\" should be an object");
+				}
+				else
+				{
+					for (const std::pair<std::string, FJson>& Member : Zone->Object)
+					{
+						if (!OneOf(Member.first, ZoneKeys))
+						{
+							Problems.Say(Where, "unknown key \"" + Member.first + "\" in \"zone\"");
+						}
+					}
+					const FJson* Turns = Zone->Find("turns");
+					if (!Turns || !Turns->IsNumber() || !IsWhole(Turns->Number) || Turns->Number < 1.0 || Turns->Number > 6.0)
+					{
+						Problems.Say(Where, "\"zone\" needs \"turns\", 1 to 6");
+					}
+					else
+					{
+						Out.ZoneTurns = static_cast<int>(Turns->Number);
+					}
+					auto ZoneNumber = [&](const char* Key, double High, float& Into)
+					{
+						if (const FJson* Value = Zone->Find(Key))
+						{
+							if (!Value->IsNumber() || Value->Number < 0.0 || Value->Number > High)
+							{
+								Problems.Say(Where, std::string("\"zone\" ") + Key + " should be a number from 0 to "
+									+ std::to_string(static_cast<int>(High)));
+							}
+							else
+							{
+								Into = static_cast<float>(Value->Number);
+							}
+						}
+					};
+					ZoneNumber("percent", 25.0, Out.ZonePercent);
+					ZoneNumber("sight", 12.0, Out.ZoneSight);
+					auto ZoneFlag = [&](const char* Key, bool& Into)
+					{
+						if (const FJson* Value = Zone->Find(Key))
+						{
+							if (Value->Type != FJson::EType::Bool)
+							{
+								Problems.Say(Where, std::string("\"zone\" ") + Key + " should be true or false");
+							}
+							else
+							{
+								Into = Value->Bool;
+							}
+						}
+					};
+					ZoneFlag("once", Out.bZoneOnce);
+					ZoneFlag("reveal", Out.bZoneReveal);
+					ZoneFlag("hide", Out.bZoneHide);
+					ZoneFlag("flammable", Out.bZoneFlammable);
+					ZoneFlag("portal", Out.bZonePortal);
+					if (const FJson* Also = Zone->Find("also"))
+					{
+						const FJson* Id = Also->IsObject() ? Also->Find("id") : nullptr;
+						const FJson* AlsoTurns = Also->IsObject() ? Also->Find("turns") : nullptr;
+						if (!Id || !Id->IsString() || !FindStatus(Id->String) || !AlsoTurns || !AlsoTurns->IsNumber()
+							|| !IsWhole(AlsoTurns->Number) || AlsoTurns->Number < 1.0 || AlsoTurns->Number > 10.0)
+						{
+							Problems.Say(Where, "\"zone\" also should be a known status id and 1 to 10 turns");
+						}
+						else
+						{
+							Out.ZoneStatus2 = Id->String;
+							Out.ZoneStatus2Turns = static_cast<int>(AlsoTurns->Number);
+						}
+					}
+				}
+				if (Out.Special != "zone" && Out.Special != "recall")
+				{
+					Problems.Say(Where, "\"zone\" goes with \"special\": \"zone\" or \"recall\"");
+				}
+			}
+			else if (Out.Special == "zone" || Out.Special == "recall")
+			{
+				Problems.Say(Where, "\"special\": \"" + Out.Special + "\" needs a \"zone\"");
 			}
 			Out.Element = StringOf(Json, "element", Where, Problems, false);
 			if (!Out.Element.empty() && !OneOf(Out.Element, Elements))

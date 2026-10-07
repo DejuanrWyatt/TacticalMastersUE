@@ -44,56 +44,54 @@
       }
     },
     {
-      "id": "sylvan_muse_thorn_anthem",
-      "name": "Thorn Anthem",
-      "desc": "Every ally within 3 m of a point up to 6 m away gains 25% TG. (1.5 s)",
+      "id": "sylvan_muse_spirit_swap",
+      "name": "Spirit Swap",
+      "desc": "Trade shares of health with an ally 1-6 m away: you at 90% and it at 20% become 20% and 90%.",
       "kind": "active",
       "effect": "support",
       "scale": "mag",
       "target": "ally",
-      "shape": "circle",
+      "shape": "unit",
       "power": 0,
-      "min_range": 0,
+      "min_range": 1,
       "max_range": 6,
-      "aoe": 3,
-      "cooldown": 3,
-      "cast": 1.5,
-      "tg": 25,
+      "aoe": 0,
+      "cooldown": 5,
+      "cast": 0,
       "fx": "haste",
       "vfx": {
         "system": "/Game/ParagonKhaimera/FX/ParticleSystems/Abilities/WarriorSustain/FX/P_Passive_Activate.P_Passive_Activate",
         "at": "targets",
         "scale": 1
-      }
+      },
+      "anim": "heal",
+      "special": "spiritswap"
     },
     {
-      "id": "sylvan_muse_thorn_ballad",
-      "name": "Thorn Ballad",
-      "desc": "Every ally within 4 m is inspired; AttDef +3, MagDef +3 for 2 turns. Always on, for allies nearby.",
-      "kind": "aura",
+      "id": "sylvan_muse_thornweave",
+      "name": "Thornweave",
+      "desc": "Weave a 9 m line of thorns for 3 turns: an enemy that starts or stops on it loses 6% of its health and is Slowed.",
+      "kind": "active",
       "effect": "support",
       "scale": "mag",
-      "target": "ally",
-      "shape": "self",
+      "target": "enemy",
+      "shape": "line",
       "power": 0,
-      "min_range": 0,
-      "max_range": 0,
-      "aoe": 4,
-      "cooldown": 0,
+      "min_range": 1,
+      "max_range": 9,
+      "aoe": 0.9,
+      "cooldown": 3,
       "cast": 0,
-      "buffs": [
-        {
-          "stat": "attdef",
-          "amount": 3,
-          "turns": 2
-        },
-        {
-          "stat": "magdef",
-          "amount": 3,
-          "turns": 2
-        }
-      ],
-      "fx": "haste"
+      "status": {
+        "id": "slow",
+        "turns": 1
+      },
+      "fx": "pin_shot",
+      "special": "zone",
+      "zone": {
+        "turns": 3,
+        "percent": 6
+      }
     },
     {
       "id": "sylvan_muse_thorn_finale",
@@ -121,5 +119,29 @@
         "scale": 1
       }
     }
-  ]
+  ],
+  "creator": {
+    "rebalanced": {
+      "on": "2026-10-06",
+      "why": "Cire's Spell Codex pick A5 Thornweave in place of Thorn Ballad (feat-codex-picks.md). Before that (2026-10-05): Spirit Swap in place of Thorn Anthem (unique and mobility spells, 2026-10-05)."
+    },
+    "icons": {
+      "abilities": [
+        null,
+        null,
+        {
+          "backing": "circle",
+          "glyph": "thorn",
+          "colour": "#9cc94f",
+          "style": "light",
+          "mark": "line",
+          "scale": 1,
+          "rotate": 0,
+          "badge": "nature",
+          "finish": "lit"
+        },
+        null
+      ]
+    }
+  }
 }

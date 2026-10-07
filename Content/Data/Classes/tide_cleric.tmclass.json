@@ -48,26 +48,28 @@
       }
     },
     {
-      "id": "tide_cleric_mend",
-      "name": "Mend",
-      "desc": "Heal an ally up to 6 m away",
+      "id": "tide_cleric_chain_mend",
+      "name": "Chain Mend",
+      "desc": "Heal an ally up to 6 m away; the heal then leaps to the nearest ally within 3 m not yet healed, twice, a quarter weaker each leap.",
       "kind": "active",
       "effect": "heal",
       "scale": "mag",
       "target": "ally",
       "shape": "unit",
-      "power": 22,
+      "power": 20,
       "min_range": 0,
       "max_range": 6,
       "aoe": 0,
-      "cooldown": 0,
-      "cast": 1,
+      "cooldown": 1,
+      "cast": 0,
       "fx": "cure",
       "vfx": {
         "system": "/Game/ParagonMuriel/FX/Particles/Abilities/LifeLock/FX/P_Lifelock_Charged_Hands.P_Lifelock_Charged_Hands",
         "at": "targets",
         "scale": 1
-      }
+      },
+      "anim": "heal",
+      "special": "chain"
     },
     {
       "id": "tide_cleric_rebirth",
@@ -146,8 +148,8 @@
     "description": "Healer who revives",
     "measured": -40,
     "rebalanced": {
-      "on": "2026-10-03",
-      "why": "Rod leaves the target Wet"
+      "on": "2026-10-05",
+      "why": "Chain Mend in place of Mend (unique and mobility spells, 2026-10-05). Before that (2026-10-03): Rod leaves the target Wet"
     }
   }
 }

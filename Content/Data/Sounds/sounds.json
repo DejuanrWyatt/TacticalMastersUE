@@ -365,6 +365,9 @@
       "/Game/Essential_Foosteps_SK/WAV/Concrete/Footstep_Concrete_Boots_Walk_6.Footstep_Concrete_Boots_Walk_6",
       "/Game/Essential_Foosteps_SK/WAV/Concrete/Footstep_Concrete_Boots_Walk_7.Footstep_Concrete_Boots_Walk_7",
       "/Game/Essential_Foosteps_SK/WAV/Concrete/Footstep_Concrete_Boots_Walk_8.Footstep_Concrete_Boots_Walk_8"
+    ],
+    "clock_warning": [
+      "/Game/Free_Sounds_Pack/wav/Sci-Fi_Interface_8-1.Sci-Fi_Interface_8-1"
     ]
   },
   "motions": {
@@ -764,7 +767,8 @@
     "step_meadow": "step_meadow",
     "step_winter": "step_winter",
     "step_volcanic": "step_volcanic",
-    "step_ruined_keep": "step_ruined_keep"
+    "step_ruined_keep": "step_ruined_keep",
+    "clockWarning": "clock_warning"
   },
   "voices": {
     "aurora": {

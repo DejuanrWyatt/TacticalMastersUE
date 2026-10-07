@@ -71,33 +71,33 @@
       }
     },
     {
-      "id": "cantor_holy_ballad",
-      "name": "Holy Ballad",
-      "desc": "Every ally within 4 m is inspired; AttDef +4, MagDef +4 for 2 turns. Always on, for allies nearby.",
-      "kind": "aura",
+      "id": "cantor_beacon_of_return",
+      "name": "Beacon of Return",
+      "desc": "Raise a beacon 4 m wide for 3 turns: allies who start or stop in it Regenerate and walk further.",
+      "kind": "active",
       "effect": "support",
       "scale": "mag",
       "target": "ally",
-      "shape": "self",
+      "shape": "circle",
       "power": 0,
       "min_range": 0,
-      "max_range": 0,
-      "aoe": 4,
-      "cooldown": 0,
+      "max_range": 6,
+      "aoe": 2,
+      "cooldown": 3,
       "cast": 0,
-      "buffs": [
-        {
-          "stat": "attdef",
-          "amount": 4,
-          "turns": 2
-        },
-        {
-          "stat": "magdef",
-          "amount": 4,
-          "turns": 2
+      "status": {
+        "id": "regen",
+        "turns": 1
+      },
+      "fx": "sanctuary",
+      "special": "zone",
+      "zone": {
+        "turns": 3,
+        "also": {
+          "id": "stride",
+          "turns": 1
         }
-      ],
-      "fx": "haste"
+      }
     },
     {
       "id": "cantor_holy_finale",
@@ -128,8 +128,26 @@
   ],
   "creator": {
     "rebalanced": {
-      "on": "2026-10-03",
-      "why": "Holy Anthem also gives Shell"
+      "on": "2026-10-06",
+      "why": "Cire's Spell Codex pick A7 Beacon of Return in place of Holy Ballad (feat-codex-picks.md). Before that (2026-10-03): Holy Anthem also gives Shell"
+    },
+    "icons": {
+      "abilities": [
+        null,
+        null,
+        {
+          "backing": "circle",
+          "glyph": "sun",
+          "colour": "#f3cf68",
+          "style": "light",
+          "mark": "circle",
+          "scale": 1,
+          "rotate": 0,
+          "badge": "none",
+          "finish": "lit"
+        },
+        null
+      ]
     }
   }
 }

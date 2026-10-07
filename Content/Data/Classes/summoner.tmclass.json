@@ -77,32 +77,31 @@
       }
     },
     {
-      "id": "summoner_carbuncle",
-      "name": "Carbuncle",
-      "desc": "Raise MagDef by 6 for every ally within 3 m of a point up to 6 m away, 2 turns.",
+      "id": "summoner_rift_gate",
+      "name": "Rift Gate",
+      "desc": "Open a pair of gates for 2 of your turns, one where you stand and one at a point 3-10 m away. A unit of your side that ends a walk in one comes out of the other.",
       "kind": "active",
       "effect": "support",
       "scale": "mag",
       "target": "ally",
-      "shape": "circle",
+      "shape": "point",
       "power": 0,
-      "min_range": 0,
-      "max_range": 6,
-      "aoe": 3,
-      "cooldown": 3,
-      "cast": 1,
-      "buffs": [
-        {
-          "stat": "magdef",
-          "amount": 6,
-          "turns": 2
-        }
-      ],
+      "min_range": 3,
+      "max_range": 10,
+      "aoe": 1,
+      "cooldown": 4,
+      "cast": 0.5,
       "fx": "haste",
       "vfx": {
         "system": "/Game/FreeParticle_SoftTofu/Niagara/NS_Sparkling_Glow.NS_Sparkling_Glow",
-        "at": "targets",
+        "at": "user",
         "scale": 1
+      },
+      "anim": "area",
+      "special": "zone",
+      "zone": {
+        "turns": 2,
+        "portal": true
       }
     },
     {
@@ -134,8 +133,8 @@
       "why": "Descriptions say what the abilities do (2026-10-02): Stun not sleep, Crit not the old Power, turns not seconds"
     },
     "rebalanced": {
-      "on": "2026-10-03",
-      "why": "Tuning pass 2026-10-03 (lab 15% in place of the Black Mage): HP 63->68, Speed 6->8, power +17%. Before that (2026-10-02): Balance audit 2026-10-02: rod reaches 1-7 m (power -15%); the summon casts in 1 s, every 3 turns, and calls up a computer-played pet for 3 turns; ultimate 1 s quicker"
+      "on": "2026-10-05",
+      "why": "Rift Gate in place of Carbuncle (unique and mobility spells, 2026-10-05). Before that (2026-10-03): Tuning pass 2026-10-03 (lab 15% in place of the Black Mage): HP 63->68, Speed 6->8, power +17%. Before that (2026-10-02): Balance audit 2026-10-02: rod reaches 1-7 m (power -15%); the summon casts in 1 s, every 3 turns, and calls up a computer-played pet for 3 turns; ultimate 1 s quicker"
     },
     "changedAt": "2026-10-03T03:45:00.000Z"
   }

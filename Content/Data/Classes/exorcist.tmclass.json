@@ -70,30 +70,28 @@
       }
     },
     {
-      "id": "exorcist_holy_slumber",
-      "name": "Holy Slumber",
-      "desc": "Lull an enemy 2-7 m away into a stupor; Stuns for 1 turn. (2 s)",
+      "id": "exorcist_purge_transfer",
+      "name": "Purge Transfer",
+      "desc": "Lift every harmful status off an ally up to 6 m away and lay them on the nearest enemy within 6 m of it, turns and all.",
       "kind": "active",
       "effect": "support",
       "scale": "mag",
-      "target": "enemy",
+      "target": "ally",
       "shape": "unit",
       "power": 0,
-      "min_range": 2,
-      "max_range": 7,
+      "min_range": 0,
+      "max_range": 6,
       "aoe": 0,
       "cooldown": 3,
-      "cast": 2,
-      "status": {
-        "id": "stun",
-        "turns": 1
-      },
+      "cast": 0.5,
       "fx": "haste",
       "vfx": {
         "system": "/Game/ParagonSerath/FX/Particles/Abilities/Fury/FX/P_Fury_Impact.P_Fury_Impact",
         "at": "targets",
         "scale": 1
-      }
+      },
+      "anim": "heal",
+      "special": "transfer"
     },
     {
       "id": "exorcist_holy_doom",
@@ -142,8 +140,8 @@
       ]
     },
     "rebalanced": {
-      "on": "2026-10-04",
-      "why": "Status curse in place of Holy Curse (never used): a light hit that Silences the enemy for 1 turn (no abilities)"
+      "on": "2026-10-05",
+      "why": "Purge Transfer in place of Holy Slumber (unique and mobility spells, 2026-10-05). Before that (2026-10-04): Status curse in place of Holy Curse (never used): a light hit that Silences the enemy for 1 turn (no abilities)"
     }
   }
 }

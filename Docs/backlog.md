@@ -107,6 +107,42 @@ Not yet broken down; run `/plan-milestone` to split it into slices.
 | ui-double-click-centre | Double click a turn chip or a left-panel portrait: the camera goes to that unit | – | unreal-engineer | Done, not built |
 | look-summons | Pets wear bodies like their names (characters.json "classes"), and the summoner's guide page shows each pet in full | – | unreal-engineer | Done, not built |
 
+## v20 play test (2026-10-04)
+| id | goal | depends on | owner | status |
+|----|------|-----------|-------|--------|
+| look-aura-ground | Ground marks for auras (reach) and buffs (boon / bane rings) | – | unreal-engineer | Done, not built |
+| ui-report-value | Revalue the report's points: shared takedowns, monster damage lower, mitigation and guarding higher, shields as healing; points per unit | – | unreal-engineer | Done, not built; weights in feat-battle-report.md, worth a look after some games |
+| feat-lobby-items | Buy items in the online lobby, each player for their own units | – | unreal-engineer | Done, not built |
+| feat-lobby-settings | Every battle setting on the lobby screen (host changes, everyone sees) | – | unreal-engineer | Done, not built |
+| feat-random-online | Random in the class picker, Random classes in the lobby, Random pick / ban in the draft | – | unreal-engineer | Done, not built |
+| feat-tower-autocapture | A turn ended at a watchtower captures it | – | sim-engineer | Done, not built; SimWatchtowerTest covers it |
+| ui-pick-close-units | Easier picking when units stand close: whole body, nearer middle, valid targets first | – | unreal-engineer | Done, not built |
+| ui-less-text | Less text during fights: all 12 candidates on the canvas | – | unreal-engineer | Done, not built (the human: "implement the suggested changes") |
+| feat-wasd-move | Moving units with WASD | – | producer | On hold (the human, 2026-10-04); options A-D on the canvas |
+| feat-tile-move | Tile movement as a setting: free, 4 ways, 8 ways (FTuning::TileMove, "tile_move") | – | sim-engineer | Done, not built; walks only (ranges and areas stay in metres); SimWatchtowerTest plays 18 battles with it |
+
+## v21 play test (2026-10-04)
+| id | goal | depends on | owner | status |
+|----|------|-----------|-------|--------|
+| tune-cast-x4 | Casts four times as long by default (cast_time_multiplier 4 in the game) | – | sim-engineer | Done, not built |
+| feat-boss-aggro | Bosses notice and chase further (boss_aggro, 1.5 in the game, Developer Tools) | – | sim-engineer | Done, not built |
+| look-units-smaller | Units a quarter smaller (UnitSize 1.125); summons half their summoner's height | – | unreal-engineer | Done, not built; overheads over a summon still sit at a full unit's height |
+| look-aura-fx | Auras as an effect at the owner's feet (the look's aura effect), no reach ring | – | unreal-engineer | Done, not built; uses the legacy aura effects, worth a look against the "Ring Aura VFX" examples |
+| ui-ghost-ring | Walk-end ghost: only the circle and arrows | – | unreal-engineer | Done, not built |
+| ui-odds-option | Enemy odds box an option, off by default | – | unreal-engineer | Done, not built |
+| ui-setup-start | Start Battle beside Back on the setup screen | – | unreal-engineer | Done, not built |
+
+## Ground zones (2026-10-04)
+| id | goal | depends on | owner | status |
+|----|------|-----------|-------|--------|
+| feat-ground-zones | Area denial: ground that lasts (damage, debuffs, sight), twelve abilities swapped into twelve classes (feat-ground-zones.md) | – | sim-engineer, unreal-engineer | Done, not built; SimZoneTest passes |
+| look-zone-fx | A lasting particle effect on each zone (Fab packs) | feat-ground-zones | unreal-engineer | Not started |
+| feat-zone-eye-break | Watcher's Eye broken by one hit | feat-ground-zones | sim-engineer | Not started |
+| feat-new-spells | Thirty unique and mobility spells swapped into thirty classes (feat-new-spells.md) | – | sim-engineer, unreal-engineer | Done, not built; SimSpellTest passes |
+| look-spell-moves | Animate units moved by others' spells (hook, shove, pull, rally, gates) instead of snapping | feat-new-spells | unreal-engineer | Not started |
+| ai-mobility | Teach the computer Dash, Grapple, Lure, Recall, Rift Gate, Shadow Hop | feat-new-spells | sim-engineer | Not started |
+| tool-creator-zones | The class creator's library: the twelve classes' new abilities (it accepts zones now) | feat-ground-zones | – | Not started; installing from the creator would undo the swaps |
+
 ## Objectives and items (proposed 2026-09-29, specs Draft)
 | id | goal | depends on | owner | status |
 |----|------|-----------|-------|--------|

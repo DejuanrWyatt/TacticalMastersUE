@@ -150,6 +150,15 @@ namespace
 		{ "reraise",   FLinearColor(1.0f, 0.9f, 0.6f),   0.5f, false, 1.0f },
 		{ "wet",       FLinearColor(0.3f, 0.55f, 1.0f),  0.0f, false, 1.0f },
 		{ "oiled",     FLinearColor(0.5f, 0.42f, 0.2f),  0.0f, false, 1.0f },
+		// 2026-10-05, the unique spells.
+		{ "undying",   FLinearColor(1.0f, 0.95f, 0.75f), 0.8f, false, 1.0f },
+		{ "bomb",      FLinearColor(1.0f, 0.55f, 0.2f),  2.5f, false, 1.0f },
+		{ "plague",    FLinearColor(0.5f, 0.8f, 0.25f),  0.7f, false, 0.9f },
+		{ "linked",    FLinearColor(0.7f, 0.55f, 1.0f),  0.0f, false, 1.0f },
+		{ "tethered",  FLinearColor(0.7f, 0.2f, 0.35f),  0.6f, false, 1.0f },
+		{ "deathmark", FLinearColor(0.8f, 0.15f, 0.2f),  1.0f, false, 1.0f },
+		{ "echo",      FLinearColor(0.55f, 0.85f, 1.0f), 0.0f, false, 1.0f },
+		{ "retribution", FLinearColor(1.0f, 0.9f, 0.55f), 0.0f, false, 1.0f },
 	};
 
 	/** The brightness of a status glow, well under the ready light's. */
@@ -224,6 +233,11 @@ bool ATMBattleDirector::Harms(const TMSim::FEvent& Event)
 	{
 		return true;
 	}
+	// The new spells (2026-10-05): Life Tether's drain mends its caster, Spirit Swap moves health both ways.
+	if (Event.Id == "drain" || Event.Id == "spirit_up")
+	{
+		return false;
+	}
 	if (Event.By >= 0)
 	{
 		const TMSim::FAbility* Ability = TMSim::FindAbility(Event.Id);
@@ -247,6 +261,12 @@ void ATMBattleDirector::GatherBlows(const TMSim::FTickReport& Report)
 			Blow.Aim = Event.Where;
 			Blow.Motion = Blow.Ability ? FString(UTF8_TO_TCHAR(TMSim::MotionOf(*Blow.Ability, Event.Slot).c_str())) : FString(TEXT("none"));
 			Blow.Slot = Event.Slot;
+			// A warned blow (2026-10-06): drawn with a swing, landing without one.
+			Blow.Warned = Blow.Ability && Blow.Ability->Special == "warned" ? Event.Amount : 0;
+			if (Blow.Warned == 1)
+			{
+				Blow.Motion = TEXT("none");
+			}
 			Open = Blows.Num() - 1;
 			// An effect on the user plays as it goes off; the rest wait to land.
 			const TMSim::FUnit* User = Battle.FindUnit(Event.Unit);
@@ -305,10 +325,15 @@ void ATMBattleDirector::GatherBlows(const TMSim::FTickReport& Report)
 			Blow.bStarted = true;
 		}
 		// No motion, no swing to wait for -- unless Cast Studio gave it a release.
+		// A warned blow landing has neither: it erupts as the caster's turn begins.
 		const bool bPickedSwing = Motions.IsValidIndex(Caster) && Blow.Slot >= 0 && Blow.Slot < TMSim::AbilitySlots
 			&& Motions[Caster].Picked[Blow.Slot].Release != nullptr;
-		Blow.ImpactAt = Blow.Release && (Blow.Motion != TEXT("none") || bPickedSwing)
+		Blow.ImpactAt = Blow.Warned != 1 && Blow.Release && (Blow.Motion != TEXT("none") || bPickedSwing)
 			? static_cast<float>(TMCast::ContactSeconds(Lead, Blow.Release->GetPlayLength(), Share)) : 0.0f;
+		if (Blow.Warned == 1)
+		{
+			Blow.bStarted = true;
+		}
 
 		// Whoever this fells or raises stays as they are until it lands.
 		for (const TMSim::FEvent& Event : Blow.Events)
@@ -348,12 +373,15 @@ void ATMBattleDirector::AdvanceBlows(float DeltaSeconds)
 		{
 			// The swing begins (after any walk there): heard now, landing later.
 			Blow.bSounded = true;
-			SoundBlowStarts(Blow, Blow.Slot);
-			if (CastStrip(Blow.Ability) != TMCast::EStrip::All)
+			if (Blow.Warned != 1)
 			{
-				LookCast(Blow);
+				SoundBlowStarts(Blow, Blow.Slot);
+				if (CastStrip(Blow.Ability) != TMCast::EStrip::All)
+				{
+					LookCast(Blow);
+				}
+				CastSwing(Blow);
 			}
-			CastSwing(Blow);
 		}
 		if (Blow.bStarted && !bLanded)
 		{
@@ -362,7 +390,11 @@ void ATMBattleDirector::AdvanceBlows(float DeltaSeconds)
 			{
 				Blow.bLaunched = true;
 				CastRelease(Blow);
-				LaunchShots(Blow);
+				// A warned blow throws nothing: it is drawn, then the ground erupts.
+				if (Blow.Warned == 0)
+				{
+					LaunchShots(Blow);
+				}
 			}
 			if (Blow.bLaunched)
 			{
@@ -663,6 +695,11 @@ void ATMBattleDirector::ShowOne(const TMSim::FEvent& Event, const TMSim::FAbilit
 		BlowMarks.RemoveAndCopyValue(Event.Unit, Mark);
 		const bool bCrit = (Mark & 1) != 0;
 		const bool bGraze = (Mark & 2) != 0;
+		// A tick (a status, the ground, regen, mending: no ability of its own) adds into
+		// one number with the other ticks on the unit just then (v20 play test, less text).
+		Look.bTick = Event.By < 0 || TMSim::FindStatus(Event.Id) != nullptr || Event.Id == "mend" || Event.Id == "decay" || Event.Id == "ground"
+			|| Event.Id == "zone" || Event.Id == "link";
+		Look.Amount = Harms(Event) ? -Event.Amount : Event.Amount;
 		// Down for damage and a burn, up for healing and regen.
 		if (Harms(Event))
 		{
@@ -680,9 +717,9 @@ void ATMBattleDirector::ShowOne(const TMSim::FEvent& Event, const TMSim::FAbilit
 				Tint = FColor(214, 51, 108);
 				Look.Scale = 0.85f;
 			}
-			else if (Event.By < 0)
+			else if (Event.By < 0 || Event.Id == "zone")
 			{
-				// The ground, decay: a tick, a size smaller.
+				// The ground, decay, a ground zone: a tick, a size smaller.
 				Look.Scale = 0.85f;
 			}
 			else if (bCrit)
@@ -757,6 +794,9 @@ void ATMBattleDirector::ShowOne(const TMSim::FEvent& Event, const TMSim::FAbilit
 		Tint = StatusWordTint(Event.Id);
 		Look.Scale = 0.7f;
 		Look.bBold = true;
+		// Its icon pops rather than its name (v20 play test); the name stays for one with no icon.
+		Look.StatusIcon = UTF8_TO_TCHAR(Event.Id.c_str());
+		Look.bPop = true;
 		break;
 	}
 	case TMSim::EEventKind::Knocked:
@@ -803,6 +843,21 @@ void ATMBattleDirector::AddFloater(int32 UnitId, const FString& What, const FCol
 	{
 		return;
 	}
+	// A tick joins one already rising off this unit, of the same kind, just made:
+	// "-9" once rather than "-3 -3 -3" (v20 play test, less text).
+	if (Look && Look->bTick && Look->Amount != 0)
+	{
+		for (FTMFloater& Other : Floaters)
+		{
+			if (Other.UnitId == UnitId && Other.bTick && Other.Text && Other.Age < 0.6f && (Other.Amount < 0) == (Look->Amount < 0)
+				&& Other.Text->TextRenderColor == Tint)
+			{
+				Other.Amount += Look->Amount;
+				Other.Text->SetText(FText::FromString(FString::Printf(TEXT("%s%d"), Other.Amount < 0 ? TEXT("-") : TEXT("+"), FMath::Abs(Other.Amount))));
+				return;
+			}
+		}
+	}
 	// Above the head, and nudged along by however many are already in flight
 	// for this unit, so two numbers in the same instant do not sit on top of
 	// one another.
@@ -843,6 +898,9 @@ void ATMBattleDirector::AddFloater(int32 UnitId, const FString& What, const FCol
 		Floater.bExact = true;
 		Floater.Tag = Look->Tag;
 		Floater.TagTint = Look->TagTint;
+		Floater.StatusIcon = Look->StatusIcon;
+		Floater.bTick = Look->bTick;
+		Floater.Amount = Look->Amount;
 	}
 	if (bCount)
 	{

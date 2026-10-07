@@ -188,12 +188,12 @@ void ATMBattleDirector::ClickAbility(const TMSim::FUnit& Unit, bool bPlanning)
 		const bool bTaken = OrderSelected(TMSim::FOrder::MakeUseAbility(Unit.Id, Unit.Serial, AimSlot, Where.Point, Where.Follow));
 		Acknowledge(Where.Point, bTaken ? Violet : Refused, bTaken);
 	}
-	else if (bOutOfRange && bPlanning && PlanWalkIntoRange(Unit, Where.Point))
+	else if (bOutOfRange && bPlanning && PlanWalkIntoRange(Unit, Where.Point, Where.Follow))
 	{
 		// Planned: the walk into range, then it.
 		Acknowledge(Where.Point, Orange);
 	}
-	else if (bOutOfRange && !bPlanning && WalkIntoRange(Unit, Where.Point))
+	else if (bOutOfRange && !bPlanning && WalkIntoRange(Unit, Where.Point, Where.Follow))
 	{
 		// Walking there first; the ability goes off on arrival (battle.gd:791).
 		Acknowledge(Where.Point, Orange);
@@ -256,7 +256,7 @@ void ATMBattleDirector::UpdateWalkPress()
 	WalkPress.Face = -1;
 	if (CursorPosition(X, Y) && FVector2D::Distance(FVector2D(X, Y), WalkPress.Mouse) >= 18.0 && bHaveHover)
 	{
-		WalkPress.Face = FaceToward(HoverPoint - WalkPress.To);
+		WalkPress.Face = FaceToward((Battle.TilesOn() ? HoverGround : HoverPoint) - WalkPress.To);
 	}
 }
 

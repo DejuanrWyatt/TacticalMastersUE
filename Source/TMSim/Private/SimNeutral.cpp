@@ -71,7 +71,7 @@ namespace TMSim
 			return -1;
 		}
 		const FVec2 Anchor = Battle.LeashAnchor(Unit);
-		const double Leash = LeashOf(*Info) + 6.0;
+		const double Leash = LeashOf(*Info) * Battle.AggroScale(*Info) + 6.0;
 		int Best = -1;
 		double BestScore = -Far;
 		for (const FUnit& Other : Battle.Units)
@@ -197,7 +197,7 @@ namespace TMSim
 		{
 			// Only from where its leash lets it stand.
 			const FVec2 Anchor = Battle.LeashAnchor(Unit);
-			const double Leash = LeashOf(*Info);
+			const double Leash = LeashOf(*Info) * Battle.AggroScale(*Info);
 			std::vector<std::pair<FNode, double>> Inside;
 			for (const auto& Pair : Reach)
 			{

@@ -116,6 +116,15 @@ namespace TMHudStyle
 			{ "wounded", FLinearColor(0.75f, 0.32f, 0.36f), TEXT("Receives only half of any healing: abilities, Regen, springs, mending and lifesteal.") },
 			{ "hunted", FLinearColor(1.0f, 0.54f, 0.36f), TEXT("A boss is hunting it: it goes for this unit first, until it falls or the boss loses sight of it for 3 of its turns.") },
 			{ "boon", FLinearColor(1.0f, 0.82f, 0.48f), TEXT("The Boss's Boon: its side claimed a boss. Its abilities do 10% more damage.") },
+			// 2026-10-05, the unique spells (Docs/design/feat-new-spells.md).
+			{ "plague", FLinearColor(0.6f, 0.88f, 0.35f), TEXT("Loses 5% of max HP at the start of each of its turns. Ending a turn within 2 m of its allies passes it on to them (twice at most from the first).") },
+			{ "linked", FLinearColor(0.79f, 0.65f, 1.0f), TEXT("Bound to another unit: half of whatever damage either takes, the other takes too, while they stand within 8 m.") },
+			{ "bomb", FLinearColor(1.0f, 0.6f, 0.25f), TEXT("A charge: when its count runs out it goes off, hurting everyone within 4 m, friend and foe.") },
+			{ "tethered", FLinearColor(0.75f, 0.25f, 0.4f), TEXT("At the start of each of its turns its caster drains 5% of its max HP, while within 8 m.") },
+			{ "echo", FLinearColor(0.55f, 0.85f, 1.0f), TEXT("Its next damage or healing ability goes off twice, the second time at half power.") },
+			{ "retribution", FLinearColor(1.0f, 0.9f, 0.55f), TEXT("The first enemy to hurt it is Stunned.") },
+			{ "undying", FLinearColor(1.0f, 0.95f, 0.75f), TEXT("Can't fall below 1 HP while it lasts.") },
+			{ "deathmark", FLinearColor(0.85f, 0.2f, 0.25f), TEXT("If it falls while marked, every unit on the marker's side gains 30% Turn Gauge.") },
 		};
 		for (const FStatusLook& Look : Looks)
 		{
